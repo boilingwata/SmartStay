@@ -223,9 +223,11 @@ const Faq = () => {
       <BottomSheet isOpen={!!selectedArticle} onClose={() => setSelectedArticle(null)} title="Chi tiết bài viết">
         {selectedArticle && (
           <div className="space-y-6 pb-10 px-2">
-             <div className="h-48 rounded-[32px] overflow-hidden border border-gray-100 shadow-sm">
-                <img src={selectedArticle.image} className="w-full h-full object-cover" alt="" />
-             </div>
+             {selectedArticle.image && (
+               <div className="h-48 rounded-[32px] overflow-hidden border border-gray-100 shadow-sm">
+                  <img src={selectedArticle.image} className="w-full h-full object-cover" alt="" />
+               </div>
+             )}
              <div className="space-y-4">
                 <span className="px-3 py-1 bg-teal-50 rounded-lg text-[10px] font-black uppercase tracking-widest text-[#0D8A8A]">
                   {selectedArticle.category}
@@ -239,7 +241,7 @@ const Faq = () => {
              </div>
              <button 
                 onClick={() => setSelectedArticle(null)}
-                className="w-full h-15 bg-slate-900 text-white rounded-[20px] font-black uppercase tracking-[2px] text-[10px] active:scale-95 transition-all shadow-xl shadow-slate-900/10"
+                className="w-full h-14 bg-slate-900 text-white rounded-[20px] font-black uppercase tracking-[2px] text-[10px] active:scale-95 transition-all shadow-xl shadow-slate-900/10"
               >
                 Đã hiểu
               </button>

@@ -132,16 +132,24 @@ function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
     unitPriceSnapshot: price ?? 0,
     amount: item.line_total,
     type: (item as any).type || 'Other',
-    snapshot_price: price,
-    snapshot_label: (item as any).snapshot_label || 'Giá HĐ',
-    tierBreakdown: (item as any).tier_breakdown_json 
-      ? JSON.parse((item as any).tier_breakdown_json).map((t: any) => ({
+    snapshotPrice: (item as any).snapshot_price ?? 0,
+    snapshotLabel: (item as any).snapshot_label || 'Hợp đồng',
+    tierBreakdown: (() => {
+      const json = (item as any).tier_breakdown_json;
+      if (!json) return undefined;
+      try {
+        const parsed = JSON.parse(json);
+        return Array.isArray(parsed) ? parsed.map((t: any) => ({
           label: t.label || `Bậc ${t.tierOrder || ''}`,
           qty: t.qty || t.kwh || t.usage || 0,
           unitPrice: t.unitPrice || t.price || 0,
           amount: t.amount || 0
-        }))
-      : undefined
+        })) : undefined;
+      } catch {
+        console.error('Failed to parse tier_breakdown_json for item:', item.id);
+        return undefined;
+      }
+    })()
   };
 }
 
@@ -241,8 +249,9 @@ export const invoiceService = {
       query = query.range(from, to);
     }
 
-    const { data, count } = await query;
-    if (!data) throw new Error('Failed to fetch invoices');
+    const { data, error, count } = await query;
+    if (error) throw new Error(`Failed to fetch invoices: ${error.message}`);
+    if (!data) throw new Error('Failed to fetch invoices: no data returned');
 
     const rows = data as unknown as DbInvoiceRow[];
     return {

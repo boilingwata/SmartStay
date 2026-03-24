@@ -196,7 +196,7 @@ const TicketDetail: React.FC = () => {
                         "text-[10px] text-slate-400 font-bold px-1",
                         isStaff ? "text-left" : "text-right"
                       )}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   </m.div>

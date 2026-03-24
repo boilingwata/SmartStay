@@ -99,7 +99,7 @@ const InvoiceDetail: React.FC = () => {
   const walletBalance = 0; // Mocked 0 for edge cases
 
   const renderItemContent = (item: InvoiceItem) => {
-    if (item.snapshot_price == null) {
+    if (item.snapshotPrice == null) {
       return (
         <div className="text-red-500 text-xs font-semibold mt-1">
           Lỗi: Dữ liệu hợp đồng không hợp lệ
@@ -108,8 +108,8 @@ const InvoiceDetail: React.FC = () => {
     }
     return (
       <p className="text-[11px] text-slate-500 font-medium tracking-wide">
-        {item.quantity} x {formatVND(item.snapshot_price)}
-        <span className="ml-1 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px]">{item.snapshot_label}</span>
+        {item.quantity} x {formatVND(item.snapshotPrice)}
+        <span className="ml-1 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px]">{item.snapshotLabel}</span>
       </p>
     );
   };
@@ -428,7 +428,13 @@ const InvoiceDetail: React.FC = () => {
               <button 
                 onClick={handlePay}
                 disabled={!paymentMethod || processing || (paymentMethod === 'Wallet' && walletBalance < invoice.totalAmount)}
-                title={!paymentMethod ? "Chọn phương thức thanh toán" : ""}
+                title={
+                  !paymentMethod 
+                    ? "Chọn phương thức thanh toán" 
+                    : (paymentMethod === 'Wallet' && walletBalance < invoice.totalAmount)
+                      ? `Số dư không đủ (${formatVND(walletBalance)}) - Cần nộp thêm ${formatVND(invoice.totalAmount - walletBalance)}`
+                      : ""
+                }
                 className={cn(
                    "w-full h-14 rounded-[20px] text-[13px] font-black uppercase tracking-[3px] flex items-center justify-center gap-3 transition-all duration-300",
                    paymentMethod && !processing && !(paymentMethod === 'Wallet' && walletBalance < invoice.totalAmount)

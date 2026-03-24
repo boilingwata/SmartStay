@@ -101,12 +101,11 @@ const TicketList: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Yêu cầu hỗ trợ</h2>
           <button 
-            onClick={() => toast.success('Đang kết nối với nhân viên hỗ trợ...')}
+            onClick={() => toast.info('Đang kết nối với nhân viên hỗ trợ...')}
             className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50"
           >
             <MessageSquare size={20} />
-          </button>
-        </div>
+          </button>        </div>
 
         {/* E.9.1 Tab Bar (Same as Screen 6) */}
         <div className="flex bg-gray-100 rounded-[14px] p-1 gap-1 relative">

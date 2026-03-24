@@ -101,22 +101,25 @@ const VisitorList: React.FC = () => {
       title: "Mã QR khách SmartStay",
       text: shareText,
     };
+
     if (navigator.share) {
       try {
         await navigator.share(shareData);
+        return;
       } catch (err) {
-        // user cancelled or failed
-        if ((err as Error).name !== 'AbortError') {
-          navigator.clipboard.writeText(shareText);
-          toast.info('Đã copy thông tin chia sẻ');
-        }
+        if ((err as Error).name === 'AbortError') return;
+        console.error('Share failed, falling back to clipboard', err);
       }
-    } else {
-      navigator.clipboard.writeText(shareText);
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareText);
       toast.success('Đã copy thông tin chia sẻ');
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
+      toast.error('Không thể copy thông tin');
     }
   };
-
   const getStatusChip = (status: VisitorStatus) => {
     const configs: Record<string, { bg: string, text: string, label: string }> = {
       Expected: { bg: 'bg-teal-50 border-teal-100', text: 'text-teal-600', label: 'Dự kiến' },

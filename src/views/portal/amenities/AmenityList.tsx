@@ -251,8 +251,10 @@ const AmenityList: React.FC = () => {
             {bookingStep === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="grid grid-cols-7 gap-2">
-                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
-                    <div key={d} className="text-center text-[10px] font-black text-slate-400 uppercase mb-2">{d}</div>
+                  {next7Days.map((date, i) => (
+                    <div key={i} className="text-center text-[10px] font-black text-slate-400 uppercase mb-2">
+                      {format(date, 'EEEEEE', { locale: vi })}
+                    </div>
                   ))}
                   {next7Days.map((date, i) => {
                     const isToday = isSameDay(date, new Date());

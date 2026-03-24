@@ -153,8 +153,7 @@ const MyBookings: React.FC = () => {
         {currentList.length === 0 ? (
           <div className="text-center py-20 bg-slate-50/50 rounded-[40px] border-2 border-dashed border-slate-200 space-y-4 opacity-50">
             <AlertCircle size={48} className="mx-auto text-slate-300" />
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic tracking-[3px]">Trống danh sách</p>
-          </div>
+            <p className="text-xs font-black text-slate-400 uppercase italic tracking-[3px]">Trống danh sách</p>          </div>
         ) : (
           currentList.map((booking) => {
             const Icon = getIcon(booking.amenityName);

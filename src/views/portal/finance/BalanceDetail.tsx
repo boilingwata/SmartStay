@@ -44,10 +44,13 @@ const BalanceDetail = () => {
                 Quản lý số dư nội bộ
              </p>
           </div>
-          <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+          <button 
+            aria-label="Lọc giao dịch"
+            onClick={() => toast.info('Tính năng lọc đang được phát triển')}
+            className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50"
+          >
             <Filter size={20} />
-          </button>
-        </div>
+          </button>        </div>
 
         {/* 1. Real-time Balance Card */}
         <div className="px-5 pt-6">

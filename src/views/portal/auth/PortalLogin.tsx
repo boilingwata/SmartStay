@@ -4,7 +4,7 @@ import { Eye, EyeOff, Lock, User, RefreshCcw, Smartphone, ShieldCheck, ArrowLeft
 import { cn } from '@/utils';
 import { toast } from 'sonner';
 import useAuthStore from '@/stores/authStore';
-import { getPostLoginRedirect } from '@/lib/authRouting';
+import { getPostLoginRedirect, getAuthenticatedHomePath } from '@/lib/authRouting';
 
 const PortalLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -18,9 +18,19 @@ const PortalLogin: React.FC = () => {
   const [lockoutTimer, setLockoutTimer] = useState(0);
 
   const loginAuth = useAuthStore(state => state.login);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const user = useAuthStore(state => state.user);
+
   const requestedRedirect =
     searchParams.get('redirect') ??
     ((location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? null);
+
+  // Redirect if already logged in as a Tenant
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'Tenant') {
+      navigate(getAuthenticatedHomePath(user), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     if (lockoutTimer > 0) {
@@ -51,7 +61,7 @@ const PortalLogin: React.FC = () => {
         invalidRoleMessage: 'Tài khoản này không thuộc Cổng Cư dân. Vui lòng dùng trang quản trị.',
       });
       toast.success('Chào mừng trở lại!');
-      navigate(getPostLoginRedirect(useAuthStore.getState().user, requestedRedirect));
+      navigate(getPostLoginRedirect(useAuthStore.getState().user, requestedRedirect), { replace: true });
     } catch (error: any) {
       const message = error?.message || 'Tài khoản hoặc mật khẩu không chính xác';
       toast.error(message);

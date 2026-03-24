@@ -114,8 +114,7 @@ const CreateTicket: React.FC = () => {
                     className={cn(
                       "px-4 py-2 text-sm whitespace-nowrap rounded-full font-semibold transition-all duration-300",
                       isSelected 
-                        ? (isEmergency ? "bg-red-500 text-white shadow-lg shadow-red-200 animate-pulse" : "bg-teal-600 text-white shadow-lg shadow-teal-200")
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        ? (isEmergency ? "bg-red-500 text-white shadow-lg shadow-red-200 motion-safe:animate-pulse" : "bg-teal-600 text-white shadow-lg shadow-teal-200")                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     )}
                   >
                     {cat.id}
@@ -135,10 +134,10 @@ const CreateTicket: React.FC = () => {
                 placeholder="Nhập tiêu đề yêu cầu..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
                 className="w-full h-12 px-5 bg-white border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all outline-none text-sm font-medium"
               />
-              <p className="text-[10px] text-gray-400 font-medium ml-1">Tiêu đề dài từ 5 - 200 ký tự</p>
-           </div>
+              <p className="text-[10px] text-gray-400 font-medium ml-1">Tiêu đề dài từ 5 - 200 ký tự</p>           </div>
 
            {/* Mô tả chi tiết */}
            <div className="space-y-2">

@@ -40,7 +40,6 @@ const InvoiceList = () => {
   });
 
   const invoices = data?.items || [];
-  const totalCount = data?.total || 0;
 
   const { data: counts } = useQuery<Record<InvoiceStatus | 'All', number>>({
     queryKey: ['invoiceCounts'],

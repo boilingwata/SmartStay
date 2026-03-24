@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, RefreshCcw, ShieldCheck, Smartphone, ShieldAlert, ArrowRight } from 'lucide-react';
 import { cn } from '@/utils';
 import useAuthStore from '@/stores/authStore';
 import { toast } from 'sonner';
+import { getPostLoginRedirect, getAuthenticatedHomePath } from '@/lib/authRouting';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -35,9 +36,23 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', remember: false });
   const [lockRemainingMs, setLockRemainingMs] = useState(0);
-  const login = useAuthStore(state => state.login);
+  const loginAction = useAuthStore(state => state.login);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const user = useAuthStore(state => state.user);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const requestedRedirect =
+    searchParams.get('redirect') ??
+    ((location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? null);
+
+  // Redirect if already logged in as Admin/Staff
+  useEffect(() => {
+    if (isAuthenticated && user?.role !== 'Tenant') {
+      navigate(getAuthenticatedHomePath(user), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   // Detect context
   const isPortal = location.pathname.includes('/portal');
@@ -93,13 +108,13 @@ const LoginPage = () => {
 
     setLoading(true);
     try {
-      await login(form.username, form.password, {
+      await loginAction(form.username, form.password, {
         allowedRoles: ['Admin', 'Staff'],
         invalidRoleMessage: 'Tài khoản này không được phép đăng nhập trang quản trị. Vui lòng dùng Cổng Cư dân.',
       });
       clearLockoutData();
       toast.success('Chào mừng trở lại!');
-      navigate('/dashboard');
+      navigate(getPostLoginRedirect(useAuthStore.getState().user, requestedRedirect), { replace: true });
     } catch (err: unknown) {
       recordFailedAttempt();
       const message = err instanceof Error

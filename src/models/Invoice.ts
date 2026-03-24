@@ -10,8 +10,8 @@ export interface InvoiceItem {
   amount: number;
   type: InvoiceItemType;
   tierBreakdown?: { label: string; qty: number; unitPrice: number; amount: number }[];
-  snapshot_price: number | null;
-  snapshot_label: string;
+  snapshotPrice: number | null;
+  snapshotLabel: string;
 }
 
 export interface PaymentTransaction {
