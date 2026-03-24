@@ -74,147 +74,126 @@ const ServiceRequests: React.FC = () => {
           </button>
         </div>
 
-        {/* Main Tabs */}
-        <div className="flex p-1.5 bg-slate-100/60 rounded-[24px] border border-slate-200/50">
-          <button
-            onClick={() => setActiveTab('current')}
-            className={cn(
-              "flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all duration-500",
-              activeTab === 'current' ? "bg-white text-[#0D8A8A] shadow-lg shadow-black/5 scale-[1.02]" : "text-slate-400"
-            )}
-          >
-            Đang sử dụng
-          </button>
-          <button
-            onClick={() => setActiveTab('available')}
-            className={cn(
-              "flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all duration-500",
-              activeTab === 'available' ? "bg-white text-[#0D8A8A] shadow-lg shadow-black/5 scale-[1.02]" : "text-slate-400"
-            )}
-          >
-            Đăng ký mới
-          </button>
+        {/* E.8.1 Header: "Dịch vụ đang dùng" + chip */}
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-lg font-bold text-gray-900">Dịch vụ đang dùng</h3>
+          <span className="bg-teal-50 text-teal-700 px-3 py-1 rounded-full text-xs font-semibold border border-teal-100">
+            {MOCK_CURRENT_SERVICES.length} dịch vụ
+          </span>
         </div>
       </div>
 
-      <div className="px-5 pt-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+      <div className="px-5 pt-6 animate-in slide-in-from-bottom-4 fade-in duration-500 space-y-8">
         
-        {/* CURRENT SERVICES TAB */}
-        {activeTab === 'current' && (
-          <div className="space-y-4">
-             {MOCK_CURRENT_SERVICES.length > 0 ? (
-               MOCK_CURRENT_SERVICES.map(svc => (
-                 <div key={svc.id} className="p-5 bg-white rounded-[32px] border border-slate-100 shadow-sm shadow-slate-200/50 flex flex-col gap-4">
-                    <div className="flex items-center gap-4">
-                       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center", svc.color)}>
-                          <svc.icon size={28} strokeWidth={1.5} />
-                       </div>
-                       <div className="flex-1 space-y-1">
-                          <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">{svc.name}</h4>
-                          <div className="flex items-baseline gap-1">
-                             <span className="text-lg font-black text-[#0D8A8A] tabular-nums tracking-tighter">{svc.price.toLocaleString()}</span>
-                             <span className="text-[10px] text-slate-400 font-bold uppercase">đ/{svc.unit}</span>
-                          </div>
-                       </div>
-                    </div>
-                    <div className="pt-4 border-t border-slate-50 flex justify-end">
-                       <button onClick={() => setSelectedCurrent(svc)} className="text-[11px] font-black text-rose-500 uppercase tracking-widest px-4 py-2 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
-                          Hủy dịch vụ
-                       </button>
-                    </div>
-                 </div>
-               ))
-             ) : (
-                <div className="text-center py-20">
-                   <AlertCircle size={40} className="mx-auto text-slate-300 mb-4" />
-                   <p className="text-sm font-black text-slate-800">Chưa có dịch vụ nào</p>
-                   <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Chuyển sang Đăng ký mới để thêm</p>
-                </div>
-             )}
-          </div>
-        )}
+        {/* CURRENT SERVICES LIST */}
+        <div className="space-y-3">
+           {MOCK_CURRENT_SERVICES.length > 0 ? (
+             MOCK_CURRENT_SERVICES.map(svc => (
+               <div key={svc.id} className="flex items-center gap-3 bg-white rounded-[16px] p-4 border border-gray-100 shadow-sm">
+                  {/* Icon dịch vụ: w-10 h-10 rounded-[12px] bg-teal-50 text-teal-600 */}
+                  <div className="w-10 h-10 rounded-[12px] bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                     <svc.icon size={20} strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                     <h4 className="text-sm font-semibold text-gray-900 truncate">{svc.name}</h4>
+                     <p className="text-xs text-slate-500 font-medium">{svc.price.toLocaleString()}đ/{svc.unit}</p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedCurrent(svc)} 
+                    className="text-red-500 border border-red-200 rounded-lg px-3 py-1 text-sm font-medium hover:bg-red-50 transition-colors shrink-0"
+                  >
+                     Hủy đăng ký
+                  </button>
+               </div>
+             ))
+           ) : (
+              <div className="text-center py-10 bg-white rounded-[24px] border border-dashed border-slate-200">
+                 <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
+                 <p className="text-sm font-bold text-slate-400">Chưa có dịch vụ nào đang dùng</p>
+              </div>
+           )}
+        </div>
 
-        {/* AVAILABLE SERVICES TAB */}
-        {activeTab === 'available' && (
-          <div className="space-y-6">
-             <div className="relative p-7 bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                   <ShoppingBag size={120} className="text-white" />
-                </div>
-                <div className="relative z-10 space-y-2">
-                   <h3 className="text-xl font-black text-white tracking-tight uppercase italic">Khám phá tiện ích</h3>
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[2px] italic leading-relaxed">
-                     Thêm sự tiện nghi cho căn hộ của bạn.
-                   </p>
-                </div>
-             </div>
+        {/* E.8.2 Available Services Grid */}
+        <div className="space-y-4">
+           <div className="flex flex-col gap-1">
+              <h3 className="text-lg font-bold text-gray-900">Dịch vụ có sẵn</h3>
+              <p className="text-xs text-slate-500">Đăng ký thêm tiện ích cho căn hộ của bạn</p>
+           </div>
 
-             <div className="grid grid-cols-2 gap-4">
-               {MOCK_AVAILABLE_SERVICES.map((svc) => (
-                 <div 
-                   key={svc.id}
-                   onClick={() => setSelectedAvailable(svc)}
-                   className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex flex-col gap-4 active:scale-95 transition-all group hover:border-[#0D8A8A]/30 hover:shadow-xl hover:shadow-teal-100/50"
-                 >
-                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110", svc.color)}>
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+             {MOCK_AVAILABLE_SERVICES.map((svc) => (
+               <div 
+                 key={svc.id}
+                 className="bg-white rounded-[20px] p-5 border border-gray-100 hover:border-teal-200 hover:shadow-md transition-all flex flex-col gap-4 group"
+               >
+                  <div className="flex justify-between items-start">
+                    <div className={cn("w-12 h-12 rounded-[16px] flex items-center justify-center transition-transform group-hover:scale-110", svc.color)}>
                        <svc.icon size={24} />
                     </div>
-                    <div className="space-y-1">
-                       <h4 className="text-[13px] font-black text-slate-800 line-clamp-2 leading-tight uppercase tracking-tight">{svc.name}</h4>
-                       <div className="flex items-center gap-1">
-                         <Star size={10} className="text-amber-400 fill-amber-400" />
-                         <span className="text-[10px] font-black text-slate-400">{svc.rating}</span>
-                       </div>
+                    <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
+                      <Star size={12} className="text-amber-400 fill-amber-400" />
+                      <span className="text-[11px] font-bold text-amber-700">{svc.rating}</span>
                     </div>
-                    <div className="flex flex-col mt-auto">
-                       <span className="text-sm font-black text-[#0D8A8A] tabular-nums tracking-tighter">{svc.price.toLocaleString()} đ</span>
-                       <span className="text-[10px] text-slate-300 font-bold uppercase">/ {svc.unit}</span>
-                    </div>
-                 </div>
-               ))}
-             </div>
-          </div>
-        )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                     <h4 className="text-[15px] font-bold text-gray-900 leading-tight">{svc.name}</h4>
+                     <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-bold text-teal-600">{svc.price.toLocaleString()}đ</span>
+                        <span className="text-[10px] text-slate-400 font-bold">/{svc.unit}</span>
+                     </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setSelectedAvailable(svc)}
+                    className="w-full bg-teal-600 text-white h-10 rounded-xl font-semibold text-sm active:scale-95 transition-all hover:bg-teal-700 shadow-sm shadow-teal-200"
+                  >
+                    Đăng ký
+                  </button>
+               </div>
+             ))}
+           </div>
+        </div>
 
       </div>
 
       {/* SUBSCRIBE MODAL */}
-      <BottomSheet isOpen={!!selectedAvailable} onClose={() => !processing && setSelectedAvailable(null)} title="Đăng ký dịch vụ">
+      <BottomSheet isOpen={!!selectedAvailable} onClose={() => !processing && setSelectedAvailable(null)} title="Xác nhận đăng ký">
         {selectedAvailable && (
-          <div className="space-y-8 pb-10">
-             <div className="flex items-start gap-4">
-                <div className={cn("w-20 h-20 rounded-[24px] flex items-center justify-center shadow-inner", selectedAvailable.color)}>
-                   <selectedAvailable.icon size={36} strokeWidth={1.5} />
+          <div className="space-y-6 pb-10">
+             <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className={cn("w-16 h-16 rounded-[16px] flex items-center justify-center shadow-sm", selectedAvailable.color)}>
+                   <selectedAvailable.icon size={32} strokeWidth={1.5} />
                 </div>
-                <div className="flex-1 space-y-1 pt-1">
-                   <h3 className="text-lg font-black text-slate-900 leading-tight tracking-tight uppercase">{selectedAvailable.name}</h3>
-                   <div className="flex items-center gap-1 text-amber-500">
-                      <Star size={14} className="fill-amber-500" />
-                      <span className="text-sm font-black">{selectedAvailable.rating}</span>
-                   </div>
+                <div className="flex-1 space-y-1">
+                   <h3 className="text-base font-bold text-slate-900 leading-tight">{selectedAvailable.name}</h3>
+                   <p className="text-xs text-slate-500 font-medium">Giá: {selectedAvailable.price.toLocaleString()}đ/{selectedAvailable.unit}</p>
                 </div>
              </div>
 
-             <div className="p-5 bg-teal-50/50 rounded-[28px] border border-teal-100/50">
-                <div className="flex justify-between items-center">
-                   <span className="text-[11px] font-black text-teal-700 uppercase tracking-widest">Đơn giá áp dụng</span>
-                   <div className="flex items-baseline gap-1">
-                     <span className="text-2xl font-black text-[#0D8A8A] tabular-nums tracking-tighter">{selectedAvailable.price.toLocaleString()}</span>
-                     <span className="text-[10px] font-bold text-[#0D8A8A] uppercase">đ / {selectedAvailable.unit}</span>
-                   </div>
-                </div>
-                <p className="text-[11px] text-teal-600/80 mt-3 font-medium leading-relaxed italic">
-                  * Yêu cầu sẽ được gửi đến BQL để phê duyệt. Phí dịch vụ sẽ được tính từ kỳ tính cước tiếp theo.
+             <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
+                <p className="text-[13px] text-teal-700 font-medium leading-relaxed">
+                  Bạn có chắc chắn muốn đăng ký dịch vụ này? Yêu cầu sẽ được gửi đến Ban quản lý để phê duyệt. Phí sẽ được tính vào hóa đơn kỳ tới.
                 </p>
              </div>
 
-             <button 
-               onClick={handleSubscribe}
-               disabled={processing}
-               className="w-full h-15 bg-[#0D8A8A] text-white rounded-[20px] font-black uppercase tracking-[3px] text-[13px] shadow-2xl shadow-[#0D8A8A]/30 active:scale-95 transition-all flex items-center justify-center"
-             >
-                {processing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Xác nhận đăng ký'}
-             </button>
+             <div className="flex gap-3">
+                <button 
+                  onClick={() => setSelectedAvailable(null)}
+                  disabled={processing}
+                  className="flex-1 h-12 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm active:scale-95 transition-all"
+                >
+                   Bỏ qua
+                </button>
+                <button 
+                  onClick={handleSubscribe}
+                  disabled={processing}
+                  className="flex-[2] h-12 bg-teal-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-teal-200 active:scale-95 transition-all flex items-center justify-center"
+                >
+                   {processing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Xác nhận đăng ký'}
+                </button>
+             </div>
           </div>
         )}
       </BottomSheet>
@@ -222,29 +201,29 @@ const ServiceRequests: React.FC = () => {
       {/* CANCEL MODAL */}
       <BottomSheet isOpen={!!selectedCurrent} onClose={() => !processing && setSelectedCurrent(null)} title="Hủy dịch vụ">
         {selectedCurrent && (
-          <div className="space-y-8 pb-10 text-center">
-             <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-rose-500 mb-2">
+          <div className="space-y-6 pb-10 text-center">
+             <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-rose-500 mb-2">
                 <XCircle size={40} strokeWidth={1.5} />
              </div>
              <div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight leading-tight">Bạn muốn hủy dịch vụ?</h3>
-                <p className="text-sm text-slate-500 font-medium mt-2">Dịch vụ <strong className="text-slate-900">{selectedCurrent.name}</strong> sẽ bị ngừng cung cấp kể từ kỳ thanh toán tiếp theo.</p>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Xác nhận hủy dịch vụ?</h3>
+                <p className="text-sm text-slate-500 mt-2 px-4">Dịch vụ <strong className="text-slate-900">{selectedCurrent.name}</strong> sẽ ngừng cung cấp từ kỳ thanh toán tiếp theo.</p>
              </div>
              
              <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={() => setSelectedCurrent(null)}
                   disabled={processing}
-                  className="h-14 bg-slate-100 text-slate-600 rounded-[20px] font-black uppercase tracking-widest text-xs active:scale-95 transition-all"
+                  className="h-12 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm active:scale-95 transition-all"
                 >
                    Quay lại
                 </button>
                 <button 
                   onClick={handleCancel}
                   disabled={processing}
-                  className="h-14 bg-rose-500 text-white rounded-[20px] font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-500/20 active:scale-95 transition-all flex items-center justify-center"
+                  className="h-12 bg-rose-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-rose-200 active:scale-95 transition-all flex items-center justify-center"
                 >
-                   {processing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Xác nhận hủy'}
+                   {processing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Hủy ngay'}
                 </button>
              </div>
           </div>

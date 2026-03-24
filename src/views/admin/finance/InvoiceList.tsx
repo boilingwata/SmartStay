@@ -32,12 +32,15 @@ const InvoiceList = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   
   // Queries
-  const { data: invoices, isLoading, isError, refetch } = useQuery<Invoice[]>({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoices', activeTab],
     queryFn: () => invoiceService.getInvoices({ 
       status: activeTab === 'All' ? undefined : activeTab 
     })
   });
+
+  const invoices = data?.items || [];
+  const totalCount = data?.total || 0;
 
   const { data: counts } = useQuery<Record<InvoiceStatus | 'All', number>>({
     queryKey: ['invoiceCounts'],
@@ -180,7 +183,7 @@ const InvoiceList = () => {
                 <tr>
                   <td colSpan={10} className="py-20 text-center"><Spinner /></td>
                 </tr>
-              ) : !invoices?.length ? (
+              ) : !invoices.length ? (
                 <tr>
                   <td colSpan={10}>
                     <EmptyState

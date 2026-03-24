@@ -168,13 +168,12 @@ export const AutoOffsetModal = ({ tenantId, onClose }: ModalProps) => {
     queryFn: () => paymentService.getTenantBalance(tenantId)
   });
 
-  const { data: invoices } = useQuery({
+  const { data } = useQuery({
     queryKey: ['tenantInvoices', tenantId],
     queryFn: () => invoiceService.getInvoices({ tenantId })
   });
 
-  const unpaidInvoices = invoices?.filter(i => (i.status === 'Unpaid' || i.status === 'Overdue') && i.tenantId === tenantId) || [];
-  
+  const unpaidInvoices = (data?.items || []).filter(i => (i.status === 'Unpaid' || i.status === 'Overdue') && i.tenantId === tenantId);
   const totalOffset = unpaidInvoices
     .filter(i => selectedInvoices.includes(i.id))
     .reduce((sum, i) => sum + (i.totalAmount - i.paidAmount), 0);

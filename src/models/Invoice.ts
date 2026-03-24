@@ -5,10 +5,13 @@ export interface InvoiceItem {
   id: string;
   description: string;
   quantity: number;
+  /** @deprecated Use snapshot_price instead. Replaced to support null states and explicit labels. */
   unitPriceSnapshot: number;
   amount: number;
   type: InvoiceItemType;
-  tierBreakdown?: any;
+  tierBreakdown?: { label: string; qty: number; unitPrice: number; amount: number }[];
+  snapshot_price: number | null;
+  snapshot_label: string;
 }
 
 export interface PaymentTransaction {

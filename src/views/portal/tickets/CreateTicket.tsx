@@ -82,210 +82,178 @@ const CreateTicket: React.FC = () => {
   const isEmergency = category === 'Khẩn cấp';
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F1F5F9] pb-32 animate-in fade-in duration-1000 no-scrollbar relative overflow-x-hidden">
+    <div className="flex flex-col min-h-[100dvh] bg-slate-50/50 pb-32 animate-in fade-in duration-700 font-sans relative">
       
-      {/* 1. Lush Premium Header */}
-      <div className="relative h-[280px] w-full overflow-hidden bg-gradient-to-br from-[#1B3A6B] via-[#0D8A8A] to-[#2E5D9F] px-8 pt-12">
-        {/* Animated Mesh Overlays */}
-        <div className="absolute inset-0 opacity-40 mix-blend-overlay">
-          <div className="absolute top-[-20%] left-[-10%] w-[80%] h-[120%] bg-white/20 blur-[120px] rounded-full animate-float"></div>
-          <div className="absolute bottom-[-30%] right-[-10%] w-[60%] h-[100%] bg-emerald-400/20 blur-[100px] rounded-full"></div>
-        </div>
-        
-        <div className="relative z-10 space-y-6">
-          <div className="flex items-center justify-between">
-            <button 
-              onClick={() => navigate(-1)}
-              className="w-14 h-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[22px] flex items-center justify-center text-white active:scale-95 transition-all shadow-xl hover:bg-white/20"
-            >
-              <ArrowLeft size={24} strokeWidth={2.5} />
-            </button>
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[22px] flex items-center justify-center text-white shadow-xl">
-               <MessageSquare size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[12px] font-black text-white/60 uppercase tracking-[5px] italic">Technical Center</p>
-            <h1 className="text-[36px] font-black text-white tracking-tighter leading-tight italic">
-              Tạo <span className="text-emerald-400">Yêu Cầu</span>
-            </h1>
-          </div>
+      {/* 1. Header */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-2xl border-b border-gray-100 px-5 pt-12 pb-4">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate(-1)}
+            className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-700 active:scale-95 transition-all hover:bg-slate-50"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Tạo yêu cầu</h2>
         </div>
       </div>
 
-      {/* 2. Overlapping Form Card */}
-      <div className="px-5 -mt-16 relative z-20 w-full mx-auto space-y-8">
-        <div className="bg-white/90 backdrop-blur-2xl rounded-[40px] p-8 shadow-premium border border-white/60 space-y-10 relative">
-          
-          {/* Category Section */}
-          <div className="space-y-6">
-            <div className="flex flex-col gap-1">
-              <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-[3px] italic">Bản chất yêu cầu <span className="text-rose-500">*</span></h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phân loại giúp xử lý nhanh hơn</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {categories.map((cat, idx) => {
+      {/* 2. Form Content */}
+      <div className="px-5 pt-6 space-y-8 pb-10">
+        
+        {/* E.10.1 Ticket Type Selector — Horizontal Scroll Chips */}
+        <div className="space-y-3">
+           <h3 className="text-sm font-bold text-gray-900 ml-1">Loại yêu cầu <span className="text-red-500">*</span></h3>
+           <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar">
+              {categories.map((cat) => {
                 const isSelected = category === cat.id;
-                const Icon = cat.icon;
-                const isCatEmergency = cat.id === 'Khẩn cấp';
-
+                const isEmergency = cat.id === 'Khẩn cấp';
                 return (
                   <button
                     key={cat.id}
                     onClick={() => setCategory(cat.id)}
                     className={cn(
-                      "relative p-5 rounded-[28px] border-2 flex flex-col items-start gap-4 transition-all duration-500 active:scale-95 overflow-hidden text-left shadow-sm",
+                      "px-4 py-2 text-sm whitespace-nowrap rounded-full font-semibold transition-all duration-300",
                       isSelected 
-                        ? "bg-slate-900 border-slate-900 text-white shadow-xl scale-[1.03] z-10" 
-                        : "bg-slate-50 border-transparent hover:border-[#0D8A8A]/30",
-                      idx === categories.length - 1 ? "col-span-2 flex-row items-center" : ""
+                        ? (isEmergency ? "bg-red-500 text-white shadow-lg shadow-red-200 animate-pulse" : "bg-teal-600 text-white shadow-lg shadow-teal-200")
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     )}
                   >
-                    <div className={cn(
-                      "w-12 h-12 rounded-[20px] flex items-center justify-center shrink-0 transition-all",
-                      isSelected ? "bg-[#0D8A8A] text-white shadow-glow" : cat.bg + " " + cat.color
-                    )}>
-                      <Icon size={22} strokeWidth={2.5} />
-                    </div>
-                    <div className="flex-1">
-                       <span className={cn(
-                         "text-[13px] font-black uppercase tracking-tight italic",
-                         isSelected ? "text-white" : "text-slate-800"
-                       )}>{cat.id}</span>
-                       {idx === categories.length - 1 && isSelected && (
-                         <div className="text-[9px] text-emerald-400 font-black uppercase tracking-widest mt-1 animate-pulse"> Priority High </div>
-                       )}
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#0D8A8A] shadow-glow" />
-                    )}
+                    {cat.id}
                   </button>
                 );
               })}
-            </div>
-          </div>
+           </div>
+        </div>
 
-          <div className="h-px bg-slate-100" />
+        {/* E.10.2 Form Fields */}
+        <div className="space-y-6">
+           {/* Tiêu đề */}
+           <div className="space-y-2">
+              <h3 className="text-sm font-bold text-gray-900 ml-1">Tiêu đề <span className="text-red-500">*</span></h3>
+              <input
+                type="text"
+                placeholder="Nhập tiêu đề yêu cầu..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full h-12 px-5 bg-white border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all outline-none text-sm font-medium"
+              />
+              <p className="text-[10px] text-gray-400 font-medium ml-1">Tiêu đề dài từ 5 - 200 ký tự</p>
+           </div>
 
-          {/* Issue Details */}
-          <div className="space-y-6">
-            <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-[3px] italic">Thông tin sự cố</h3>
-            
-            {/* Title Input */}
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tiêu đề ngắn gọn</label>
-               <input
-                 type="text"
-                 placeholder="Cần hỗ trợ về..."
-                 value={title}
-                 onChange={(e) => setTitle(e.target.value)}
-                 className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent rounded-[24px] focus:bg-white focus:border-[#0D8A8A]/30 transition-all outline-none font-black text-slate-800 placeholder:text-slate-300 shadow-inner"
-               />
-            </div>
+           {/* Mô tả chi tiết */}
+           <div className="space-y-2">
+              <h3 className="text-sm font-bold text-gray-900 ml-1">Mô tả chi tiết</h3>
+              <textarea
+                placeholder="Mô tả cụ thể vấn đề bạn đang gặp phải..."
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                className="w-full min-h-[120px] p-5 bg-white border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all outline-none text-sm font-medium resize-none leading-relaxed"
+                maxLength={2000}
+              />
+           </div>
 
-            {/* Description Input */}
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Mô tả chi tiết</label>
-               <textarea
-                 placeholder="Vui lòng mô tả chi tiết tình trạng hiện tại..."
-                 rows={4}
-                 value={desc}
-                 onChange={(e) => setDesc(e.target.value)}
-                 className="w-full p-6 bg-slate-50 border-2 border-transparent rounded-[24px] focus:bg-white focus:border-[#0D8A8A]/30 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 shadow-inner resize-none leading-relaxed"
-               />
-            </div>
-          </div>
-
-          {/* Media Upload */}
-          <div className="space-y-4">
-             <div className="flex items-center justify-between px-2">
-               <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-[3px] italic">Hình ảnh & Video</h3>
-               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{files.length}/3</span>
-             </div>
-             <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-                {files.length < 3 && (
-                   <div className="flex gap-3">
-                      <button onClick={() => cameraInputRef.current?.click()} className="w-24 h-24 rounded-[28px] bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-[#0D8A8A] hover:bg-teal-50 hover:border-[#0D8A8A]/30 transition-all active:scale-90">
-                         <Camera size={24} />
-                         <span className="text-[8px] font-black uppercase tracking-widest">Camera</span>
-                      </button>
-                      <button onClick={() => fileInputRef.current?.click()} className="w-24 h-24 rounded-[28px] bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 hover:border-indigo-200 transition-all active:scale-90">
-                         <Paperclip size={24} />
-                         <span className="text-[8px] font-black uppercase tracking-widest">Gallery</span>
-                      </button>
-                   </div>
-                )}
-                
-                <input type="file" accept="image/*,video/mp4" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-                <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileChange} />
-
-                {files.map((file, idx) => (
-                   <div key={idx} className="relative w-24 h-24 rounded-[28px] overflow-hidden shadow-premium group shrink-0">
-                      <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
-                      <button onClick={() => removeFile(idx)} className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-rose-500 shadow-lg active:scale-75 transition-all opacity-0 group-hover:opacity-100">
-                         <X size={14} strokeWidth={3} />
-                      </button>
-                   </div>
-                ))}
-             </div>
-          </div>
-
-          <div className="h-px bg-slate-100" />
-
-          {/* Timeslots */}
-          <div className="space-y-6">
-             <div className="flex flex-col gap-1">
-               <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-[3px] italic">Lịch hẹn mong muốn</h3>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Thời gian kỹ thuật có thể đến</p>
-             </div>
-             <div className="grid grid-cols-1 gap-3">
-                {timeslots.map(slot => {
-                  const isSelected = preferredTimes.includes(slot.id);
-                  return (
-                    <div key={slot.id} onClick={() => handleTimeToggle(slot.id)} className={cn(
-                      "flex items-center justify-between p-5 rounded-[24px] border-2 cursor-pointer transition-all duration-300",
-                      isSelected ? "bg-[#0D8A8A] border-[#0D8A8A] text-white shadow-premium scale-[1.02]" : "bg-slate-50 border-transparent hover:border-[#0D8A8A]/30"
-                    )}>
-                       <div className="flex items-center gap-4">
-                          <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all", isSelected ? "bg-white border-white text-[#0D8A8A]" : "border-slate-300 text-transparent")}>
-                             {isSelected && <Check size={12} strokeWidth={4} />}
-                          </div>
-                          <div className="flex flex-col">
-                             <span className="text-[13px] font-black uppercase tracking-tight italic">{slot.label}</span>
-                             <span className={cn("text-[10px] font-bold tabular-nums tracking-widest", isSelected ? "text-white/60" : "text-slate-400")}>{slot.time}</span>
-                          </div>
-                       </div>
-                       <Clock size={16} className={isSelected ? "text-white/40" : "text-slate-200"} />
+           {/* Ảnh/video đính kèm */}
+           <div className="space-y-3">
+              <div className="flex items-center justify-between ml-1">
+                 <h3 className="text-sm font-bold text-gray-900">Ảnh/video đính kèm</h3>
+                 <span className="text-xs text-gray-400 font-medium">{files.length}/3 files</span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                 {/* Thumbnail previews */}
+                 {files.map((file, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 shadow-sm group">
+                       <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                       <button 
+                         onClick={() => removeFile(idx)}
+                         className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
+                       >
+                          <X size={14} />
+                       </button>
                     </div>
-                  );
-                })}
-             </div>
-          </div>
+                 ))}
 
+                 {/* Upload slots */}
+                 {files.length < 3 && (
+                    <div className="aspect-square flex flex-col gap-2">
+                       <label 
+                         htmlFor="file-input" 
+                         className="flex-1 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:border-teal-500 hover:text-teal-600 transition-all cursor-pointer bg-white"
+                       >
+                          <Paperclip size={20} />
+                          <span className="text-[10px] font-bold uppercase mt-1">Gallery</span>
+                       </label>
+                       
+                       <label 
+                         htmlFor="camera-input" 
+                         className="flex-1 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:border-teal-500 hover:text-teal-600 transition-all cursor-pointer bg-white"
+                       >
+                          <Camera size={20} />
+                          <span className="text-[10px] font-bold uppercase mt-1">Camera</span>
+                       </label>
+                    </div>
+                 )}
+              </div>
+
+              <input 
+                id="file-input"
+                type="file" 
+                accept="image/*,video/*" 
+                multiple 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+              />
+              <input 
+                id="camera-input" 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                className="hidden" 
+                ref={cameraInputRef} 
+                onChange={handleFileChange} 
+              />
+              <p className="text-[10px] text-gray-400 font-medium italic">* Tối đa 3 file, 20MB/file</p>
+           </div>
+
+           {/* Thời gian thuận tiện */}
+           <div className="space-y-3">
+              <h3 className="text-sm font-bold text-gray-900 ml-1">Thời gian thuận tiện</h3>
+              <div className="flex gap-2">
+                 {timeslots.map(slot => {
+                    const isSelected = preferredTimes.includes(slot.id);
+                    return (
+                      <button 
+                        key={slot.id}
+                        onClick={() => handleTimeToggle(slot.id)}
+                        className={cn(
+                          "px-5 py-2.5 rounded-full text-sm font-semibold transition-all border",
+                          isSelected 
+                            ? "bg-teal-50 border-teal-200 text-teal-700 shadow-sm" 
+                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                        )}
+                      >
+                         {slot.label}
+                      </button>
+                    );
+                 })}
+              </div>
+           </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="pt-4 space-y-4">
-           {isEmergency && (
-             <div className="flex items-center gap-3 justify-center text-rose-500 animate-pulse">
-                <AlertCircle size={16} />
-                <span className="text-[11px] font-black uppercase tracking-[2px]">Báo động khẩn cấp được kích hoạt</span>
-             </div>
-           )}
-           <button 
-             onClick={handleSubmit} 
-             disabled={!category || !title} 
-             className={cn(
-               "w-full h-20 rounded-[30px] flex items-center justify-center gap-4 text-[15px] font-black uppercase tracking-[4px] italic shadow-2xl active:scale-95 transition-all group overflow-hidden border border-white/20 disabled:grayscale disabled:opacity-50",
-               isEmergency ? "bg-gradient-to-r from-rose-500 to-rose-600 text-white" : "bg-slate-900 text-white"
-             )}
-           >
-              <span className="relative z-10">{isEmergency ? 'Gửi Yêu Cầu Gấp' : 'Xác nhận gửi'}</span>
-              <Send size={22} className="relative z-10 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform" />
-           </button>
-        </div>
+        {/* Submit Button */}
+        <button 
+          onClick={handleSubmit}
+          disabled={!category || title.length < 5}
+          className={cn(
+            "w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base font-bold transition-all shadow-xl shadow-teal-100 active:scale-95 disabled:grayscale disabled:opacity-50",
+            category === 'Khẩn cấp' ? "bg-red-500 text-white" : "bg-teal-600 text-white hover:bg-teal-700"
+          )}
+        >
+           <span>{category === 'Khẩn cấp' ? 'Gửi yêu cầu khẩn cấp' : 'Gửi yêu cầu'}</span>
+           <Send size={20} />
+        </button>
+
       </div>
     </div>
   );

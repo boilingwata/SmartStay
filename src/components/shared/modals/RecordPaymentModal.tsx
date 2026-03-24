@@ -47,13 +47,13 @@ export const RecordPaymentModal = ({ isOpen, onClose, invoice, initialInvoiceId 
   }, [invoice?.id, initialInvoiceId]);
 
   // Fetch unpaid invoices if we need to select one
-  const { data: allInvoices } = useQuery({
+  const { data } = useQuery({
     queryKey: ['unpaidInvoices'],
     queryFn: () => invoiceService.getInvoices(),
     enabled: isOpen && !invoice
   });
 
-  const unpaidInvoices = allInvoices?.filter(i => i.status === 'Unpaid' || i.status === 'Overdue') || [];
+  const unpaidInvoices = (data?.items || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue');
   
   // Determine which invoice data to use for preview
   const activeInvoice = invoice ? invoice : unpaidInvoices.find(i => i.id === selectedInvoiceId);

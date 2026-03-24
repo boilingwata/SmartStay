@@ -12,12 +12,21 @@ import {
 
 export type PaymentMethod = 'Wallet' | 'VNPay' | 'MoMo' | 'ZaloPay' | 'Transfer';
 
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface InvoiceFilter {
   buildingId?: string;
   status?: InvoiceStatus;
   search?: string;
   period?: string;
   tenantId?: string;
+  page?: number;
+  limit?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,13 +124,24 @@ function mapDbRowToInvoice(row: DbInvoiceRow): Invoice {
 }
 
 function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
+  const price = item.unit_price !== undefined && item.unit_price !== null ? Number(item.unit_price) : null;
   return {
     id: item.id,
     description: item.description,
     quantity: item.quantity,
-    unitPriceSnapshot: item.unit_price,
+    unitPriceSnapshot: price ?? 0,
     amount: item.line_total,
-    type: 'Other',
+    type: (item as any).type || 'Other',
+    snapshot_price: price,
+    snapshot_label: (item as any).snapshot_label || 'Giá HĐ',
+    tierBreakdown: (item as any).tier_breakdown_json 
+      ? JSON.parse((item as any).tier_breakdown_json).map((t: any) => ({
+          label: t.label || `Bậc ${t.tierOrder || ''}`,
+          qty: t.qty || t.kwh || t.usage || 0,
+          unitPrice: t.unitPrice || t.price || 0,
+          amount: t.amount || 0
+        }))
+      : undefined
   };
 }
 
@@ -176,15 +196,20 @@ const INVOICE_SELECT = `
 // ---------------------------------------------------------------------------
 
 export const invoiceService = {
-  getInvoices: async (filters: InvoiceFilter = {}): Promise<Invoice[]> => {
+  getInvoices: async (filters: InvoiceFilter = {}): Promise<PaginatedResult<Invoice>> => {
     let query = supabase
       .from('invoices')
-      .select(INVOICE_SELECT)
+      .select(INVOICE_SELECT, { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (filters.buildingId) {
       // Filter via the nested rooms.building_id path
       query = query.eq('contracts.rooms.building_id' as any, Number(filters.buildingId));
+    }
+
+    if (filters.tenantId) {
+      // Filter via the nested contracts.contract_tenants.tenant_id path
+      query = query.eq('contracts.contract_tenants.tenant_id' as any, Number(filters.tenantId));
     }
 
     if (filters.status) {
@@ -206,8 +231,26 @@ export const invoiceService = {
       query = query.ilike('invoice_code', `%${filters.search}%`);
     }
 
-    const rows = await unwrap(query) as unknown as DbInvoiceRow[];
-    return rows.map(mapDbRowToInvoice);
+    // Defaulting logic: only paginate if both are provided, otherwise return a large batch
+    const typedPage = filters.page !== undefined ? Math.max(1, Math.floor(Number(filters.page) || 1)) : undefined;
+    const typedLimit = filters.limit !== undefined ? Math.max(1, Math.floor(Number(filters.limit) || 10)) : undefined;
+
+    if (typedPage !== undefined && typedLimit !== undefined) {
+      const from = (typedPage - 1) * typedLimit;
+      const to = from + typedLimit - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count } = await query;
+    if (!data) throw new Error('Failed to fetch invoices');
+
+    const rows = data as unknown as DbInvoiceRow[];
+    return {
+      items: rows.map(mapDbRowToInvoice),
+      total: count ?? 0,
+      page: typedPage ?? 1,
+      limit: typedLimit ?? (count ?? 0),
+    };
   },
 
   getInvoiceCounts: async (): Promise<Record<InvoiceStatus | 'All', number>> => {
@@ -243,7 +286,7 @@ export const invoiceService = {
     const itemRows = await unwrap(
       supabase
         .from('invoice_items')
-        .select('id, invoice_id, description, quantity, unit_price, line_total, meter_reading_id, sort_order')
+        .select('id, invoice_id, description, quantity, unit_price, line_total, meter_reading_id, sort_order, type, snapshot_label, tier_breakdown_json')
         .eq('invoice_id', Number(id))
         .order('sort_order', { ascending: true })
     ) as unknown as DbInvoiceItemRow[];

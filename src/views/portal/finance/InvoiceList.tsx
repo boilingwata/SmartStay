@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, ArrowRight, Clock, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { invoiceService } from '@/services/invoiceService';
 import { Invoice } from '@/models/Invoice';
-import { cn } from '@/utils';
+import { cn, formatVND } from '@/utils';
+import { m } from 'framer-motion';
 
 type TabType = 'Unpaid_Overdue' | 'Paid' | 'All';
 
@@ -11,17 +12,30 @@ const InvoiceList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Unpaid_Overdue');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const limit = 10;
+  
   const navigate = useNavigate();
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Pull to refresh state
-  const [pullDistance, setPullDistance] = useState(0);
-  const [startY, setStartY] = useState(0);
-
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (pageNum: number, isRefresh = false) => {
     try {
-      const data = await invoiceService.getInvoices();
-      setInvoices(data);
+      const data = await invoiceService.getInvoices({ page: pageNum, limit });
+      const newItems = data.items;
+      
+      if (isRefresh || pageNum === 1) {
+        setInvoices(newItems);
+      } else {
+        setInvoices(prev => {
+          // Prevent duplicates on strict mode
+          const newIds = new Set(newItems.map(d => d.id));
+          const filteredPrev = prev.filter(p => !newIds.has(p.id));
+          return [...filteredPrev, ...newItems];
+        });
+      }
+      setHasMore((data.page - 1) * data.limit + newItems.length < data.total);
     } catch (error) {
       console.error('Error fetching invoices:', error);
     }
@@ -30,39 +44,43 @@ const InvoiceList: React.FC = () => {
   useEffect(() => {
     const initFetch = async () => {
       setLoading(true);
-      await fetchInvoices();
+      await fetchInvoices(1, true);
       setLoading(false);
     };
     initFetch();
   }, []);
 
+  // Infinite Scroll Observer using stable callback ref
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading) return;
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
+          setIsFetchingNextPage(true);
+          setPage(p => p + 1);
+        }
+      },
+      { 
+        threshold: 0.1, 
+        rootMargin: '0px 0px 200px 0px' 
+      }
+    );
+
+    if (node) observerRef.current.observe(node);
+  }, [loading, hasMore, isFetchingNextPage]);
+
+  // Fetch next page when page changes
+  useEffect(() => {
+    if (page > 1) {
+      fetchInvoices(page, false).finally(() => setIsFetchingNextPage(false));
+    }
+  }, [page]);
+
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchInvoices();
-    setRefreshing(false);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
-      setStartY(e.touches[0].clientY);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (startY === 0) return;
-    const y = e.touches[0].clientY;
-    const distance = y - startY;
-    if (distance > 0 && distance < 120) {
-      setPullDistance(distance);
-    }
-  };
-
-  const handleTouchEnd = async () => {
-    if (pullDistance > 60) {
-      await handleRefresh();
-    }
-    setPullDistance(0);
-    setStartY(0);
+    setPage(1);
+    await fetchInvoices(1, true);
   };
 
   const overdueCount = invoices.filter(inv => inv.status === 'Overdue').length;
@@ -73,15 +91,6 @@ const InvoiceList: React.FC = () => {
     if (activeTab === 'Unpaid_Overdue') return inv.status === 'Unpaid' || inv.status === 'Overdue';
     return true;
   });
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'Paid': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case 'Unpaid': return 'bg-amber-50 text-amber-600 border-amber-100';
-      case 'Overdue': return 'bg-red-50 text-red-600 border-red-100 shadow-sm shadow-red-100';
-      default: return 'bg-slate-50 text-slate-500 border-slate-100';
-    }
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -101,178 +110,209 @@ const InvoiceList: React.FC = () => {
     }
   };
 
-  if (loading) {
+  const calculateDays = (dueDate: string, isOverdue: boolean) => {
+    const due = new Date(dueDate);
+    const now = new Date();
+    const diffTime = due.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (isOverdue) {
+      return `Quá hạn ${Math.abs(diffDays)} ngày`;
+    }
+    return `Còn ${diffDays > 0 ? diffDays : 0} ngày`;
+  };
+
+  if (loading && page === 1) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-white min-h-[80vh]">
-        <div className="w-10 h-10 border-4 border-slate-100 border-t-[#0D8A8A] rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-slate-100 border-t-teal-600 rounded-full animate-spin"></div>
         <p className="text-[10px] text-slate-400 font-black animate-pulse uppercase tracking-[3px]">Loading Finance Core</p>
       </div>
     );
   }
 
   return (
-    <div 
-      className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      
-      {/* Pull to refresh indicator */}
-      {(pullDistance > 0 || refreshing) && (
-        <div 
-          className="fixed top-0 left-0 right-0 z-[60] flex justify-center pointer-events-none transition-transform duration-200"
-          style={{ transform: `translateY(${Math.min(pullDistance || 80, 80)}px)` }}
-        >
-          <div className="bg-white rounded-full shadow-lg p-2.5 text-[#0D8A8A] border border-slate-100 flex items-center gap-2 px-4 animate-in slide-in-from-top-4 fade-in">
-             <RefreshCw size={18} className={cn(refreshing && "animate-spin")} style={{ transform: `rotate(${pullDistance * 3}deg)` }} strokeWidth={2.5} />
-             {pullDistance > 60 && !refreshing && <span className="text-[10px] font-black uppercase tracking-widest">Thả để tải lại</span>}
-             {refreshing && <span className="text-[10px] font-black uppercase tracking-widest">Đang tải...</span>}
-          </div>
-        </div>
-      )}
-
-      {/* Sticky Header Hub */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-2xl border-b border-slate-100 px-5 pt-12 pb-4 space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-             <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Hóa đơn</h2>
-             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1">
-                Lịch sử giao dịch 
-                <button onClick={handleRefresh} className={cn("ml-1 p-1 hover:bg-slate-100 rounded-full transition-all", refreshing && "animate-spin text-[#0D8A8A]")}>
-                  <RefreshCw size={12} strokeWidth={3} />
+    <div className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700">
+        
+        {/* Unified Sticky Container */}
+        <div className="sticky top-0 z-40 flex flex-col">
+          {/* Sticky Header Hub */}
+          <div className="bg-white/80 backdrop-blur-2xl border-b border-gray-100 px-5 pt-12 pb-4 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                 <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Hóa đơn</h2>
+                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1">
+                    Lịch sử giao dịch 
+                 </p>
+              </div>
+              <div className="flex gap-2">
+                <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+                  <Search size={20} />
                 </button>
-             </p>
+                <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+                  <Filter size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* D.6.1 Tab Bar Design */}
+            <div className="flex bg-gray-100 rounded-[14px] p-1 gap-1 relative">
+              {[
+                { id: 'Unpaid_Overdue', label: 'Chưa TT' },
+                { id: 'Paid', label: 'Đã TT' },
+                { id: 'All', label: 'Tất cả' }
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as TabType)}
+                    className={cn(
+                      "flex-1 py-2 text-[12px] transition-all duration-300 relative flex items-center justify-center",
+                      isActive 
+                        ? "bg-white rounded-[10px] shadow-sm text-gray-900 font-semibold" 
+                        : "text-gray-500 hover:text-gray-700 font-medium"
+                    )}
+                  >
+                    <div className="flex items-center justify-center z-10 relative">
+                      {tab.label}
+                      {tab.id === 'Unpaid_Overdue' && overdueCount > 0 && (
+                         <span className="inline-flex items-center justify-center w-5 h-5 bg-red-500 text-white text-[10px] rounded-full ml-1.5 font-bold shadow-sm">
+                           {overdueCount}
+                         </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
-              <Search size={20} />
-            </button>
-            <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
-              <Filter size={20} />
-            </button>
-          </div>
+
+          {/* D.6.2 Overdue Alert Banner */}
+          {overdueCount > 0 && activeTab !== 'Paid' && (
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 flex items-center justify-between shadow-lg shadow-red-500/20 mx-4 mt-4 rounded-[20px] backdrop-blur-md">
+               <div className="flex items-center gap-2">
+                 <AlertCircle size={18} strokeWidth={2.5} className="animate-pulse shadow-sm" />
+                 <p className="text-[13px] font-bold tracking-wide">Bạn có {overdueCount} hóa đơn quá hạn!</p>
+               </div>
+               <button className="bg-white/20 hover:bg-white text-white hover:text-red-600 rounded-xl px-4 py-1.5 text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-sm backdrop-blur-sm">
+                  Thanh toán
+               </button>
+            </div>
+          )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex p-1.5 bg-slate-100/60 rounded-[24px] border border-slate-200/50 relative">
-          {[
-            { id: 'Unpaid_Overdue', label: 'Chưa thanh toán' },
-            { id: 'Paid', label: 'Đã thanh toán' },
-            { id: 'All', label: 'Tất cả' }
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+        {/* Invoice List */}
+        <div className="px-5 pt-6 space-y-4">
+          {filteredInvoices.length > 0 ? (
+            filteredInvoices.map((inv, idx) => (
+              <m.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05, duration: 0.4, ease: "easeOut" }}
+                key={inv.id}
+                onClick={() => navigate(`/portal/invoices/${inv.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/portal/invoices/${inv.id}`);
+                  }
+                }}
                 className={cn(
-                  "flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all duration-500 relative",
-                  isActive 
-                    ? "bg-white text-[#0D8A8A] shadow-lg shadow-black/5 scale-[1.02]" 
-                    : "text-slate-400 hover:text-slate-600"
+                  "cursor-pointer transform transition-all duration-400 hover:-translate-y-1 group relative overflow-hidden",
+                  inv.status === 'Overdue' ? 'bg-white border hover:border-red-300 border-red-100 rounded-[28px] p-5 shadow-[0_8px_30px_-5px_rgba(239,68,68,0.15)] ring-1 ring-red-50' :
+                  inv.status === 'Paid' ? 'bg-slate-50 border border-slate-100/60 rounded-[28px] p-5 opacity-80 hover:opacity-100 shadow-sm' :
+                  'bg-white border border-gray-100 rounded-[28px] p-5 hover:shadow-[0_8px_30px_-5px_rgba(245,158,11,0.15)] hover:border-amber-200 ring-1 ring-gray-50'
                 )}
               >
-                <div className="flex items-center justify-center gap-1.5 z-10 relative">
-                  {tab.label}
-                  {tab.id === 'Unpaid_Overdue' && overdueCount > 0 && (
-                     <span className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[9px] shadow-sm transform -translate-y-0.5 animate-bounce">
-                       {overdueCount}
-                     </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                {/* Decorative highlight bar */}
+                <div className={cn(
+                  "absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[28px]",
+                  inv.status === 'Overdue' ? 'bg-gradient-to-b from-red-400 to-rose-600' :
+                  inv.status === 'Paid' ? 'bg-gradient-to-b from-emerald-300 to-teal-500 opacity-50' :
+                  'bg-gradient-to-b from-amber-300 to-orange-400'
+                )} />
 
-      {/* Overdue Alert Banner */}
-      {overdueCount > 0 && activeTab !== 'Paid' && (
-        <div className="mx-5 mt-5 p-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 rounded-3xl flex items-center gap-4 shadow-sm shadow-red-100/50 relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl group-hover:bg-red-500/10 transition-colors" />
-           <div className="w-12 h-12 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center shrink-0">
-             <AlertCircle size={24} strokeWidth={2.5} className="animate-pulse" />
-           </div>
-           <div className="flex-1 space-y-0.5">
-             <p className="text-[13px] font-black text-red-700 tracking-tight leading-tight">Bạn có {overdueCount} hóa đơn quá hạn!</p>
-             <p className="text-[10px] font-bold text-red-500/80 uppercase tracking-widest leading-tight">Thanh toán ngay để không bị gián đoạn dịch vụ</p>
-           </div>
-        </div>
-      )}
-
-      {/* Invoice List */}
-      <div className="px-5 pt-6 space-y-4">
-        {filteredInvoices.length > 0 ? (
-          filteredInvoices.map((inv) => (
-            <div 
-              key={inv.id}
-              onClick={() => navigate(`/portal/invoices/${inv.id}`)}
-              className={cn(
-                "card-container p-6 bg-white border shadow-sm space-y-5 transform transition-all duration-500 hover:shadow-xl rounded-[32px] group active:scale-[0.98] relative overflow-hidden",
-                inv.status === 'Overdue' ? 'border-red-100 shadow-red-100/30' : 'border-slate-100 shadow-slate-200/40'
-              )}
-            >
-              {inv.status === 'Overdue' && <div className="absolute top-0 right-0 w-32 h-32 bg-red-50/50 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none" />}
-              
-              <div className="flex justify-between items-start relative z-10">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[2px]">{inv.invoiceCode}</p>
-                  <p className="text-lg font-black text-slate-900 tracking-tight leading-none pt-1">Tháng {inv.period}</p>
-                </div>
-                <div className={cn("px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border transition-all", getStatusStyle(inv.status))}>
-                  {getStatusIcon(inv.status)} {getStatusLabel(inv.status)}
-                </div>
-              </div>
-
-              {/* Mini Breakdown */}
-              <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100/50 space-y-2 relative z-10">
-                 <div className="flex justify-between items-center text-[11px] font-medium text-slate-500">
-                    <span>Phí thuê phòng</span>
-                    <span className="font-bold text-slate-700">Theo HD gốc</span>
-                 </div>
-                 <div className="flex justify-between items-center text-[11px] font-medium text-slate-500">
-                    <span>Điện, nước & Dịch vụ</span>
-                    <span className="font-bold text-slate-700">Theo sử dụng</span>
-                 </div>
-              </div>
-
-              <div className="flex items-end justify-between pt-2 relative z-10">
-                <div className="space-y-1.5">
-                  <p className={cn("text-[10px] font-black uppercase tracking-widest", inv.status === 'Overdue' ? 'text-red-500' : 'text-slate-400')}>
-                    Hạn: {inv.dueDate}
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-2xl font-black text-[#0D8A8A] tabular-nums tracking-tighter">{inv.totalAmount.toLocaleString()}</p>
-                    <span className="text-[10px] font-bold text-[#0D8A8A] uppercase">đ</span>
+                {/* Header row */}
+                <div className="flex justify-between items-center mb-1 pl-2">
+                  <div className="text-[15px] font-black text-gray-800 tracking-tight">
+                    Tháng {inv.period}
+                  </div>
+                  <div className={cn(
+                    "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm backdrop-blur-sm",
+                    inv.status === 'Overdue' ? 'bg-red-50 text-red-600 border border-red-100' :
+                    inv.status === 'Paid' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    'bg-amber-50 text-amber-600 border border-amber-100'
+                  )}>
+                    {getStatusIcon(inv.status)} {getStatusLabel(inv.status)}
                   </div>
                 </div>
-                
-                {inv.status !== 'Paid' ? (
-                  <button className="h-10 px-5 bg-teal-50 text-[#0D8A8A] rounded-xl font-black text-[10px] uppercase tracking-widest group-hover:bg-[#0D8A8A] group-hover:text-white transition-colors duration-300">
-                    Thanh toán
+
+                {/* Amount & Due Date */}
+                <div className="space-y-1 mt-3 pl-2">
+                  <div className="text-3xl font-black text-gray-900 tabular-nums tracking-tighter">
+                    {formatVND(inv.totalAmount)}
+                  </div>
+                  {inv.status !== 'Paid' && (
+                    <div className={cn("text-[11px] font-bold uppercase tracking-widest", inv.status === 'Overdue' ? "text-red-500" : "text-amber-500")}>
+                      {calculateDays(inv.dueDate, inv.status === 'Overdue')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mini breakdown */}
+                <div className="bg-gray-50/50 rounded-2xl p-3 mt-4 border border-gray-100 grid grid-cols-2 gap-x-4 ml-2">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-gray-500 font-medium">Tiền thuê</span>
+                    <span className="font-bold text-gray-700">Theo HĐ</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-gray-500 font-medium">Điện</span>
+                    <span className="font-bold text-gray-700">Theo SD</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] mt-1.5">
+                    <span className="text-gray-500 font-medium">Nước</span>
+                    <span className="font-bold text-gray-700">Theo SD</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] mt-1.5">
+                    <span className="text-gray-500 font-medium">Dịch vụ</span>
+                    <span className="font-bold text-gray-700">Cố định</span>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex justify-between items-center gap-3 mt-5 pl-2">
+                  <button className="flex-1 text-xs font-black uppercase tracking-widest text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-xl h-11 transition-colors">
+                    Chi tiết
                   </button>
-                ) : (
-                   <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-slate-100 transition-colors">
-                     <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
-                   </div>
-                )}
+                  {inv.status !== 'Paid' && (
+                    <button className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-xl h-11 text-xs font-black uppercase tracking-widest shadow-[0_4px_14px_0_rgba(20,184,166,0.39)] hover:shadow-[0_6px_20px_rgba(20,184,166,0.23)] hover:-translate-y-0.5 transition-all">
+                      Thanh toán
+                    </button>
+                  )}
+                </div>
+              </m.div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                 <CheckCircle2 size={40} className="text-slate-300" strokeWidth={1.5} />
               </div>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight mb-2">Tuyệt vời!</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                Không có hóa đơn nào {activeTab === 'Unpaid_Overdue' ? 'cần thanh toán' : ''} trong danh mục này.
+              </p>
             </div>
-          ))
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-               <CheckCircle2 size={40} className="text-slate-300" strokeWidth={1.5} />
-            </div>
-            <h3 className="text-lg font-black text-slate-800 tracking-tight mb-2">Tuyệt vời!</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-              Không có hóa đơn nào {activeTab === 'Unpaid_Overdue' ? 'cần thanh toán' : ''} trong danh mục này.
-            </p>
+          )}
+          
+          {/* Sentinel for Infinite Scroll */}
+          <div ref={lastElementRef} className="h-6 w-full flex justify-center items-center">
+            {isFetchingNextPage && <RefreshCw size={16} className="animate-spin text-slate-400" />}
           </div>
-        )}
+        </div>
       </div>
-    </div>
   );
 };
 

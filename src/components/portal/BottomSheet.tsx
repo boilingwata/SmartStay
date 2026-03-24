@@ -36,7 +36,7 @@ export const BottomSheet = ({ isOpen, onClose, title, children, height = 'h-[70v
         onClick={onClose}
       />
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] p-8 transition-transform duration-300 transform shadow-2xl overflow-hidden flex flex-col",
+        "absolute bottom-0 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:bottom-10 md:rounded-[40px] bg-white rounded-t-[40px] p-8 transition-transform duration-300 transform shadow-2xl overflow-hidden flex flex-col w-full md:max-w-[500px] lg:max-w-[600px]",
         height,
         isOpen ? "translate-y-0" : "translate-y-full"
       )}>

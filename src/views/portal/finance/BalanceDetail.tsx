@@ -14,8 +14,12 @@ import portalFinanceService from '@/services/portalFinanceService';
 import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
+import { m } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const BalanceDetail = () => {
+  const navigate = useNavigate();
+
   // RULE-05: currentBalance MUST be fresh, dashboard cache is display-only
   const { data: balanceInfo, isLoading: loadingBalance } = useQuery({
     queryKey: ['portal-fresh-balance'],
@@ -31,10 +35,23 @@ const BalanceDetail = () => {
   const isLoading = loadingBalance || loadingDocs;
 
   return (
-    <div className="space-y-8 pb-32">
+    <div className="bg-slate-50/50 min-h-screen pb-32 animate-in fade-in slide-in-from-right-6 duration-700 font-sans">
+        {/* Sticky Header Hub */}
+        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl px-5 py-6 flex items-center justify-between border-b border-gray-100">
+          <div className="space-y-1">
+             <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Ví SmartStay</h2>
+             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1">
+                Quản lý số dư nội bộ
+             </p>
+          </div>
+          <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+            <Filter size={20} />
+          </button>
+        </div>
+
         {/* 1. Real-time Balance Card */}
-        <div className="px-8 pt-8">
-            <div className="bg-[#0D8A8A] rounded-[48px] p-10 text-white shadow-2xl shadow-teal-500/20 relative overflow-hidden">
+        <div className="px-5 pt-6">
+            <div className="bg-gradient-to-br from-teal-400 via-teal-500 to-emerald-600 rounded-[36px] p-8 text-white shadow-[0_8px_30px_-5px_rgba(20,184,166,0.4)] relative overflow-hidden">
                 <div className="relative z-10 flex flex-col gap-2">
                     <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em]">Số dư khả dụng</span>
                     <h3 className="text-4xl font-black tracking-tighter truncate">
@@ -54,9 +71,9 @@ const BalanceDetail = () => {
         </div>
 
         {/* 2. Ledger Info Alert */}
-        <div className="px-8">
-            <div className="bg-blue-50 border-2 border-blue-100 p-6 rounded-[32px] flex gap-4">
-                <Info className="text-blue-500 shrink-0" size={20} />
+        <div className="px-5 mt-6">
+            <div className="bg-blue-50/50 backdrop-blur-md border border-blue-100 p-5 rounded-[28px] flex gap-4 shadow-sm">
+                <Info className="text-blue-500 shrink-0 mt-0.5" size={20} />
                 <div className="space-y-1">
                     <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest leading-none">Minh bạch tài chính</h4>
                     <p className="text-[10px] text-blue-700/70 font-medium leading-relaxed italic">
@@ -67,23 +84,24 @@ const BalanceDetail = () => {
         </div>
 
         {/* 3. Transaction Ledger */}
-        <div className="px-6 space-y-6">
+        <div className="px-5 mt-8 space-y-5">
             <div className="flex items-center justify-between px-2">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                    <Activity size={16} className="text-teal-500" /> Nhật ký ví cư dân
+                <h3 className="text-[12px] font-black text-gray-400 uppercase tracking-[3px] flex items-center gap-2">
+                    <Activity size={16} className="text-teal-500" /> Nhật ký giao dịch
                 </h3>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {isLoading ? (
                     <div className="py-20 flex justify-center"><Spinner /></div>
                 ) : (transactions?.items?.length ?? 0) > 0 ? (
-                    transactions!.items.map((tx: any) => <TransactionRow key={tx.id} tx={tx} />)
+                    transactions!.items.map((tx: any, idx: number) => <TransactionRow key={tx.id} tx={tx} index={idx} />)
                 ) : (
                     // Mock data reflecting LEDGER pattern
-                    [1, 2, 3, 4].map((i) => (
+                    [1, 2, 3, 4].map((i, idx) => (
                         <TransactionRow 
                             key={i} 
+                            index={idx}
                             tx={{
                                 id: i,
                                 amount: i % 2 === 0 ? -1500000 : 2000000,
@@ -102,11 +120,16 @@ const BalanceDetail = () => {
   );
 };
 
-const TransactionRow = ({ tx }: { tx: any }) => {
+const TransactionRow = ({ tx, index }: { tx: any, index: number }) => {
   const isCredit = tx.type === 'Credit' || tx.amount > 0;
   
   return (
-    <div className="bg-white p-6 rounded-[36px] shadow-sm border border-slate-50 flex items-center justify-between group active:scale-[0.99] transition-all">
+    <m.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
+      className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-100 flex items-center justify-between group hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 cursor-default"
+    >
         <div className="flex items-center gap-5">
             <div className={cn(
                 "w-12 h-12 rounded-[22px] flex items-center justify-center transition-transform group-hover:rotate-6 shadow-inner",
@@ -128,10 +151,10 @@ const TransactionRow = ({ tx }: { tx: any }) => {
                 </div>
             </div>
         </div>
-        <div className={cn("text-sm font-black tracking-tighter", isCredit ? "text-emerald-500" : "text-red-500")}>
+        <div className={cn("text-[15px] font-black tracking-tighter tabular-nums", isCredit ? "text-emerald-500" : "text-gray-900")}>
             {isCredit ? '+' : ''}{formatVND(tx.amount)}
         </div>
-    </div>
+    </m.div>
   );
 };
 

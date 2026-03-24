@@ -4,6 +4,7 @@ import { ChevronLeft, Bell, Home, Receipt, Wrench, Building2, User } from 'lucid
 import BottomNavigation from './BottomNavigation';
 import { cn } from '@/utils';
 import useAuthStore from '@/stores/authStore';
+import { LazyMotion, domMax } from 'framer-motion';
 
 interface PortalLayoutProps {
   /** The title to display in the header. If omitted, it will be inferred from the current route. */
@@ -180,9 +181,11 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
 
         {/* Page Content */}
         <main className="flex-1 pt-14 md:pt-16 pb-20 md:pb-0 min-w-0 w-full xl:max-w-[1200px] xl:mx-auto overflow-y-auto custom-scrollbar">
-          <div className="w-full h-full">
-            {children !== undefined ? children : <Outlet />}
-          </div>
+          <LazyMotion features={domMax} strict>
+            <div className="w-full h-full">
+              {children !== undefined ? children : <Outlet />}
+            </div>
+          </LazyMotion>
         </main>
 
         {/* Bottom Nav — mobile only */}

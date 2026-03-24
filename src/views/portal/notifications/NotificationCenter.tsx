@@ -104,7 +104,7 @@ const SwipeableNotificationItem = ({ item, onRead, onDelete }: { item: any; onRe
             </h4>
             
             <p className="text-[12px] font-medium text-slate-500 leading-relaxed line-clamp-2">
-               {item.content}
+               {item.message}
             </p>
           </div>
         </div>

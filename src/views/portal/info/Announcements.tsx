@@ -59,203 +59,207 @@ const Announcements = () => {
   };
 
   const handleShare = async (ann: any) => {
+    const shareText = `${ann.title}\n${ann.summary || ''}`;
     const shareData = {
       title: ann.title,
-      text: ann.summary || ann.title,
-      url: window.location.href
+      text: shareText,
     };
     if (navigator.share) {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        toast.info('Link bài viết đã sẵn sàng chia sẻ');
+        if ((err as Error).name !== 'AbortError') {
+          navigator.clipboard.writeText(shareText);
+          toast.info('Đã copy nội dung thông báo');
+        }
       }
     } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success('Đã sao chép link liên kết');
+      navigator.clipboard.writeText(shareText);
+      toast.success('Đã copy nội dung thông báo');
     }
   };
 
   const items = annData?.items || [];
-  const pinnedItems = items.filter((i: any) => i.isPinned);
-  const otherItems = items.filter((i: any) => !i.isPinned);
+  const filteredItems = items.filter((i: any) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'pinned') return i.isPinned;
+    return i.type === activeFilter;
+  });
 
   return (
-    <div className="min-h-screen bg-transparent pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {/* Hero Banner Section */}
-      <div className="px-5 pt-6 pb-2">
-        <div className="relative p-7 bg-gradient-to-br from-[#0D8A8A] to-[#0A6B6B] rounded-[32px] overflow-hidden shadow-2xl shadow-[#0D8A8A]/20">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="relative z-10 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white backdrop-blur-sm border border-white/20">
-                <Megaphone size={24} />
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-black text-white/60 uppercase tracking-[2px]">Cố định</p>
-                <h3 className="text-xl font-black text-white tracking-tight leading-none">Thông báo từ BQL</h3>
-              </div>
-            </div>
-            <p className="text-sm text-teal-50/80 font-medium leading-relaxed max-w-[240px]">
-              Cập nhật tin tức, sự kiện và thông báo quan trọng nhất dành cho cư dân.
-            </p>
+    <div className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in slide-in-from-right-6 duration-700 font-sans">
+      {/* F.14.1 Sticky Header */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-2xl px-5 py-4 border-b border-gray-100 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)} className="w-10 h-10 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-slate-700 active:scale-95 transition-all">
+              <ArrowLeft size={18} />
+            </button>
+            <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">Thông báo</h2>
           </div>
-          <div className="absolute right-[-20px] bottom-[-20px] opacity-10 -rotate-12">
-            <Megaphone size={140} className="text-white" />
-          </div>
+          <button className="w-10 h-10 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-teal-600 active:scale-95 transition-all">
+            <BellRing size={20} />
+          </button>
         </div>
-      </div>
 
-      <div className="p-5 space-y-7 w-full mx-auto">
-        {/* Filter Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth">
-          {ANNOUNCEMENT_TYPES.map((type) => (
+        {/* Filter Chips */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {[
+            { id: 'all', label: 'Tất cả', icon: Megaphone },
+            { id: 'pinned', label: 'Ghim', icon: Pin },
+            { id: 'Emergency', label: 'Khẩn cấp', icon: AlertTriangle }
+          ].map((filter) => (
             <button
-              key={type.id}
-              onClick={() => setActiveFilter(type.id)}
+              key={filter.id}
+              onClick={() => setActiveFilter(filter.id)}
               className={cn(
-                "whitespace-nowrap px-6 h-11 rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all border shadow-sm",
-                activeFilter === type.id 
-                  ? "bg-[#0D8A8A] text-white border-[#0D8A8A] shadow-[#0D8A8A]/20" 
-                  : "bg-white text-slate-400 border-slate-100"
+                "flex items-center gap-1.5 px-4 h-9 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border shrink-0",
+                activeFilter === filter.id 
+                  ? "bg-slate-900 border-slate-900 text-white shadow-lg" 
+                  : "bg-white border-gray-100 text-slate-400"
               )}
             >
-              {type.label}
+              <filter.icon size={12} strokeWidth={3} />
+              {filter.label}
             </button>
           ))}
         </div>
-
-        {/* News Feed Area */}
-        <div className="space-y-4">
-          {isLoading ? (
-            Array(3).fill(0).map((_, i) => (
-              <div key={i} className="h-32 bg-slate-50 rounded-[28px] animate-pulse"></div>
-            ))
-          ) : items.length > 0 ? (
-            <>
-              {pinnedItems.map((ann: any) => (
-                <AnnouncementCard key={ann.id} ann={ann} onClick={() => handleOpenDetail(ann)} pinned />
-              ))}
-              {otherItems.map((ann: any) => (
-                <AnnouncementCard key={ann.id} ann={ann} onClick={() => handleOpenDetail(ann)} />
-              ))}
-            </>
-          ) : (
-            <div className="text-center py-20 bg-slate-50/50 rounded-[40px] border border-dashed border-slate-200">
-               <div className="w-20 h-20 bg-white rounded-[32px] flex items-center justify-center mx-auto mb-5 shadow-sm">
-                 <Megaphone size={32} className="text-slate-200" />
-               </div>
-               <p className="text-sm font-black text-slate-400 uppercase tracking-[3px]">Chưa có thông báo</p>
-            </div>
-          )}
-        </div>
       </div>
 
+      <div className="p-5 space-y-4">
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-28 bg-white/50 rounded-3xl animate-pulse" />
+            ))}
+          </div>
+        ) : filteredItems.length > 0 ? (
+          filteredItems.map((ann: any) => {
+            const isPinned = ann.isPinned;
+            const isEmergency = ann.type === 'Emergency';
+
+            return (
+              <div 
+                key={ann.id}
+                onClick={() => handleOpenDetail(ann)}
+                className={cn(
+                  "relative p-5 rounded-[24px] border transition-all active:scale-[0.98] cursor-pointer group overflow-hidden",
+                  isPinned 
+                    ? "bg-gradient-to-br from-slate-800 to-slate-900 text-white border-slate-700 shadow-xl shadow-slate-900/10" 
+                    : isEmergency 
+                    ? "bg-white border-red-200 shadow-lg shadow-red-500/5" 
+                    : "bg-white border-gray-100 shadow-sm hover:border-teal-100"
+                )}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {isPinned && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/10 rounded-full border border-white/10">
+                        <Pin size={10} className="text-amber-400" fill="currentColor" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-400">Đã ghim</span>
+                      </div>
+                    )}
+                    {isEmergency && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-red-500 rounded-full">
+                        <AlertTriangle size={10} className="text-white" fill="currentColor" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white">Khẩn cấp</span>
+                      </div>
+                    )}
+                    {!isPinned && !isEmergency && (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Bản tin cư dân</span>
+                    )}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-bold tracking-tighter opacity-60 italic",
+                    isPinned ? "text-slate-300" : "text-slate-400"
+                  )}>
+                    {formatDistanceToNow(new Date(ann.createdAt), { addSuffix: true, locale: vi })}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className={cn(
+                    "text-[15px] font-black leading-snug tracking-tight uppercase",
+                    isPinned ? "text-white" : "text-slate-800"
+                  )}>
+                    {ann.title}
+                  </h3>
+                  <p className={cn(
+                    "text-[12px] line-clamp-2 leading-relaxed opacity-70",
+                    isPinned ? "text-slate-100" : "text-slate-500"
+                  )}>
+                    {ann.summary || 'Nhấn để xem chi tiết thông báo...'}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t flex items-center justify-between border-white/5">
+                   <div className="flex items-center gap-1">
+                      {!ann.isRead && (
+                        <div className="w-2 h-2 rounded-full bg-teal-500 ring-4 ring-teal-500/10" />
+                      )}
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-widest",
+                        isPinned ? "text-amber-400" : "text-teal-600"
+                      )}>
+                        Chi tiết <ArrowRight size={10} className="inline ml-0.5" strokeWidth={3} />
+                      </span>
+                   </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-20 opacity-40">
+            <Megaphone size={48} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-[11px] font-black uppercase tracking-widest">Không có thông báo nào</p>
+          </div>
+        )}
+      </div>
+
+      {/* Detail Bottom Sheet */}
       <BottomSheet 
         isOpen={!!selectedAnn} 
         onClose={() => setSelectedAnn(null)} 
-        title="Thông báo chi tiết"
+        title="Chi tiết thông báo"
       >
         {selectedAnn && (
-          <div className="space-y-7 pb-10 animate-in fade-in slide-in-from-bottom-6 duration-500">
-            <div className="space-y-4">
-               <div className="flex items-center justify-between">
-                  <span className={cn(
-                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                    ANNOUNCEMENT_TYPES.find(t => t.id === selectedAnn.type)?.color || 'bg-slate-50 text-slate-500'
-                  )}>
+          <div className="py-2 pb-10 space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                 <span className="px-2.5 py-1 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">
                     {selectedAnn.type}
-                  </span>
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                    {formatDistanceToNow(new Date(selectedAnn.createdAt), { addSuffix: true, locale: vi })}
-                  </p>
-               </div>
-               <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tight uppercase">
-                 {selectedAnn.title}
-               </h3>
-               <div className="p-4 bg-teal-50/50 rounded-2xl border border-teal-100 flex items-center gap-3">
-                  <Sparkles size={18} className="text-[#0D8A8A]" />
-                  <p className="text-[11px] font-black text-teal-800 uppercase tracking-[2px]">Tin chính thức từ BQL</p>
-               </div>
+                 </span>
+                 <span className="text-[11px] font-bold text-slate-400 italic">
+                    {new Date(selectedAnn.createdAt).toLocaleDateString('vi-VN')}
+                 </span>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 leading-tight tracking-tight uppercase">
+                {selectedAnn.title}
+              </h2>
+            </div>
+            
+            <div className="prose prose-slate max-w-none text-slate-600 font-medium text-[14px] leading-relaxed">
+              <RichTextViewer html={selectedAnn.content} />
             </div>
 
-            <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed font-medium">
-               <RichTextViewer html={selectedAnn.content} />
-            </div>
-
-            <div className="pt-6 border-t border-slate-50 flex gap-4">
-               <button 
-                 onClick={() => handleShare(selectedAnn)}
-                 className="flex-1 h-15 bg-white border border-slate-100 rounded-[20px] font-black uppercase tracking-[2px] text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all text-slate-500"
-               >
-                  <Share2 size={18} />
-                  Chia sẻ
-               </button>
-               <button 
-                 onClick={() => setSelectedAnn(null)}
-                 className="flex-1 h-15 bg-[#0D8A8A] text-white rounded-[20px] font-black uppercase tracking-[2px] text-[10px] active:scale-95 transition-all shadow-xl shadow-[#0D8A8A]/20"
-               >
-                  Đã đọc
-               </button>
+            <div className="flex gap-3 pt-4">
+              <button 
+                onClick={() => handleShare(selectedAnn)}
+                className="flex-1 h-15 bg-white border border-gray-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-[3px] active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Share2 size={18} />
+                Chia sẻ
+              </button>
+              <button 
+                onClick={() => setSelectedAnn(null)}
+                className="flex-[2] h-15 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-xl active:scale-95 transition-all"
+              >
+                Đã hiểu
+              </button>
             </div>
           </div>
         )}
       </BottomSheet>
-    </div>
-  );
-};
-
-const AnnouncementCard = ({ ann, onClick, pinned }: any) => {
-  const isEmergency = ann.type === 'Emergency';
-  const typeStyle = ANNOUNCEMENT_TYPES.find(t => t.id === ann.type);
-  
-  return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        "bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 transition-all active:scale-[0.98] relative overflow-hidden group hover:border-[#0D8A8A]/20 hover:shadow-xl hover:shadow-slate-200/50",
-        isEmergency && "border-red-100 bg-red-50/10",
-        pinned && "border-teal-100 shadow-teal-100/20"
-      )}
-    >
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-           <div className={cn(
-              "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-              typeStyle?.color || "bg-slate-50 text-slate-500 border-slate-100"
-           )}>
-              {ann.type}
-           </div>
-           {pinned ? (
-             <div className="w-7 h-7 bg-[#0D8A8A] rounded-full flex items-center justify-center text-white rotate-45 shadow-lg">
-                <Pin size={12} strokeWidth={3} />
-             </div>
-           ) : (
-             <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-               {formatDistanceToNow(new Date(ann.createdAt), { addSuffix: true, locale: vi })}
-             </p>
-           )}
-        </div>
-
-        <div className="flex gap-4">
-           {isEmergency && (
-              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 shrink-0">
-                 <AlertTriangle size={24} strokeWidth={2.5} />
-              </div>
-           )}
-           <div className="flex-1 space-y-1.5">
-              <h4 className={cn("text-[15px] font-black tracking-tight leading-tight uppercase line-clamp-1", isEmergency ? "text-red-700" : "text-slate-800")}>
-                {ann.title}
-              </h4>
-              <p className="text-xs text-slate-400 font-medium line-clamp-2 leading-relaxed tracking-tight">
-                {ann.summary || 'Nhấn để xem chi tiết các cập nhật mới nhất từ Ban quản lý SmartStay...'}
-              </p>
-           </div>
-           <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 group-hover:text-[#0D8A8A] group-hover:bg-teal-50 transition-all shrink-0">
-              <ArrowRight size={20} strokeWidth={3} />
-           </div>
-        </div>
-      </div>
     </div>
   );
 };
