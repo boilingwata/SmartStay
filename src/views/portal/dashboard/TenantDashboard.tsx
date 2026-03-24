@@ -1,31 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Bell, 
-  CreditCard, 
-  MessageSquare, 
-  ArrowUpRight, 
-  ChevronRight,
-  Home,
-  Clock,
-  Zap,
-  Droplets,
-  Info,
-  AlertTriangle,
-  FileText,
-  Users,
-  CalendarDays,
-  Activity,
-  ArrowRight
-} from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/utils';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Bell, CreditCard, MessageSquare, Droplets, Users, 
+  ArrowRight, FileText, Receipt, AlertCircle, CalendarDays,
+  Home, CheckCircle2
+} from 'lucide-react';
+import { cn } from '@/utils';
 import { tenantDashboardService, DashboardSummary } from '@/services/tenantDashboardService';
-import { differenceInDays, formatDistanceToNow, isPast } from 'date-fns';
+import { differenceInDays, isPast, format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-const TenantDashboard: React.FC = () => {
+export default function TenantDashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,227 +30,265 @@ const TenantDashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  if (loading || !data) {
+  if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-6 bg-[#F8FAFC] min-h-[80vh]">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-[#0D8A8A]/10 border-t-[#0D8A8A] rounded-full animate-spin shadow-xl"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-             <div className="w-10 h-10 bg-[#0D8A8A]/5 rounded-full animate-pulse"></div>
+      <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6 lg:p-8 min-h-screen bg-[#F1F5F9]">
+        <div className="flex-1 min-w-0 space-y-6">
+          <div className="h-[200px] w-full bg-slate-200 animate-pulse rounded-[24px]" />
+          <div className="grid grid-cols-4 gap-3">
+             {[1,2,3,4].map(i => <div key={i} className="h-24 bg-slate-200 animate-pulse rounded-[16px]" />)}
           </div>
+          <div className="h-[200px] bg-slate-200 animate-pulse rounded-[20px]" />
         </div>
-        <div className="text-center space-y-2">
-          <p className="text-[14px] text-slate-900 font-black uppercase tracking-[8px] animate-pulse">SmartStay</p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[4px]">Hệ thống bảo mật cư dân</p>
+        <div className="w-full lg:w-1/3 shrink-0 space-y-6">
+          <div className="h-[240px] bg-slate-200 animate-pulse rounded-[20px]" />
+          <div className="h-[200px] bg-slate-200 animate-pulse rounded-[20px]" />
         </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+        <AlertCircle size={48} className="mb-4 text-slate-300" />
+        <p className="text-lg font-bold">Không có dữ liệu</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-teal-50 text-teal-600 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all">Thử lại</button>
       </div>
     );
   }
 
   const activeContract = data.activeContract;
   const contractExpiryDays = activeContract ? differenceInDays(new Date(activeContract.endDate), new Date()) : 0;
-  const isExpiryWarning = contractExpiryDays < 30;
+  
+  // Quick Actions Config
+  const quickActions = [
+    { icon: Receipt, label: 'Hóa đơn', color: 'bg-teal-50 text-teal-600', route: '/portal/invoices' },
+    { icon: MessageSquare, label: 'Hỗ trợ', color: 'bg-orange-50 text-orange-600', route: '/portal/tickets' },
+    { icon: Droplets, label: 'Tiện ích', color: 'bg-purple-50 text-purple-600', route: '/portal/amenities' },
+    { icon: Users, label: 'Khách', color: 'bg-blue-50 text-blue-600', route: '/portal/visitors' },
+  ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F1F5F9] pb-32 animate-in fade-in duration-1000 no-scrollbar">
-      {/* 1. Lush Header with Overlapping Card */}
-      <div className="relative h-[280px] w-full overflow-hidden bg-gradient-to-br from-[#1B3A6B] via-[#0D8A8A] to-[#2E5D9F] px-8 pt-12">
-        {/* Animated Mesh Overlays */}
-        <div className="absolute inset-0 opacity-40 mix-blend-overlay">
-          <div className="absolute top-[-20%] left-[-10%] w-[80%] h-[120%] bg-white/20 blur-[120px] rounded-full animate-float"></div>
-          <div className="absolute bottom-[-30%] right-[-10%] w-[60%] h-[100%] bg-emerald-400/20 blur-[100px] rounded-full"></div>
-        </div>
+    <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6 lg:p-8 min-h-screen bg-[#F1F5F9]">
+      {/* LEFT COLUMN: Main Content */}
+      <div className="flex-1 min-w-0 flex flex-col gap-6">
         
-        <div className="relative z-10 space-y-1">
-          <p className="text-[12px] font-black text-white/60 uppercase tracking-[5px] italic">Premium Resident</p>
-          <h2 className="text-[36px] font-black text-white tracking-tighter leading-tight">
-            Xin chào,<br/>
-            <span className="italic">{activeContract?.tenantName.split(' ').pop()}!</span>
-          </h2>
-        </div>
-
-        {/* Floating Abstract Element */}
-        <div className="absolute top-10 right-8 animate-float opacity-30">
-           <Activity size={100} strokeWidth={0.5} className="text-white" />
-        </div>
-      </div>
-
-      {/* 2. Overlapping Tactical Hub (Dashboard Main Content) */}
-      <div className="px-5 -mt-24 relative z-20 space-y-8">
-        
-        {/* Unit & Contract Info Overlap */}
-        <div className="bg-white/90 backdrop-blur-2xl rounded-[32px] p-6 shadow-premium border border-white/60 group hover:shadow-glow transition-all duration-500">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#0D8A8A] to-[#1B3A6B] text-white rounded-[24px] flex items-center justify-center shadow-xl shadow-[#0D8A8A]/20 transition-transform group-hover:rotate-[10deg]">
-               <Home size={28} strokeWidth={2.5} />
+        {/* 1. Hero Banner */}
+        <section className="bg-gradient-to-br from-[#0D8A8A] to-[#1B3A6B] rounded-[24px] p-6 text-white shadow-lg relative overflow-hidden flex flex-col justify-between min-h-[180px]">
+          <div className="relative z-10 flex items-start justify-between">
+            <div className="space-y-1">
+              <p className="text-[12px] font-bold text-white/70 uppercase tracking-wider">
+                {format(new Date(), 'EEEE, dd/MM/yyyy', { locale: vi })}
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight pt-1">
+                Xin chào, {activeContract?.tenantName?.split(' ').pop() || 'Cư dân'}! 👋
+              </h2>
             </div>
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center justify-between">
-                <p className="text-xl font-black text-slate-900 tracking-tight italic">Căn hộ {activeContract?.roomCode}</p>
-                <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1.5 transition-transform" />
+          </div>
+          
+          <div className="relative z-10 mt-6 pt-5 border-t border-white/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm shrink-0">
+                <Home size={20} className="text-white" />
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{activeContract?.buildingName}</p>
-            </div>
-          </div>
-          
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between">
-             <div className="flex items-center gap-2">
-                <Clock size={14} className="text-slate-400" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider italic">Hợp đồng: {activeContract?.endDate}</span>
-             </div>
-             <span className={cn(
-               "h-6 px-3 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center justify-center",
-               isExpiryWarning ? "bg-rose-50 text-rose-500 border border-rose-100 animate-pulse" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
-             )}>
-                {isExpiryWarning ? "Sắp hết hạn" : "Đang Active"}
-             </span>
-          </div>
-        </div>
-
-        {/* High-End VIP Financial Card */}
-        <div className="relative group cursor-pointer" onClick={() => navigate('/portal/invoices')}>
-          <div className="absolute -inset-1 bg-gradient-to-r from-[#0D8A8A] to-indigo-600 rounded-[44px] blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
-          <div className="relative bg-slate-900 rounded-[40px] overflow-hidden p-8 text-white shadow-2xl">
-            {/* Glossy Texture Overlay */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[100px] -mr-32 -mt-32 rounded-full" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#0D8A8A]/10 blur-[60px] -ml-16 -mb-16 rounded-full" />
-
-            <div className="relative z-10 flex flex-col h-full justify-between gap-12">
-               <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                     <p className="text-[11px] font-black text-white/40 uppercase tracking-[4px]">Số dư khả dụng</p>
-                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black tracking-tighter tabular-nums drop-shadow-2xl">
-                          {data.balance.currentBalance.toLocaleString()}
-                        </span>
-                        <span className="text-lg font-black text-white/60">đ</span>
-                     </div>
-                  </div>
-                  <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl border border-white/10 shadow-inner group-hover:scale-110 transition-transform">
-                    <Zap size={24} strokeWidth={2.5} className="text-[#0D8A8A]" />
-                  </div>
-               </div>
-
-               <div className="flex items-center gap-4 py-4 px-5 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm group-hover:bg-white/10 transition-all">
-                  <div className="w-10 h-10 bg-[#0D8A8A] rounded-xl flex items-center justify-center text-white shadow-lg">
-                    <FileText size={18} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Hóa đơn chưa đóng</p>
-                    <p className="text-sm font-black italic tracking-tight">{data.pendingInvoicesCount} mục chờ thanh toán</p>
-                  </div>
-                  <ArrowUpRight size={22} className="text-white/40 group-hover:text-white transition-colors" />
-               </div>
-
-               <button className="w-full h-16 bg-[#0D8A8A] hover:bg-emerald-500 rounded-[24px] text-white font-black text-[14px] tracking-[6px] uppercase italic transition-all active:scale-[0.97] shadow-lg shadow-[#0D8A8A]/30 flex items-center justify-center gap-4">
-                  Nạp tiền / Thanh toán
-               </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Functional List Sections */}
-        <div className="space-y-12 pt-4 pb-20">
-          
-          {/* Upcoming Invoices */}
-          <section className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-               <div className="flex items-center gap-3">
-                  <div className="w-2 h-6 bg-[#0D8A8A] rounded-full shadow-glow" />
-                  <h3 className="text-2xl font-black text-slate-800 tracking-tighter italic">Lịch thu phí</h3>
-               </div>
-               <button onClick={() => navigate('/portal/invoices')} className="text-[10px] font-black text-[#0D8A8A] uppercase tracking-widest bg-white px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">Tất cả</button>
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">Căn hộ {activeContract?.roomCode || '—'}</p>
+                <p className="text-[11px] text-white/70 uppercase tracking-widest truncate">{activeContract?.buildingName || '—'}</p>
+              </div>
             </div>
             
-            <div className="space-y-4">
-              {data.upcomingInvoices.slice(0, 3).map((inv) => (
-                <div key={inv.id} className="card-premium p-5 flex items-center justify-between group active:scale-[0.98] transition-all bg-white/90 border-slate-100" onClick={() => navigate(`/portal/invoices/${inv.id}`)}>
-                  <div className="flex items-center gap-4">
-                     <div className="w-14 h-14 bg-slate-100/50 text-[#1B3A6B] rounded-2xl flex items-center justify-center transition-all group-hover:bg-[#1B3A6B] group-hover:text-white shadow-inner">
-                       <CreditCard size={24} strokeWidth={2.5} />
-                     </div>
-                     <div className="space-y-1">
-                       <p className="text-[16px] font-black text-slate-900 tracking-tight leading-none">{inv.title}</p>
-                       <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none">Hạn: {inv.dueDate}</p>
-                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black text-slate-900 tabular-nums italic">{inv.amount.toLocaleString()}đ</p>
-                    <ArrowRight size={18} className="text-slate-200 ml-auto group-hover:text-[#0D8A8A] transition-colors" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Quick Dashboard Toggles */}
-          <section className="grid grid-cols-2 gap-4">
-             <div className="card-premium p-6 space-y-4 bg-gradient-to-br from-indigo-50/50 to-white/90 border-indigo-100/50" onClick={() => navigate('/portal/tickets')}>
-                <div className="w-12 h-12 bg-white text-indigo-500 rounded-2xl flex items-center justify-center shadow-lg border border-indigo-50">
-                   <MessageSquare size={22} strokeWidth={2.5} />
-                </div>
-                <div className="space-y-1">
-                   <p className="text-sm font-black text-slate-800 tracking-tight leading-none italic">Sự cố & Hỗ trợ</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                     {data.recentTickets.filter(t => t.status === 'Open' || t.status === 'InProgress').length} yêu cầu
-                   </p>
-                </div>
-             </div>
-
-             <div className="card-premium p-6 space-y-4 bg-gradient-to-br from-emerald-50/50 to-white/90 border-emerald-100/50" onClick={() => navigate('/portal/amenities')}>
-                <div className="w-12 h-12 bg-white text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg border border-emerald-50">
-                   <Droplets size={22} strokeWidth={2.5} />
-                </div>
-                <div className="space-y-1">
-                   <p className="text-sm font-black text-slate-800 tracking-tight leading-none italic">Tiện ích tòa nhà</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đang khả dụng</p>
-                </div>
-             </div>
-          </section>
-
-          {/* Service Snapshot Card */}
-          <div className="card-premium p-8 relative overflow-hidden bg-slate-900 group">
-             <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none group-hover:scale-125 transition-transform duration-1000">
-                <Zap size={140} className="text-[#0D8A8A]" />
-             </div>
-             <div className="relative z-10 space-y-6">
-                <div className="flex items-center justify-between">
-                   <h3 className="text-xl font-black text-white italic tracking-tight">Trạng thái tiện ích</h3>
-                   <span className="text-[9px] font-black text-[#0D8A8A] uppercase tracking-[4px] animate-pulse">Live Now</span>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                   <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-[#0D8A8A]">
-                         <Zap size={16} fill="currentColor" />
-                         <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Điện năng</span>
-                      </div>
-                      <p className="text-2xl font-black text-white tabular-nums italic tracking-tighter">1,250 <span className="text-[10px] text-white/40 not-italic uppercase tracking-widest ml-1">kWh</span></p>
-                   </div>
-                   <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sky-400">
-                         <Droplets size={16} fill="currentColor" />
-                         <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Nước sạch</span>
-                      </div>
-                      <p className="text-2xl font-black text-white tabular-nums italic tracking-tighter">45.5 <span className="text-[10px] text-white/40 not-italic uppercase tracking-widest ml-1">m3</span></p>
-                   </div>
-                </div>
-                <Button className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-[3px] h-12 rounded-2xl active:scale-95 transition-all shadow-none" onClick={() => navigate('/portal/meters')}>Chi tiết chỉ số</Button>
-             </div>
+            {activeContract && (
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm shrink-0 w-fit">
+                <CalendarDays size={16} className="text-white/80 shrink-0" />
+                <span className="text-xs font-semibold whitespace-nowrap">
+                   Hợp đồng còn {Math.max(0, contractExpiryDays)} ngày
+                </span>
+              </div>
+            )}
           </div>
-        </div>
+          
+          {/* Decorative Background */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[80px] -mr-20 -mt-20 rounded-full" />
+        </section>
 
-        {/* Premium Brand Footer */}
-        <div className="py-20 text-center space-y-4 opacity-30">
-           <div className="flex justify-center items-center gap-3">
-              <div className="w-1 h-1 rounded-full bg-[#0D8A8A]" />
-              <span className="text-[11px] font-black uppercase tracking-[10px] text-slate-900 italic">SMARTSTAY</span>
-              <div className="w-1 h-1 rounded-full bg-[#0D8A8A]" />
-           </div>
-           <p className="text-[8px] font-black text-slate-400 uppercase tracking-[4px]">Designed for Exclusive Living © 2026</p>
-        </div>
+        {/* 2. Quick Actions */}
+        <section className="grid grid-cols-4 gap-3">
+          {quickActions.map(action => (
+            <button 
+              key={action.label}
+              onClick={() => navigate(action.route)}
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-[16px] border border-gray-100 shadow-sm hover:shadow-md hover:border-teal-200 active:scale-[0.98] hover:scale-[1.02] transition-transform duration-200 ease-out"
+            >
+              <div className={cn('w-10 h-10 sm:w-12 sm:h-12 rounded-[12px] flex items-center justify-center shrink-0', action.color)}>
+                <action.icon size={22} strokeWidth={2.5} />
+              </div>
+              <span className="text-[11px] sm:text-xs text-slate-700 font-bold max-w-full truncate">{action.label}</span>
+            </button>
+          ))}
+        </section>
+
+        {/* 3. Upcoming Invoices */}
+        <section className="bg-white rounded-[20px] p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[15px] font-black text-slate-800">Hóa đơn sắp đến</h3>
+            <button onClick={() => navigate('/portal/invoices')} className="text-[12px] font-bold text-[#0D8A8A] hover:underline">Xem tất cả</button>
+          </div>
+          
+          <div className="space-y-3">
+            {data.upcomingInvoices.length === 0 ? (
+              <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                <CheckCircle2 size={32} className="text-emerald-400 mb-2" />
+                <p className="text-sm font-medium">Không có hóa đơn nợ</p>
+              </div>
+            ) : (
+              data.upcomingInvoices.slice(0, 3).map(inv => {
+                const isOverdue = inv.dueDate && isPast(new Date(inv.dueDate));
+                return (
+                  <div key={inv.id} className={cn(
+                    "p-3 rounded-2xl border flex items-center justify-between transition-colors cursor-pointer hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] duration-200",
+                    isOverdue ? "border-red-200 bg-red-50/50" : "border-slate-100 bg-white"
+                  )} onClick={() => navigate(`/portal/invoices/${inv.id}`)}>
+                    <div className="flex items-center gap-3 min-w-0 pr-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                        isOverdue ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"
+                      )}>
+                        <Receipt size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-slate-800 truncate">{inv.title}</p>
+                        <p className={cn("text-[11px] font-medium mt-0.5 truncate", isOverdue ? "text-red-500" : "text-slate-500")}>
+                          Hạn: {inv.dueDate ? format(new Date(inv.dueDate), 'dd/MM/yyyy') : '—'}
+                          {isOverdue && ' (Quá hạn)'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[14px] font-black text-slate-900 shrink-0">{inv.amount?.toLocaleString()}đ</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        {/* 4. Active Tickets */}
+        <section className="bg-white rounded-[20px] p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[15px] font-black text-slate-800">Yêu cầu đang xử lý</h3>
+            <button onClick={() => navigate('/portal/tickets')} className="text-[12px] font-bold text-[#0D8A8A] hover:underline">Chi tiết</button>
+          </div>
+          
+          <div className="space-y-3">
+            {data.recentTickets.filter(t => ['Open', 'InProgress'].includes(t.status)).length === 0 ? (
+              <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                <CheckCircle2 size={32} className="text-emerald-400 mb-2" />
+                <p className="text-sm font-medium">Không có yêu cầu nào đang chờ</p>
+              </div>
+            ) : (
+              data.recentTickets.filter(t => ['Open', 'InProgress'].includes(t.status)).slice(0, 2).map(ticket => {
+                const slaBreached = ticket.slaDeadline && isPast(new Date(ticket.slaDeadline));
+                return (
+                  <div key={ticket.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-3 cursor-pointer hover:bg-slate-100 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200" onClick={() => navigate(`/portal/tickets/${ticket.id}`)}>
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 pr-4">
+                        <p className="text-[11px] font-bold text-slate-500 uppercase">{ticket.ticketCode}</p>
+                        <p className="text-[14px] font-bold text-slate-800 truncate mt-0.5">{ticket.title}</p>
+                      </div>
+                      <span className="shrink-0 as px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-orange-100 text-orange-600">
+                        {ticket.status === 'Open' ? 'Mới' : 'Đang xử lý'}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <div className="flex justify-between text-[11px] font-medium mb-1">
+                        <span className="text-slate-500">Tiến độ xử lý</span>
+                        <span className={cn(slaBreached ? "text-red-500" : "text-slate-500")}>
+                          {slaBreached ? "Quá hạn SLA" : "Trong hạn SLA"}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          slaBreached ? "bg-red-500 w-full" : "bg-orange-400 w-1/2" 
+                        )} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+      </div>
+
+      {/* RIGHT COLUMN: Sidebar Summary */}
+      <div className="w-full lg:w-1/3 shrink-0 flex flex-col gap-6">
+        
+        {/* Balance Card */}
+        <section className="bg-white rounded-[20px] p-6 border border-teal-100 shadow-md">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[14px] font-black text-slate-500 uppercase tracking-widest">Ví của bạn</h3>
+            <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center shrink-0">
+              <CreditCard size={20} />
+            </div>
+          </div>
+          
+          <div className="space-y-1 mb-6">
+            <p className="text-[12px] font-semibold text-slate-500">Số dư khả dụng</p>
+            <div className="flex items-baseline gap-1 break-all">
+              <p className="text-3xl font-black text-slate-900 tracking-tight">
+                {data.balance.currentBalance?.toLocaleString() || '0'}
+              </p>
+              <span className="text-lg font-bold text-slate-400">đ</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between mb-6 border border-slate-100">
+            <div className="flex items-center gap-2 text-slate-600 min-w-0 pr-2">
+              <FileText size={16} className="shrink-0" />
+              <span className="text-[13px] font-medium truncate">Hóa đơn chờ thanh toán</span>
+            </div>
+            <span className="text-[13px] font-bold text-rose-500 shrink-0">{data.pendingInvoicesCount} mục</span>
+          </div>
+
+          <button 
+            onClick={() => navigate('/portal/balance')}
+            className="w-full h-12 bg-[#0D8A8A] text-white rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 ease-out shadow-lg shadow-teal-500/20"
+          >
+            Thanh toán ngay <ArrowRight size={16} />
+          </button>
+        </section>
+
+        {/* Announcements */}
+        <section className="bg-white rounded-[20px] p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[15px] font-black text-slate-800">Thông báo mới</h3>
+            <button onClick={() => navigate('/portal/announcements')} className="text-[12px] font-bold text-[#0D8A8A] hover:underline">Tất cả</button>
+          </div>
+          
+          <div className="space-y-4">
+            {(!data.hotAnnouncements || data.hotAnnouncements.length === 0) ? (
+              <div className="py-6 flex flex-col items-center justify-center text-slate-400">
+                <Bell size={28} className="text-slate-300 mb-2" />
+                <p className="text-[13px] font-medium">Chưa có thông báo nào</p>
+              </div>
+            ) : (
+              data.hotAnnouncements.slice(0, 3).map(ann => (
+                <div key={ann.id} className="flex gap-3 group cursor-pointer hover:bg-slate-50 p-2 -mx-2 rounded-xl transition-colors hover:scale-[1.01] active:scale-[0.99] duration-200" onClick={() => navigate(`/portal/announcements/${ann.id}`)}>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-slate-800 line-clamp-2 group-hover:text-[#0D8A8A] transition-colors">{ann.title}</p>
+                    <p className="text-[11px] font-medium text-slate-500 mt-1 truncate">{formatDistanceToNow(new Date(ann.createdAt), { addSuffix: true, locale: vi })}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
       </div>
     </div>
   );
-};
-
-export default TenantDashboard;
+}
