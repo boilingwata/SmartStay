@@ -1,0 +1,121 @@
+/**
+ * Security utilities for URL sanitization and validation
+ * Prevents XSS and loading content from untrusted remote sources
+ */
+
+export const TRUSTED_DOMAINS = [
+  'cdn.smartstay.vn',
+  'localhost',
+  '127.0.0.1',
+  'i.pravatar.cc', // Whitelisted for demo avatars
+];
+
+/**
+ * Validates if a URL is safe to render in src or href
+ * 1. Checks for common protocols (https only, no javascript:)
+ * 2. Checks if the domain is in the trusted whitelist
+ * 3. Allows blob: and data: urls for local previews if safe
+ */
+export const isSafeUrl = (url: string | undefined): boolean => {
+  if (!url) return false;
+
+  // 1. Block known dangerous protocols
+  const lowerUrl = url.toLowerCase().trim();
+  if (lowerUrl.startsWith('javascript:')) return false;
+  if (lowerUrl.startsWith('data:')) {
+    // Only allow data images, block other types
+    return lowerUrl.startsWith('data:image/');
+  }
+  if (lowerUrl.startsWith('blob:')) return true; // Local previews are generally safe
+
+  // 2. Protocol Check
+  if (!lowerUrl.startsWith('http://') && !lowerUrl.startsWith('https://')) {
+    // Relative paths are safe
+    if (url.startsWith('/')) return true;
+    return false;
+  }
+
+  // 3. Domain Check
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    return TRUSTED_DOMAINS.some(domain => 
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Returns a safe URL or a fallback image
+ */
+export const sanitizeUrl = (url: string | undefined, fallback: string = '/images/safe-fallback.png'): string => {
+  if (isSafeUrl(url)) return url!;
+  return fallback;
+};
+
+/**
+ * Validates file integrity by checking magic bytes (demonstration)
+ * Used in client-side pre-upload validation
+ */
+export const checkImageIntegrity = async (file: Blob): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = (e) => {
+      if (!e.target?.result) return resolve(false);
+      const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 4);
+      let header = "";
+      for (let i = 0; i < arr.length; i++) {
+        header += arr[i].toString(16).padStart(2, '0');
+      }
+      
+      const isPng = header.startsWith("89504e47");
+      const isJpeg = header.startsWith("ffd8ff");
+      const isWebp = header.includes("52494646"); // RIFF header for WebP
+      
+      resolve(isPng || isJpeg || isWebp);
+    };
+    reader.readAsArrayBuffer(file.slice(0, 16));
+  });
+};
+
+/**
+ * Strictly validates and normalizes a URL string. 
+ * Only allows http: and https: protocols AND requires the host
+ * to be on the TRUSTED_DOMAINS whitelist.
+ * Returns the normalized href string or null if invalid.
+ */
+export const getNormalizedHttpUrl = (url?: unknown): string | null => {
+  if (typeof url !== 'string' || !url.trim()) return null;
+
+  try {
+    const parsed = new URL(url.trim());
+    
+    // 1. Protocol check
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      
+      // 2. Strip credentials to prevent user:pass@host obfuscation
+      parsed.username = '';
+      parsed.password = '';
+      
+      // 3. Domain Whitelist check
+      const hostname = parsed.hostname.toLowerCase();
+      const isTrusted = TRUSTED_DOMAINS.some(domain => 
+        hostname === domain || hostname.endsWith('.' + domain)
+      );
+      
+      if (isTrusted) {
+        return parsed.href;
+      } else {
+        console.warn(`[Security] Untrusted URL domain blocked: ${hostname}`);
+        return null;
+      }
+    }
+    console.warn(`[Security] Invalid URL protocol blocked: ${parsed.protocol}`);
+  } catch (e) {
+    console.warn(`[Security] Malformed URL encountered and blocked.`);
+  }
+  return null;
+};

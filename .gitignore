@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# Environment variables
+*.local
+.env
+.env.*
+!.env.example
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Editor directories
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vite compiled config artifacts
+vite.config.d.ts
+vite.config.js
+
+# AI agent tooling (Claude Code, .agents, MCP)
+.claude/
+.agents/
+.mcp.json
+skills-lock.json
+
+# Playwright / test output
+.playwright-cli/
+.playwright-mcp/
+audit-screenshots/
+output/
+e2e/test-results/
+playwright-report/
+
+# Root-level screenshot snapshots (session artifacts)
+*.png
+
+# Temporary / session files
+*.tmp
+
+E2E-TEST-REPORT.md
+AUDIT.md
+CLAUDE.md
+IMPROVEMENTS.md

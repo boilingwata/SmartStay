@@ -1,0 +1,18 @@
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/supabase'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY env vars')
+}
+
+export const supabase = createClient<Database, 'smartstay'>(supabaseUrl, supabaseAnonKey, {
+  db: { schema: 'smartstay' },
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    storage: localStorage,
+  },
+})
