@@ -72,7 +72,7 @@ const TicketDetail: React.FC = () => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 p-5 space-y-8 overflow-y-auto pb-40 no-scrollbar max-w-[430px] mx-auto w-full">
+      <div className="flex-1 p-5 space-y-8 overflow-y-auto pb-40 no-scrollbar w-full mx-auto">
         {/* Date Label */}
         <div className="text-center py-4">
           <span className="px-4 py-1.5 bg-white border border-slate-100 rounded-full text-[10px] font-black text-slate-400 shadow-sm uppercase tracking-[2.5px]">
@@ -138,7 +138,7 @@ const TicketDetail: React.FC = () => {
 
       {/* Enhanced Input Area */}
       {ticket.status !== 'Closed' && (
-        <div className="fixed bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-2xl border-t border-slate-100/50 z-[100] max-w-[430px] mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-2xl border-t border-slate-100/50 z-[100] w-full mx-auto">
           <div className="flex gap-3 bg-slate-50/80 rounded-[28px] p-2 items-center border border-slate-100 shadow-inner">
             <button className="w-10 h-10 text-slate-400 hover:text-[#0D8A8A] flex items-center justify-center transition-colors">
               <Paperclip size={20} />

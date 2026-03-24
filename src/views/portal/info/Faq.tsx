@@ -91,7 +91,7 @@ const Faq = () => {
         </div>
       </div>
 
-      <div className="p-5 space-y-8 max-w-[430px] mx-auto pt-6">
+      <div className="p-5 space-y-8 w-full mx-auto pt-6">
         {/* Search & Hero Card */}
         <div className="relative p-7 bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 p-8 opacity-10">

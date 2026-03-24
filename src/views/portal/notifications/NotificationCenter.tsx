@@ -47,7 +47,7 @@ const SwipeableNotificationItem = ({ item, onRead, onDelete }: { item: any; onRe
 
   const handleTouchEnd = () => {
     if (offset < -80) {
-      setOffset(-window.innerWidth);
+      setOffset(-1000);
       setTimeout(onDelete, 300);
     } else {
       setOffset(0);
@@ -171,7 +171,7 @@ const NotificationCenter = () => {
 
   return (
     <div className="min-h-full bg-transparent pb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="p-5 space-y-6 max-w-[430px] mx-auto pt-4">
+      <div className="p-4 sm:p-5 space-y-6 w-full mx-auto pt-4">
         {/* Header Section */}
         <div className="flex items-center justify-between px-1">
           <div className="space-y-0.5">

@@ -57,7 +57,7 @@ const MeterReadingList: React.FC = () => {
          )}></div>
       </div>
 
-      <div className="relative pt-12 px-6 max-w-[430px] mx-auto space-y-8">
+      <div className="relative pt-12 px-6 w-full mx-auto space-y-8">
         {/* Header Navigation */}
         <div className="flex items-center justify-between">
           <button 

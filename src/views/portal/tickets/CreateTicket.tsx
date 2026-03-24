@@ -115,7 +115,7 @@ const CreateTicket: React.FC = () => {
       </div>
 
       {/* 2. Overlapping Form Card */}
-      <div className="px-5 -mt-16 relative z-20 max-w-[430px] mx-auto space-y-8">
+      <div className="px-5 -mt-16 relative z-20 w-full mx-auto space-y-8">
         <div className="bg-white/90 backdrop-blur-2xl rounded-[40px] p-8 shadow-premium border border-white/60 space-y-10 relative">
           
           {/* Category Section */}

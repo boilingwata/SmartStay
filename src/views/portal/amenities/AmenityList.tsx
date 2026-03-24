@@ -122,7 +122,7 @@ const AmenityList: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent pb-32 animate-in fade-in slide-in-from-right-6 duration-700 font-sans">
-      <div className="p-5 space-y-8 max-w-[430px] mx-auto pt-6">
+      <div className="p-5 space-y-8 w-full mx-auto pt-6">
         <div className="flex items-center justify-between pr-2">
             <div className="space-y-0.5">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Dành cho cư dân</p>

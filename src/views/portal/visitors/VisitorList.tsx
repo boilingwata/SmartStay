@@ -131,7 +131,7 @@ const VisitorList: React.FC = () => {
         </button>
       </div>
 
-      <div className="p-5 space-y-8 max-w-[430px] mx-auto pt-6">
+      <div className="p-5 space-y-8 w-full mx-auto pt-6">
         {/* Tab Switcher */}
         <div className="flex p-1 bg-white rounded-[20px] shadow-sm border border-slate-100">
           {(['upcoming', 'history'] as const).map((tab) => (

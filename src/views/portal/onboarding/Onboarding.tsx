@@ -267,10 +267,9 @@ const Onboarding: React.FC = () => {
       <div className="min-h-screen w-full bg-[#F1F5F9] px-4 py-6 lg:px-8 lg:py-8">
         <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[1280px] flex-col items-center justify-center rounded-[32px] border border-slate-200/70 bg-slate-50 p-8 text-center shadow-[0_32px_80px_-48px_rgba(15,23,42,0.45)] relative overflow-hidden lg:p-12">
           <Confetti
-            width={window.innerWidth}
-            height={window.innerHeight}
             recycle={false}
             numberOfPieces={280}
+            className="absolute inset-0 w-full h-full pointer-events-none"
           />
           <div className="w-24 h-24 bg-teal-100 rounded-full flex items-center justify-center text-[#0D8A8A] mb-8 animate-bounce relative z-10 shadow-lg shadow-teal-500/20">
             <Sparkles size={48} />

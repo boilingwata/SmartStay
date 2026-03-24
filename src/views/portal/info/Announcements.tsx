@@ -106,7 +106,7 @@ const Announcements = () => {
         </div>
       </div>
 
-      <div className="p-5 space-y-7 max-w-[430px] mx-auto">
+      <div className="p-5 space-y-7 w-full mx-auto">
         {/* Filter Pills */}
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth">
           {ANNOUNCEMENT_TYPES.map((type) => (

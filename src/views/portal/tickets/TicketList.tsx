@@ -155,7 +155,7 @@ const TicketList: React.FC = () => {
       </div>
 
       {/* 2. Overlapping Ticket List */}
-      <div className="px-5 -mt-6 relative z-20 space-y-6 max-w-[430px] mx-auto pb-40 no-scrollbar">
+      <div className="px-5 -mt-6 relative z-20 space-y-6 w-full mx-auto pb-40 no-scrollbar">
         {filteredTickets.length > 0 ? (
           filteredTickets.map((ticket, index) => {
             const statusStyle = getStatusDisplay(ticket.status);
