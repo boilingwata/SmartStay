@@ -174,7 +174,7 @@ export const roomService = {
       query = query.in('status', dbStatuses);
     }
 
-    if (filters?.roomType && filters.roomType !== '') {
+    if (filters?.roomType) {
       query = query.eq('room_type', filters.roomType);
     }
 
