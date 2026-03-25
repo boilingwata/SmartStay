@@ -1,7 +1,9 @@
 import {
   Room, RoomDetail, RoomStatus, RoomType,
   HandoverChecklist, RoomStatusHistory, RoomMeter, RoomAsset,
+  RoomFilters, CreateRoomData, UpdateRoomData, AssetFilters
 } from '@/models/Room';
+
 import { Asset } from '@/models/Asset';
 import { supabase } from '@/lib/supabase';
 import { unwrap, buildingScoped } from '@/lib/supabaseHelpers';
@@ -152,7 +154,7 @@ function toMeters(readings: MeterReadingRow[], roomId: number): RoomMeter[] {
 // --- Service ---
 
 export const roomService = {
-  getRooms: async (filters?: any): Promise<Room[]> => {
+  getRooms: async (filters?: RoomFilters): Promise<Room[]> => {
     let query = supabase
       .from('rooms')
       .select('*, buildings(name)')
@@ -244,7 +246,7 @@ export const roomService = {
     return !data || data.length === 0;
   },
 
-  createRoom: async (data: any): Promise<Room> => {
+  createRoom: async (data: CreateRoomData): Promise<Room> => {
     const row = await unwrap(
       supabase
         .from('rooms')
@@ -269,7 +271,7 @@ export const roomService = {
     return toRoom(row);
   },
 
-  updateRoom: async (id: string, data: any): Promise<Room> => {
+  updateRoom: async (id: string, data: UpdateRoomData): Promise<Room> => {
     const row = await unwrap(
       supabase
         .from('rooms')
@@ -294,7 +296,8 @@ export const roomService = {
     return toRoom(row);
   },
 
-  getAssets: async (filters?: any): Promise<Asset[]> => {
+  getAssets: async (filters?: AssetFilters): Promise<Asset[]> => {
+
     let query = supabase
       .from('room_assets')
       .select('*, assets(id, name, category, qr_code, unit_cost, warranty_months), rooms(room_code)');

@@ -30,3 +30,14 @@ export interface OwnerDetail extends Owner {
   totalBuildings: number;
   totalRooms: number;
 }
+export interface CreateOwnerData {
+  fullName: string;
+  avatarUrl?: string;
+  phone: string;
+  email: string;
+  cccd: string;
+  taxCode?: string;
+  address?: string;
+}
+
+export type UpdateOwnerData = Partial<CreateOwnerData>;

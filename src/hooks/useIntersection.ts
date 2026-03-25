@@ -15,7 +15,7 @@ export function useIntersection(ref: RefObject<HTMLElement>, options?: Intersect
     return () => {
       observer.disconnect();
     };
-  }, [ref, options]);
+  }, [ref, JSON.stringify(options)]);
 
   return isIntersecting;
 }

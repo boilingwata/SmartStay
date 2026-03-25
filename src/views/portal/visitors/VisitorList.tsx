@@ -25,8 +25,19 @@ import { toast } from 'sonner';
 
 import { QRCodeSVG } from 'qrcode.react';
 
+const generateDeterministicQR = (id: string) => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `STAY-${Math.abs(hash % 900000 + 100000)}`;
+};
+
 const VisitorList: React.FC = () => {
   const navigate = useNavigate();
+  const ENABLE_SIMULATION = import.meta.env.DEV && !import.meta.env.PROD;
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -73,9 +84,10 @@ const VisitorList: React.FC = () => {
       return;
     }
     
+    const visitorId = `V${Date.now()}`;
     // Simulate submission
     const newVisitor: Visitor = {
-      id: `V${Date.now()}`,
+      id: visitorId,
       tenantId: 'T1',
       name: formData.name,
       idCard: formData.idCard,
@@ -83,7 +95,7 @@ const VisitorList: React.FC = () => {
       visitDate: formData.visitDateTime.split('T')[0],
       visitTime: formData.visitDateTime.split('T')[1],
       status: 'Expected' as VisitorStatus,
-      qrCode: `STAY-${Math.floor(100000 + Math.random() * 900000)}`
+      qrCode: ENABLE_SIMULATION ? generateDeterministicQR(visitorId) : ''
     };
 
     setVisitors([newVisitor, ...visitors]);

@@ -56,3 +56,25 @@ export interface Amenity {
   name: string;
   icon: string;
 }
+export interface BuildingFilters {
+  search?: string;
+}
+
+export interface CreateBuildingData {
+  buildingName: string;
+  type?: BuildingType;
+  address: string;
+  provinceId?: string;
+  districtId?: string;
+  wardId?: string;
+  yearBuilt?: number;
+  totalFloors: number;
+  managementPhone?: string;
+  managementEmail?: string;
+  latitude?: number;
+  longitude?: number;
+  description?: string;
+  amenities?: string[];
+}
+
+export type UpdateBuildingData = Partial<CreateBuildingData>;

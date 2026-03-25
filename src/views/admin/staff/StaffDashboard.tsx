@@ -18,21 +18,24 @@ import { toast } from 'sonner';
 const StaffDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { activeBuildingId } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   const { data: staffKpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['staff_dashboard_kpis', activeBuildingId],
+    queryKey: ['dashboard', 'staff', 'kpis', activeBuildingId],
     queryFn: () => dashboardService.getStaffKPIs(activeBuildingId || undefined)
   });
 
   const { data: staffTickets, isLoading: ticketsLoading } = useQuery({
-    queryKey: ['staff_dashboard_tickets', activeBuildingId],
+    queryKey: ['dashboard', 'staff', 'tickets', activeBuildingId],
     queryFn: () => dashboardService.getStaffTickets(activeBuildingId || undefined)
   });
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries();
+  const isRefreshing = queryClient.isFetching({ queryKey: ['dashboard', 'staff'] }) > 0;
+
+  const handleRefresh = async () => {
+    await queryClient.cancelQueries({ queryKey: ['dashboard', 'staff'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard', 'staff'] });
     setLastUpdated(new Date());
     toast.info('Cập nhật dữ liệu mới nhất...');
   };
@@ -58,9 +61,13 @@ const StaffDashboard = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleRefresh}
-            className="p-3 bg-white border border-primary/10 rounded-xl hover:bg-primary/5 text-muted transition-all active:scale-95 shadow-sm"
+            disabled={isRefreshing}
+            className={cn(
+              "p-3 bg-white border border-primary/10 rounded-xl hover:bg-primary/5 text-muted transition-all active:scale-95 shadow-sm",
+              isRefreshing && "opacity-50 cursor-not-allowed"
+            )}
           >
-            <RefreshCcw size={18} />
+            <RefreshCcw size={18} className={cn(isRefreshing && "animate-spin")} />
           </button>
           <div className="text-right">
              <p className="text-[9px] font-black text-muted uppercase tracking-[2px]">Last Sync</p>

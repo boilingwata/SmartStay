@@ -5,6 +5,7 @@ import { invoiceService } from '@/services/invoiceService';
 import { Invoice } from '@/models/Invoice';
 import { cn, formatVND } from '@/utils';
 import { m } from 'framer-motion';
+import { toast } from 'sonner';
 
 type TabType = 'Unpaid_Overdue' | 'Paid' | 'All';
 
@@ -15,6 +16,8 @@ const InvoiceList: React.FC = () => {
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({ All: 0, Unpaid: 0, Paid: 0, Overdue: 0 });
   const limit = 10;
   
   const navigate = useNavigate();
@@ -36,15 +39,29 @@ const InvoiceList: React.FC = () => {
         });
       }
       setHasMore((data.page - 1) * data.limit + newItems.length < data.total);
+      setError(null);
     } catch (error) {
       console.error('Error fetching invoices:', error);
+      setError('Không thể tải danh sách hóa đơn. Vui lòng thử lại.');
+    }
+  };
+
+  const fetchCounts = async () => {
+    try {
+      const data = await invoiceService.getInvoiceCounts();
+      setCounts(data);
+    } catch (err) {
+      console.error('Error fetching counts:', err);
     }
   };
 
   useEffect(() => {
     const initFetch = async () => {
       setLoading(true);
-      await fetchInvoices(1, true);
+      await Promise.all([
+        fetchInvoices(1, true),
+        fetchCounts()
+      ]);
       setLoading(false);
     };
     initFetch();
@@ -79,11 +96,16 @@ const InvoiceList: React.FC = () => {
   }, [page]);
 
   const handleRefresh = async () => {
+    setLoading(true);
     setPage(1);
-    await fetchInvoices(1, true);
+    await Promise.all([
+      fetchInvoices(1, true),
+      fetchCounts()
+    ]);
+    setLoading(false);
   };
 
-  const overdueCount = invoices.filter(inv => inv.status === 'Overdue').length;
+  const overdueCount = counts.Overdue;
 
   const filteredInvoices = invoices.filter(inv => {
     if (activeTab === 'All') return true;
@@ -131,6 +153,26 @@ const InvoiceList: React.FC = () => {
     );
   }
 
+  if (error && invoices.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center space-y-6 px-10 bg-white min-h-[80vh] text-center">
+        <div className="p-6 bg-red-50 rounded-[32px] text-red-500 shadow-sm border border-red-100">
+           <AlertCircle size={48} strokeWidth={1.5} />
+        </div>
+        <div className="space-y-2">
+           <h3 className="text-xl font-black text-slate-900 tracking-tight">Hệ thống bận</h3>
+           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest leading-relaxed">{error}</p>
+        </div>
+        <button 
+          onClick={handleRefresh}
+          className="flex items-center gap-2 px-8 py-3 bg-teal-600 text-white rounded-[20px] font-black uppercase tracking-widest text-[11px] hover:bg-teal-700 active:scale-95 transition-all shadow-lg shadow-teal-500/20"
+        >
+          <RefreshCw size={16} /> Thử lại
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700">
         
@@ -146,10 +188,16 @@ const InvoiceList: React.FC = () => {
                  </p>
               </div>
               <div className="flex gap-2">
-                <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+                <button 
+                  onClick={() => toast.info("Chức năng tìm kiếm đang được phát triển")}
+                  className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50"
+                >
                   <Search size={20} />
                 </button>
-                <button className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50">
+                <button 
+                  onClick={() => toast.info("Chức năng lọc nâng cao đang được phát triển")}
+                  className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-all hover:bg-slate-50"
+                >
                   <Filter size={20} />
                 </button>
               </div>
@@ -195,9 +243,15 @@ const InvoiceList: React.FC = () => {
                  <AlertCircle size={18} strokeWidth={2.5} className="animate-pulse shadow-sm" />
                  <p className="text-[13px] font-bold tracking-wide">Bạn có {overdueCount} hóa đơn quá hạn!</p>
                </div>
-               <button className="bg-white/20 hover:bg-white text-white hover:text-red-600 rounded-xl px-4 py-1.5 text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-sm backdrop-blur-sm">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.info("Chức năng thanh toán đang được phát triển");
+                  }}
+                  className="bg-white/20 hover:bg-white text-white hover:text-red-600 rounded-xl px-4 py-1.5 text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-sm backdrop-blur-sm"
+                >
                   Thanh toán
-               </button>
+                </button>
             </div>
           )}
         </div>
@@ -288,7 +342,13 @@ const InvoiceList: React.FC = () => {
                     Chi tiết
                   </button>
                   {inv.status !== 'Paid' && (
-                    <button className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-xl h-11 text-xs font-black uppercase tracking-widest shadow-[0_4px_14px_0_rgba(20,184,166,0.39)] hover:shadow-[0_6px_20px_rgba(20,184,166,0.23)] hover:-translate-y-0.5 transition-all">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast.info("Chức năng thanh toán đang được phát triển");
+                      }}
+                      className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-xl h-11 text-xs font-black uppercase tracking-widest shadow-[0_4px_14px_0_rgba(20,184,166,0.39)] hover:shadow-[0_6px_20px_rgba(20,184,166,0.23)] hover:-translate-y-0.5 transition-all"
+                    >
                       Thanh toán
                     </button>
                   )}

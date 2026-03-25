@@ -1,5 +1,6 @@
-import { BuildingSummary, BuildingDetail, Building } from '@/models/Building';
-import { OwnerSummary, OwnerDetail, Owner } from '@/models/Owner';
+import { BuildingSummary, BuildingDetail, Building, BuildingFilters, CreateBuildingData, UpdateBuildingData } from '@/models/Building';
+import { OwnerSummary, OwnerDetail, Owner, CreateOwnerData, UpdateOwnerData } from '@/models/Owner';
+
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { MOCK_PROVINCES, MOCK_DISTRICTS, MOCK_WARDS } from '@/mocks/systemMocks';
@@ -70,7 +71,7 @@ function toBuildingDetail(row: BuildingRow): BuildingDetail {
 }
 
 export const buildingService = {
-  getBuildings: async (filters?: { search?: string }): Promise<BuildingSummary[]> => {
+  getBuildings: async (filters?: BuildingFilters): Promise<BuildingSummary[]> => {
     let query = supabase
       .from('buildings')
       .select('*, rooms(count)')
@@ -181,7 +182,7 @@ export const buildingService = {
     return !data || data.length === 0;
   },
 
-  createBuilding: async (data: any): Promise<Building> => {
+  createBuilding: async (data: CreateBuildingData): Promise<Building> => {
     const row = await unwrap(
       supabase
         .from('buildings')
@@ -215,7 +216,7 @@ export const buildingService = {
     };
   },
 
-  updateBuilding: async (id: string, data: any): Promise<Building> => {
+  updateBuilding: async (id: string, data: UpdateBuildingData): Promise<Building> => {
     const row = await unwrap(
       supabase
         .from('buildings')
@@ -250,11 +251,33 @@ export const buildingService = {
     };
   },
 
-  createOwner: async (data: any): Promise<Owner> => {
-    return { ...data, id: `O${Date.now()}`, isDeleted: false };
+  createOwner: async (data: CreateOwnerData): Promise<Owner> => {
+    return { 
+      id: `O${Date.now()}`,
+      fullName: data.fullName,
+      avatarUrl: data.avatarUrl,
+      phone: data.phone,
+      email: data.email,
+      cccd: data.cccd,
+      taxCode: data.taxCode,
+      address: data.address,
+      isDeleted: false 
+    };
   },
 
-  updateOwner: async (id: string, data: any): Promise<Owner> => {
-    return { ...data, id };
+  updateOwner: async (id: string, data: UpdateOwnerData): Promise<Owner> => {
+    return { 
+      id,
+      fullName: data.fullName || '',
+      avatarUrl: data.avatarUrl,
+      phone: data.phone || '',
+      email: data.email || '',
+      cccd: data.cccd || '',
+      taxCode: data.taxCode,
+      address: data.address,
+      isDeleted: false // Defaulting for now as this is a mock implementation
+    };
   },
+
+
 };

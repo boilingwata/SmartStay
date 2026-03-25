@@ -273,22 +273,43 @@ export function DataTable<T>({
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="flex gap-1 items-center">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1; // Simplified pagination logic
-                return (
+              {(() => {
+                const pages = [];
+                const delta = 2; // Number of pages of either side of current
+                
+                for (let i = 1; i <= totalPages; i++) {
+                  if (
+                    i === 1 || 
+                    i === totalPages || 
+                    (i >= pagination.page - delta && i <= pagination.page + delta)
+                  ) {
+                    pages.push(i);
+                  } else if (
+                    (i === pagination.page - delta - 1) || 
+                    (i === pagination.page + delta + 1)
+                  ) {
+                    pages.push('...');
+                  }
+                }
+                
+                // Filter out multiple consecutive dots
+                const uniquePages = pages.filter((v, i, a) => v !== '...' || a[i-1] !== '...');
+
+                return uniquePages.map((pageNum, idx) => (
                   <button
-                    key={pageNum}
-                    onClick={() => pagination.onChange(pageNum, pagination.limit)}
+                    key={idx}
+                    onClick={() => typeof pageNum === 'number' ? pagination.onChange(pageNum, pagination.limit) : undefined}
+                    disabled={pageNum === '...'}
                     className={cn(
                       "w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
-                      pagination.page === pageNum ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                      pagination.page === pageNum ? "bg-blue-600 text-white" : "hover:bg-gray-100",
+                      pageNum === '...' && "cursor-default hover:bg-transparent"
                     )}
                   >
                     {pageNum}
                   </button>
-                );
-              })}
-              {totalPages > 5 && <span>...</span>}
+                ));
+              })()}
             </div>
             <button
               onClick={() => pagination.onChange(pagination.page + 1, pagination.limit)}

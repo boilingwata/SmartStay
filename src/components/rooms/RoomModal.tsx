@@ -59,7 +59,7 @@ interface RoomModalProps {
 export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
   const isEditing = !!room;
   const queryClient = useQueryClient();
-  const { activeBuildingId } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
   
   const defaultValues = useMemo(() => getDefaults(activeBuildingId), [activeBuildingId]);
   

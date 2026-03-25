@@ -104,3 +104,35 @@ export interface HandoverAsset {
   conditionAfter: string;
   note?: string;
 }
+export interface RoomFilters {
+  buildingId?: string;
+  search?: string;
+  status?: RoomStatus[];
+  roomType?: RoomType | '';
+  minFloor?: number;
+  maxFloor?: number;
+  minArea?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
+export interface CreateRoomData {
+  buildingId: string;
+  roomCode: string;
+  floorNumber: number;
+  areaSqm: number;
+  roomType: RoomType;
+  maxOccupancy: number;
+  hasBalcony?: boolean;
+  directionFacing: DirectionFacing;
+  amenities?: string[];
+  baseRentPrice: number;
+  conditionScore: number;
+  status?: RoomStatus;
+}
+
+export type UpdateRoomData = Partial<CreateRoomData>;
+
+export interface AssetFilters {
+  roomId?: string;
+}

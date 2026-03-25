@@ -29,12 +29,11 @@ export const visitorService = {
   createVisitor: async (
     visitor: Omit<Visitor, 'id' | 'qrCode' | 'status'>,
   ): Promise<Visitor> => {
-    // No-op until a visitors table is added to the schema.
-    // Return a synthetic object so callers do not break on the resolved value.
+    const id = `V${Date.now()}`;
     return {
       ...visitor,
-      id: `V${Date.now()}`,
-      qrCode: `QR-VIS-${Math.floor(Math.random() * 1000)}`,
+      id,
+      qrCode: `QR-DET-${id.slice(-4)}`,
       status: 'Expected',
     };
   },

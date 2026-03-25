@@ -8,7 +8,11 @@ export const TRUSTED_DOMAINS = [
   'localhost',
   '127.0.0.1',
   'i.pravatar.cc', // Whitelisted for demo avatars
+  'images.unsplash.com', // Added for amenity images
 ];
+
+export const DEFAULT_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop';
+
 
 /**
  * Validates if a URL is safe to render in src or href
@@ -35,10 +39,19 @@ export const isSafeUrl = (url: string | undefined): boolean => {
     return false;
   }
 
-  // 3. Domain Check
+  // 3. Domain & Protocol Check
   try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    // Senior Architect Tip: Enforce HTTPS in production for remote trusted domains
+    const isProd = import.meta.env.PROD;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    if (isProd && urlObj.protocol === 'http:' && !isLocal) {
+      console.warn(`[Security] Insecure HTTP URL blocked in production: ${url}`);
+      return false;
+    }
     
     return TRUSTED_DOMAINS.some(domain => 
       hostname === domain || hostname.endsWith('.' + domain)
@@ -46,6 +59,7 @@ export const isSafeUrl = (url: string | undefined): boolean => {
   } catch (e) {
     return false;
   }
+
 };
 
 /**

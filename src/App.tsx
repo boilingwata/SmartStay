@@ -42,7 +42,8 @@ import useAuthStore from './stores/authStore';
 
 // Helper component for Landing Page redirection
 const AuthRedirect = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, user } = useAuthStore();
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const user = useAuthStore(s => s.user);
   if (isAuthenticated) {
     return <Navigate to={getAuthenticatedHomePath(user)} replace />;
   }

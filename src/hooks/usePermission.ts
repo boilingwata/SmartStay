@@ -6,7 +6,9 @@ export const usePermission = () => {
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? 'Viewer';
 
-  const { permissions, loadedForRole, fetchPermissions } = usePermissionStore();
+  const permissions = usePermissionStore((s) => s.permissions);
+  const loadedForRole = usePermissionStore((s) => s.loadedForRole);
+  const fetchPermissions = usePermissionStore((s) => s.fetchPermissions);
 
   useEffect(() => {
     if (role && loadedForRole !== role) {

@@ -89,14 +89,16 @@ const InvoiceDetail: React.FC = () => {
   if (loading || !invoice) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-white min-h-[80vh]">
-        <div className="w-10 h-10 border-4 border-slate-100 border-teal-600 rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
         <p className="text-[10px] text-slate-400 font-black animate-pulse uppercase tracking-[3px]">Loading Invoice</p>
+
       </div>
     );
   }
 
   const isUnpaid = invoice.status === 'Unpaid' || invoice.status === 'Overdue';
-  const walletBalance = 0; // Mocked 0 for edge cases
+  // TODO: Fetch actual wallet balance from user state or API
+  const walletBalance = 0; // FIXME: Replace with actual balance
 
   const renderItemContent = (item: InvoiceItem) => {
     if (item.snapshotPrice == null) {

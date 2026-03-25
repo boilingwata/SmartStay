@@ -19,7 +19,7 @@ import useUIStore from '@/stores/uiStore';
 
 const BulkMeterEntry = () => {
   const navigate = useNavigate();
-  const { activeBuildingId } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
   const [step, setStep] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;

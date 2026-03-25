@@ -13,7 +13,8 @@ import { cn } from '@/utils';
 
 // --- 4.1 Admin & Staff Shared Layout ---
 export const AdminLayout = () => {
-  const { sidebarOpen, toggleSidebar } = useUIStore();
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (

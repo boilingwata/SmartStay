@@ -6,3 +6,5 @@ export * from './SidePanel';
 export * from './StatusBadge';
 export * from './StatusStates';
 export * from './DashboardUI';
+export * from './SafeImage';
+

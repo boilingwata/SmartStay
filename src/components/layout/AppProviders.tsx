@@ -8,8 +8,12 @@ import useAuthStore from '@/stores/authStore';
 import useUIStore from '@/stores/uiStore';
 
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, logout, sessionExpired, setSessionExpired } = useAuthStore();
-  const { theme } = useUIStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const logout = useAuthStore((s) => s.logout);
+  const sessionExpired = useAuthStore((s) => s.sessionExpired);
+  const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
+
+  const theme = useUIStore((s) => s.theme);
   
   // Apply theme to document
   useEffect(() => {

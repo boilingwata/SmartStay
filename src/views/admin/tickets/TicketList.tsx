@@ -80,7 +80,8 @@ const SLACountdown = ({ deadline, status }: { deadline: string, status: TicketSt
 const TicketList = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { activeBuildingId, setBuilding } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>(() =>
     (localStorage.getItem('ticket-view-mode') as any) || 'list'
   );
@@ -128,8 +129,8 @@ const TicketList = () => {
 
   const handleCreateTicket = async (data: any) => {
     try {
-      console.log('Creating ticket:', data);
       // await ticketService.createTicket(data); // Uncomment and implement actual service call
+
       toast.success(t('pages.tickets.createSuccess'));
       setIsModalOpen(false);
       refetch();
@@ -138,7 +139,7 @@ const TicketList = () => {
     }
   };
 
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
 
   if (user?.role === 'Staff' && searchParams.get('assignedTo') === 'me') {

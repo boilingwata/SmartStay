@@ -30,9 +30,21 @@ const notificationColorMap: Record<Notification['type'], string> = {
 };
 
 export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void }) => {
-  const { user, logout } = useAuthStore();
-  const { sidebarOpen, theme, toggleTheme } = useUIStore();
-  const { notifications, unreadCount, hasNew, fetchNotifications, markRead, markAllRead, subscribe, cleanup } = useNotificationStore();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const theme = useUIStore((s) => s.theme);
+  const toggleTheme = useUIStore((s) => s.toggleTheme);
+
+  const notifications = useNotificationStore((s) => s.notifications);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const hasNew = useNotificationStore((s) => s.hasNew);
+  const fetchNotifications = useNotificationStore((s) => s.fetchNotifications);
+  const markRead = useNotificationStore((s) => s.markRead);
+  const markAllRead = useNotificationStore((s) => s.markAllRead);
+  const subscribe = useNotificationStore((s) => s.subscribe);
+  const cleanup = useNotificationStore((s) => s.cleanup);
   const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

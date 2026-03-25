@@ -1,4 +1,5 @@
 import { ServiceType, BillingMethod } from "@/types/service";
+import { formatVND } from "@/utils/index";
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   Utility: "Tiện ích",
@@ -22,14 +23,10 @@ export const BILLING_METHOD_LABELS: Record<BillingMethod, string> = {
   Usage: "Theo lần dùng",
 };
 
-export const formatVND = (amount: number): string =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(amount);
-
-export const calcPriceChangePct = (oldPrice: number, newPrice: number): number =>
-  Math.abs(((newPrice - oldPrice) / oldPrice) * 100);
+export const calcPriceChangePct = (oldPrice: number, newPrice: number): number => {
+  if (oldPrice === 0) return newPrice > 0 ? 100 : 0;
+  return Math.abs(((newPrice - oldPrice) / oldPrice) * 100);
+};
 
 export const isPriceChangeWarning = (oldPrice: number, newPrice: number): boolean =>
   calcPriceChangePct(oldPrice, newPrice) > 20;

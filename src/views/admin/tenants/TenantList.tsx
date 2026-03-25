@@ -25,7 +25,8 @@ import useUIStore from '@/stores/uiStore';
 const TenantList = () => {
   const navigate = useNavigate();
   const { hasPermission } = usePermission();
-  const { activeBuildingId, setBuilding } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
   const canViewPII = hasPermission('owner.view_pii') || hasPermission('tenant.view_pii'); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -24,7 +24,8 @@ const RoomList = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { hasPermission } = usePermission();
-  const { activeBuildingId, setBuilding } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
   
   const canManage = hasPermission('room.manage');
   const [viewMode, setViewMode] = useState<'List' | 'Grid'>(

@@ -30,52 +30,53 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { activeBuildingId, setBuilding } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
   const [period, setPeriod] = useState('Month');
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   // Fetch real buildings from database
   const { data: buildingsList = [] } = useQuery({
-    queryKey: ['buildings_list'],
+    queryKey: ['dashboard', 'buildings'],
     queryFn: () => buildingService.getBuildings(),
     staleTime: 10 * 60 * 1000,
   });
 
   // Queries
   const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard_kpis', activeBuildingId, period],
+    queryKey: ['dashboard', 'kpis', activeBuildingId, period],
     queryFn: () => dashboardService.getKPIs(activeBuildingId || undefined),
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
   });
 
   const { data: revenueData, isLoading: revenueLoading } = useQuery({
-    queryKey: ['dashboard_revenue', activeBuildingId],
+    queryKey: ['dashboard', 'revenue', activeBuildingId],
     queryFn: () => dashboardService.getRevenueChart(activeBuildingId || undefined)
   });
 
   const { data: occupancy, isLoading: occupancyLoading } = useQuery({
-    queryKey: ['dashboard_occupancy', activeBuildingId],
+    queryKey: ['dashboard', 'occupancy', activeBuildingId],
     queryFn: () => dashboardService.getOccupancy(activeBuildingId || undefined)
   });
 
   const { data: payments, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['dashboard_payments', activeBuildingId],
+    queryKey: ['dashboard', 'payments', activeBuildingId],
     queryFn: () => dashboardService.getRecentPayments(activeBuildingId || undefined)
   });
 
   const { data: tickets, isLoading: ticketsLoading } = useQuery({
-    queryKey: ['dashboard_tickets', activeBuildingId],
+    queryKey: ['dashboard', 'tickets', activeBuildingId],
     queryFn: () => dashboardService.getRecentTickets(activeBuildingId || undefined)
   });
 
   const { data: electricity, isLoading: electricityLoading } = useQuery({
-    queryKey: ['dashboard_electricity', activeBuildingId],
+    queryKey: ['dashboard', 'electricity', activeBuildingId],
     queryFn: () => dashboardService.getElectricityChart(activeBuildingId || undefined)
   });
 
   const { data: alerts, isLoading: alertsLoading } = useQuery({
-    queryKey: ['dashboard_alerts'],
+    queryKey: ['dashboard', 'alerts'],
     queryFn: () => dashboardService.getAnalyticsAlerts()
   });
 
@@ -87,8 +88,12 @@ const AdminDashboard = () => {
     }
   });
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries();
+  const isRefreshing = queryClient.isFetching({ queryKey: ['dashboard'] }) > 0;
+
+  const handleRefresh = async () => {
+    // 4.1.3 Manual refresh logic + Race condition handling
+    await queryClient.cancelQueries({ queryKey: ['dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     setLastUpdated(new Date());
     toast.info(t('pages.dashboard.refreshing'));
   };
@@ -183,10 +188,14 @@ const AdminDashboard = () => {
           </div>
           <button 
             onClick={handleRefresh}
-            className="p-3 bg-white border border-primary/10 rounded-xl hover:bg-primary/5 text-muted transition-all group shadow-sm active:scale-95"
+            disabled={isRefreshing}
+            className={cn(
+              "p-3 bg-white border border-primary/10 rounded-xl hover:bg-primary/5 text-muted transition-all group shadow-sm active:scale-95",
+              isRefreshing && "opacity-50 cursor-not-allowed"
+            )}
             title={t('pages.dashboard.refresh')}
           >
-            <RefreshCcw size={18} className="group-active:rotate-180 transition-transform duration-500" />
+            <RefreshCcw size={18} className={cn("group-active:rotate-180 transition-transform duration-500", isRefreshing && "animate-spin")} />
           </button>
           <button className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20">
             <Plus size={18} /> <span className="hidden sm:inline">{t('pages.dashboard.export')}</span>
@@ -308,10 +317,19 @@ const AdminDashboard = () => {
                        <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigator.clipboard.writeText(payment.transactionCode);
-                          setCopiedTxId(payment.id);
-                          toast.success(t('pages.dashboard.copiedTxCode'));
-                          setTimeout(() => setCopiedTxId(null), 2000);
+                          if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(payment.transactionCode)
+                              .then(() => {
+                                setCopiedTxId(payment.id);
+                                toast.success(t('pages.dashboard.copiedTxCode'));
+                                setTimeout(() => setCopiedTxId(null), 2000);
+                              })
+                              .catch(() => {
+                                toast.error(t('common.error.copyFailed') || 'Không thể sao chép');
+                              });
+                          } else {
+                            toast.error(t('common.error.clipboardNotSupported') || 'Trình duyệt không hỗ trợ sao chép');
+                          }
                         }}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-bg rounded transition-all"
                        >
@@ -444,7 +462,7 @@ const AdminDashboard = () => {
 };
 
 const Dashboard = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore(s => s.user);
   
   if (user?.role === 'Staff') {
     return <StaffDashboard />;

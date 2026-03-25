@@ -23,6 +23,7 @@ import { Service } from '@/types/service';
 import { cn, formatVND } from '@/utils';
 import { toast } from 'sonner';
 import { BottomSheet } from '@/components/portal/BottomSheet';
+import { SafeImage } from '@/components/ui';
 import { addDays, format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
@@ -185,7 +186,7 @@ const AmenityList: React.FC = () => {
                 )}
               >
                 {/* Image */}
-                <img 
+                <SafeImage 
                   src={getImageUrl(item.serviceName)} 
                   alt={item.serviceName} 
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 

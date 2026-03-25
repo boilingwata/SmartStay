@@ -76,7 +76,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       .filter(validateFile)
       .slice(0, maxFiles - files.length)
       .map(file => ({
-        id: Math.random().toString(36).substring(7),
+        id: crypto.randomUUID(),
         file,
         progress: 0,
         status: 'pending',

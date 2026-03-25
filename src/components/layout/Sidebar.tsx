@@ -47,7 +47,7 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
       { labelKey: "sidebar.visitorCheckin", route: "/admin/staff/visitor-checkin", icon: Users, permission: "visitor.checkin" },
       { labelKey: "sidebar.amenityCheckin", route: "/admin/staff/amenity-checkin", icon: Zap, permission: "amenity.checkin" },
       { labelKey: "sidebar.assets", route: "/admin/assets", icon: Package, permission: "asset.view" },
-      { labelKey: "sidebar.allTickets", route: "/admin/tickets", icon: AlertCircle, permission: "ticket.view.all", badge: 3 },
+      { labelKey: "sidebar.allTickets", route: "/admin/tickets", icon: AlertCircle, permission: "ticket.view.all" },
       { labelKey: "sidebar.reports", route: "/admin/reports", icon: BarChart2, permission: "report.view" },
       { labelKey: "sidebar.announcements", route: "/admin/announcements", icon: Megaphone, permission: "announcement.manage" },
       { labelKey: "sidebar.owners", route: "/admin/owners", icon: Briefcase, adminOnly: true },
@@ -67,8 +67,13 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
 ];
 
 export const Sidebar = () => {
-  const { sidebarOpen, toggleSidebar, activeBuildingId, setBuilding } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
+
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { can } = usePermission();
   const navigate = useNavigate();
   const { t } = useTranslation();

@@ -356,7 +356,7 @@ export const paymentService = {
   },
 
   generateCashCode: (): string => {
-    return `CASH-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    return `CASH-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
   },
 
   manualBalanceAdjustment: async (

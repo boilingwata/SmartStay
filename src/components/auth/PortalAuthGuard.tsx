@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuthStore from '@/stores/authStore';
 import { Spinner } from '@/components/ui/Feedback';
@@ -6,7 +6,17 @@ import { toast } from 'sonner';
 import { getTenantHomePath } from '@/lib/authRouting';
 
 const PortalAuthGuard: React.FC = () => {
-  const { isAuthenticated, role, user, sessionExpired, isLoading } = useAuthStore();
+  const { isAuthenticated, role, user, sessionExpired, isLoading, clearAuth } = useAuthStore();
+  const hasShownToast = useRef(false);
+
+  useEffect(() => {
+    if (sessionExpired && !hasShownToast.current) {
+      toast.error('Phiên làm việc hết hạn');
+      hasShownToast.current = true;
+      // Clear auth data for security
+      clearAuth();
+    }
+  }, [sessionExpired, clearAuth]);
   const location = useLocation();
   const onboardingAllowedPaths = ['/portal/onboarding', '/portal/profile', '/portal/documents'];
 
@@ -19,7 +29,6 @@ const PortalAuthGuard: React.FC = () => {
   }
 
   if (sessionExpired) {
-    toast.error('Phiên làm việc hết hạn');
     return <Navigate to="/portal/login" replace />;
   }
 

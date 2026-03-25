@@ -173,7 +173,7 @@ export const portalService = {
     return toContractDetail(row);
   },
 
-  getRepairRequests: async (): Promise<any[]> => {
+  getRepairRequests: async (): Promise<{ id: string; title: string; status: string; createdAt: string }[]> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return [];
 
@@ -193,7 +193,7 @@ export const portalService = {
     }));
   },
 
-  getResidentBills: async (): Promise<any[]> => {
+  getResidentBills: async (): Promise<{ id: string; code: string; amount: number; status: string; dueDate: string }[]> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return [];
 
@@ -228,3 +228,4 @@ export const portalService = {
 };
 
 export default portalService;
+

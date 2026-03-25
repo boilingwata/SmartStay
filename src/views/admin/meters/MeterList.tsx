@@ -18,7 +18,8 @@ import useUIStore from '@/stores/uiStore';
 
 const MeterList = () => {
   const navigate = useNavigate();
-  const { activeBuildingId, setBuilding } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const setBuilding = useUIStore((s) => s.setBuilding);
   const [roomId, setRoomId] = useState('');
   const [meterType, setMeterType] = useState<'Electricity' | 'Water' | ''>('');
   const [meterStatus, setMeterStatus] = useState<'Active' | 'Inactive' | 'Replaced'>('Active');

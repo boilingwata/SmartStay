@@ -11,7 +11,7 @@ export function useQueryWithBuilding<TQueryFnData = unknown, TError = Error, TDa
     queryFn: (params: { buildingId: string | number | null }) => Promise<TQueryFnData>;
   } & Omit<UseQueryOptions<TQueryFnData, TError, TData, QueryKey>, 'queryKey' | 'queryFn'>
 ) {
-  const { activeBuildingId } = useUIStore();
+  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
   const { queryKey, queryFn, ...rest } = options;
 
   return useQuery<TQueryFnData, TError, TData, QueryKey>({

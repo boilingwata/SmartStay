@@ -20,6 +20,7 @@ interface AuthState {
   setUser: (user: User) => void;
   clearAuth: () => void;
   setSessionExpired: (expired: boolean) => void;
+  unsubscribeAuth?: () => void;
 }
 
 interface LoginOptions {
@@ -105,7 +106,10 @@ const useAuthStore = create<AuthState>()(
             set({ isLoading: false, isAuthenticated: false, user: null, role: null })
           }
 
-          supabase.auth.onAuthStateChange(async (event, session) => {
+          const { unsubscribeAuth } = get();
+          if (unsubscribeAuth) unsubscribeAuth();
+
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
               set({ user: null, isAuthenticated: false, role: null, sessionExpired: false })
             } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -119,6 +123,8 @@ const useAuthStore = create<AuthState>()(
               }
             }
           })
+
+          set({ unsubscribeAuth: subscription.unsubscribe })
         } catch {
           set({ isLoading: false })
         }
