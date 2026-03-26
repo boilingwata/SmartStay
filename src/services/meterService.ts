@@ -140,10 +140,16 @@ export const meterService = {
         .order('room_code', { ascending: true });
 
       if (params.buildingId) {
-        roomQuery = roomQuery.eq('building_id', Number(params.buildingId));
+        const numBuildingId = Number(params.buildingId);
+        if (Number.isFinite(numBuildingId)) {
+          roomQuery = roomQuery.eq('building_id', numBuildingId);
+        }
       }
       if (params.roomId) {
-        roomQuery = roomQuery.eq('id', Number(params.roomId));
+        const numRoomId = Number(params.roomId);
+        if (Number.isFinite(numRoomId)) {
+          roomQuery = roomQuery.eq('id', numRoomId);
+        }
       }
 
       const rooms = (await unwrap(roomQuery)) as unknown as DbRoomRow[];
@@ -326,15 +332,43 @@ export const meterService = {
         water_usage: !isElec ? body.currentIndex - prevWater : 0,
       };
 
-      const row = (await unwrap(
+      // C-08: Use select-then-update/insert instead of upsert to avoid depending on
+      // a UNIQUE(room_id, billing_period) DB constraint that may not exist.
+      const existingRow = (await unwrap(
         supabase
           .from('meter_readings')
-          .insert(insertData)
-          .select(
-            'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
-          )
-          .single()
-      )) as unknown as DbMeterReadingRow;
+          .select('id')
+          .eq('room_id', roomId)
+          .eq('billing_period', billingPeriod)
+          .maybeSingle()
+      )) as unknown as { id: number } | null;
+
+      let row: DbMeterReadingRow;
+
+      if (existingRow) {
+        // Update the existing reading for this period
+        row = (await unwrap(
+          supabase
+            .from('meter_readings')
+            .update(insertData)
+            .eq('id', existingRow.id)
+            .select(
+              'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
+            )
+            .single()
+        )) as unknown as DbMeterReadingRow;
+      } else {
+        // Insert a new reading for this period
+        row = (await unwrap(
+          supabase
+            .from('meter_readings')
+            .insert(insertData)
+            .select(
+              'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
+            )
+            .single()
+        )) as unknown as DbMeterReadingRow;
+      }
 
       const typeKey: 'elec' | 'water' = isElec ? 'elec' : 'water';
       return mapReadingRowToMeterReading(row, typeKey);

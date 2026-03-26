@@ -1060,6 +1060,41 @@ export interface Database {
         }
         Relationships: []
       }
+      /**
+       * PL-01 FIX: Added public_room_listings view to generated types.
+       * This view must exist in the DB for the public listings feature to work.
+       * If it does not exist, queries will return an empty array (gracefully caught).
+       * SQL to create:
+       *   CREATE OR REPLACE VIEW smartstay.public_room_listings AS
+       *   SELECT r.id AS room_id, r.uuid AS room_uuid, r.room_code, r.room_type, ...
+       *   FROM smartstay.rooms r JOIN smartstay.buildings b ON r.building_id = b.id
+       *   WHERE r.status = 'available' AND r.is_deleted = false;
+       */
+      public_room_listings: {
+        Row: {
+          room_id: number
+          room_uuid: string
+          room_code: string
+          room_type: string | null
+          area_sqm: number | null
+          base_rent: number | null
+          max_occupants: number | null
+          floor_number: number | null
+          has_balcony: boolean | null
+          has_private_bathroom: boolean | null
+          facing: string | null
+          condition_score: number | null
+          room_amenities: unknown
+          building_id: number
+          building_uuid: string
+          building_name: string
+          building_address: string
+          building_description: string | null
+          building_amenities: unknown
+          availability_status: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_code: {

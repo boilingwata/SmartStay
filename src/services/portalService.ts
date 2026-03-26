@@ -120,6 +120,10 @@ function toContractDetail(row: DbContractRow): ContractDetail {
     isRepresentative: primary?.is_primary ?? false,
     depositAmount: row.deposit_amount ?? 0,
     depositStatus: mapDepositStatus.fromDb(row.deposit_status ?? 'pending') as ContractDetail['depositStatus'],
+    // PS-01: paymentDueDay is hardcoded to 5 (5th of each month).
+    // The `contracts` table has no `payment_due_day` column in the current schema.
+    // TO PERSIST: add `payment_due_day SMALLINT DEFAULT 5` to the `contracts` table,
+    // include it in the select string, and map `row.payment_due_day ?? 5` here.
     paymentDueDay: 5,
     terminationReason: row.termination_reason ?? undefined,
     tenants,
@@ -146,8 +150,11 @@ export const portalService = {
         .eq('contracts.status', 'active')
         .eq('contracts.is_deleted', false)
         .limit(1)
-        .single()
-    ) as unknown as { contract_id: number };
+        .maybeSingle()   // returns null instead of throwing when no active contract
+    ) as unknown as { contract_id: number } | null;
+
+    // No active contract — return null (caller shows empty state)
+    if (!contractLink) return null;
 
     const row = await unwrap(
       supabase

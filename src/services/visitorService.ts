@@ -1,7 +1,15 @@
-// No visitors table exists in the DB yet.
-// Methods return empty data so the UI renders gracefully.
-// The Visitor type is re-exported here so consumers need not import from mocks.
-
+/**
+ * Visitor Service — FEATURE STUB
+ *
+ * The `visitors` table does NOT exist in the `smartstay` schema.
+ * Read methods return empty data. createVisitor throws a user-friendly error
+ * instead of silently creating a non-persistent in-memory object that disappears on refresh.
+ *
+ * TO ENABLE THIS FEATURE:
+ *   1. Run migration: CREATE TABLE smartstay.visitors (...)
+ *   2. Re-generate src/types/supabase.ts
+ *   3. Replace stubs with real supabase queries
+ */
 export type VisitorStatus = 'Expected' | 'Arrived' | 'Departed';
 
 export interface Visitor {
@@ -18,24 +26,24 @@ export interface Visitor {
 }
 
 export const visitorService = {
-  getVisitors: async (filters?: { tenantId?: string; [key: string]: any }): Promise<Visitor[]> => {
+  getVisitors: async (_filters?: { tenantId?: string; [key: string]: unknown }): Promise<Visitor[]> => {
+    // VIS-01: No visitors table in DB — return empty list gracefully
     return [];
   },
 
-  getVisitorDetail: async (id: string): Promise<Visitor | undefined> => {
+  getVisitorDetail: async (_id: string): Promise<Visitor | undefined> => {
     return undefined;
   },
 
   createVisitor: async (
-    visitor: Omit<Visitor, 'id' | 'qrCode' | 'status'>,
+    _visitor: Omit<Visitor, 'id' | 'qrCode' | 'status'>,
   ): Promise<Visitor> => {
-    const id = `V${Date.now()}`;
-    return {
-      ...visitor,
-      id,
-      qrCode: `QR-DET-${id.slice(-4)}`,
-      status: 'Expected',
-    };
+    // VIS-01 FIX: Replaced silent fake-object creation with an explicit user-facing error.
+    // Previously this returned a fake object that vanished on page refresh.
+    throw new Error(
+      'Tính năng quản lý khách thăm chưa được kích hoạt. ' +
+      'Vui lòng liên hệ quản trị viên để tạo bảng visitors.'
+    );
   },
 };
 

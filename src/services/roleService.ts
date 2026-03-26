@@ -1,22 +1,28 @@
 import { Role } from '../models/Role';
 import { RolePermission, Permission } from '../models/Permission';
-import { MOCK_ROLE_PERMISSIONS } from '@/mocks/adminMocks';
+import { ROLE_PERMISSION_CONFIG } from '@/config/rolePermissions';
 import { permissionService } from './permissionService';
 
+/**
+ * Role Service
+ *
+ * ROL-01 / MK-01 FIX: Imports from @/config/rolePermissions instead of @/mocks/adminMocks.
+ * `updateRolePermissions()` logs a clear warning because there is no DB table to persist
+ * changes to. The UI should disable this action or show a tooltip explaining this limitation.
+ */
+
 const DEFAULT_ROLES: Role[] = [
-  { id: 'admin', name: 'Admin', description: 'Full system access', isSystem: true },
-  { id: 'staff', name: 'Staff', description: 'Operational access', isSystem: true },
-  { id: 'tenant', name: 'Tenant', description: 'Tenant portal access', isSystem: true },
-  { id: 'viewer', name: 'Viewer', description: 'Read-only access', isSystem: true },
+  { id: 'admin',  name: 'Admin',  description: 'Toàn quyền hệ thống',    isSystem: true },
+  { id: 'staff',  name: 'Staff',  description: 'Quyền vận hành',          isSystem: true },
+  { id: 'tenant', name: 'Tenant', description: 'Quyền cổng cư dân',       isSystem: true },
+  { id: 'viewer', name: 'Viewer', description: 'Chỉ xem',                  isSystem: true },
 ];
 
 export const roleService = {
-  getRoles: async (): Promise<Role[]> => {
-    return [...DEFAULT_ROLES];
-  },
+  getRoles: async (): Promise<Role[]> => [...DEFAULT_ROLES],
 
   getAllPermissions: async (): Promise<Permission[]> => {
-    return MOCK_ROLE_PERMISSIONS.permissions.map((p) => ({
+    return ROLE_PERMISSION_CONFIG.permissions.map(p => ({
       key: p.permissionKey,
       group: p.module,
       name: p.description,
@@ -37,7 +43,14 @@ export const roleService = {
   },
 
   updateRolePermissions: async (_roleId: string, _permissions: string[]): Promise<void> => {
-    // Will be wired to DB when role_permissions table exists
-    console.warn('[roleService] updateRolePermissions: no DB table yet, changes not persisted');
+    // ROL-01: No role_permissions table exists in the DB.
+    // Changes are NOT persisted. The UI should either hide this action or show
+    // a tooltip: "Thay đổi quyền cần cập nhật cấu hình hệ thống."
+    console.warn(
+      '[roleService] updateRolePermissions: no role_permissions table — changes not persisted. ' +
+      'To persist changes, create the role_permissions table and regenerate supabase.ts.'
+    );
   },
 };
+
+export default roleService;

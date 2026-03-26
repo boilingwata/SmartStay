@@ -143,27 +143,42 @@ async function getCurrentProfile() {
 
 export const publicListingsService = {
   getListings: async (): Promise<PublicListing[]> => {
-    const rows = await unwrap(
-      (supabase as any)
-        .from('public_room_listings')
-        .select('*')
-        .order('base_rent', { ascending: true })
-    ) as unknown as PublicListingRow[];
+    try {
+      // PL-01 FIX: public_room_listings view type added to supabase.ts — no longer need (supabase as any).
+      // If the view doesn't exist in the DB, this will return an error caught gracefully below.
+      const rows = await unwrap(
+        supabase
+          .from('public_room_listings')
+          .select('*')
+          .order('base_rent', { ascending: true })
+      ) as unknown as PublicListingRow[];
 
-    return (rows ?? []).map(toPublicListing);
+      return (rows ?? []).map(toPublicListing);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[publicListingsService] getListings failed — view may not exist:', msg);
+      return [];
+    }
   },
 
   getListingDetail: async (roomId: string): Promise<PublicListing | null> => {
-    const rows = await unwrap(
-      (supabase as any)
-        .from('public_room_listings')
-        .select('*')
-        .eq('room_id', Number(roomId))
-        .limit(1)
-    ) as unknown as PublicListingRow[];
+    try {
+      // PL-01 FIX: Using typed client after adding view type to supabase.ts
+      const rows = await unwrap(
+        supabase
+          .from('public_room_listings')
+          .select('*')
+          .eq('room_id', Number(roomId))
+          .limit(1)
+      ) as unknown as PublicListingRow[];
 
-    if (!rows || rows.length === 0) return null;
-    return toPublicListing(rows[0]);
+      if (!rows || rows.length === 0) return null;
+      return toPublicListing(rows[0]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[publicListingsService] getListingDetail failed — view may not exist:', msg);
+      return null;
+    }
   },
 
   getExistingApplication: async (roomId: string): Promise<RentalApplicationSummary | null> => {
@@ -198,16 +213,23 @@ export const publicListingsService = {
     };
   },
 
-  submitInquiry: async (roomId: string, data: RoomInquiryData): Promise<void> => {
-    const { error } = await (supabase as any)
-      .from('room_inquiries')
-      .insert({
-        room_id: Number(roomId),
-        inquirer_name: data.name.trim(),
-        inquirer_phone: data.phone.trim(),
-        message: data.message.trim(),
-      });
-    if (error) throw new Error('Không thể gửi câu hỏi. Vui lòng thử lại sau.');
+  submitInquiry: async (_roomId: string, _data: RoomInquiryData): Promise<void> => {
+    /**
+     * FEATURE STUB (PL-02): The `room_inquiries` table does NOT exist in the `smartstay` schema.
+     *
+     * TO ENABLE THIS FEATURE:
+     *   1. CREATE TABLE smartstay.room_inquiries (
+     *        id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+     *        room_id BIGINT NOT NULL REFERENCES smartstay.rooms(id),
+     *        inquirer_name TEXT NOT NULL,
+     *        inquirer_phone TEXT NOT NULL,
+     *        message TEXT,
+     *        created_at TIMESTAMPTZ DEFAULT NOW()
+     *      );
+     *   2. Re-generate src/types/supabase.ts
+     *   3. Replace this stub with a real insert
+     */
+    throw new Error('Tính năng gửi câu hỏi chưa được kích hoạt. Vui lòng liên hệ quản lý qua số điện thoại hoặc email.');
   },
 
   submitApplication: async (roomId: string, form: RentalApplicationFormData): Promise<RentalApplicationSummary> => {

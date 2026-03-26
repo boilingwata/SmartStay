@@ -25,7 +25,14 @@ const useUIStore = create<UIState>()(
 
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       
-      setBuilding: (id) => set({ activeBuildingId: id }),
+      setBuilding: (id) => {
+        // Guard: reject NaN values that can sneak in from numeric conversions
+        if (id !== null && !Number.isFinite(Number(id))) {
+          set({ activeBuildingId: null });
+        } else {
+          set({ activeBuildingId: id });
+        }
+      },
       
       toggleTheme: () => set((state) => ({ 
         theme: state.theme === "light" ? "dark" : "light" 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
+import type { DbServiceCalcType } from '@/types/supabase';
 import {
   Service,
   ServiceFilter,
@@ -10,113 +11,92 @@ import {
 } from '@/types/service';
 
 // ---------------------------------------------------------------------------
-// DB row shapes
+// DB row shapes — matches smartstay.services and smartstay.service_prices exactly
 // ---------------------------------------------------------------------------
 
 interface DbServiceRow {
   id: number;
-  service_code: string;
   name: string;
-  service_type: string;
-  unit: string;
-  billing_method: string;
-  description: string | null;
-  is_active: boolean;
-  created_at: string;
+  calc_type: DbServiceCalcType;
+  is_active: boolean | null;
+  is_deleted: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface DbServicePriceRow {
   id: number;
   service_id: number;
-  price: number;
+  unit_price: number;        // was wrongly named "price" before
   effective_from: string;
   effective_to: string | null;
-  set_by: string | null;
-  reason: string | null;
-  created_at: string;
+  is_active: boolean | null; // actual DB column; use this instead of deriving
+  created_at: string | null;
 }
 
-// Insert/update shapes for tables whose generated types are stale.
-// The actual DB columns exist but supabase.ts hasn't been regenerated.
-interface ServiceInsert {
-  service_code: string;
-  name: string;
-  service_type: string;
-  unit: string;
-  billing_method: string;
-  description: string | null;
-  is_active: boolean;
-}
+// ---------------------------------------------------------------------------
+// calc_type ↔ billingMethod mapping (calc_type is the only discriminator in DB)
+// ---------------------------------------------------------------------------
 
-interface ServiceUpdate {
-  name?: string;
-  service_type?: string;
-  unit?: string;
-  billing_method?: string;
-  description?: string | null;
-  is_active?: boolean;
-}
+const CALC_TYPE_TO_BILLING: Record<DbServiceCalcType, Service['billingMethod']> = {
+  per_person: 'PerPerson',
+  per_unit:   'Metered',
+  flat_rate:  'Fixed',
+  per_room:   'Fixed',
+};
 
-interface ServicePriceInsert {
-  service_id: number;
-  price: number;
-  effective_from: string;
-  reason?: string;
-}
+const BILLING_TO_CALC_TYPE: Record<string, DbServiceCalcType> = {
+  PerPerson: 'per_person',
+  Metered:   'per_unit',
+  Fixed:     'flat_rate',
+  Usage:     'per_unit',
+  PerM2:     'per_unit',
+};
 
-interface ServicePriceUpdate {
-  effective_to?: string;
-}
+// Derive a reasonable serviceType from calc_type (DB has no service_type col)
+// C-04: per_room maps to 'Amenity' so AmenityList filter (`s.serviceType === 'Amenity'`) works
+const CALC_TYPE_TO_SERVICE_TYPE: Record<DbServiceCalcType, Service['serviceType']> = {
+  per_person: 'Management',
+  per_unit:   'Utility',
+  flat_rate:  'Management',
+  per_room:   'Amenity',
+};
 
 // ---------------------------------------------------------------------------
 // Mappers
 // ---------------------------------------------------------------------------
 
-const SERVICE_TYPE_MAP: Record<string, string> = {
-  utility: 'Utility',
-  management: 'Management',
-  amenity: 'Amenity',
-  optional: 'Optional',
-};
-
-const BILLING_METHOD_MAP: Record<string, string> = {
-  fixed: 'Fixed',
-  per_person: 'PerPerson',
-  per_m2: 'PerM2',
-  metered: 'Metered',
-  usage: 'Usage',
-};
-
 function toService(row: DbServiceRow, latestPrice?: DbServicePriceRow): Service {
+  const billingMethod = CALC_TYPE_TO_BILLING[row.calc_type] ?? 'Fixed';
   return {
-    serviceId: row.id,
-    serviceName: row.name,
-    serviceCode: row.service_code,
-    serviceType: (SERVICE_TYPE_MAP[row.service_type] ?? row.service_type) as Service['serviceType'],
-    unit: row.unit,
-    billingMethod: (BILLING_METHOD_MAP[row.billing_method] ?? row.billing_method) as Service['billingMethod'],
-    description: row.description ?? undefined,
-    isActive: row.is_active,
-    currentPrice: latestPrice?.price ?? 0,
-    currentPriceEffectiveFrom: latestPrice?.effective_from ?? row.created_at,
+    serviceId:                 row.id,
+    serviceName:               row.name,
+    serviceCode:               `SVC-${String(row.id).padStart(4, '0')}`,  // generated client-side
+    serviceType:               CALC_TYPE_TO_SERVICE_TYPE[row.calc_type] ?? 'Management',
+    unit:                      row.calc_type === 'per_unit' ? 'kWh' : '月',
+    billingMethod,
+    description:               undefined,  // no description column in DB
+    isActive:                  row.is_active ?? true,
+    currentPrice:              latestPrice?.unit_price ?? 0,
+    currentPriceEffectiveFrom: latestPrice?.effective_from ?? (row.created_at ?? ''),
   };
 }
 
 function toPriceHistory(row: DbServicePriceRow): ServicePriceHistory {
   return {
     priceHistoryId: row.id,
-    serviceId: row.service_id,
-    price: row.price,
-    effectiveFrom: row.effective_from,
-    effectiveTo: row.effective_to,
-    setByName: row.set_by ?? '',
-    reason: row.reason ?? '',
-    isActive: row.effective_to === null,
+    serviceId:      row.service_id,
+    price:          row.unit_price,        // mapped from DB's unit_price
+    effectiveFrom:  row.effective_from,
+    effectiveTo:    row.effective_to,
+    setByName:      '',                    // no set_by column in DB
+    reason:         '',                    // no reason column in DB
+    isActive:       row.is_active ?? (row.effective_to === null),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Service
+// Service functions (all pure — no Zustand coupling)
 // ---------------------------------------------------------------------------
 
 export const getServices = async (
@@ -125,23 +105,28 @@ export const getServices = async (
   let query = supabase
     .from('services')
     .select('*')
+    .eq('is_deleted', false)          // always exclude soft-deleted
     .order('created_at', { ascending: false });
 
   if (filter.search) {
     query = query.ilike('name', `%${filter.search}%`);
   }
-  if (filter.serviceType) {
-    const dbType = Object.entries(SERVICE_TYPE_MAP).find(([, v]) => v === filter.serviceType)?.[0];
-    // service_type column exists in DB but not in generated types
-    if (dbType) query = (query as any).eq('service_type', dbType);
-  }
   if (filter.isActive !== undefined) {
     query = query.eq('is_active', filter.isActive);
+  }
+  // SV-02: service_type column does not exist in the DB — serviceType filter is derived from
+  // calc_type and applied in-memory after the DB fetch.
+  // Warn developers so they can detect where the filter is being ignored.
+  if (filter.serviceType) {
+    console.info(
+      `[serviceService] serviceType filter '${filter.serviceType}' applied in-memory ` +
+      `(DB has no service_type column — derived from calc_type via CALC_TYPE_TO_SERVICE_TYPE).`
+    );
   }
 
   const rows = await unwrap(query) as unknown as DbServiceRow[];
 
-  // Fetch latest price for each service
+  // Fetch latest active price for each service
   const serviceIds = rows.map(r => r.id);
   let priceRows: DbServicePriceRow[] = [];
   if (serviceIds.length > 0) {
@@ -150,32 +135,51 @@ export const getServices = async (
         .from('service_prices')
         .select('*')
         .in('service_id', serviceIds)
-        .is('effective_to', null)
+        .eq('is_active', true)         // use the DB flag, not effective_to heuristic
     ) as unknown as DbServicePriceRow[];
   }
 
   const priceMap = new Map<number, DbServicePriceRow>();
   for (const p of priceRows) {
-    priceMap.set(p.service_id, p);
+    // Keep only the newest active price per service
+    if (!priceMap.has(p.service_id)) {
+      priceMap.set(p.service_id, p);
+    }
   }
 
   const data = rows.map(r => toService(r, priceMap.get(r.id)));
-  return { data, total: data.length };
+
+  // SV-02: Apply serviceType filter in-memory (no service_type column in DB).
+  // The derived serviceType comes from CALC_TYPE_TO_SERVICE_TYPE in toService().
+  const filtered = filter.serviceType
+    ? data.filter(s => s.serviceType === filter.serviceType)
+    : data;
+
+  return { data: filtered, total: filtered.length };
 };
 
 export const getServiceById = async (id: number): Promise<Service | undefined> => {
+  if (!Number.isFinite(id)) throw new Error(`Invalid service id: ${id}`);
+
   const row = await unwrap(
     supabase.from('services').select('*').eq('id', id).single()
   ) as unknown as DbServiceRow;
 
   const prices = await unwrap(
-    supabase.from('service_prices').select('*').eq('service_id', id).is('effective_to', null).limit(1)
+    supabase
+      .from('service_prices')
+      .select('*')
+      .eq('service_id', id)
+      .eq('is_active', true)
+      .limit(1)
   ) as unknown as DbServicePriceRow[];
 
   return toService(row, prices[0]);
 };
 
 export const getPriceHistory = async (serviceId: number): Promise<ServicePriceHistory[]> => {
+  if (!Number.isFinite(serviceId)) throw new Error(`Invalid serviceId: ${serviceId}`);
+
   const rows = await unwrap(
     supabase
       .from('service_prices')
@@ -188,103 +192,107 @@ export const getPriceHistory = async (serviceId: number): Promise<ServicePriceHi
 };
 
 export const createService = async (dto: CreateServiceDto): Promise<Service> => {
-  const dbType = Object.entries(SERVICE_TYPE_MAP).find(([, v]) => v === dto.serviceType)?.[0] ?? 'utility';
-  const dbBilling = Object.entries(BILLING_METHOD_MAP).find(([, v]) => v === dto.billingMethod)?.[0] ?? 'fixed';
+  const calcType: DbServiceCalcType =
+    BILLING_TO_CALC_TYPE[dto.billingMethod] ?? 'flat_rate';
 
-  const insertPayload: ServiceInsert = {
-    service_code: dto.serviceCode,
-    name: dto.serviceName,
-    service_type: dbType,
-    unit: dto.unit,
-    billing_method: dbBilling,
-    description: dto.description ?? null,
-    is_active: dto.isActive,
-  };
   const row = await unwrap(
-    supabase.from('services').insert(insertPayload as never).select().single()
+    supabase
+      .from('services')
+      .insert({
+        name:      dto.serviceName,
+        calc_type: calcType,
+        is_active: dto.isActive,
+      })
+      .select()
+      .single()
   ) as unknown as DbServiceRow;
 
   // Create initial price
-  const pricePayload: ServicePriceInsert = {
-    service_id: row.id,
-    price: dto.initialPrice,
-    effective_from: dto.priceEffectiveFrom,
-    reason: dto.priceReason,
-  };
-  await unwrap(
-    supabase.from('service_prices').insert(pricePayload as never)
-  );
+  const priceRow = await unwrap(
+    supabase
+      .from('service_prices')
+      .insert({
+        service_id:     row.id,
+        unit_price:     dto.initialPrice,
+        effective_from: dto.priceEffectiveFrom,
+        is_active:      true,
+      })
+      .select()
+      .single()
+  ) as unknown as DbServicePriceRow;
 
-  return toService(row, {
-    id: 0,
-    service_id: row.id,
-    price: dto.initialPrice,
-    effective_from: dto.priceEffectiveFrom,
-    effective_to: null,
-    set_by: null,
-    reason: dto.priceReason,
-    created_at: new Date().toISOString(),
-  });
+  return toService(row, priceRow);
 };
 
 export const updateService = async (id: number, dto: UpdateServiceDto): Promise<Service> => {
-  const dbType = Object.entries(SERVICE_TYPE_MAP).find(([, v]) => v === dto.serviceType)?.[0] ?? 'utility';
-  const dbBilling = Object.entries(BILLING_METHOD_MAP).find(([, v]) => v === dto.billingMethod)?.[0] ?? 'fixed';
+  if (!Number.isFinite(id)) throw new Error(`Invalid service id: ${id}`);
 
-  const updatePayload: ServiceUpdate = {
-    name: dto.serviceName,
-    service_type: dbType,
-    unit: dto.unit,
-    billing_method: dbBilling,
-    description: dto.description ?? null,
-    is_active: dto.isActive,
-  };
+  const calcType: DbServiceCalcType =
+    dto.billingMethod ? (BILLING_TO_CALC_TYPE[dto.billingMethod] ?? 'flat_rate') : 'flat_rate';
+
   const row = await unwrap(
-    supabase.from('services').update(updatePayload as never).eq('id', id).select().single()
+    supabase
+      .from('services')
+      .update({
+        name:      dto.serviceName,
+        calc_type: calcType,
+        is_active: dto.isActive,
+      })
+      .eq('id', id)
+      .select()
+      .single()
   ) as unknown as DbServiceRow;
 
   return toService(row);
 };
 
 export const toggleServiceActive = async (id: number, isActive: boolean): Promise<void> => {
+  if (!Number.isFinite(id)) throw new Error(`Invalid service id: ${id}`);
   await unwrap(
-    supabase.from('services').update({ is_active: isActive } as ServiceUpdate as never).eq('id', id)
+    supabase.from('services').update({ is_active: isActive }).eq('id', id)
   );
 };
 
 export const updateServicePrice = async (serviceId: number, dto: UpdateServicePriceDto): Promise<void> => {
-  // Close current active price
+  if (!Number.isFinite(serviceId)) throw new Error(`Invalid serviceId: ${serviceId}`);
+
+  // Mark current active price as inactive + set effective_to
   await unwrap(
     supabase
       .from('service_prices')
-      .update({ effective_to: dto.effectiveFrom } as ServicePriceUpdate as never)
+      .update({ effective_to: dto.effectiveFrom, is_active: false })
       .eq('service_id', serviceId)
-      .is('effective_to', null)
+      .eq('is_active', true)
   );
 
-  // Insert new price
+  // Insert new price record
   await unwrap(
     supabase.from('service_prices').insert({
-      service_id: serviceId,
-      price: dto.newPrice,
+      service_id:     serviceId,
+      unit_price:     dto.newPrice,
       effective_from: dto.effectiveFrom,
-      reason: dto.reason,
-    } as ServicePriceInsert as never)
+      is_active:      true,
+    })
   );
 };
 
-export const checkServiceCodeUnique = async (code: string, excludeId?: number): Promise<boolean> => {
-  let query = supabase.from('services').select('id').eq('service_code', code);
-  if (excludeId) query = query.neq('id', excludeId);
-  const rows = await unwrap(query) as unknown as { id: number }[];
-  return rows.length === 0;
-};
-
+/**
+ * Check name uniqueness (service_code column does not exist in DB).
+ * Callers that previously used checkServiceCodeUnique should migrate to this.
+ */
 export const checkServiceNameUnique = async (name: string, excludeId?: number): Promise<boolean> => {
-  let query = supabase.from('services').select('id').eq('name', name);
-  if (excludeId) query = query.neq('id', excludeId);
+  let query = supabase.from('services').select('id').ilike('name', name);
+  if (excludeId && Number.isFinite(excludeId)) query = query.neq('id', excludeId);
   const rows = await unwrap(query) as unknown as { id: number }[];
   return rows.length === 0;
 };
 
-export const generateServiceCode = (): string => `SVC-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+/**
+ * @deprecated service_code column does not exist in the DB.
+ * Use checkServiceNameUnique instead. Kept as alias for backwards compat.
+ */
+export const checkServiceCodeUnique = checkServiceNameUnique;
+
+/** Generate a human-readable label — purely client-side, never stored in DB. */
+export const generateServiceCode = (): string =>
+  `SVC-${Date.now().toString(36).toUpperCase().slice(-4)}`;

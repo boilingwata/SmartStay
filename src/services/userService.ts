@@ -28,7 +28,12 @@ function rowToUser(row: ProfileRow): User {
     // profiles table has no separate username column; use full_name as fallback
     username: row.full_name,
     fullName: row.full_name,
-    // email is only in auth.users — not available client-side; leave empty
+    // USR-02: email is intentionally empty here.
+    // The `profiles` table does NOT store email — it lives only in `auth.users`,
+    // which is not directly accessible from the client JS SDK.
+    // Email is patched in ONLY by authStore.syncSessionUser() which has access
+    // to `session.user.email` from the active Supabase session.
+    // Callers that need email must go through authStore, not userService.getUsers().
     email: '',
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
@@ -103,8 +108,34 @@ export const userService = {
     if (user.fullName !== undefined) updatePayload.full_name = user.fullName;
     if (user.phone !== undefined) updatePayload.phone = user.phone ?? null;
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
-    if (user.role !== undefined) updatePayload.role = mapRole.toDb(user.role) as DbUserRole;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
+
+    // E-02 FIX: Prevent silent role corruption for manager/landlord users.
+    // mapRole.fromDb maps 'manager' and 'landlord' → 'Admin', and mapRole.toDb('Admin') → 'admin'.
+    // If we naively persist the mapped role, managers/landlords become admins silently.
+    // Guard: only update role if explicitly provided AND the current DB role is not one of the
+    // privileged variants (manager, landlord) that round-trip incorrectly.
+    if (user.role !== undefined) {
+      const { data: currentRow } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', String(id))
+        .maybeSingle();
+      const currentDbRole = (currentRow as { role: string } | null)?.role ?? '';
+      // Only write role if the DB currently stores 'admin' (safe to overwrite)
+      // or if the target is 'staff'/'tenant' (no round-trip ambiguity for those).
+      const isSafeToUpdateRole =
+        currentDbRole === 'admin' ||
+        currentDbRole === 'staff' ||
+        currentDbRole === 'tenant' ||
+        user.role === 'Staff' ||
+        user.role === 'Tenant';
+      if (isSafeToUpdateRole) {
+        updatePayload.role = mapRole.toDb(user.role) as DbUserRole;
+      }
+      // If currentDbRole is 'manager' or 'landlord' and user.role === 'Admin',
+      // skip the update to avoid data corruption (E-02).
+    }
 
     const row = await unwrap(
       supabase

@@ -87,6 +87,12 @@ const TICKET_STATUS_TO_DB: StringRecord = {
   InProgress: 'in_progress',
   Resolved: 'resolved',
   Closed: 'closed',
+  // E-01 KNOWN DATA LOSS: DB ticket_status_type enum does NOT include 'cancelled'.
+  // Valid DB values: new | in_progress | pending_confirmation | resolved | closed
+  // A ticket cancelled in the UI is stored as 'closed' in the DB.
+  // On next load, 'closed' maps back to 'Closed' \u2014 not 'Cancelled' \u2014 so the round-trip is lossy.
+  // Impact: UI filter for 'Cancelled' tickets will always return 0 results.
+  // To fix: either add 'cancelled' to the DB enum or remove the Cancelled UI state.
   Cancelled: 'closed',
 }
 
@@ -132,6 +138,11 @@ const DEPOSIT_STATUS_FROM_DB: StringRecord = {
   refunded: 'Refunded',
   forfeited: 'Deducted',
 }
+const DEPOSIT_STATUS_TO_DB: StringRecord = {
+  Available: 'received',
+  Deducted: 'partially_refunded',
+  Refunded: 'refunded',
+}
 
 // --- Gender ---
 const GENDER_FROM_DB: StringRecord = {
@@ -162,6 +173,6 @@ export const mapInvoiceStatus = { fromDb: createMapper(INVOICE_STATUS_FROM_DB), 
 export const mapTicketStatus = { fromDb: createMapper(TICKET_STATUS_FROM_DB), toDb: createMapper(TICKET_STATUS_TO_DB) }
 export const mapPriority = { fromDb: createMapper(PRIORITY_FROM_DB), toDb: createMapper(PRIORITY_TO_DB) }
 export const mapPaymentMethod = { fromDb: createMapper(PAYMENT_METHOD_FROM_DB), toDb: createMapper(PAYMENT_METHOD_TO_DB) }
-export const mapDepositStatus = { fromDb: createMapper(DEPOSIT_STATUS_FROM_DB) }
+export const mapDepositStatus = { fromDb: createMapper(DEPOSIT_STATUS_FROM_DB), toDb: createMapper(DEPOSIT_STATUS_TO_DB) }
 export const mapGender = { fromDb: createMapper(GENDER_FROM_DB), toDb: createMapper(GENDER_TO_DB) }
 export const mapAssetStatus = { fromDb: createMapper(ASSET_STATUS_FROM_DB) }

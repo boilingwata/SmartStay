@@ -1,6 +1,8 @@
 import { ServiceType, BillingMethod } from "@/types/service";
 import { formatVND } from "@/utils/index";
 
+export { formatVND };
+
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   Utility: "Tiện ích",
   Management: "Quản lý",

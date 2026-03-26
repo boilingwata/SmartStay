@@ -70,8 +70,8 @@ export const tenantDashboardService = {
 
     // Fetch data in parallel
     interface BalanceRow { balance_after: number }
-    interface InvoiceRow { id: number; total_amount: number; due_date: string; status: string }
-    interface TicketRow { id: number; ticket_code: string; title: string; priority: string; status: string; created_at: string; sla_deadline: string | null; rooms: { room_code: string } | null }
+    interface InvoiceRow { id: number; total_amount: number; due_date: string; status: string; contracts?: { contract_tenants?: { tenant_id: number }[] } | null }
+    interface TicketRow { id: number; ticket_code: string; subject: string; priority: string; status: string; created_at: string; rooms: { room_code: string } | null }
 
     const [balanceRows, invoiceRows, ticketRows] = await Promise.all([
       // Balance
@@ -95,8 +95,8 @@ export const tenantDashboardService = {
       // Recent tickets
       unwrap(
         supabase.from('tickets')
-          .select('id, ticket_code, title, priority, status, created_at, sla_deadline, rooms(room_code)')
-          .eq('reported_by', Number(tenantId))
+          .select('id, ticket_code, subject, priority, status, created_at, rooms(room_code)')
+          .eq('tenant_id', Number(tenantId))
           .order('created_at', { ascending: false })
           .limit(5)
       ).catch(() => []) as Promise<unknown>,
@@ -108,17 +108,23 @@ export const tenantDashboardService = {
 
     const currentBalance = typedBalance[0]?.balance_after ?? 0;
 
-    const totalPendingAmount = typedInvoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
+    // C-07: Filter invoices to only the current tenant's invoices (in-memory, based on joined contract_tenants)
+    const tenantInvoices = typedInvoices.filter(inv => {
+      const cts = inv.contracts?.contract_tenants;
+      return Array.isArray(cts) && cts.some(ct => ct.tenant_id === Number(tenantId));
+    });
+
+    const totalPendingAmount = tenantInvoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
 
     const recentTickets: RecentTicket[] = typedTickets.map((t) => ({
       id: String(t.id),
       ticketCode: t.ticket_code,
-      title: t.title,
+      title: t.subject,          // C-01: DB column is `subject`, not `title`
       roomName: t.rooms?.room_code ?? '',
       priority: mapPriority.fromDb(t.priority) as RecentTicket['priority'],
       status: mapTicketStatus.fromDb(t.status) as RecentTicket['status'],
       createdAt: t.created_at,
-      slaDeadline: t.sla_deadline ?? t.created_at,
+      slaDeadline: t.created_at, // C-01: sla_deadline không tồn tại trong DB, dùng created_at
     }));
 
     return {
@@ -129,9 +135,9 @@ export const tenantDashboardService = {
         lastUpdated: new Date().toISOString(),
         lastUpdatedAt: new Date().toISOString(),
       },
-      pendingInvoicesCount: typedInvoices.length,
+      pendingInvoicesCount: tenantInvoices.length,
       totalPendingAmount,
-      upcomingInvoices: typedInvoices.map((inv) => ({
+      upcomingInvoices: tenantInvoices.map((inv) => ({
         id: String(inv.id),
         title: `Hóa đơn #${inv.id}`,
         amount: inv.total_amount,

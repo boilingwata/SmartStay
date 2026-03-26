@@ -10,7 +10,9 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, allowedRoles }) => {
-  const { isAuthenticated, role, isLoading } = useAuthStore();
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const role = useAuthStore(s => s.role);
+  const isLoading = useAuthStore(s => s.isLoading);
   const location = useLocation();
 
   if (isLoading) {

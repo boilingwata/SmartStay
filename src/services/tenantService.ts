@@ -179,6 +179,9 @@ export const tenantService = {
    */
   getTenantDetail: async (id: string): Promise<TenantProfile> => {
     const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] getTenantDetail: invalid id "${id}"`);
+    }
 
     const row = await unwrap(
       supabase
@@ -245,6 +248,9 @@ export const tenantService = {
    */
   getTenantBalance: async (id: string): Promise<TenantBalance> => {
     const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] getTenantBalance: invalid id "${id}"`);
+    }
 
     const row = await unwrap(
       supabase
@@ -267,6 +273,9 @@ export const tenantService = {
    */
   getTenantLedger: async (id: string): Promise<TenantBalanceTransaction[]> => {
     const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] getTenantLedger: invalid id "${id}"`);
+    }
 
     const rows = await unwrap(
       supabase
@@ -304,6 +313,9 @@ export const tenantService = {
    */
   getEmergencyContacts: async (id: string): Promise<EmergencyContact[]> => {
     const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] getEmergencyContacts: invalid id "${id}"`);
+    }
 
     const row = await unwrap(
       supabase
@@ -337,6 +349,9 @@ export const tenantService = {
    */
   getOnboardingProgress: async (id: string): Promise<OnboardingProgress> => {
     const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] getOnboardingProgress: invalid id "${id}"`);
+    }
 
     const row = await unwrap(
       supabase

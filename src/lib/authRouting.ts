@@ -22,7 +22,7 @@ export function getTenantHomePath(stage?: TenantStage | null): string {
 
 export function getAuthenticatedHomePath(user?: Pick<User, 'role' | 'tenantStage'> | null): string {
   if (!user) return '/';
-  if (user.role !== 'Tenant') return '/dashboard';
+  if (user.role !== 'Tenant') return '/admin/dashboard';
   return getTenantHomePath(user.tenantStage);
 }
 
@@ -39,7 +39,7 @@ export function getPostLoginRedirect(
 
   if (safePath && user) {
     if (user.role !== 'Tenant') {
-      return safePath.startsWith('/portal') ? '/dashboard' : safePath;
+      return safePath.startsWith('/portal') ? '/admin/dashboard' : safePath;
     }
 
     if (safePath.startsWith('/listings')) return safePath;

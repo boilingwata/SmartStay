@@ -104,6 +104,10 @@ function buildStatus(row: TenantOnboardingRow, contractSteps: {
     isPersonalInfoConfirmed: !!(row.full_name && row.id_number && row.date_of_birth),
     isCCCDUploaded: hasCCCDDoc,
     isEmergencyContactAdded: !!row.emergency_contact_name,
+    // PO-01: isRoomHandovered is always false because neither the `contracts` nor
+    // `tenants` table has a room-handover timestamp/flag column.
+    // TO ENABLE: add `room_handover_at TIMESTAMPTZ` to the `contracts` table,
+    // then check `activeContract.contracts?.room_handover_at != null` here.
     isRoomHandovered: false,
     isDepositPaid: contractSteps.isDepositPaid,
     isContractSigned: contractSteps.isContractSigned,

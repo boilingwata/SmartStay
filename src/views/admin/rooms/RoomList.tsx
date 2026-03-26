@@ -53,19 +53,26 @@ const RoomList = () => {
 
   const { data: rooms, isLoading, isError, refetch } = useQuery<Room[]>({
     queryKey: ['rooms', activeBuildingId, search, statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, hasMeter],
-    queryFn: () => roomService.getRooms({
-      buildingId: activeBuildingId,
-      search,
-      status: statusFilter.length > 0 ? statusFilter as RoomStatus[] : undefined,
-      roomType: typeFilter || undefined,
-      minPrice,
-      maxPrice,
-      minFloor,
-      maxFloor,
-      minArea,
-      maxArea,
-      hasMeter
-    })
+    queryFn: () => {
+      // Only pass a buildingId that is a valid finite number or a non-empty string
+      const numericId = Number(activeBuildingId);
+      const safeId = (activeBuildingId != null && activeBuildingId !== '' && Number.isFinite(numericId))
+        ? String(activeBuildingId)
+        : undefined;
+      return roomService.getRooms({
+        buildingId: safeId,
+        search,
+        status: statusFilter.length > 0 ? statusFilter as RoomStatus[] : undefined,
+        roomType: typeFilter ? typeFilter as any : undefined,
+        minPrice,
+        maxPrice,
+        minFloor,
+        maxFloor,
+        minArea,
+        maxArea,
+        hasMeter
+      });
+    }
   });
 
   const handleCreateRoom = () => {
@@ -126,7 +133,14 @@ const RoomList = () => {
              label={t('sidebar.buildings')}
              placeholder={t('pages.rooms.allBuildings')}
              value={activeBuildingId?.toString()}
-             onChange={(val) => setBuilding(val ? (isNaN(Number(val)) ? val : Number(val)) : null)}
+             onChange={(val) => {
+               if (!val) {
+                 setBuilding(null);
+               } else {
+                 const num = Number(val);
+                 setBuilding(Number.isFinite(num) ? num : val);
+               }
+             }}
              loadOptions={async () => {
                const b = await buildingService.getBuildings();
                return b.map(item => ({ label: item.buildingName, value: item.id.toString() }));

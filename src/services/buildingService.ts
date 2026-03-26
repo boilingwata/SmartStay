@@ -173,11 +173,14 @@ export const buildingService = {
   getDistricts: async (provinceId: string) => MOCK_DISTRICTS[provinceId] || [],
   getWards: async (districtId: string) => MOCK_WARDS[districtId] || [],
 
-  checkBuildingCodeUnique: async (code: string): Promise<boolean> => {
+  checkBuildingCodeUnique: async (name: string): Promise<boolean> => {
+    // buildingCode is derived from DB id — not stored as a column.
+    // Check building name uniqueness instead (case-insensitive).
     const { data } = await supabase
       .from('buildings')
       .select('id')
-      .ilike('name', code)
+      .ilike('name', name)
+      .eq('is_deleted', false)
       .limit(1);
     return !data || data.length === 0;
   },
@@ -252,30 +255,60 @@ export const buildingService = {
   },
 
   createOwner: async (data: CreateOwnerData): Promise<Owner> => {
-    return { 
-      id: `O${Date.now()}`,
-      fullName: data.fullName,
-      avatarUrl: data.avatarUrl,
-      phone: data.phone,
-      email: data.email,
-      cccd: data.cccd,
-      taxCode: data.taxCode,
-      address: data.address,
-      isDeleted: false 
+    // Note: creating a new auth user requires supabase.auth.admin or a server function.
+    // Here we insert a profile directly with a generated UUID if the user already exists in auth.
+    // For a full implementation, use an Edge Function to call auth.admin.createUser().
+    const newId = crypto.randomUUID();
+    const row = await unwrap(
+      supabase
+        .from('profiles')
+        .insert({
+          id:        newId,
+          full_name: data.fullName,
+          phone:     data.phone ?? null,
+          role:      'landlord',
+          is_active: true,
+        })
+        .select()
+        .single()
+    ) as unknown as ProfileRow;
+
+    return {
+      id:         row.id,
+      fullName:   row.full_name,
+      avatarUrl:  row.avatar_url ?? undefined,
+      phone:      row.phone ?? '',
+      email:      data.email ?? '',
+      cccd:       data.cccd ?? '',
+      taxCode:    data.taxCode ?? '',
+      address:    data.address ?? '',
+      isDeleted:  false,
     };
   },
 
   updateOwner: async (id: string, data: UpdateOwnerData): Promise<Owner> => {
-    return { 
-      id,
-      fullName: data.fullName || '',
-      avatarUrl: data.avatarUrl,
-      phone: data.phone || '',
-      email: data.email || '',
-      cccd: data.cccd || '',
-      taxCode: data.taxCode,
-      address: data.address,
-      isDeleted: false // Defaulting for now as this is a mock implementation
+    const row = await unwrap(
+      supabase
+        .from('profiles')
+        .update({
+          full_name: data.fullName || undefined,
+          phone:     data.phone   ?? null,
+        })
+        .eq('id', id)
+        .select()
+        .single()
+    ) as unknown as ProfileRow;
+
+    return {
+      id:        row.id,
+      fullName:  row.full_name,
+      avatarUrl: row.avatar_url ?? undefined,
+      phone:     row.phone ?? '',
+      email:     data.email  ?? '',
+      cccd:      data.cccd   ?? '',
+      taxCode:   data.taxCode ?? '',
+      address:   data.address ?? '',
+      isDeleted: false,
     };
   },
 

@@ -6,7 +6,12 @@ import { toast } from 'sonner';
 import { getTenantHomePath } from '@/lib/authRouting';
 
 const PortalAuthGuard: React.FC = () => {
-  const { isAuthenticated, role, user, sessionExpired, isLoading, clearAuth } = useAuthStore();
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const role = useAuthStore(s => s.role);
+  const user = useAuthStore(s => s.user);
+  const sessionExpired = useAuthStore(s => s.sessionExpired);
+  const isLoading = useAuthStore(s => s.isLoading);
+  const clearAuth = useAuthStore(s => s.clearAuth);
   const hasShownToast = useRef(false);
 
   useEffect(() => {

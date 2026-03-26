@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Coffee, 
@@ -46,8 +46,8 @@ const AmenityList: React.FC = () => {
     setBookingStep(1);
   };
 
-  // Generate next 7 days
-  const next7Days = Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i));
+  // Generate next 7 days — memoized so Date objects are not recreated on every render (PERF-001)
+  const next7Days = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i)), []);
   
   // Generate time slots (mock)
   const timeSlots = React.useMemo(() => {
@@ -117,8 +117,10 @@ const AmenityList: React.FC = () => {
           // Simulate deterministic conflict for testing
           const shouldConflict = ENABLE_SIMULATION && (parseInt(selectedTimeSlot?.split(':')[0] || '0') % 5 === 0);
           if (shouldConflict) {
-            const error = new Error('Conflict');
-            (error as any).response = { status: 409 };
+            // Use a custom discriminant that works for simulated AND real Supabase errors.
+            // When replaced with a real API call, check for PostgrestError code instead:
+            //   if ((error as PostgrestError).code === '23505') { ... }
+            const error = Object.assign(new Error('Conflict'), { code: 'SLOT_CONFLICT' });
             reject(error);
           } else {
             resolve(true);
@@ -128,8 +130,11 @@ const AmenityList: React.FC = () => {
       
       toast.success(`Đặt thành công ${selectedAmenity?.serviceName}`);
       resetBookingState();
-    } catch (error: any) {
-      if (error?.response?.status === 409) {
+    } catch (error: unknown) {
+      // Check for our simulated slot-conflict error.
+      // In production (real Supabase call), replace this check with:
+      //   if ((error as PostgrestError).code === '23505') { ... }
+      if (error instanceof Error && (error as Error & { code?: string }).code === 'SLOT_CONFLICT') {
         toast.error('Slot đã được đặt, vui lòng chọn giờ khác');
         setSelectedTimeSlot(null);
         setBookingStep(2); // Stay on time slot selection

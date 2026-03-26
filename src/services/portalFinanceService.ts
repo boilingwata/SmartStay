@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { TenantBalance, TenantBalanceTransaction, TransactionType } from '@/models/TenantBalance';
-import { mapInvoiceStatus } from '@/lib/enumMaps';
+import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
 
 // ---------------------------------------------------------------------------
 // Internal DB row shapes
@@ -36,6 +36,16 @@ interface DbInvoiceRow {
   billing_period: string | null;
 }
 
+interface PaymentHistoryItem {
+  id: string;
+  amount: number;
+  method: string;
+  status: 'Pending' | 'Confirmed' | 'Rejected';
+  createdAt: string;
+  description: string;
+  invoiceId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -57,11 +67,17 @@ async function getCurrentTenantId(): Promise<number | null> {
 }
 
 function mapTransactionType(dbType: string): TransactionType {
+  // PF-01: DB enum balance_transaction_type = deposit | deduction | refund | adjustment
+  // The values below that are NOT in the enum (payment, overpayment, auto_offset) are legacy
+  // labels that may appear in historical balance_history.notes or from application logic paths.
+  // They fall through to 'Other' via the fallback \u2014 no crash, but the display label will be 'Other'.
   const map: Record<string, TransactionType> = {
+    // DB enum values:
     deposit: 'ManualTopUp',
     deduction: 'ManualDeduct',
     refund: 'Refund',
     adjustment: 'Correction',
+    // Extended values (not in DB enum \u2014 may appear from application-level writes):
     payment: 'Payment',
     overpayment: 'Overpayment',
     auto_offset: 'AutoOffset',
@@ -95,8 +111,20 @@ export const portalFinanceService = {
         .from('tenant_balances')
         .select('tenant_id, balance, last_updated')
         .eq('tenant_id', tenantId)
-        .single()
-    ) as unknown as DbBalanceRow;
+        .maybeSingle()  // C-06: dùng maybeSingle() thay single() để tránh crash khi tenant mới chưa có balance row
+    ) as unknown as DbBalanceRow | null;
+
+    // C-06: Tenant mới chưa có row trong tenant_balances → trả về balance 0
+    if (!row) {
+      return {
+        tenantId: String(tenantId),
+        currentBalance: 0,
+        totalPaid: 0,
+        totalUnpaid: 0,
+        lastUpdated: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString(),
+      };
+    }
 
     // Also compute total paid / unpaid from invoices
     const contractLinks = await unwrap(
@@ -166,7 +194,7 @@ export const portalFinanceService = {
     return { items };
   },
 
-  getPaymentHistory: async (): Promise<{ items: any[] }> => {
+  getPaymentHistory: async (): Promise<{ items: PaymentHistoryItem[] }> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return { items: [] };
 
@@ -192,23 +220,41 @@ export const portalFinanceService = {
 
     const invoiceIds = invoiceRows.map(r => r.id);
 
+    interface DbPaymentRow {
+      id: number;
+      payment_code: string | null;
+      amount: number;
+      method: string | null;
+      payment_date: string;
+      confirmed_at: string | null;
+      notes: string | null;
+      invoice_id: number;
+    }
+
     const payments = await unwrap(
       supabase
         .from('payments')
-        .select('id, payment_code, amount, method, payment_date, notes, invoice_id')
+        .select('id, payment_code, amount, method, payment_date, confirmed_at, notes, invoice_id')
         .in('invoice_id', invoiceIds)
         .order('payment_date', { ascending: false })
-    ) as unknown as any[];
+    ) as unknown as DbPaymentRow[];
 
-    const items = (payments ?? []).map((p: any) => ({
-      id: p.payment_code ?? String(p.id),
-      amount: p.amount,
-      method: p.method ?? 'Transfer',
-      status: 'Success',
-      createdAt: p.payment_date,
-      description: p.notes ?? `Thanh toán hóa đơn`,
-      invoiceId: String(p.invoice_id),
-    }));
+    const items: PaymentHistoryItem[] = (payments ?? []).map((p) => {
+      // Derive status the same way as paymentService.deriveStatus()
+      let status: PaymentHistoryItem['status'] = 'Pending';
+      if (p.confirmed_at) status = 'Confirmed';
+      else if (p.notes?.startsWith('[REJECTED]')) status = 'Rejected';
+
+      return {
+        id: p.payment_code ?? String(p.id),
+        amount: p.amount,
+        method: mapPaymentMethod.fromDb(p.method ?? 'cash'),
+        status,
+        createdAt: p.payment_date,
+        description: (p.notes && !p.notes.startsWith('[REJECTED]')) ? p.notes : 'Thanh toán hóa đơn',
+        invoiceId: String(p.invoice_id),
+      };
+    });
 
     return { items };
   },

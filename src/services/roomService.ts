@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { unwrap, buildingScoped } from '@/lib/supabaseHelpers';
 import { mapRoomStatus, mapAssetStatus } from '@/lib/enumMaps';
 import type { DbRoomStatus } from '@/types/supabase';
-import useUIStore from '@/stores/uiStore';
 
 // --- Row interfaces ---
 
@@ -160,9 +159,9 @@ export const roomService = {
       .select('*, buildings(name)')
       .eq('is_deleted', false);
 
-    // Building filter: explicit param or global store
-    const targetBuildingId = filters?.buildingId ?? useUIStore.getState().activeBuildingId;
-    query = buildingScoped(query, targetBuildingId);
+    // Building filter: only use the explicitly-provided buildingId from the caller.
+    // Do NOT fall back to global store — services must remain dependency-free.
+    query = buildingScoped(query, filters?.buildingId ?? null);
 
     if (filters?.search) {
       const s = `%${filters.search}%`;
@@ -181,6 +180,7 @@ export const roomService = {
     if (filters?.minFloor !== undefined) query = query.gte('floor_number', filters.minFloor);
     if (filters?.maxFloor !== undefined) query = query.lte('floor_number', filters.maxFloor);
     if (filters?.minArea !== undefined) query = query.gte('area_sqm', filters.minArea);
+    if (filters?.maxArea !== undefined) query = query.lte('area_sqm', filters.maxArea);
     if (filters?.minPrice !== undefined) query = query.gte('base_rent', filters.minPrice);
     if (filters?.maxPrice !== undefined) query = query.lte('base_rent', filters.maxPrice);
 
@@ -190,6 +190,9 @@ export const roomService = {
 
   getRoomDetail: async (id: string): Promise<RoomDetail> => {
     const numId = Number(id);
+    if (!Number.isFinite(numId)) {
+      throw new Error(`[roomService] Invalid room id: "${id}"`);
+    }
 
     // Fetch room, assets, history, and meters in parallel
     const [row, assetRows, historyRows, meterRows] = await Promise.all([
@@ -272,6 +275,10 @@ export const roomService = {
   },
 
   updateRoom: async (id: string, data: UpdateRoomData): Promise<Room> => {
+    const numId = Number(id);
+    if (!Number.isFinite(numId)) {
+      throw new Error(`[roomService] Invalid room id: "${id}"`);
+    }
     const row = await unwrap(
       supabase
         .from('rooms')
@@ -288,7 +295,7 @@ export const roomService = {
           condition_score: data.conditionScore,
           status: data.status ? mapRoomStatus.toDb(data.status) as DbRoomStatus : undefined,
         })
-        .eq('id', Number(id))
+        .eq('id', numId)
         .select('*, buildings(name)')
         .single()
     ) as unknown as RoomRow;

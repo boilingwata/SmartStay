@@ -112,8 +112,10 @@ export interface RoomFilters {
   minFloor?: number;
   maxFloor?: number;
   minArea?: number;
+  maxArea?: number;
   minPrice?: number;
   maxPrice?: number;
+  hasMeter?: boolean;
 }
 
 export interface CreateRoomData {

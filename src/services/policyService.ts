@@ -31,7 +31,12 @@ export const getElectricityPolicyHistory = async (): Promise<ElectricityPolicy[]
 };
 
 export const createElectricityPolicy = async (_dto: CreateElectricityPolicyDto): Promise<ElectricityPolicy> => {
-  throw new Error('Policy management not yet connected to backend');
+  // POL-01 FIX: Changed from opaque throw to user-facing message.
+  // The electricity_policies table has not been provisioned yet.
+  throw new Error(
+    'Tính năng quản lý chính sách điện chưa được kích hoạt. ' +
+    'Vui lòng liên hệ quản trị viên hệ thống để tạo bảng electricity_policies.'
+  );
 };
 
 export const getCurrentWaterPolicy = async (): Promise<WaterPolicy> => {
@@ -54,7 +59,12 @@ export const getWaterPolicyHistory = async (): Promise<WaterPolicy[]> => {
 };
 
 export const createWaterPolicy = async (_dto: CreateWaterPolicyDto): Promise<WaterPolicy> => {
-  throw new Error('Policy management not yet connected to backend');
+  // POL-01 FIX: Changed from opaque throw to user-facing message.
+  // The water_policies table has not been provisioned yet.
+  throw new Error(
+    'Tính năng quản lý chính sách nước chưa được kích hoạt. ' +
+    'Vui lòng liên hệ quản trị viên hệ thống để tạo bảng water_policies.'
+  );
 };
 
 export const previewTierCalculation = (

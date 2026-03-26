@@ -102,7 +102,15 @@ const COMMENT_SELECT = `
 // Mappers
 // ---------------------------------------------------------------------------
 
-// SLA deadline: 24h for Critical/High, 72h for Medium, 7 days for Low
+// TK-01: SLA deadline is a computed client-side field — it is NOT stored in the DB.
+// Business rule: deadlines are measured from ticket creation time.
+//   Priority 'urgent' (Critical) → 24 hours
+//   Priority 'high'              → 48 hours
+//   Priority 'normal'            → 72 hours
+//   Priority 'low'               → 168 hours (7 days)
+// TO PERSIST: add `sla_deadline_at TIMESTAMPTZ` to the `tickets` table,
+// populate it via a DB trigger or service-side logic on insert,
+// and remove this computation from the frontend.
 function calcSlaDeadline(createdAt: string, priority: string | null): string {
   const created = new Date(createdAt);
   const hours =
@@ -220,9 +228,17 @@ export const ticketService = {
     const rows = (await unwrap(query)) as unknown as DbTicketRow[];
     let tickets = rows.map(mapDbRowToTicket);
 
-    // Building filter: applied in-memory since it's a nested join field
-    if (filters?.buildingId) {
-      tickets = tickets.filter((t) => t.buildingId === filters.buildingId);
+    // Building filter: applied in-memory since it's a nested join field.
+    // Normalise both sides to string to avoid string vs number mismatch.
+    if (filters?.buildingId != null && filters.buildingId !== '') {
+      const targetBuildingId = String(filters.buildingId);
+      tickets = tickets.filter((t) => t.buildingId === targetBuildingId);
+    }
+
+    // Type (category) filter: applied in-memory after fetch
+    if (filters?.type && filters.type !== 'All') {
+      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+      tickets = tickets.filter((t) => types.includes(t.type));
     }
 
     if (filters?.search) {
@@ -233,6 +249,16 @@ export const ticketService = {
           t.title.toLowerCase().includes(s) ||
           (t.tenantName ?? '').toLowerCase().includes(s)
       );
+    }
+
+    // SLA breach filter: applied in-memory
+    if (filters?.slaBreached !== undefined) {
+      const now = new Date();
+      tickets = tickets.filter((t) => {
+        const deadline = new Date(t.slaDeadline ?? '');
+        const isBreached = !isNaN(deadline.getTime()) && now > deadline;
+        return filters.slaBreached ? isBreached : !isBreached;
+      });
     }
 
     return tickets;

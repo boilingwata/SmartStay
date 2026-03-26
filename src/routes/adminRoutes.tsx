@@ -137,5 +137,5 @@ export const adminRoutes: RouteObject[] = [
 
     ],
   },
-  { path: '', element: <Navigate to="/dashboard" replace /> },
+  { path: '', element: <Navigate to="dashboard" replace /> },
 ];

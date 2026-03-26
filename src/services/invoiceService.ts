@@ -33,34 +33,35 @@ export interface InvoiceFilter {
 // Internal DB row shapes (used only inside this file via `as unknown as`)
 // ---------------------------------------------------------------------------
 
+// NOTE: id fields are numbers in DB (not strings). We keep string for frontend compat via String()
 interface DbInvoiceRow {
-  id: string;
+  id: number;           // DB: integer
   invoice_code: string;
-  contract_id: string;
-  billing_period: string;
-  subtotal: number;
-  tax_amount: number;
-  total_amount: number;
-  amount_paid: number;
-  balance_due: number;
-  due_date: string;
+  contract_id: number;  // DB: integer
+  billing_period: string | null;
+  subtotal: number | null;
+  tax_amount: number | null;
+  total_amount: number | null;
+  amount_paid: number | null;
+  balance_due: number | null;
+  due_date: string | null;
   paid_date: string | null;
-  status: string;
+  status: string | null;
   notes: string | null;
-  created_at: string;
+  created_at: string | null;
   contracts: {
     contract_code: string;
-    room_id: string;
+    room_id: number;
     rooms: {
       room_code: string;
-      building_id: string;
+      building_id: number;
       buildings: {
         name: string;
       };
     };
     contract_tenants: {
-      tenant_id: string;
-      is_primary: boolean;
+      tenant_id: number;
+      is_primary: boolean | null;
       tenants: {
         full_name: string;
       };
@@ -68,21 +69,22 @@ interface DbInvoiceRow {
   };
 }
 
+// Matches actual smartstay.invoice_items columns exactly
 interface DbInvoiceItemRow {
-  id: string;
-  invoice_id: string;
+  id: number;
+  invoice_id: number;
   description: string;
-  quantity: number;
+  quantity: number | null;
   unit_price: number;
   line_total: number;
-  meter_reading_id: string | null;
-  sort_order: number;
+  meter_reading_id: number | null;
+  sort_order: number | null;
 }
 
 interface DbPaymentRow {
-  id: string;
+  id: number;
   payment_code: string;
-  invoice_id: string;
+  invoice_id: number;
   amount: number;
   method: string;
   payment_date: string;
@@ -102,60 +104,56 @@ function mapDbRowToInvoice(row: DbInvoiceRow): Invoice {
     contract.contract_tenants[0];
 
   return {
-    id: row.id,
+    id: String(row.id),
     invoiceCode: row.invoice_code,
-    contractId: row.contract_id,
+    contractId: String(row.contract_id),
     contractCode: contract.contract_code,
-    roomId: contract.room_id,
+    roomId: String(contract.room_id),
     roomCode: room.room_code,
-    buildingId: room.building_id,
+    buildingId: String(room.building_id),
     buildingName: building.name,
-    tenantId: primaryTenant?.tenant_id ?? '',
+    tenantId: primaryTenant?.tenant_id != null ? String(primaryTenant.tenant_id) : '',
     tenantName: primaryTenant?.tenants?.full_name ?? '',
     period: row.billing_period?.slice(0, 7) ?? '',
-    totalAmount: row.total_amount,
-    paidAmount: row.amount_paid,
-    dueDate: row.due_date,
-    status: mapInvoiceStatus.fromDb(row.status) as InvoiceStatus,
+    totalAmount: row.total_amount ?? 0,
+    paidAmount: row.amount_paid ?? 0,
+    dueDate: row.due_date ?? '',
+    status: mapInvoiceStatus.fromDb(row.status ?? 'draft') as InvoiceStatus,
     hasViewed: false,
     viewCount: 0,
-    createdAt: row.created_at,
+    createdAt: row.created_at ?? new Date().toISOString(),
   };
 }
 
+/**
+ * Derive a frontend item type from the description text.
+ * The DB has no `type` column — we infer from keywords.
+ */
+function deriveItemType(description: string): InvoiceItem['type'] {
+  const lower = description.toLowerCase();
+  if (lower.includes('điện') || lower.includes('electr')) return 'Electricity';
+  if (lower.includes('nước') || lower.includes('water')) return 'Water';
+  if (lower.includes('thuê') || lower.includes('rent')) return 'Rent';
+  return 'Service';
+}
+
 function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
-  const price = item.unit_price !== undefined && item.unit_price !== null ? Number(item.unit_price) : null;
   return {
-    id: item.id,
-    description: item.description,
-    quantity: item.quantity,
-    unitPriceSnapshot: price ?? 0,
-    amount: item.line_total,
-    type: (item as any).type || 'Other',
-    snapshotPrice: (item as any).snapshot_price ?? 0,
-    snapshotLabel: (item as any).snapshot_label || 'Hợp đồng',
-    tierBreakdown: (() => {
-      const json = (item as any).tier_breakdown_json;
-      if (!json) return undefined;
-      try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.map((t: any) => ({
-          label: t.label || `Bậc ${t.tierOrder || ''}`,
-          qty: t.qty || t.kwh || t.usage || 0,
-          unitPrice: t.unitPrice || t.price || 0,
-          amount: t.amount || 0
-        })) : undefined;
-      } catch {
-        console.error('Failed to parse tier_breakdown_json for item:', item.id);
-        return undefined;
-      }
-    })()
+    id:                String(item.id),
+    description:       item.description,
+    quantity:          item.quantity ?? 1,
+    unitPriceSnapshot: Number(item.unit_price),
+    amount:            Number(item.line_total),
+    type:              deriveItemType(item.description),
+    snapshotPrice:     Number(item.unit_price),
+    snapshotLabel:     item.description,
+    tierBreakdown:     undefined,  // no tier_breakdown_json column in DB
   };
 }
 
 function mapDbPaymentToTransaction(payment: DbPaymentRow): PaymentTransaction {
   return {
-    id: payment.id,
+    id: String(payment.id),
     transactionCode: payment.payment_code,
     paidAt: payment.payment_date,
     amount: payment.amount,
@@ -210,16 +208,6 @@ export const invoiceService = {
       .select(INVOICE_SELECT, { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    if (filters.buildingId) {
-      // Filter via the nested rooms.building_id path
-      query = query.eq('contracts.rooms.building_id' as any, Number(filters.buildingId));
-    }
-
-    if (filters.tenantId) {
-      // Filter via the nested contracts.contract_tenants.tenant_id path
-      query = query.eq('contracts.contract_tenants.tenant_id' as any, Number(filters.tenantId));
-    }
-
     if (filters.status) {
       // Map frontend status → DB status; for 'Unpaid' we use in() to cover all three DB variants
       if (filters.status === 'Unpaid') {
@@ -254,11 +242,40 @@ export const invoiceService = {
     if (!data) throw new Error('Failed to fetch invoices: no data returned');
 
     const rows = data as unknown as DbInvoiceRow[];
+    let items = rows.map(mapDbRowToInvoice);
+
+    // Building filter: applied in-memory because PostgREST JS client does not
+    // support filtering on deeply nested join columns via dotted paths.
+    // INV-01 FIX: recalculate `total` after each in-memory filter so pagination
+    // doesn't show phantom pages beyond the actual filtered result size.
+    if (filters.buildingId) {
+      const numBuildingId = Number(filters.buildingId);
+      if (Number.isFinite(numBuildingId)) {
+        const targetBuildingId = String(numBuildingId);
+        items = items.filter((inv) => String(inv.buildingId) === targetBuildingId);
+      }
+    }
+
+    // Tenant filter: applied in-memory for the same reason
+    if (filters.tenantId) {
+      const numTenantId = Number(filters.tenantId);
+      if (Number.isFinite(numTenantId)) {
+        const targetTenantId = String(numTenantId);
+        items = items.filter((inv) => String(inv.tenantId) === targetTenantId);
+      }
+    }
+
+    // INV-01: Use item count after in-memory filtering as the source-of-truth total.
+    // If no in-memory filter was applied the DB count is still accurate.
+    const filteredTotal = (filters.buildingId || filters.tenantId)
+      ? items.length
+      : (count ?? 0);
+
     return {
-      items: rows.map(mapDbRowToInvoice),
-      total: count ?? 0,
+      items,
+      total: filteredTotal,
       page: typedPage ?? 1,
-      limit: typedLimit ?? (count ?? 0),
+      limit: typedLimit ?? filteredTotal,
     };
   },
 
@@ -291,13 +308,13 @@ export const invoiceService = {
 
     const base = mapDbRowToInvoice(invoiceRow);
 
-    // 2. Fetch invoice items
+    // 2. Fetch invoice items — select only columns that exist in smartstay.invoice_items
     const itemRows = await unwrap(
       supabase
         .from('invoice_items')
-        .select('id, invoice_id, description, quantity, unit_price, line_total, meter_reading_id, sort_order, type, snapshot_label, tier_breakdown_json')
+        .select('id, invoice_id, description, quantity, unit_price, line_total, meter_reading_id, sort_order')
         .eq('invoice_id', Number(id))
-        .order('sort_order', { ascending: true })
+        .order('sort_order', { ascending: true, nullsFirst: false })
     ) as unknown as DbInvoiceItemRow[];
 
     const items: InvoiceItem[] = itemRows.map(mapDbItemToInvoiceItem);
@@ -317,8 +334,8 @@ export const invoiceService = {
       ...base,
       items,
       payments,
-      subTotal: invoiceRow.subtotal,
-      taxAmount: invoiceRow.tax_amount,
+      subTotal: invoiceRow.subtotal ?? 0,
+      taxAmount: invoiceRow.tax_amount ?? 0,
       discountAmount: 0,
       overdueFee: 0,
     };

@@ -53,11 +53,16 @@ async function fetchProfile(userId: string): Promise<User | null> {
     ? await portalOnboardingService.getStatusForProfile(userId)
     : null
 
+  // AUTH-01: email is intentionally set to '' here and patched by the caller.
+  // `profiles` table does not store email — only `auth.users` does.
+  // The two places that call fetchProfile both patch `profile.email = session.user.email`
+  // immediately after. This is a deliberate two-step because fetchProfile can be reused
+  // in contexts where the session may differ from the profileId being fetched.
   return {
     id: data.id,
     username: data.full_name,
     fullName: data.full_name,
-    email: '',
+    email: '',  // patched by caller via session.user.email — see syncSessionUser & login
     phone: data.phone ?? undefined,
     avatar: data.avatar_url ?? undefined,
     role,

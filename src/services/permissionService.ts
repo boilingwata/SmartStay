@@ -1,37 +1,25 @@
-import { supabase } from '@/lib/supabase';
-import { MOCK_ROLE_PERMISSIONS } from '@/mocks/adminMocks';
-
-interface RolePermissionRow {
-  id: string;
-  role: string;
-  permission_key: string;
-}
+import { ROLE_PERMISSION_CONFIG } from '@/config/rolePermissions';
 
 /**
- * Fetches the permission keys for a given role from the `role_permissions` table.
- * Falls back to the static MOCK_ROLE_PERMISSIONS when the table doesn't exist yet.
+ * Permissions Service
+ *
+ * MK-01 / PRM-01 FIX: Imports from @/config/rolePermissions instead of @/mocks/adminMocks.
+ * The `role_permissions` table does NOT exist in the `smartstay` schema.
+ * Permissions are managed via static configuration for security — changes require
+ * a code deploy, preventing accidental escalation via a UI bug.
+ *
+ * TO add DB-backed permissions in the future:
+ *   1. Create a `role_permissions` table in supabase/migrations
+ *   2. Re-generate src/types/supabase.ts
+ *   3. Replace the static return below with a supabase.from('role_permissions') query
  */
 export const permissionService = {
   async getPermissionsForRole(role: string): Promise<string[]> {
-    const dbRole = role.toLowerCase();
+    return ROLE_PERMISSION_CONFIG.roleMap[role] ?? [];
+  },
 
-    const { data, error } = await supabase
-      .from('role_permissions' as any)
-      .select('permission_key')
-      .eq('role', dbRole);
-
-    if (error) {
-      // Table likely doesn't exist yet — fall back to static map
-      console.warn('[permissionService] Falling back to static permissions:', error.message);
-      return MOCK_ROLE_PERMISSIONS.roleMap[role] ?? [];
-    }
-
-    if (!data || data.length === 0) {
-      // Table exists but no rows for this role — still fall back
-      return MOCK_ROLE_PERMISSIONS.roleMap[role] ?? [];
-    }
-
-    return (data as unknown as RolePermissionRow[]).map((row) => row.permission_key);
+  async getAllPermissions() {
+    return ROLE_PERMISSION_CONFIG.permissions;
   },
 };
 

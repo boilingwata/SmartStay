@@ -187,6 +187,10 @@ export const portalProfileService = {
         avatar: avatarUrl,
         roomCode: activeLink?.contracts?.rooms?.room_code ?? '',
         buildingName: activeLink?.contracts?.rooms?.buildings?.name ?? 'SmartStay',
+        // PP-01: notificationPrefs are hardcoded to all-enabled defaults.
+        // The `profiles` and `tenants` tables have no notification preferences column.
+        // TO PERSIST USER PREFS: add a `notification_prefs` JSONB column to `profiles`
+        // or create a separate `notification_preferences` table, then query it here.
         notificationPrefs: {
           sms: true,
           email: true,
@@ -292,15 +296,18 @@ export const portalProfileService = {
 
       const { tenantId } = context;
 
-      // tenant_feedback is not yet in the generated types, cast to bypass
-      await (supabase as any)
-        .from('tenant_feedback')
-        .insert({
-          tenant_id: tenantId,
-          feedback_type: 'Suggestion',
-          content,
-          is_resolved: false,
-        });
+      // tenant_feedback table does not exist — redirect to tickets table with category 'feedback'
+      await unwrap(
+        supabase
+          .from('tickets')
+          .insert({
+            tenant_id: tenantId,
+            subject: content.slice(0, 200),
+            category: 'feedback',
+            priority: 'normal',
+            status: 'new',
+          })
+      );
     } catch (error) {
       handleServiceError(error, 'Không thể gửi góp ý');
     }

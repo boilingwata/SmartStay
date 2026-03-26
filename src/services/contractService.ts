@@ -2,7 +2,7 @@ import { Contract, ContractDetail, ContractTenant, ContractService } from '@/mod
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapContractStatus, mapDepositStatus } from '@/lib/enumMaps';
-import useUIStore from '@/stores/uiStore';
+import type { DbContractStatus } from '@/types/supabase';
 
 // --- ContractFilter ---
 
@@ -137,6 +137,9 @@ function toContractDetail(
     depositStatus: mapDepositStatus.fromDb(
       row.deposit_status ?? 'pending'
     ) as ContractDetail['depositStatus'],
+    // PS-01: paymentDueDay is hardcoded to 5 (5th of each month).
+    // The `contracts` table has no `payment_due_day` column in the current schema.
+    // TO PERSIST: add `payment_due_day SMALLINT DEFAULT 5` to the `contracts` table.
     paymentDueDay: 5,
     terminationReason: row.termination_reason ?? undefined,
     tenants: tenantRows.map(toContractTenant),
@@ -149,8 +152,7 @@ function toContractDetail(
 
 export const contractService = {
   getContracts: async (filters: ContractFilter = {}): Promise<Contract[]> => {
-    const targetBuildingId =
-      filters.buildingId ?? useUIStore.getState().activeBuildingId;
+    const targetBuildingId = filters.buildingId;
 
     let query = supabase
       .from('contracts')
@@ -166,14 +168,9 @@ export const contractService = {
       )
       .eq('is_deleted', false);
 
-    // Building filter via rooms.building_id
-    if (targetBuildingId) {
-      query = query.eq('rooms.building_id', Number(targetBuildingId));
-    }
-
     // Status filter
     if (filters.status && filters.status !== '') {
-      query = query.eq('status', mapContractStatus.toDb(filters.status) as any);
+      query = query.eq('status', mapContractStatus.toDb(filters.status) as DbContractStatus);
     }
 
     // Search by contract_code (case-insensitive)
@@ -184,11 +181,31 @@ export const contractService = {
     query = query.order('id', { ascending: false });
 
     const rows = await unwrap(query) as unknown as ContractRow[];
-    return rows.map(toContract);
+    let contracts = rows.map(toContract);
+
+    // Building filter: applied in-memory — PostgREST does not support
+    // dotted-path filtering on joined columns through the JS client.
+    // Normalise to string to avoid type mismatch (buildingId stored as String on model).
+    if (targetBuildingId) {
+      const numBuildingId = Number(targetBuildingId);
+      if (Number.isFinite(numBuildingId)) {
+        const targetStr = String(numBuildingId);
+        contracts = contracts.filter((c) => {
+          // Access the raw row's building_id via the joined rooms field
+          const rowEntry = rows.find((r) => String(r.id) === c.id);
+          return String(rowEntry?.rooms?.building_id ?? '') === targetStr;
+        });
+      }
+    }
+
+    return contracts;
   },
 
   getContractDetail: async (id: string): Promise<ContractDetail> => {
     const numId = Number(id);
+    if (!Number.isFinite(numId)) {
+      throw new Error(`[contractService] Invalid contract id: "${id}"`);
+    }
 
     const [contractRow, serviceRows] = await Promise.all([
       unwrap(

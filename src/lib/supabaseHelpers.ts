@@ -9,7 +9,16 @@ export async function unwrap<T>(
 ): Promise<T> {
   const { data, error } = await promise
   if (error) {
-    throw new Error(error.message)
+    // Preserve Supabase error details for better debugging
+    const err = new Error(error.message) as Error & {
+      code?: string
+      details?: string
+      hint?: string
+    }
+    err.code    = error.code
+    err.details = error.details ?? undefined
+    err.hint    = error.hint ?? undefined
+    throw err
   }
   return data as T
 }
@@ -22,8 +31,9 @@ export function buildingScoped<Q extends { eq: (...args: any[]) => any }>(
   query: Q,
   buildingId: string | number | null | undefined
 ): Q {
-  if (buildingId) {
-    return query.eq('building_id', Number(buildingId))
+  const numId = Number(buildingId);
+  if (buildingId != null && buildingId !== '' && Number.isFinite(numId)) {
+    return query.eq('building_id', numId);
   }
-  return query
+  return query;
 }

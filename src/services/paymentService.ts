@@ -105,6 +105,7 @@ const PAYMENT_SELECT = `
 
 function deriveStatus(row: DbPaymentRow): PaymentStatus {
   if (row.confirmed_at) return 'Confirmed';
+  if (row.notes?.startsWith('[REJECTED]')) return 'Rejected';
   return 'Pending';
 }
 
@@ -370,14 +371,18 @@ export const paymentService = {
     const balanceBefore = balance.currentBalance;
     const balanceAfter = balanceBefore + amount;
 
-    // Get the balance record id
+    // C-03: Use maybeSingle() so we get null (not an exception) when the tenant has no balance row yet
     const balanceRow = (await unwrap(
       supabase
         .from('tenant_balances')
         .select('id')
         .eq('tenant_id', Number(tenantId))
-        .single()
-    )) as unknown as { id: number };
+        .maybeSingle()
+    )) as unknown as { id: number } | null;
+
+    if (!balanceRow) {
+      throw new Error(`Không tìm thấy balance record cho tenant ${tenantId}. Cần tạo tenant_balances row trước.`);
+    }
 
     const dbType = mapTransactionTypeToDb(type);
 

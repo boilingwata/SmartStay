@@ -2,6 +2,7 @@ import { Asset, AssetType, AssetCondition } from '@/models/Asset';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapAssetStatus } from '@/lib/enumMaps';
+import type { DbAssetStatus } from '@/types/supabase';
 
 // Shape returned by the joined query
 interface RoomAssetRow {
@@ -100,18 +101,20 @@ export const assetService = {
   },
 
   createAsset: async (data: Partial<Asset> & { assetId?: number; roomId?: string | number }): Promise<Asset> => {
-    const insertPayload: Record<string, unknown> = {
+    // AS-01 FIX: Typed insert payload aligned with smartstay.room_assets schema.
+    // DB schema requires room_id and asset_id; status must match DbAssetStatus enum.
+    const insertPayload = {
       asset_id: data.assetId ?? 0,
-      room_id: data.roomId ? Number(data.roomId) : null,
+      room_id: data.roomId ? Number(data.roomId) : 0,  // DB: room_id is required (non-null)
       purchase_date: data.purchaseDate ?? null,
       warranty_expiry: data.warrantyExpiry ?? null,
-      status: 'in_use',
+      status: 'in_use' as DbAssetStatus,
     };
 
     const row = await unwrap(
       supabase
         .from('room_assets')
-        .insert(insertPayload as any)
+        .insert(insertPayload)
         .select('id, status, purchase_date, warranty_expiry, assets(id, name, qr_code, category, unit_cost), rooms(id, room_code)')
         .single()
     ) as unknown as RoomAssetRow;
@@ -120,14 +123,15 @@ export const assetService = {
   },
 
   updateAsset: async (id: string | number, data: Partial<Asset>): Promise<Asset> => {
-    const updatePayload: Record<string, unknown> = {};
+    // AS-01 FIX: Type the update payload aligned with smartstay.room_assets update schema.
+    const updatePayload: { purchase_date?: string | null; warranty_expiry?: string | null } = {};
     if (data.purchaseDate !== undefined) updatePayload.purchase_date = data.purchaseDate;
     if (data.warrantyExpiry !== undefined) updatePayload.warranty_expiry = data.warrantyExpiry;
 
     const row = await unwrap(
       supabase
         .from('room_assets')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', Number(id))
         .select('id, status, purchase_date, warranty_expiry, assets(id, name, qr_code, category, unit_cost), rooms(id, room_code)')
         .single()
