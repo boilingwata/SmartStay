@@ -3,11 +3,12 @@ import {
   Building2, Home, Maximize,
   Check, X, AlertCircle, User, Wind, Droplets, Refrigerator, Disc, Monitor, Layout
 } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm, useWatch, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { roomService } from '@/services/roomService';
+import { buildingService } from '@/services/buildingService';
 import { roomSchema, RoomFormData } from '@/schemas/roomSchema';
 import { Room, RoomDetail, RoomType, Furnishing, DirectionFacing } from '@/models/Room';
 import { cn } from '@/utils';
@@ -54,14 +55,28 @@ interface RoomModalProps {
   isOpen: boolean;
   onClose: () => void;
   room?: RoomDetail | Room | null;
+  /** Optional: pre-select a specific building (e.g. when called from BuildingDetail) */
+  buildingId?: string | number | null;
+  /** Optional: called after a successful create/update */
+  onSuccess?: () => void;
 }
 
-export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
+export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, onSuccess }: RoomModalProps) => {
   const isEditing = !!room;
   const queryClient = useQueryClient();
   const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+
+  // Priority: explicit prop > global store
+  const resolvedBuildingId = propBuildingId != null
+    ? String(propBuildingId)
+    : activeBuildingId != null ? String(activeBuildingId) : '';
   
-  const defaultValues = useMemo(() => getDefaults(activeBuildingId), [activeBuildingId]);
+  const { data: buildings, isLoading: isLoadingBuildings } = useQuery({
+    queryKey: ['buildings-summary'],
+    queryFn: () => buildingService.getBuildings()
+  });
+
+  const defaultValues = useMemo(() => getDefaults(resolvedBuildingId || activeBuildingId), [resolvedBuildingId, activeBuildingId]);
   
   const {
     register,
@@ -74,6 +89,16 @@ export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
     resolver: zodResolver(roomSchema) as unknown as Resolver<RoomFormData>,
     defaultValues: mapRoomToFormData(room || null, defaultValues)
   });
+
+  // Auto-select first building if none pre-selected and buildings loaded
+  const buildingSelectRef = React.useRef(false);
+  useEffect(() => {
+    if (isOpen && !buildingSelectRef.current && !resolvedBuildingId && buildings && buildings.length > 0) {
+      setValue('buildingId', String(buildings[0].id));
+      buildingSelectRef.current = true;
+    }
+    if (!isOpen) buildingSelectRef.current = false;
+  }, [isOpen, resolvedBuildingId, buildings, setValue]);
 
   const selectedAmenities = useWatch({ control, name: 'amenities' }) || [];
   const currentCondition = useWatch({ control, name: 'conditionScore' }) || 8;
@@ -89,8 +114,12 @@ export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
     mutationFn: (data: RoomFormData) => roomService.createRoom(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      onSuccess?.();
       toast.success('Đã tạo phòng mới thành công');
       onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Tạo phòng thất bại: ${error.message}`);
     }
   });
 
@@ -101,8 +130,12 @@ export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
       if (room?.id) {
         queryClient.invalidateQueries({ queryKey: ['room', room.id] });
       }
+      onSuccess?.();
       toast.success('Đã cập nhật thông tin phòng');
       onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Cập nhật phòng thất bại: ${error.message}`);
     }
   });
 
@@ -144,9 +177,18 @@ export const RoomModal = ({ isOpen, onClose, room }: RoomModalProps) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted uppercase">Toà nhà</label>
-                    <select {...register('buildingId')} disabled={isEditing} className="input-base w-full bg-bg/50">
-                       <option value="1">Keangnam Landmark</option><option value="2">Lotte Center</option>
-                    </select>
+                     <select {...register('buildingId')} disabled={isEditing} className="input-base w-full bg-bg/50">
+                        {isLoadingBuildings ? (
+                           <option value="">Đang tải...</option>
+                        ) : (
+                           <>
+                             <option value="">-- Chọn tòa nhà --</option>
+                             {buildings?.map((b) => (
+                                <option key={b.id} value={String(b.id)}>{b.buildingCode} - {b.buildingName}</option>
+                             ))}
+                           </>
+                        )}
+                     </select>
                  </div>
                  <div className="space-y-2 relative">
                     <label className="text-[10px] font-black text-muted uppercase">Mã phòng *</label>

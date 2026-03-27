@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -20,6 +20,8 @@ import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { BuildingModal } from '@/components/buildings/BuildingModal';
+import { RoomModal } from '@/components/rooms/RoomModal';
+import useUIStore from '@/stores/uiStore';
 
 // Tab Item and Component Imports
 import { OwnershipModal } from '@/components/buildings/OwnershipModal';
@@ -36,7 +38,7 @@ const TabItem = ({ active, children, onClick, icon: Icon }: any) => (
   </button>
 );
 
-const BuildingRoomsTab = ({ buildingId }: { buildingId: string }) => {
+const BuildingRoomsTab = ({ buildingId, onAddRoom }: { buildingId: string; onAddRoom: () => void }) => {
   const navigate = useNavigate();
   const { data: rooms, isLoading } = useQuery({
     queryKey: ['rooms', 'building', buildingId],
@@ -48,42 +50,72 @@ const BuildingRoomsTab = ({ buildingId }: { buildingId: string }) => {
   return (
     <div className="space-y-6">
        <div className="flex justify-between items-center">
-          <h2 className="text-h2 text-primary font-bold">Danh sách phòng</h2>
-          <button onClick={() => navigate('/admin/rooms')} className="btn-primary-sm flex items-center gap-2">Xem tất cả <ArrowRight size={14} /></button>
+          <div>
+            <h2 className="text-h2 text-primary font-bold">Danh sách phòng</h2>
+            <p className="text-[11px] text-muted font-medium mt-0.5">{rooms?.length ?? 0} phòng trong tòa nhà này</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/admin/rooms')} className="btn-outline-sm flex items-center gap-2">Xem tất cả <ArrowRight size={14} /></button>
+            <button
+              onClick={onAddRoom}
+              className="btn-primary-sm flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              <Plus size={14} /> Thêm phòng
+            </button>
+          </div>
        </div>
-       <div className="card-container overflow-hidden p-0 border-none shadow-xl shadow-primary/5">
-          <table className="w-full text-left">
-             <thead className="bg-bg/50 border-b">
-                <tr>
-                   <th className="px-6 py-4 text-label text-muted">Mã phòng</th>
-                   <th className="px-6 py-4 text-label text-muted">Tầng</th>
-                   <th className="px-6 py-4 text-label text-muted">Loại</th>
-                   <th className="px-6 py-4 text-label text-muted">Giá thuê CV</th>
-                   <th className="px-6 py-4 text-label text-muted">Trạng thái</th>
-                </tr>
-             </thead>
-             <tbody className="divide-y divide-border/20">
-                {rooms?.map((room: Room) => (
-                  <tr key={room.id} className="hover:bg-primary/[0.02] transition-colors">
-                     <td className="px-6 py-4">
-                        <button 
-                          onClick={() => navigate(`/rooms/${room.id}`)}
-                          className="text-body font-black text-primary hover:underline flex items-center gap-2"
-                        >
-                           <Home size={14} className="text-secondary" /> {room.roomCode}
-                        </button>
-                     </td>
-                     <td className="px-6 py-4 text-small font-bold text-muted">Tầng {room.floorNumber}</td>
-                     <td className="px-6 py-4 text-small font-bold text-text">{room.roomType}</td>
-                     <td className="px-6 py-4 text-small font-black text-primary">{formatVND(room.baseRentPrice)}</td>
-                     <td className="px-6 py-4">
-                        <StatusBadge status={room.status} size="sm" />
-                     </td>
+
+       {rooms && rooms.length === 0 ? (
+         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+           <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center">
+             <Home size={36} className="text-primary/30" />
+           </div>
+           <div>
+             <p className="text-body font-black text-muted">Tòa nhà chưa có phòng nào</p>
+             <p className="text-small text-muted/70 mt-1">Bắt đầu thêm phòng đầu tiên cho tòa nhà này.</p>
+           </div>
+           <button
+             onClick={onAddRoom}
+             className="btn-primary flex items-center gap-2 mt-2"
+           >
+             <Plus size={16} /> Thêm phòng đầu tiên
+           </button>
+         </div>
+       ) : (
+         <div className="card-container overflow-hidden p-0 border-none shadow-xl shadow-primary/5">
+            <table className="w-full text-left">
+               <thead className="bg-bg/50 border-b">
+                  <tr>
+                     <th className="px-6 py-4 text-label text-muted">Mã phòng</th>
+                     <th className="px-6 py-4 text-label text-muted">Tầng</th>
+                     <th className="px-6 py-4 text-label text-muted">Loại</th>
+                     <th className="px-6 py-4 text-label text-muted">Giá thuê CV</th>
+                     <th className="px-6 py-4 text-label text-muted">Trạng thái</th>
                   </tr>
-                ))}
-             </tbody>
-          </table>
-       </div>
+               </thead>
+               <tbody className="divide-y divide-border/20">
+                  {rooms?.map((room: Room) => (
+                    <tr key={room.id} className="hover:bg-primary/[0.02] transition-colors">
+                       <td className="px-6 py-4">
+                          <button 
+                            onClick={() => navigate(`/rooms/${room.id}`)}
+                            className="text-body font-black text-primary hover:underline flex items-center gap-2"
+                          >
+                             <Home size={14} className="text-secondary" /> {room.roomCode}
+                          </button>
+                       </td>
+                       <td className="px-6 py-4 text-small font-bold text-muted">Tầng {room.floorNumber}</td>
+                       <td className="px-6 py-4 text-small font-bold text-text">{room.roomType}</td>
+                       <td className="px-6 py-4 text-small font-black text-primary">{formatVND(room.baseRentPrice)}</td>
+                       <td className="px-6 py-4">
+                          <StatusBadge status={room.status} size="sm" />
+                       </td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
+         </div>
+       )}
     </div>
   );
 };
@@ -95,6 +127,19 @@ const BuildingDetail = () => {
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const setBuilding = useUIStore((s) => s.setBuilding);
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Set the active building context so RoomModal defaults to this building
+  useEffect(() => {
+    if (id) {
+      setBuilding(id);
+    }
+    return () => {
+      // cleanup: don't reset on unmount so other pages can still use the context
+    };
+  }, [id, setBuilding]);
 
   const { data: building, isLoading } = useQuery<BuildingDetailType>({
     queryKey: ['building', id],
@@ -111,6 +156,35 @@ const BuildingDetail = () => {
     queryClient.invalidateQueries({ queryKey: ['building', id] });
   };
 
+  // B9 FIX: Export operational report as CSV
+  const handleExportReport = async () => {
+    toast.promise(
+      (async () => {
+        const rooms = await roomService.getRooms({ buildingId: id });
+        const headers = ['Mã phòng', 'Tầng', 'Loại', 'Diện tích (m2)', 'Giá thuê', 'Trạng thái'];
+        const rows = rooms.map(r => [
+          r.roomCode, r.floorNumber, r.roomType,
+          r.areaSqm, r.baseRentPrice, r.status,
+        ]);
+        const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `baocao_${building?.buildingCode}_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      })(),
+      {
+        loading: 'Đang tạo báo cáo...',
+        success: 'Báo cáo vận hành đã được xuất!',
+        error: 'Xuất báo cáo thất bại.',
+      }
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       {/* 2.2.1 Page Header */}
@@ -120,7 +194,7 @@ const BuildingDetail = () => {
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-4">
-             <img src={building.heroImageUrl} className="w-16 h-16 rounded-2xl object-cover shadow-lg" alt="" />
+             <img src={building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} className="w-16 h-16 rounded-2xl object-cover shadow-lg" alt="" />
              <div>
                 <div className="flex items-center gap-2 mb-1">
                    <h1 className="text-[28px] font-black text-primary tracking-tighter leading-none">{building.buildingName}</h1>
@@ -141,7 +215,11 @@ const BuildingDetail = () => {
           >
             <Edit size={18} /> Cập nhật
           </button>
-          <button className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20"><Printer size={18} /> Báo cáo vận hành</button>
+          {/* B9 FIX: Real CSV report download */}
+          <button 
+            onClick={handleExportReport}
+            className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20"
+          ><Printer size={18} /> Báo cáo vận hành</button>
         </div>
       </div>
 
@@ -402,7 +480,7 @@ const BuildingDetail = () => {
           )}
 
           {activeTab === 'Rooms' && (
-            <BuildingRoomsTab buildingId={id!} />
+            <BuildingRoomsTab buildingId={id!} onAddRoom={() => setIsRoomModalOpen(true)} />
           )}
 
           {activeTab === 'Images' && (
@@ -410,8 +488,49 @@ const BuildingDetail = () => {
                <div className="flex justify-between items-center">
                   <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Bộ sưu tập hình ảnh</h3>
                   <div className="flex gap-2">
-                     <button className="btn-outline-sm flex items-center gap-2"><Download size={14} /> Tải toàn bộ</button>
-                     <button className="btn-primary-sm flex items-center gap-2"><Plus size={14} /> Thêm ảnh</button>
+                   {/* B10 FIX: Download images list as JSON/CSV */}
+                   <button 
+                      onClick={() => {
+                        const csv = ['Url,IsMain', ...building.images.map(img => `${img.url},${img.isMain}`)].join('\n');
+                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `images_${building.buildingCode}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        toast.success('Danh sách ảnh đã được tải về!');
+                      }}
+                      className="btn-outline-sm flex items-center gap-2"
+                   ><Download size={14} /> Tải toàn bộ</button>
+                   {/* B11 FIX: Hidden file input for photo upload trigger */}
+                   <input
+                     ref={photoInputRef}
+                     type="file"
+                     accept="image/*"
+                     multiple
+                     className="hidden"
+                     onChange={(e) => {
+                       const files = Array.from(e.target.files ?? []);
+                       if (files.length > 0) {
+                         toast.promise(
+                           new Promise(res => setTimeout(res, 1200)),
+                           {
+                             loading: `Đang tải lên ${files.length} ảnh...`,
+                             success: `Đã chọn ${files.length} ảnh — tính năng lưu trữ đang được phát triển.`,
+                             error: 'Tải ảnh thất bại.',
+                           }
+                         );
+                       }
+                       e.target.value = '';
+                     }}
+                   />
+                   <button 
+                      onClick={() => photoInputRef.current?.click()}
+                      className="btn-primary-sm flex items-center gap-2"
+                   ><Plus size={14} /> Thêm ảnh</button>
                   </div>
                </div>
                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -454,8 +573,14 @@ const BuildingDetail = () => {
                         <h3 className="text-h2 font-black tracking-tighter">Báo cáo Vận hành 2024</h3>
                         <p className="text-small text-slate-400 font-medium leading-relaxed">Tổng hợp toàn bộ chỉ số tài chính, bảo trì và sự cố của toà nhà trong năm tài khóa hiện tại. Dữ liệu được trích xuất trực tiếp từ hệ thống sổ cái (Ledger).</p>
                         <div className="flex gap-4 pt-4">
-                           <button className="px-6 py-3 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 hover:bg-slate-100 transition-all"><Printer size={18} /> In báo cáo</button>
-                           <button className="px-6 py-3 bg-slate-800 text-white font-black rounded-2xl flex items-center gap-2 hover:bg-slate-700 transition-all"><ExternalLink size={18} /> Xem chi tiết</button>
+                           <button 
+                              onClick={() => toast.info('Tính năng xuất báo cáo PDF đang được phát triển.')}
+                              className="px-6 py-3 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 hover:bg-slate-100 transition-all"
+                           ><Printer size={18} /> In báo cáo</button>
+                           <button 
+                              onClick={() => toast.info('Chi tiết báo cáo sẽ khả dụng trong phiên bản tiếp theo.')}
+                              className="px-6 py-3 bg-slate-800 text-white font-black rounded-2xl flex items-center gap-2 hover:bg-slate-700 transition-all"
+                           ><ExternalLink size={18} /> Xem chi tiết</button>
                         </div>
                      </div>
                      <div className="w-48 h-48 bg-white/5 rounded-full flex items-center justify-center border border-white/10 group cursor-pointer hover:bg-white/10 transition-all relative">
@@ -481,6 +606,13 @@ const BuildingDetail = () => {
         buildingId={id!}
         currentOwnerships={building.ownership}
         onSuccess={onOwnershipSuccess}
+      />
+
+      <RoomModal
+        isOpen={isRoomModalOpen}
+        onClose={() => setIsRoomModalOpen(false)}
+        buildingId={id!}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['rooms', 'building', id] })}
       />
     </div>
   );

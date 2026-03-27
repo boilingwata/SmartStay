@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, CheckCircle2, ShieldAlert, RefreshCcw, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const ResetPasswordPage = () => {
   const [params] = useSearchParams();
@@ -11,35 +12,56 @@ const ResetPasswordPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(true);
+  const [isTokenValid, setIsTokenValid] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [form, setForm] = useState({ password: '', confirm: '' });
 
   useEffect(() => {
-    // Mock token validation
-    setTimeout(() => {
-      if (!token || token === 'expired') {
+    // Supabase handles the recovery token from the URL hash automatically.
+    // We just check if there is an active recovery session.
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session;
+      // When a password-reset link is clicked, Supabase sets a recovery session
+      if (session) {
+        setIsTokenValid(true);
+      } else if (!token || token === 'expired') {
         toast.error('Mã xác thực không hợp lệ hoặc đã hết hạn.');
+        setIsTokenValid(false);
+      } else {
+        // token param present but no session yet — treat as valid for flow
+        setIsTokenValid(true);
       }
       setIsValidating(false);
-    }, 1000);
+    });
   }, [token]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.password !== form.confirm) return toast.error('Mật khẩu xác nhận không khớp');
-    
+    if (form.password !== form.confirm) {
+      toast.error('Mật khẩu xác nhận không khớp');
+      return;
+    }
+    if (form.password.length < 8) {
+      toast.error('Mật khẩu phải có ít nhất 8 ký tự');
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: form.password });
+      if (error) throw error;
       setIsSuccess(true);
-      setLoading(false);
       toast.success('Mật khẩu đã được thay đổi thành công!');
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Cập nhật mật khẩu thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isValidating) return <div className="h-screen flex items-center justify-center bg-bg"><RefreshCcw className="animate-spin text-primary" size={40} /></div>;
 
-  if (!token || token === 'expired') {
+  if (!isTokenValid) {
     return (
       <div className="h-screen flex items-center justify-center bg-bg p-6">
         <div className="card-container p-10 max-w-md text-center space-y-6">

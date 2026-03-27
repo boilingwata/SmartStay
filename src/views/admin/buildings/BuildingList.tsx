@@ -108,9 +108,12 @@ const BuildingList = () => {
                        ))}
                        <div className="w-8 h-8 rounded-full border-2 border-white bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shadow-sm">+9</div>
                     </div>
-                    <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:gap-3 transition-all">
-                       Chi tiết toà nhà <ArrowRight size={14} />
-                    </button>
+                     <button 
+                        onClick={(e) => { e.stopPropagation(); navigate(`/buildings/${building.id}`); }}
+                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:gap-3 transition-all"
+                     >
+                        Chi tiết toà nhà <ArrowRight size={14} />
+                     </button>
                  </div>
               </div>
 

@@ -12,9 +12,12 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner, Skeleton } from '@/components/ui/Feedback';
 import { useQuery } from '@tanstack/react-query';
 import { meterService } from '@/services/meterService';
+import { buildingService } from '@/services/buildingService';
+import { roomService } from '@/services/roomService';
 import { Meter } from '@/models/Meter';
 import { MeterReadingModal } from '@/components/forms/MeterReadingModal';
 import useUIStore from '@/stores/uiStore';
+import { toast } from 'sonner';
 
 const MeterList = () => {
   const navigate = useNavigate();
@@ -26,19 +29,57 @@ const MeterList = () => {
   const [search, setSearch] = useState('');
   const [isMissingOnly, setIsMissingOnly] = useState(false);
   
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+  
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeter, setSelectedMeter] = useState<Meter | null>(null);
 
   const { data: meters, isLoading, refetch } = useQuery({
-    queryKey: ['meters', activeBuildingId, roomId, meterType, meterStatus, search],
+    queryKey: ['meters', activeBuildingId, roomId, meterType, meterStatus, search, isMissingOnly, page],
     queryFn: () => meterService.getMeters({ 
       buildingId: activeBuildingId ? String(activeBuildingId) : undefined, 
-      roomId, 
-      type: meterType,
-      status: meterStatus 
+      roomId: roomId || undefined, 
+      type: meterType || undefined,
+      status: meterStatus,
+      search: search || undefined,
+      missingOnly: isMissingOnly,
+      page,
+      limit: PAGE_SIZE,
     })
   });
+
+  const totalPages = Math.max(1, Math.ceil((meters?.total ?? 0) / PAGE_SIZE));
+
+  // B34 FIX: Generate and download CSV from current meters
+  const handleDownloadCSV = () => {
+    const data = meters?.data ?? [];
+    if (data.length === 0) {
+      toast.warning('Không có dữ liệu để xuất.');
+      return;
+    }
+    const headers = ['Mã đồng hồ', 'Phòng', 'Loại', 'Chỉ số mới nhất', 'Tháng', 'Trạng thái'];
+    const rows = data.map(m => [
+      m.meterCode,
+      m.roomCode,
+      m.meterType === 'Electricity' ? 'Điện' : 'Nước',
+      m.latestReadingIndex ?? '',
+      m.latestMonthYear ?? '',
+      m.meterStatus,
+    ]);
+    const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meters_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Đã xuất ${data.length} đồng hồ ra file CSV!`);
+  };
 
   const handleOpenReadingModal = (meter: Meter) => {
     setSelectedMeter(meter);
@@ -66,7 +107,11 @@ const MeterList = () => {
             <History size={18} />
             <span>Ghi hàng loạt</span>
           </button>
-          <button className="h-14 w-14 flex items-center justify-center rounded-[20px] bg-white text-muted hover:text-primary transition-all shadow-xl shadow-slate-200/50 active:scale-95 border border-white">
+          <button 
+            onClick={handleDownloadCSV}
+            className="h-14 w-14 flex items-center justify-center rounded-[20px] bg-white text-muted hover:text-primary transition-all shadow-xl shadow-slate-200/50 active:scale-95 border border-white"
+            title="Xuất CSV"
+          >
             <Download size={22} />
           </button>
         </div>
@@ -81,10 +126,10 @@ const MeterList = () => {
               placeholder="Tất cả tòa nhà"
               icon={Building}
               value={activeBuildingId ? String(activeBuildingId) : ''}
-              loadOptions={async () => [
-                { label: 'The Manor Central Park', value: 'B1' },
-                { label: 'Vinhomes Central Park', value: 'B2' }
-              ]}
+              loadOptions={async (search) => {
+                const buildings = await buildingService.getBuildings({ search });
+                return buildings.map(b => ({ label: b.buildingName, value: String(b.id) }));
+              }}
               onChange={(val) => setBuilding(val)} 
             />
           </div>
@@ -96,12 +141,11 @@ const MeterList = () => {
               icon={Home}
               value={roomId}
               loadOptions={async (search) => {
-                 const rooms = [
-                   { label: 'Phòng A-101', value: 'R1' },
-                   { label: 'Phòng B-205', value: 'R2' },
-                   { label: 'Phòng V-401', value: 'R3' }
-                 ];
-                 return rooms.filter(r => r.label.toLowerCase().includes(search.toLowerCase()));
+                 const rooms = await roomService.getRooms({
+                   buildingId: activeBuildingId ? String(activeBuildingId) : undefined,
+                   search: search || undefined,
+                 });
+                 return rooms.map(r => ({ label: `Phòng ${r.roomCode}`, value: String(r.id) }));
               }}
               onChange={(val) => setRoomId(val)} 
             />
@@ -271,15 +315,39 @@ const MeterList = () => {
            </table>
         </div>
         
-        {/* Pagination Info */}
+        {/* Pagination */}
         <div className="p-8 border-t border-border/5 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-6">
            <p className="text-small text-muted font-bold uppercase tracking-wider">
               Hiển thị {meters?.data?.length || 0} trong {meters?.total || 0} đồng hồ
            </p>
            <div className="flex items-center gap-2">
-              <button className="h-11 px-6 rounded-xl border border-border text-muted opacity-50 cursor-not-allowed text-[11px] font-black uppercase">Trước</button>
-              <button className="h-11 w-11 rounded-xl bg-white border border-border text-primary text-[11px] font-black uppercase shadow-inner border-primary/20">1</button>
-              <button className="h-11 px-6 rounded-xl border border-border text-muted opacity-50 cursor-not-allowed text-[11px] font-black uppercase">Sau</button>
+              <button
+                className={cn('h-11 px-6 rounded-xl border text-[11px] font-black uppercase transition-all',
+                  page <= 1 ? 'border-border text-muted opacity-50 cursor-not-allowed' : 'border-primary/30 text-primary hover:bg-primary/5 cursor-pointer'
+                )}
+                disabled={page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+              >Trước</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
+                Math.max(0, page - 3), Math.min(totalPages, page + 2)
+              ).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={cn('h-11 w-11 rounded-xl text-[11px] font-black uppercase transition-all',
+                    p === page
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                      : 'bg-white border border-border text-muted hover:border-primary/30 hover:text-primary'
+                  )}
+                >{p}</button>
+              ))}
+              <button
+                className={cn('h-11 px-6 rounded-xl border text-[11px] font-black uppercase transition-all',
+                  page >= totalPages ? 'border-border text-muted opacity-50 cursor-not-allowed' : 'border-primary/30 text-primary hover:bg-primary/5 cursor-pointer'
+                )}
+                disabled={page >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              >Sau</button>
            </div>
         </div>
       </div>

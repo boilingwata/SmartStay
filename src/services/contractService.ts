@@ -241,6 +241,44 @@ export const contractService = {
   },
 
   exportContracts: async (_filters: ContractFilter): Promise<Blob> => {
+    // Note: No export endpoint in current schema. Returns empty blob.
+    // TO IMPLEMENT: add a Supabase Edge Function or use a CSV library.
     return new Blob([], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  },
+
+  createContract: async (data: import('@/schemas/contractSchema').ContractFormData): Promise<Contract> => {
+    const numRoomId = Number(data.roomId);
+    if (!Number.isFinite(numRoomId)) {
+      throw new Error(`[contractService] Invalid room id: "${data.roomId}"`);
+    }
+
+    // Insert core contract record
+    const row = await unwrap(
+      supabase
+        .from('contracts')
+        .insert({
+          room_id: numRoomId,
+          start_date: data.startDate,
+          end_date: data.endDate,
+          monthly_rent: data.rentPrice,
+          deposit_amount: data.depositAmount,
+          payment_cycle_months: data.paymentCycle,
+          status: 'active' as DbContractStatus,
+          is_deleted: false,
+        })
+        .select(`
+          id, uuid, contract_code, room_id, start_date, end_date,
+          payment_cycle_months, monthly_rent, deposit_status, status,
+          rooms!inner(id, room_code, building_id, buildings(name)),
+          contract_tenants(id, contract_id, tenant_id, is_primary,
+            tenants(id, full_name, profile_id,
+              profiles(avatar_url)
+            )
+          )
+        `)
+        .single()
+    ) as unknown as ContractRow;
+
+    return toContract(row);
   },
 };

@@ -448,6 +448,20 @@ export const ticketService = {
     return mapDbCommentToTicketComment(row);
   },
 
+  // B40 FIX: Assign ticket to a staff user by their UUID
+  assignTicket: async (ticketId: string, assigneeId: string | null): Promise<boolean> => {
+    await unwrap(
+      supabase
+        .from('tickets')
+        .update({
+          assigned_to: assigneeId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', Number(ticketId))
+    );
+    return true;
+  },
+
   // Staff ratings are not stored in a dedicated table — return empty
   getStaffRatings: async (
     _staffId: string

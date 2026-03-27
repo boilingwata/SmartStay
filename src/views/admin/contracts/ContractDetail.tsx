@@ -229,13 +229,23 @@ const TenantsTab = ({ tenants }: { tenants: any[] }) => (
               )}
             </td>
             <td className="py-4 text-right">
-              <button className="p-2 text-muted hover:text-primary transition-colors"><Edit size={16} /></button>
+              <button 
+                className="p-2 text-muted hover:text-primary transition-colors"
+                onClick={() => toast.info('Tính năng chỉnh sửa thông tin cư dân trong hợp đồng đang được phát triển.')}
+              ><Edit size={16} /></button>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
-    <button className="btn-outline w-full mt-6 py-3 border-dashed flex items-center justify-center gap-2">
+    <button 
+      className="btn-outline w-full mt-6 py-3 border-dashed flex items-center justify-center gap-2"
+      onClick={() => {
+        toast.info('Điều hướng đến trang cư dân để gán vào hợp đồng.');
+        // Navigate to tenants list — full add-tenant-to-contract modal requires backend API
+        window.location.href = '/admin/tenants';
+      }}
+    >
       <Plus size={18} /> Thêm cư dân vào hợp đồng
     </button>
   </div>

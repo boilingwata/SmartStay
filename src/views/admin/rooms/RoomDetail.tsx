@@ -54,6 +54,18 @@ const RoomDetail = () => {
     queryFn: () => roomService.getRoomDetail(id!)
   });
 
+  const completeMaintenance = useMutation({
+    mutationFn: () => roomService.updateRoom(id!, { status: 'Vacant' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success('Hoàn thành bảo trì — Phòng đã chuyển sang trạng thái Trống');
+    },
+    onError: (err: Error) => {
+      toast.error(`Không thể cập nhật trạng thái: ${err.message}`);
+    }
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -137,7 +149,10 @@ const RoomDetail = () => {
           )}
           {room.status === 'Occupied' && (
             <>
-              <button className="h-12 px-6 bg-primary/10 text-primary rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-primary/20 transition-all border border-primary/20 shadow-lg shadow-primary/5">
+              <button 
+                onClick={() => navigate(`/admin/contracts?roomId=${room.id}`)}
+                className="h-12 px-6 bg-primary/10 text-primary rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-primary/20 transition-all border border-primary/20 shadow-lg shadow-primary/5"
+              >
                 <History size={18} /> Xem hợp đồng
               </button>
               <button 
@@ -149,8 +164,17 @@ const RoomDetail = () => {
             </>
           )}
           {room.status === 'Maintenance' && (
-            <button className="btn-primary flex items-center gap-2 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[11px]">
-              <CheckCircle2 size={18} /> Hoàn thành bảo trì
+            <button 
+              onClick={() => completeMaintenance.mutate()}
+              disabled={completeMaintenance.isPending}
+              className="btn-primary flex items-center gap-2 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[11px] disabled:opacity-50"
+            >
+              {completeMaintenance.isPending ? (
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <CheckCircle2 size={18} />
+              )}
+              Hoàn thành bảo trì
             </button>
           )}
           <button 

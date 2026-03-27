@@ -19,6 +19,7 @@ export interface MeterFilter extends BaseRequestParams {
   type?: string;
   status?: string;
   missingOnly?: boolean;
+  search?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +210,24 @@ export const meterService = {
         result = meters.filter((m) => !m.hasReadingThisMonth);
       }
 
-      return { data: result, total: result.length };
+      // 5. search filter (in-memory, by room code)
+      if (params.search) {
+        const s = params.search.toLowerCase();
+        result = result.filter(
+          (m) =>
+            (m.roomCode ?? '').toLowerCase().includes(s) ||
+            (m.meterCode ?? '').toLowerCase().includes(s)
+        );
+      }
+
+      // 6. B36 FIX: in-memory pagination
+      const total = result.length;
+      const page = params.page ?? 1;
+      const limit = params.limit ?? total;
+      const start = (page - 1) * limit;
+      const paged = result.slice(start, start + limit);
+
+      return { data: paged, total };
     } catch (error) {
       return handleServiceError(error, 'Không thể tải danh sách đồng hồ');
     }

@@ -10,6 +10,7 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { tenantService } from '@/services/tenantService';
+import { buildingService } from '@/services/buildingService';
 import { TenantSummary, TenantStatus } from '@/models/Tenant';
 import { cn, maskCCCD, maskPhone } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
@@ -49,10 +50,25 @@ const TenantList = () => {
     })
   });
 
-  const handleCreateSubmit = (data: any) => {
-    toast.success(`Hồ sơ cư dân ${data.fullName} đã được tạo thành công!`);
-    setIsModalOpen(false);
-    refetch();
+  const handleCreateSubmit = async (data: any) => {
+    try {
+      await tenantService.createTenant({
+        fullName: data.fullName,
+        phone: data.phone,
+        email: data.email,
+        cccd: data.cccd,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        nationality: data.nationality,
+        occupation: data.occupation,
+        permanentAddress: data.permanentAddress,
+      });
+      toast.success(`Hồ sơ cư dân ${data.fullName} đã được tạo thành công!`);
+      setIsModalOpen(false);
+      refetch();
+    } catch (err: any) {
+      toast.error(`Tạo cư dân thất bại: ${err?.message ?? 'Lỗi không xác định'}`);
+    }
   };
 
   const toggleMask = (id: string) => {
@@ -82,7 +98,25 @@ const TenantList = () => {
            <p className="text-body text-muted font-medium">Quản lý hồ sơ, trạng thái onboarding và lịch sử lưu trú của cư dân.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-outline flex items-center gap-2 h-11 transition-all hover:bg-white hover:shadow-md"><Download size={18} /> Export</button>
+          <button 
+            className="btn-outline flex items-center gap-2 h-11 transition-all hover:bg-white hover:shadow-md"
+            onClick={async () => {
+              try {
+                const data = await tenantService.getTenants({ search: debouncedSearch, status: statusFilter, buildingId: activeBuildingId || undefined });
+                const csv = [
+                  ['Họ tên','SĐT','Email','CCCD','Trạng thái','Onboarding%'].join(','),
+                  ...data.map(t => [t.fullName, t.phone, t.email ?? '', t.cccd, t.status, t.onboardingPercent].join(','))
+                ].join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `tenants_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a); URL.revokeObjectURL(url);
+                toast.success('Xuất danh sách cư dân thành công!');
+              } catch { toast.error('Xuất dữ liệu thất bại.'); }
+            }}
+          ><Download size={18} /> Export</button>
           <button 
             className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20 hover:-translate-y-0.5"
             onClick={() => setIsModalOpen(true)}
@@ -106,10 +140,10 @@ const TenantList = () => {
              icon={Building}
              value={activeBuildingId}
              onChange={setBuilding}
-             loadOptions={async () => [
-               { label: 'The Manor Central Park', value: 'B1' },
-               { label: 'Vinhomes Central Park', value: 'B2' }
-             ]}
+             loadOptions={async () => {
+               const buildings = await buildingService.getBuildings();
+               return buildings.map(b => ({ label: b.buildingName, value: b.id }));
+             }}
            />
         </div>
 
@@ -181,7 +215,10 @@ const TenantList = () => {
         </div>
 
         <div className="lg:col-span-2 flex justify-end">
-           <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-border/50 text-muted hover:text-primary transition-all shadow-sm">
+           <button 
+             onClick={() => refetch()}
+             className="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-border/50 text-muted hover:text-primary transition-all shadow-sm"
+           >
               <Filter size={16} /> <span className="text-[11px] font-black uppercase">Lọc</span>
            </button>
         </div>
@@ -298,16 +335,22 @@ const TenantList = () => {
                           </div>
                        </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-2.5 hover:bg-bg rounded-xl text-muted hover:text-primary transition-all">
-                             <MoreVertical size={18} />
-                          </button>
-                          <button className="p-2.5 hover:bg-bg rounded-xl text-muted hover:text-primary transition-all">
-                             <ArrowRight size={18} />
-                          </button>
-                       </div>
-                    </td>
+                     <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button 
+                             className="p-2.5 hover:bg-bg rounded-xl text-muted hover:text-primary transition-all"
+                             onClick={(e) => { e.stopPropagation(); toast.info('Chức năng menu đang phát triển.'); }}
+                           >
+                              <MoreVertical size={18} />
+                           </button>
+                           <button 
+                             className="p-2.5 hover:bg-bg rounded-xl text-muted hover:text-primary transition-all"
+                             onClick={(e) => { e.stopPropagation(); navigate(`/tenants/${tenant.id}`); }}
+                           >
+                              <ArrowRight size={18} />
+                           </button>
+                        </div>
+                     </td>
                   </tr>
                 ))}
               </tbody>

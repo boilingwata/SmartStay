@@ -11,6 +11,7 @@ import { format, differenceInDays, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn, formatVND } from '@/utils';
 import { contractService } from '@/services/contractService';
+import { buildingService } from '@/services/buildingService';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { toast } from 'sonner';
 
@@ -22,6 +23,11 @@ const ContractList = () => {
     status: 'Active',
     type: '',
     expiringSoon: false
+  });
+
+  const { data: buildings } = useQuery({
+    queryKey: ['buildings-summary'],
+    queryFn: () => buildingService.getBuildings()
   });
 
   const { data: contracts, isLoading, refetch } = useQuery({
@@ -54,7 +60,22 @@ const ContractList = () => {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => contractService.exportContracts(filters)}
+            onClick={async () => {
+              try {
+                const blob = await contractService.exportContracts(filters);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `contracts_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.info('Tính năng xuất Excel đang được phát triển — file rỗng được tải xuống.');
+              } catch {
+                toast.error('Không thể xuất dữ liệu hợp đồng.');
+              }
+            }}
             className="btn-outline flex items-center gap-2"
           >
             <Download size={18} /> Xuất Excel
@@ -80,9 +101,10 @@ const ContractList = () => {
                 value={filters.buildingId}
                 onChange={(e) => setFilters({...filters, buildingId: e.target.value})}
               >
-                <option value="">Tất cả tòa nhà</option>
-                <option value="1">Keangnam Landmark</option>
-                <option value="2">Lotte Center</option>
+              <option value="">Tất cả tòa nhà</option>
+                {buildings?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.buildingName}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -239,19 +261,40 @@ const ContractList = () => {
                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => navigate(`/admin/contracts/${contract.id}`)}
-                        className="p-1.5 text-muted hover:text-primary hover:bg-primary/5 rounded-md transition-all"
+                        className="p-1.5 text-muted hover:text-primary hover:bg-primary/5 rounded-md transition-all" 
                         title="Xem chi tiết"
                       >
                         <Eye size={18} />
                       </button>
-                      <button className="p-1.5 text-muted hover:text-secondary hover:bg-secondary/5 rounded-md transition-all" title="Sửa">
+                      {/* B25 FIX: Edit navigates to detail */}
+                      <button 
+                        onClick={() => navigate(`/admin/contracts/${contract.id}`)}
+                        className="p-1.5 text-muted hover:text-secondary hover:bg-secondary/5 rounded-md transition-all" 
+                        title="Sửa"
+                      >
                         <Edit size={18} />
                       </button>
-                      <button className="p-1.5 text-muted hover:text-accent hover:bg-accent/5 rounded-md transition-all" title="In">
+                      {/* B26 FIX: Print opens detail in new tab */}
+                      <button 
+                        onClick={() => {
+                          const printWin = window.open(`/admin/contracts/${contract.id}`, '_blank');
+                          if (printWin) {
+                            printWin.addEventListener('load', () => printWin.print());
+                          } else {
+                            toast.info('Vui lòng mở chi tiết hợp đồng để in.');
+                          }
+                        }}
+                        className="p-1.5 text-muted hover:text-accent hover:bg-accent/5 rounded-md transition-all" 
+                        title="In"
+                      >
                         <Printer size={18} />
                       </button>
                       <div className="w-px h-4 bg-border/50 mx-1"></div>
-                      <button className="p-1.5 text-danger/50 hover:text-danger hover:bg-danger/5 rounded-md transition-all" title="Chấm dứt">
+                      <button 
+                        onClick={() => navigate(`/admin/contracts/${contract.id}`)}
+                        className="p-1.5 text-danger/50 hover:text-danger hover:bg-danger/5 rounded-md transition-all" 
+                        title="Chấm dứt"
+                      >
                         <LogOut size={18} />
                       </button>
                     </div>

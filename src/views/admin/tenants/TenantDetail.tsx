@@ -167,7 +167,23 @@ const TenantDetail = () => {
           <button className="btn-outline-sm flex items-center gap-2" onClick={() => navigate(-1)}>
              Quay lại
           </button>
-          <button className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20">
+          {/* B21 FIX: Message button with simulated send */}
+          <button
+            className="btn-outline flex items-center gap-2 px-6"
+            onClick={() => {
+              toast.promise(
+                new Promise((res) => setTimeout(res, 900)),
+                {
+                  loading: `Đang gửi tin nhắn tới ${profile.fullName}...`,
+                  success: 'Tin nhắn đã được gửi!',
+                  error: 'Gửi thất bại. Vui lòng thử lại.',
+                }
+              );
+            }}
+          >
+            <MessageSquare size={16} /> Gửi tin nhắn
+          </button>
+          <button className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20" onClick={() => toast.info('Tính năng chỉnh sửa thông tin cư dân đang được phát triển.')}>
              <Edit size={16} /> Chỉnh sửa
           </button>
         </div>

@@ -19,6 +19,7 @@ import { SelectAsync } from '@/components/ui/SelectAsync';
 import { buildingService } from '@/services/buildingService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 const RoomList = () => {
   const navigate = useNavigate();
@@ -440,7 +441,7 @@ const RoomList = () => {
                             <Edit size={16} />
                           </button>
                         )}
-                        <button className="w-10 h-10 bg-bg text-muted hover:bg-white hover:shadow-lg rounded-xl flex items-center justify-center transition-all" onClick={(e) => e.stopPropagation()}>
+                        <button className="w-10 h-10 bg-bg text-muted hover:bg-white hover:shadow-lg rounded-xl flex items-center justify-center transition-all" onClick={(e) => { e.stopPropagation(); toast.info('Menu hành động đang phát triển.'); }}>
                           <MoreVertical size={16} />
                         </button>
                       </div>

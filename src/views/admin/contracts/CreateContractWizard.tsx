@@ -6,9 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { contractSchema, ContractFormData } from '@/schemas/contractSchema';
 import { buildingService } from '@/services/buildingService';
 import { roomService } from '@/services/roomService';
+import { contractService } from '@/services/contractService';
 import { BuildingSummary } from '@/models/Building';
 import { Room } from '@/models/Room';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import {
   Home, FileText, Zap, ShieldCheck, Building2, Users, AlertCircle, Wallet, Check,
@@ -25,10 +26,11 @@ const steps = [
 
 const CreateContractWizard = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
 
   const methods = useForm<ContractFormData>({
-    resolver: zodResolver(contractSchema) as any, // Cast necessary due to Zod default values causing type mismatch in resolver types
+    resolver: zodResolver(contractSchema) as any,
     mode: 'onChange',
     defaultValues: {
       buildingId: '',
@@ -51,6 +53,19 @@ const CreateContractWizard = () => {
   });
 
   const { trigger, handleSubmit, watch } = methods;
+
+  const createContractMutation = useMutation({
+    mutationFn: (data: ContractFormData) => contractService.createContract(data),
+    onSuccess: (contract) => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success(`Hợp đồng ${contract.contractCode} đã được kích hoạt thành công!`);
+      navigate('/admin/contracts');
+    },
+    onError: (err: Error) => {
+      toast.error(`Tạo hợp đồng thất bại: ${err.message}`);
+    }
+  });
 
   const nextStep = async () => {
     let fieldsToValidate: FieldPath<ContractFormData>[] = [];
@@ -75,13 +90,11 @@ const CreateContractWizard = () => {
   };
 
   const onSubmit = (data: ContractFormData) => {
-    toast.success('Hợp đồng đã được lưu thành công (Trạng thái: Active)');
-    navigate('/admin/contracts');
+    createContractMutation.mutate(data);
   };
 
   const handleSaveDraft = async () => {
-    toast.success('Hợp đồng đã được lưu dưới dạng nháp');
-    navigate('/admin/contracts');
+    toast.info('Lưu nháp chưa được hỗ trợ trong phiên bản này. Vui lòng Kích hoạt để lưu hợp đồng.');
   };
 
   return (
@@ -142,8 +155,12 @@ const CreateContractWizard = () => {
                ) : (
                  <>
                    <Button variant="outline" onClick={handleSaveDraft}>Lưu nháp</Button>
-                   <Button onClick={handleSubmit(onSubmit as any)} leftIcon={<Check size={18} />}>
-                      Kích hoạt ngay
+                   <Button 
+                     onClick={handleSubmit(onSubmit as any)} 
+                     leftIcon={<Check size={18} />}
+                     disabled={createContractMutation.isPending}
+                   >
+                     {createContractMutation.isPending ? 'Đang xử lý...' : 'Kích hoạt ngay'}
                    </Button>
                  </>
                )}

@@ -7,6 +7,7 @@ import {
   Download, Filter, ArrowRight 
 } from 'lucide-react';
 import { ticketService } from '@/services/ticketService';
+import { buildingService } from '@/services/buildingService';
 import { TicketSummary, TicketStatus, TicketPriority, TicketType } from '@/models/Ticket';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SelectAsync } from '@/components/ui/SelectAsync';
@@ -129,8 +130,7 @@ const TicketList = () => {
 
   const handleCreateTicket = async (data: any) => {
     try {
-      // await ticketService.createTicket(data); // Uncomment and implement actual service call
-
+      await ticketService.createTicket(data);
       toast.success(t('pages.tickets.createSuccess'));
       setIsModalOpen(false);
       refetch();
@@ -192,10 +192,10 @@ const TicketList = () => {
              icon={Building}
              value={activeBuildingId}
              onChange={setBuilding}
-             loadOptions={async () => [
-               { label: 'The Manor Central Park', value: 'B1' },
-               { label: 'Vinhomes Central Park', value: 'B2' }
-             ]}
+             loadOptions={async (search) => {
+               const buildings = await buildingService.getBuildings({ search });
+               return buildings.map(b => ({ label: b.buildingName, value: String(b.id) }));
+             }}
            />
         </div>
 

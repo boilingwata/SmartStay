@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, RefreshCcw, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
@@ -9,16 +10,25 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error('Vui lòng nhập địa chỉ email.');
+      return;
+    }
     setLoading(true);
-    
-    // Simulate API delay
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/public/reset-password`,
+      });
+      if (error) throw error;
       setIsSent(true);
-      setLoading(false);
       toast.success('Mã đặt lại mật khẩu đã được gửi!');
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isSent) {

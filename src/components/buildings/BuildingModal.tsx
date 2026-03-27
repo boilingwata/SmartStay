@@ -80,8 +80,12 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
     mutationFn: (data: BuildingFormData) => buildingService.createBuilding(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] });
+      queryClient.invalidateQueries({ queryKey: ['buildings-summary'] });
       toast.success('Đã tạo toà nhà mới thành công');
       onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Tạo toà nhà thất bại: ${error.message}`);
     }
   });
 
@@ -89,9 +93,13 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
     mutationFn: (data: BuildingFormData) => buildingService.updateBuilding(building!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] });
+      queryClient.invalidateQueries({ queryKey: ['buildings-summary'] });
       queryClient.invalidateQueries({ queryKey: ['building', building?.id] });
       toast.success('Đã cập nhật thông tin toà nhà');
       onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Cập nhật toà nhà thất bại: ${error.message}`);
     }
   });
 

@@ -250,11 +250,19 @@ export const roomService = {
   },
 
   createRoom: async (data: CreateRoomData): Promise<Room> => {
+    // BR-001 guard: ensure buildingId is a valid positive integer before insert
+    const numBuildingId = Number(data.buildingId);
+    if (!Number.isFinite(numBuildingId) || numBuildingId <= 0) {
+      throw new Error(
+        `[roomService] buildingId không hợp lệ: "${data.buildingId}". Vui lòng chọn tòa nhà trước khi tạo phòng.`
+      );
+    }
+
     const row = await unwrap(
       supabase
         .from('rooms')
         .insert({
-          building_id: Number(data.buildingId),
+          building_id: numBuildingId,
           room_code: data.roomCode,
           floor_number: data.floorNumber,
           area_sqm: data.areaSqm,

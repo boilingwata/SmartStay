@@ -9,6 +9,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { invoiceService } from '@/services/invoiceService';
+import { buildingService } from '@/services/buildingService';
 import { Invoice, InvoiceStatus } from '@/models/Invoice';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND, formatDate } from '@/utils';
@@ -30,12 +31,23 @@ const InvoiceList = () => {
   const [copiedInvoiceId, setCopiedInvoiceId] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  
+
+  // B30 FIX: Wire filter panel state
+  const [searchText, setSearchText] = useState('');
+  const [filterBuildingId, setFilterBuildingId] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [appliedBuildingId, setAppliedBuildingId] = useState('');
+  const [appliedPeriod, setAppliedPeriod] = useState('');
+
   // Queries
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['invoices', activeTab],
+    queryKey: ['invoices', activeTab, appliedSearch, appliedBuildingId, appliedPeriod],
     queryFn: () => invoiceService.getInvoices({ 
-      status: activeTab === 'All' ? undefined : activeTab 
+      status: activeTab === 'All' ? undefined : activeTab,
+      search: appliedSearch || undefined,
+      buildingId: appliedBuildingId || undefined,
+      period: appliedPeriod || undefined,
     })
   });
 
@@ -44,6 +56,11 @@ const InvoiceList = () => {
   const { data: counts } = useQuery<Record<InvoiceStatus | 'All', number>>({
     queryKey: ['invoiceCounts'],
     queryFn: () => invoiceService.getInvoiceCounts()
+  });
+
+  const { data: buildings = [] } = useQuery({
+    queryKey: ['buildings-summary'],
+    queryFn: () => buildingService.getBuildings()
   });
 
   const overdueInvoices = invoices?.filter(i => i.status === 'Overdue') || [];
@@ -144,15 +161,57 @@ const InvoiceList = () => {
          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="col-span-1 md:col-span-2 relative">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-               <input type="text" placeholder="Tìm theo mã HĐ, tên cư dân..." className="input-base w-full pl-10" />
+               <input
+                 type="text"
+                 placeholder="Tìm theo mã HĐ, tên cư dân..."
+                 className="input-base w-full pl-10"
+                 value={searchText}
+                 onChange={(e) => setSearchText(e.target.value)}
+                 onKeyDown={(e) => {
+                   if (e.key === 'Enter') {
+                     setAppliedSearch(searchText);
+                     setAppliedBuildingId(filterBuildingId);
+                     setAppliedPeriod(filterPeriod);
+                   }
+                 }}
+               />
             </div>
-            <select className="input-base">
-               <option>Tất cả tòa nhà</option>
+            <select
+              className="input-base"
+              value={filterBuildingId}
+              onChange={(e) => setFilterBuildingId(e.target.value)}
+            >
+               <option value="">Tất cả tòa nhà</option>
+               {buildings.map((b) => (
+                 <option key={b.id} value={b.id}>{b.buildingName}</option>
+               ))}
             </select>
-            <input type="month" className="input-base" />
+            <input
+              type="month"
+              className="input-base"
+              value={filterPeriod}
+              onChange={(e) => setFilterPeriod(e.target.value)}
+            />
             <div className="flex items-center gap-2">
-               <button className="btn-outline flex-1"><Filter size={16} /> Lọc</button>
-               <button className="btn-outline p-2"><History size={16} /></button>
+               <button
+                 className="btn-outline flex-1"
+                 onClick={() => {
+                   setAppliedSearch(searchText);
+                   setAppliedBuildingId(filterBuildingId);
+                   setAppliedPeriod(filterPeriod);
+                 }}
+               ><Filter size={16} /> Lọc</button>
+               <button
+                 className="btn-outline p-2"
+                 onClick={() => {
+                   setSearchText('');
+                   setFilterBuildingId('');
+                   setFilterPeriod('');
+                   setAppliedSearch('');
+                   setAppliedBuildingId('');
+                   setAppliedPeriod('');
+                 }}
+               ><History size={16} /></button>
             </div>
          </div>
       </div>
@@ -281,7 +340,11 @@ const InvoiceList = () => {
                           <CreditCard size={18} />
                         </button>
                         <div className="w-px h-4 bg-border/50 mx-1"></div>
-                        <button className="p-2 hover:bg-bg rounded-lg text-muted hover:text-accent transition-all" title="Thêm">
+                        <button 
+                          className="p-2 hover:bg-bg rounded-lg text-muted hover:text-accent transition-all" 
+                          title="Thêm"
+                          onClick={() => toast.info('Menu hành động đang phát triển.')}
+                        >
                           <MoreVertical size={18} />
                         </button>
                       </div>

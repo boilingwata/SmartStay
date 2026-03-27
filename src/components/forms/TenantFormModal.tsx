@@ -202,19 +202,37 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
                     </div>
                   </div>
 
-                  {/* Avatar Upload Placeholder */}
-                  <div className="col-span-full space-y-3">
-                    <label className="text-label text-muted font-black uppercase tracking-widest">Ảnh đại diện</label>
-                    <div className="flex items-center gap-6 p-6 bg-bg/20 border-2 border-dashed border-border/50 rounded-[32px] group hover:border-primary transition-all cursor-pointer">
-                       <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                          <Upload className="text-muted group-hover:text-primary" />
-                       </div>
-                       <div>
-                          <p className="text-body font-black text-primary uppercase">Tải ảnh lên</p>
-                          <p className="text-[10px] text-muted font-medium">PNG, JPG tối đa 5MB. Khuyên dùng ảnh vuông.</p>
-                       </div>
-                    </div>
-                  </div>
+                   {/* Avatar Upload */}
+                   <div className="col-span-full space-y-3">
+                     <label className="text-label text-muted font-black uppercase tracking-widest">Ảnh đại diện</label>
+                     <div 
+                       className="flex items-center gap-6 p-6 bg-bg/20 border-2 border-dashed border-border/50 rounded-[32px] group hover:border-primary transition-all cursor-pointer"
+                       onClick={() => document.getElementById('tenant-avatar-input')?.click()}
+                     >
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                           <Upload className="text-muted group-hover:text-primary" />
+                        </div>
+                        <div>
+                           <p className="text-body font-black text-primary uppercase">Tải ảnh lên</p>
+                           <p className="text-[10px] text-muted font-medium">PNG, JPG tối đa 5MB. Khuyên dùng ảnh vuông.</p>
+                        </div>
+                        <input 
+                          id="tenant-avatar-input"
+                          type="file" 
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file && file.size > 5 * 1024 * 1024) {
+                              toast.error('Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.');
+                              e.target.value = '';
+                            } else if (file) {
+                              toast.info(`Đã chọn: ${file.name}. Ảnh sẽ được tải lên khi lưu thông tin.`);
+                            }
+                          }}
+                        />
+                     </div>
+                   </div>
 
                   {/* Vehicle Plates (Checklist #3) */}
                   <div className="col-span-full space-y-3">

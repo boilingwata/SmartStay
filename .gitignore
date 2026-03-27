@@ -29,11 +29,12 @@ dist-ssr
 vite.config.d.ts
 vite.config.js
 
-# AI agent tooling (Claude Code, .agents, MCP)
+# AI agent tooling (Claude Code, .agents, MCP, Qodo)
 .claude/
 .agents/
 .mcp.json
 skills-lock.json
+.qodo/
 
 # Playwright / test output
 .playwright-cli/
@@ -46,9 +47,15 @@ playwright-report/
 # Root-level screenshot snapshots (session artifacts)
 *.png
 
-# Temporary / session files
+# Temporary / one-off session files
 *.tmp
+replace.js
+service_dependencies.txt
+file_list.txt
+file_list_utf8.txt
+seed-data.sql
 
+# Generated session/audit markdown docs
 E2E-TEST-REPORT.md
 AUDIT.md
 CLAUDE.md

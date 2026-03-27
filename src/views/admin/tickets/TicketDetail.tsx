@@ -5,9 +5,10 @@ import {
   ArrowLeft, Copy, Clock, User, Home, Building, 
   Send, Paperclip, MoreVertical, CheckCircle2, 
   AlertCircle, History, MessageSquare, ShieldCheck,
-  Edit2, Trash2, X, ArrowRight
+  Edit2, Trash2, X, ArrowRight, UserCheck
 } from 'lucide-react';
 import { ticketService } from '@/services/ticketService';
+import { userService } from '@/services/userService';
 import { Ticket, TicketComment, TicketStatus, TicketPriority } from '@/models/Ticket';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND } from '@/utils';
@@ -60,6 +61,22 @@ const TicketDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['ticket', id] });
       toast.success('Đã cập nhật trạng thái ticket!');
     }
+  });
+
+  // B40 FIX: staff list for assignment dropdown
+  const { data: staffList } = useQuery({
+    queryKey: ['staff-list'],
+    queryFn: () => userService.getUsers({ role: 'Staff', isActive: true }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (assigneeId: string | null) => ticketService.assignTicket(id!, assigneeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      toast.success('Đã cập nhật người phụ trách!');
+    },
+    onError: () => toast.error('Cập nhật thất bại. Vui lòng thử lại.'),
   });
 
   const handleCopy = (text: string) => {
@@ -302,24 +319,32 @@ const TicketDetail = () => {
               </div>
 
               <div className="space-y-4">
-                 <p className="text-[11px] font-black uppercase tracking-[3px] text-muted">Người xử lý</p>
-                 {ticket.assignedToName ? (
-                    <div className="flex items-center justify-between p-5 bg-bg/30 rounded-3xl border border-border/5">
-                       <div className="flex items-center gap-4">
-                          <img src={ticket.assignedToAvatar} className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-lg" alt="" />
-                          <div>
-                             <p className="text-small font-black text-primary">{ticket.assignedToName}</p>
-                             <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Kỹ thuật viên</p>
-                          </div>
-                       </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-black uppercase tracking-[3px] text-muted">Người xử lý</p>
+                    <UserCheck size={14} className="text-muted/40" />
+                  </div>
+                  {/* B40: Assignment dropdown */}
+                  <select
+                    className="input-base w-full text-small font-bold"
+                    value={ticket.assignedToId ?? ''}
+                    disabled={assignMutation.isPending}
+                    onChange={(e) => assignMutation.mutate(e.target.value || null)}
+                  >
+                    <option value="">-- Chưa phân công --</option>
+                    {staffList?.map((s) => (
+                      <option key={s.id} value={s.id}>{s.fullName}</option>
+                    ))}
+                  </select>
+                  {ticket.assignedToName && (
+                    <div className="flex items-center gap-3 p-4 bg-bg/30 rounded-2xl border border-border/5">
+                      <img src={ticket.assignedToAvatar || 'https://i.pravatar.cc/150'} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow" alt="" />
+                      <div>
+                        <p className="text-small font-black text-primary">{ticket.assignedToName}</p>
+                        <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Đang xử lý</p>
+                      </div>
                     </div>
-                 ) : (
-                    <div className="p-8 border-2 border-dashed border-border/30 rounded-[40px] text-center space-y-3 grayscale opacity-60">
-                       <User size={32} className="mx-auto text-muted" />
-                       <p className="text-small text-muted font-bold uppercase tracking-widest">Chưa có ai phụ trách</p>
-                    </div>
-                 )}
-              </div>
+                  )}
+               </div>
 
               {/* 4.2.3 Status Transitions */}
               <div className="space-y-3 pt-6 border-t border-border/10">

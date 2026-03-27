@@ -412,6 +412,93 @@ export const tenantService = {
     };
   },
 
+  /**
+   * Create a new tenant record in the `tenants` table.
+   */
+  createTenant: async (data: {
+    fullName: string;
+    phone: string;
+    email?: string;
+    cccd: string;
+    dateOfBirth?: string;
+    gender?: string;
+    nationality?: string;
+    occupation?: string;
+    permanentAddress?: string;
+    vehiclePlates?: string[];
+  }): Promise<TenantSummary> => {
+    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
+    const row = await unwrap(
+      supabase
+        .from('tenants')
+        .insert({
+          full_name: data.fullName,
+          phone: data.phone || null,
+          email: data.email || null,
+          id_number: data.cccd,
+          date_of_birth: data.dateOfBirth || null,
+          gender: genderMap[data.gender ?? 'Other'] ?? 'other',
+          permanent_address: data.permanentAddress || null,
+          documents: data.vehiclePlates && data.vehiclePlates.length > 0
+            ? { vehicle_plates: data.vehiclePlates }
+            : null,
+          is_deleted: false,
+        })
+        .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
+        .single()
+    ) as unknown as DbTenantRow;
+
+    return {
+      id: String(row.id),
+      fullName: row.full_name,
+      phone: row.phone ?? '',
+      email: row.email ?? undefined,
+      cccd: row.id_number,
+      status: 'CheckedOut',
+      currentRoomId: undefined,
+      currentRoomCode: undefined,
+      avatarUrl: undefined,
+      onboardingPercent: computeOnboardingPercent(row, false),
+      hasActiveContract: false,
+      isRepresentative: false,
+    };
+  },
+
+  /**
+   * Update an existing tenant's profile fields.
+   */
+  updateTenant: async (
+    id: string,
+    data: {
+      fullName?: string;
+      phone?: string;
+      email?: string;
+      dateOfBirth?: string;
+      gender?: string;
+      permanentAddress?: string;
+      vehiclePlates?: string[];
+    }
+  ): Promise<void> => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      throw new Error(`[tenantService] updateTenant: invalid id "${id}"`);
+    }
+    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
+    const updatePayload: Record<string, unknown> = {};
+    if (data.fullName !== undefined) updatePayload.full_name = data.fullName;
+    if (data.phone !== undefined) updatePayload.phone = data.phone || null;
+    if (data.email !== undefined) updatePayload.email = data.email || null;
+    if (data.dateOfBirth !== undefined) updatePayload.date_of_birth = data.dateOfBirth || null;
+    if (data.gender !== undefined) updatePayload.gender = genderMap[data.gender] ?? 'other';
+    if (data.permanentAddress !== undefined) updatePayload.permanent_address = data.permanentAddress || null;
+    if (data.vehiclePlates !== undefined) {
+      updatePayload.documents = { vehicle_plates: data.vehiclePlates };
+    }
+    await unwrap(
+      supabase.from('tenants').update(updatePayload).eq('id', numericId)
+    );
+  },
+
   // -------------------------------------------------------------------------
   // Stubs — no corresponding DB tables yet
   // -------------------------------------------------------------------------
