@@ -3,6 +3,7 @@ import { User, UserRoleType } from '@/types';
 import { Modal } from '@/components/shared/Modal';
 import { Button } from '@/components/ui/Button';
 import { userService } from '@/services/userService';
+import { buildingService } from '@/services/buildingService';
 import { toast } from 'sonner';
 import { Shield, User as UserIcon, Mail, Phone, Lock, Building2, X } from 'lucide-react';
 import { SelectAsync } from '@/components/ui/SelectAsync';
@@ -159,12 +160,9 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
                   ))}
                   <SelectAsync
                     placeholder="Thêm..."
-                    loadOptions={async (s) => {
-                      return [
-                        { label: 'Hanoi Center', value: 1 },
-                        { label: 'HCM Tower', value: 2 },
-                        { label: 'Da Nang Plaza', value: 3 },
-                      ].filter(b => b.label.toLowerCase().includes(s.toLowerCase()));
+                    loadOptions={async (search) => {
+                      const buildings = await buildingService.getBuildings({ search });
+                      return buildings.map(b => ({ label: b.buildingName, value: Number(b.id) }));
                     }}
                     value=""
                     onChange={(val) => {

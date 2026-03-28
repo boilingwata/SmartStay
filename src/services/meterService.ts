@@ -312,6 +312,7 @@ export const meterService = {
     currentIndex: number;
     readingDate: string;
     note?: string;
+    readingImageUrl?: string;
   }) => {
     try {
       const { roomId, type } = parseVirtualId(body.meterId);
@@ -348,6 +349,8 @@ export const meterService = {
         water_previous: !isElec ? prevWater : prevWater,
         water_current: !isElec ? body.currentIndex : prevWater,
         water_usage: !isElec ? body.currentIndex - prevWater : 0,
+        note: body.note,
+        reading_image_url: body.readingImageUrl,
       };
 
       // C-08: Use select-then-update/insert instead of upsert to avoid depending on

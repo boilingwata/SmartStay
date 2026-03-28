@@ -8,6 +8,9 @@ import {
 import { cn } from '@/utils';
 import { TicketType, TicketPriority } from '@/models/Ticket';
 import { SelectAsync } from '@/components/ui/SelectAsync';
+import { buildingService } from '@/services/buildingService';
+import { roomService } from '@/services/roomService';
+import { tenantService } from '@/services/tenantService';
 import { toast } from 'sonner';
 
 type TicketFormData = {
@@ -92,10 +95,10 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                            className={errors.buildingId ? "border-danger" : ""}
                            value={field.value}
                            onChange={field.onChange}
-                           loadOptions={async () => [
-                             { label: 'The Manor Central Park', value: 'B1' },
-                             { label: 'Vinhomes Central Park', value: 'B2' }
-                           ]}
+                            loadOptions={async (search) => {
+                              const buildings = await buildingService.getBuildings({ search });
+                              return buildings.map(b => ({ label: b.buildingName, value: String(b.id) }));
+                            }}
                          />
                       )}
                     />
@@ -112,10 +115,14 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                            icon={Home}
                            value={field.value}
                            onChange={field.onChange}
-                           loadOptions={async () => {
-                              if (!selectedBuilding) return [];
-                              return [{ label: 'Phòng A-101', value: 'R101' }, { label: 'Phòng B-205', value: 'R205' }];
-                           }}
+                            loadOptions={async (search) => {
+                               if (!selectedBuilding) return [];
+                               const rooms = await roomService.getRooms({
+                                 buildingId: selectedBuilding,
+                                 search: search || undefined
+                               });
+                               return rooms.map(r => ({ label: `Phòng ${r.roomCode}`, value: String(r.id) }));
+                            }}
                          />
                       )}
                     />
@@ -175,10 +182,13 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                            icon={User}
                            value={field.value}
                            onChange={field.onChange}
-                           loadOptions={async () => [
-                              { label: 'Nguyễn Văn A (P.101)', value: 'T1' },
-                              { label: 'Trần Thị B (P.205)', value: 'T2' }
-                           ]}
+                            loadOptions={async (search) => {
+                               const tenants = await tenantService.getTenants({ search });
+                               return tenants.map(t => ({ 
+                                 label: `${t.fullName} (${t.currentRoomCode || 'Không phòng'})`, 
+                                 value: String(t.id) 
+                               }));
+                            }}
                          />
                       )}
                     />

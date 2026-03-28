@@ -140,8 +140,8 @@ const TenantList = () => {
              icon={Building}
              value={activeBuildingId}
              onChange={setBuilding}
-             loadOptions={async () => {
-               const buildings = await buildingService.getBuildings();
+             loadOptions={async (search) => {
+               const buildings = await buildingService.getBuildings({ search });
                return buildings.map(b => ({ label: b.buildingName, value: b.id }));
              }}
            />
@@ -257,11 +257,20 @@ const TenantList = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <img 
-                            src={tenant.avatarUrl} 
-                            className="w-12 h-12 rounded-2xl object-cover shadow-lg border-2 border-white group-hover:scale-110 transition-transform duration-500" 
-                            alt="" 
-                          />
+                          {tenant.avatarUrl ? (
+                            <img 
+                              src={tenant.avatarUrl} 
+                              className="w-12 h-12 rounded-2xl object-cover shadow-lg border-2 border-white group-hover:scale-110 transition-transform duration-500" 
+                              alt={tenant.fullName}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg border-2 border-white group-hover:scale-110 transition-transform duration-500">
+                              <span className="text-white font-black text-lg leading-none select-none">
+                                {tenant.fullName?.charAt(0)?.toUpperCase() ?? '?'}
+                              </span>
+                            </div>
+                          )}
                           {tenant.onboardingPercent === 100 && (
                             <CheckCircle2 size={16} className="absolute -bottom-1 -right-1 text-success bg-white rounded-full p-0.5 shadow-sm" />
                           )}

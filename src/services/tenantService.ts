@@ -413,7 +413,27 @@ export const tenantService = {
   },
 
   /**
+   * Check whether a given CCCD/id_number already exists (including soft-deleted rows).
+   * Returns the tenant row if found, null otherwise.
+   */
+  checkIdNumberExists: async (idNumber: string): Promise<{ id: number; full_name: string; is_deleted: boolean } | null> => {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id, full_name, is_deleted')
+      .eq('id_number', idNumber)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[tenantService] checkIdNumberExists error:', error);
+      return null;
+    }
+    return data as { id: number; full_name: string; is_deleted: boolean } | null;
+  },
+
+  /**
    * Create a new tenant record in the `tenants` table.
+   * Pre-validates uniqueness of id_number to provide a friendly error
+   * instead of a raw PostgreSQL constraint violation.
    */
   createTenant: async (data: {
     fullName: string;
@@ -427,26 +447,60 @@ export const tenantService = {
     permanentAddress?: string;
     vehiclePlates?: string[];
   }): Promise<TenantSummary> => {
-    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
-    const row = await unwrap(
-      supabase
-        .from('tenants')
-        .insert({
-          full_name: data.fullName,
-          phone: data.phone || null,
-          email: data.email || null,
-          id_number: data.cccd,
-          date_of_birth: data.dateOfBirth || null,
-          gender: genderMap[data.gender ?? 'Other'] ?? 'other',
-          permanent_address: data.permanentAddress || null,
-          documents: data.vehiclePlates && data.vehiclePlates.length > 0
-            ? { vehicle_plates: data.vehiclePlates }
-            : null,
-          is_deleted: false,
-        })
-        .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
-        .single()
-    ) as unknown as DbTenantRow;
+    // --- Pre-flight: check for duplicate CCCD ---
+    if (data.cccd && data.cccd.trim() !== '') {
+      const existing = await tenantService.checkIdNumberExists(data.cccd.trim());
+      if (existing) {
+        if (existing.is_deleted) {
+          throw new Error(
+            `Số CCCD "${data.cccd}" đã tồn tại trong hệ thống (cư dân "${existing.full_name}" đã bị xoá). Vui lòng liên hệ quản trị viên để khôi phục hồ sơ.`
+          );
+        } else {
+          throw new Error(
+            `Số CCCD "${data.cccd}" đã được đăng ký bởi cư dân "${existing.full_name}". Mỗi CCCD chỉ được dùng cho một cư dân.`
+          );
+        }
+      }
+    }
+
+    const genderMap: Record<string, 'male' | 'female' | 'other'> = { Male: 'male', Female: 'female', Other: 'other' };
+
+    let row: DbTenantRow;
+    try {
+      row = await unwrap(
+        supabase
+          .from('tenants')
+          .insert({
+            full_name: data.fullName,
+            phone: data.phone || null,
+            email: data.email || null,
+            id_number: data.cccd,
+            date_of_birth: data.dateOfBirth || null,
+            gender: genderMap[data.gender ?? 'Other'] ?? 'other',
+            permanent_address: data.permanentAddress || null,
+            documents: data.vehiclePlates && data.vehiclePlates.length > 0
+              ? { vehicle_plates: data.vehiclePlates }
+              : null,
+            is_deleted: false,
+          })
+          .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
+          .single()
+      ) as unknown as DbTenantRow;
+    } catch (err: unknown) {
+      // Catch any remaining PG 23505 that slips through the pre-check (race condition)
+      const message = (err as Error)?.message ?? '';
+      if (message.includes('duplicate key') && message.includes('id_number')) {
+        throw new Error(
+          `Số CCCD "${data.cccd}" đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.`
+        );
+      }
+      if (message.includes('duplicate key') && message.includes('phone')) {
+        throw new Error(
+          `Số điện thoại "${data.phone}" đã được đăng ký. Vui lòng dùng số khác.`
+        );
+      }
+      throw err;
+    }
 
     return {
       id: String(row.id),

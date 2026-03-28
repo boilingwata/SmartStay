@@ -142,8 +142,8 @@ const RoomList = () => {
                  setBuilding(Number.isFinite(num) ? num : val);
                }
              }}
-             loadOptions={async () => {
-               const b = await buildingService.getBuildings();
+             loadOptions={async (search) => {
+               const b = await buildingService.getBuildings({ search });
                return b.map(item => ({ label: item.buildingName, value: item.id.toString() }));
              }}
              icon={Building2}

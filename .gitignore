@@ -1,23 +1,20 @@
 # Dependencies
-node_modules
+node_modules/
 
 # Build output
-dist
-dist-ssr
+dist/
+dist-ssr/
+*.tsbuildinfo
 
 # Environment variables
-*.local
 .env
 .env.*
 !.env.example
 
-# TypeScript build info
-*.tsbuildinfo
-
-# Editor directories
+# Editor / IDE
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -25,38 +22,27 @@ dist-ssr
 *.sln
 *.sw?
 
-# Vite compiled config artifacts
+# Vite / Build artifacts
 vite.config.d.ts
 vite.config.js
 
-# AI agent tooling (Claude Code, .agents, MCP, Qodo)
-.claude/
+# AI & Temporary
 .agents/
+.claude/
+.qodo/
 .mcp.json
 skills-lock.json
-.qodo/
+*.tmp
+*.log
 
-# Playwright / test output
+# Testing & Reports
+playwright-report/
+test-results/
 .playwright-cli/
 .playwright-mcp/
 audit-screenshots/
 output/
-e2e/test-results/
-playwright-report/
-
-# Root-level screenshot snapshots (session artifacts)
-*.png
-
-# Temporary / one-off session files
-*.tmp
-replace.js
-service_dependencies.txt
-file_list.txt
-file_list_utf8.txt
-seed-data.sql
-
-# Generated session/audit markdown docs
-E2E-TEST-REPORT.md
+*-REPORT.md
 AUDIT.md
 CLAUDE.md
 IMPROVEMENTS.md

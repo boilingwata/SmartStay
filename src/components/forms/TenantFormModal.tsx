@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { X, User, Phone, Mail, CreditCard, Calendar, Briefcase, MapPin, Upload, Globe } from 'lucide-react';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
+import { tenantService } from '@/services/tenantService';
 
 type TenantFormData = {
   fullName: string;
@@ -15,6 +16,7 @@ type TenantFormData = {
   occupation?: string;
   permanentAddress?: string;
   isRepresentative?: boolean;
+  vehiclePlates?: string[];
 };
 
 interface TenantModalProps {
@@ -60,7 +62,7 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
 
         {/* Form Area */}
         <div className="flex-1 p-8 md:p-12 overflow-y-auto custom-scrollbar">
-           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+           <form onSubmit={handleSubmit((data) => onSubmit({ ...data, vehiclePlates: plates }))} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  {/* Full Name */}
                  <div className="space-y-2">
@@ -107,21 +109,34 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
                     <div className="relative">
                        <CreditCard size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
                        <input 
-                        {...register('cccd', { 
-                           required: 'Vui lòng nhập CCCD',
-                           minLength: { value: 12, message: 'CCCD phải đúng 12 chữ số' },
-                           maxLength: { value: 12, message: 'CCCD phải đúng 12 chữ số' },
-                           onBlur: (e) => {
-                              if (e.target.value === '123456789012') {
-                                 toast.error('Số CCCD này đã thuộc về cư dân khác!');
+                         {...register('cccd', { 
+                            required: 'Vui lòng nhập CCCD',
+                            minLength: { value: 9, message: 'CCCD phải có 9 hoặc 12 chữ số' },
+                            maxLength: { value: 12, message: 'CCCD phải có tối đa 12 chữ số' },
+                            pattern: { value: /^[0-9]{9,12}$/, message: 'CCCD chỉ được chứa chữ số (9-12 ký tự)' },
+                            onBlur: async (e) => {
+                               const val = e.target.value.trim();
+                               if (val.length >= 9) {
+                                 try {
+                                   const existing = await tenantService.checkIdNumberExists(val);
+                                   if (existing) {
+                                     if (existing.is_deleted) {
+                                       toast.warning(`CCCD "${val}" thuộc cư dân "${existing.full_name}" (đã xoá). Liên hệ quản trị để khôi phục.`);
+                                     } else {
+                                       toast.error(`CCCD "${val}" đã được đăng ký bởi cư dân "${existing.full_name}"!`);
+                                     }
+                                   }
+                                 } catch {
+                                   // ignore check errors silently
+                                 }
                                }
-                           }
-                        })} 
-                        className={cn("input-base pl-12 h-14 font-mono", errors.cccd && "border-danger bg-danger/5")} 
-                        placeholder="12 chữ số"
-                       />
-                    </div>
-                    {errors.cccd && <p className="text-[10px] text-danger font-bold uppercase">{errors.cccd.message}</p>}
+                            }
+                         })} 
+                         className={cn("input-base pl-12 h-14 font-mono", errors.cccd && "border-danger bg-danger/5")} 
+                         placeholder="9 hoặc 12 chữ số"
+                        />
+                     </div>
+                     {errors.cccd && <p className="text-[10px] text-danger font-bold uppercase">{errors.cccd.message}</p>}
                  </div>
 
                  {/* Email */}
