@@ -5,7 +5,8 @@ import {
   DoorOpen, Building, Gauge, Package, AlertCircle, 
   BarChart2, Megaphone, Briefcase, Wrench, Zap, 
   Droplets, UserCog, Settings, ScrollText, ChevronLeft,
-  ChevronRight, LogOut, Building2
+  ChevronRight, LogOut, Building2, UserPlus, Waves,
+  ShieldCheck, FilePlus2
 } from 'lucide-react';
 import { cn } from '@/utils';
 import useUIStore from '@/stores/uiStore';
@@ -28,38 +29,54 @@ interface NavItem {
 
 const navItems: { groupKey: string; items: NavItem[] }[] = [
   {
-    groupKey: "sidebar.coreSystem",
+    groupKey: "sidebar.system",
     items: [
       { labelKey: "sidebar.dashboard", route: "/admin/dashboard", icon: LayoutDashboard },
-      { labelKey: "sidebar.myTickets", route: "/admin/tickets?assignedTo=me", icon: AlertCircle, permission: "ticket.view" },
+      { labelKey: "sidebar.buildings", route: "/admin/buildings", icon: Building, permission: "building.view" },
+      { labelKey: "sidebar.rooms", route: "/admin/rooms", icon: DoorOpen, permission: "room.view" },
+    ]
+  },
+  {
+    groupKey: "sidebar.customers",
+    items: [
+      { labelKey: "sidebar.tenants", route: "/admin/tenants", icon: Users, permission: "tenant.view" },
+      { labelKey: "sidebar.owners", route: "/admin/owners", icon: Briefcase, adminOnly: true },
       { labelKey: "sidebar.contracts", route: "/admin/contracts", icon: FileText, permission: "contract.view" },
+      { labelKey: "sidebar.contractAddendums", route: "/admin/contracts/addendums", icon: FilePlus2, permission: "contract.view" },
+    ]
+  },
+  {
+    groupKey: "sidebar.finance",
+    items: [
       { labelKey: "sidebar.invoices", route: "/admin/invoices", icon: Receipt, permission: "invoice.view" },
       { labelKey: "sidebar.payments", route: "/admin/payments", icon: CreditCard, permission: "payment.view" },
-      { labelKey: "sidebar.tenants", route: "/admin/tenants", icon: Users, permission: "tenant.view" },
-      { labelKey: "sidebar.rooms", route: "/admin/rooms", icon: DoorOpen, permission: "room.view" },
-      { labelKey: "sidebar.buildings", route: "/admin/buildings", icon: Building, permission: "building.view" },
+      { labelKey: "sidebar.services", route: "/admin/services", icon: Wrench, permission: "service.manage" },
     ]
   },
   {
     groupKey: "sidebar.operations",
     items: [
-      { labelKey: "sidebar.meterEntry", route: "/admin/meters/bulk", icon: Gauge, permission: "meter.entry" },
-      { labelKey: "sidebar.visitorCheckin", route: "/admin/staff/visitor-checkin", icon: Users, permission: "visitor.checkin" },
-      { labelKey: "sidebar.amenityCheckin", route: "/admin/staff/amenity-checkin", icon: Zap, permission: "amenity.checkin" },
-      { labelKey: "sidebar.assets", route: "/admin/assets", icon: Package, permission: "asset.view" },
       { labelKey: "sidebar.allTickets", route: "/admin/tickets", icon: AlertCircle, permission: "ticket.view.all" },
-      { labelKey: "sidebar.reports", route: "/admin/reports", icon: BarChart2, permission: "report.view" },
+      { labelKey: "sidebar.meterEntry", route: "/admin/meters/bulk", icon: Gauge, permission: "meter.entry" },
+      { labelKey: "sidebar.visitorCheckin", route: "/admin/staff/visitor-checkin", icon: UserPlus, permission: "visitor.checkin" },
+      { labelKey: "sidebar.amenityCheckin", route: "/admin/staff/amenity-checkin", icon: Waves, permission: "amenity.checkin" },
+      { labelKey: "sidebar.assets", route: "/admin/assets", icon: Package, permission: "asset.view" },
+    ]
+  },
+  {
+    groupKey: "sidebar.communication",
+    items: [
       { labelKey: "sidebar.announcements", route: "/admin/announcements", icon: Megaphone, permission: "announcement.manage" },
-      { labelKey: "sidebar.owners", route: "/admin/owners", icon: Briefcase, adminOnly: true },
+      { labelKey: "sidebar.reports", route: "/admin/reports", icon: BarChart2, permission: "report.view" },
     ]
   },
   {
     groupKey: "sidebar.settings",
     items: [
-      { labelKey: "sidebar.services", route: "/admin/services", icon: Wrench, permission: "service.manage" },
+      { labelKey: "sidebar.users", route: "/admin/settings/users", icon: UserCog, adminOnly: true },
+      { labelKey: "sidebar.permissions", route: "/admin/settings/users/permissions", icon: ShieldCheck, adminOnly: true },
       { labelKey: "sidebar.electricityPolicy", route: "/admin/settings/electricity-policy", icon: Zap, adminOnly: true },
       { labelKey: "sidebar.waterPolicy", route: "/admin/settings/water-policy", icon: Droplets, adminOnly: true },
-      { labelKey: "sidebar.users", route: "/admin/settings/users", icon: UserCog, adminOnly: true },
       { labelKey: "sidebar.systemConfig", route: "/admin/settings/system", icon: Settings, adminOnly: true },
       { labelKey: "sidebar.auditLogs", route: "/admin/settings/audit-logs", icon: ScrollText, adminOnly: true },
     ]
