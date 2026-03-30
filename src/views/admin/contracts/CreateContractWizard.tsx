@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useForm, FormProvider, useFormContext, useFieldArray, FieldPath } from 'react-hook-form';
@@ -7,13 +7,15 @@ import { contractSchema, ContractFormData } from '@/schemas/contractSchema';
 import { buildingService } from '@/services/buildingService';
 import { roomService } from '@/services/roomService';
 import { contractService } from '@/services/contractService';
+import { tenantService } from '@/services/tenantService';
+import { TenantSummary } from '@/models/Tenant';
 import { BuildingSummary } from '@/models/Building';
 import { Room } from '@/models/Room';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import {
   Home, FileText, Zap, ShieldCheck, Building2, Users, AlertCircle, Wallet, Check,
-  ChevronRight, ChevronLeft, Plus, Trash2, Calendar, DoorOpen, CheckCircle2, DollarSign, Clock, ArrowRight, Smartphone, Upload, Search
+  ChevronRight, ChevronLeft, Plus, Trash2, Calendar, DoorOpen, CheckCircle2, DollarSign, Clock, ArrowRight, Smartphone, Upload, Search, X, UserCheck
 } from 'lucide-react';
 import { cn, formatVND } from '@/utils';
 
@@ -35,10 +37,8 @@ const CreateContractWizard = () => {
     defaultValues: {
       buildingId: '',
       roomId: '',
-      tenants: [
-        { id: 'T1', name: 'Nguyễn Văn A', phone: '0901234567', cccd: '001092001234' }
-      ],
-      representativeId: 'T1',
+      tenants: [],
+      representativeId: '',
       type: 'Residential',
       startDate: '',
       endDate: '',
@@ -175,6 +175,9 @@ const CreateContractWizard = () => {
 const Step1 = () => {
   const { register, control, watch, setValue, formState: { errors } } = useFormContext<ContractFormData>();
   const [searchTerm, setSearchTerm] = useState('');
+  const [tenantSearch, setTenantSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: buildings } = useQuery({
     queryKey: ['buildings-summary'],
@@ -190,13 +193,72 @@ const Step1 = () => {
     enabled: !!selectedBuildingId
   });
 
-  const { fields, append } = useFieldArray({
+  // Fetch ALL tenants from DB for the search dropdown
+  const { data: allTenants = [], isLoading: loadingTenants } = useQuery<TenantSummary[]>({
+    queryKey: ['tenants-all'],
+    queryFn: () => tenantService.getTenants(),
+  });
+
+  const { fields, append, remove } = useFieldArray({
     control,
     name: 'tenants'
   });
 
   const representativeId = watch('representativeId');
   const selectedRoom = selectedRoomId ? (rooms?.find(r => r.id === selectedRoomId) || null) : null;
+
+  // IDs already added to contract
+  const addedDbIds = fields.map(f => (f as any).dbId).filter(Boolean);
+
+  // Filter tenants for search dropdown (exclude already-added)
+  const filteredTenants = tenantSearch.trim().length === 0 ? [] : allTenants.filter(t => {
+    const q = tenantSearch.toLowerCase();
+    const alreadyAdded = addedDbIds.includes(t.id);
+    return !alreadyAdded && (
+      t.fullName.toLowerCase().includes(q) ||
+      t.phone.includes(q) ||
+      t.cccd?.includes(q) ||
+      (t.email ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  // Filter selected tenants list by local searchTerm
+  const displayedFields = searchTerm.trim()
+    ? fields.filter((f, idx) => {
+        const name = watch(`tenants.${idx}.name`) ?? '';
+        const phone = watch(`tenants.${idx}.phone`) ?? '';
+        const q = searchTerm.toLowerCase();
+        return name.toLowerCase().includes(q) || phone.includes(q);
+      })
+    : fields;
+
+  const addTenantFromDB = (tenant: TenantSummary) => {
+    append({
+      id: `DB-${tenant.id}`,
+      name: tenant.fullName,
+      phone: tenant.phone,
+      cccd: tenant.cccd ?? '',
+      // store dbId for dedup - cast via any
+      ...(({ dbId: tenant.id } as any))
+    } as any);
+    // If no representative set yet, auto-set first added
+    if (!representativeId) {
+      setValue('representativeId', `DB-${tenant.id}`);
+    }
+    setTenantSearch('');
+    setShowDropdown(false);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4">
@@ -237,7 +299,7 @@ const Step1 = () => {
             )}
             {selectedRoom?.status === 'Occupied' && (
               <div className="flex items-center gap-1.5 text-destructive text-[10px] font-black uppercase">
-                <AlertCircle size={12} /> Phong dang co hop dong Active
+                <AlertCircle size={12} /> Phòng đang có hợp đồng Active
               </div>
             )}
           </div>
@@ -266,57 +328,144 @@ const Step1 = () => {
       </div>
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-h3 text-primary flex items-center gap-2"><Users size={20} /> Danh sách cư dân</h3>
-          <div className="relative w-72">
-             <input
-               type="text"
-               placeholder="Tìm theo tên/SĐT..."
-               className="input-base w-full py-2.5 pl-10 text-small bg-white"
-               value={searchTerm}
-               onChange={(e) => setSearchTerm(e.target.value)}
-             />
-             <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"><Users size={16} /></div>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h3 className="text-h3 text-primary flex items-center gap-2"><Users size={20} /> Danh sách cư dân ({fields.length})</h3>
+          {/* Search in selected list */}
+          {fields.length > 0 && (
+            <div className="relative w-60">
+              <input
+                type="text"
+                placeholder="Lọc trong danh sách..."
+                className="input-base w-full py-2 pl-9 pr-3 text-[11px] bg-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-primary">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Search & Add tenant from DB */}
+        <div className="relative" ref={dropdownRef}>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder={loadingTenants ? "Đang tải cư dân..." : "Tìm cư dân theo tên, SĐT, CCCD để thêm vào hợp đồng..."}
+                className="input-base w-full py-3 pl-10 pr-4 text-small bg-white border-primary/30 focus:border-primary"
+                value={tenantSearch}
+                onChange={(e) => { setTenantSearch(e.target.value); setShowDropdown(true); }}
+                onFocus={() => tenantSearch && setShowDropdown(true)}
+                disabled={loadingTenants}
+              />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary/50" />
+              {tenantSearch && (
+                <button
+                  onClick={() => { setTenantSearch(''); setShowDropdown(false); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Dropdown results */}
+          {showDropdown && tenantSearch.trim().length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-border shadow-xl shadow-primary/10 z-50 overflow-hidden max-h-[280px] overflow-y-auto">
+              {filteredTenants.length === 0 ? (
+                <div className="px-5 py-8 text-center">
+                  <UserCheck size={32} className="text-muted/30 mx-auto mb-2" />
+                  <p className="text-[11px] text-muted font-bold">Không tìm thấy cư dân phù hợp</p>
+                  <p className="text-[10px] text-muted/60 mt-1">Thử tìm theo tên, số điện thoại hoặc CCCD</p>
+                </div>
+              ) : (
+                filteredTenants.map(tenant => (
+                  <button
+                    key={tenant.id}
+                    type="button"
+                    className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-primary/5 transition-colors text-left border-b border-border/30 last:border-0"
+                    onClick={() => addTenantFromDB(tenant)}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-base shrink-0">
+                      {tenant.fullName.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-primary text-[12px] uppercase truncate">{tenant.fullName}</p>
+                      <p className="text-[10px] text-muted font-bold">{tenant.phone} · {tenant.cccd}</p>
+                    </div>
+                    <div className={cn(
+                      "shrink-0 text-[9px] font-black px-2.5 py-1 rounded-full uppercase",
+                      tenant.hasActiveContract ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+                    )}>
+                      {tenant.hasActiveContract ? 'Đang thuê' : 'Tự do'}
+                    </div>
+                    <Plus size={16} className="text-primary/40 shrink-0" />
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            {fields.map((field, index) => (
-               <label key={field.id} className={cn(
-                 "flex items-center justify-between p-5 bg-white rounded-3xl border transition-all cursor-pointer group",
-                 representativeId === field.id ? "border-primary ring-2 ring-primary/10 bg-primary/[0.02]" : "border-border/50 hover:border-primary/30"
-               )}>
-                 <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center text-primary font-black text-lg group-hover:scale-110 transition-transform">
-                      {watch(`tenants.${index}.name`)?.charAt(0) || 'T'}
-                   </div>
-                   <div>
-                     <p className="font-black text-primary uppercase text-small">{watch(`tenants.${index}.name`)}</p>
-                     <p className="text-[10px] text-muted font-bold tracking-wider">{watch(`tenants.${index}.phone`)}</p>
-                   </div>
-                 </div>
-                 <div className="flex items-center gap-3">
-                   <span className="text-[9px] font-black text-muted uppercase tracking-tighter">Đại diện</span>
-                   <input
-                     type="radio"
-                     className="w-6 h-6 text-primary ring-offset-bg focus:ring-primary rounded-full"
-                     checked={representativeId === field.id}
-                     onChange={() => setValue('representativeId', field.id)}
-                   />
-                 </div>
-               </label>
-            ))}
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full py-6 border-dashed border-2 rounded-3xl"
-            onClick={() => append({ id: `T${fields.length + 1}`, name: 'Cư dân mới', phone: '', cccd: '' })}
-            leftIcon={<Plus size={18} />}
-          >
-            Thêm cư dân mới
-          </Button>
+          {fields.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-border/40 rounded-3xl">
+              <Users size={40} className="text-muted/20 mx-auto mb-3" />
+              <p className="text-small text-muted font-bold">Chưa có cư dân nào</p>
+              <p className="text-[10px] text-muted/60 mt-1">Tìm và thêm cư dân từ ô tìm kiếm phía trên</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
+              {displayedFields.map((field, index) => {
+                // Find real index in fields array
+                const realIndex = fields.findIndex(f => f.id === field.id);
+                return (
+                  <div key={field.id} className={cn(
+                    "flex items-center justify-between p-4 bg-white rounded-3xl border transition-all group",
+                    representativeId === field.id ? "border-primary ring-2 ring-primary/10 bg-primary/[0.02]" : "border-border/50 hover:border-primary/30"
+                  )}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-11 h-11 rounded-2xl bg-primary/5 flex items-center justify-center text-primary font-black text-base shrink-0">
+                        {watch(`tenants.${realIndex}.name`)?.charAt(0) || 'T'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-black text-primary uppercase text-[11px] truncate">{watch(`tenants.${realIndex}.name`)}</p>
+                        <p className="text-[10px] text-muted font-bold">{watch(`tenants.${realIndex}.phone`)}</p>
+                        <p className="text-[9px] text-muted/60">{watch(`tenants.${realIndex}.cccd`)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[8px] font-black text-muted uppercase">Đại diện</span>
+                        <input
+                          type="radio"
+                          className="w-5 h-5 text-primary ring-offset-bg focus:ring-primary rounded-full cursor-pointer"
+                          checked={representativeId === field.id}
+                          onChange={() => setValue('representativeId', field.id)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (representativeId === field.id) setValue('representativeId', '');
+                          remove(realIndex);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-destructive/5 text-destructive hover:bg-destructive hover:text-white transition-all flex items-center justify-center"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Docs Placeholder */}
           <div className="p-6 bg-primary/[0.02] border border-dashed border-primary/20 rounded-[32px] space-y-4">

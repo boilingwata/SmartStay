@@ -1,0 +1,365 @@
+﻿{
+  "config": {
+    "configFile": "C:\\Users\\toduc\\Downloads\\SmartStay\\playwright.config.ts",
+    "rootDir": "C:/Users/toduc/Downloads/SmartStay/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/toduc/Downloads/SmartStay/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "C:/Users/toduc/Downloads/SmartStay/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*\\.setup\\.ts/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/toduc/Downloads/SmartStay/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/toduc/Downloads/SmartStay/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/toduc/Downloads/SmartStay/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "C:/Users/toduc/Downloads/SmartStay/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/toduc/Downloads/SmartStay/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "C:/Users/toduc/Downloads/SmartStay/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "auth.setup.ts",
+      "file": "auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticate as admin",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9216,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-03-29T16:33:20.499Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-1580989d32f149e984ed",
+          "file": "auth.setup.ts",
+          "line": 10,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "admin\\buildings.spec.ts",
+      "file": "admin/buildings.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Admin: Buildings Management",
+          "file": "admin/buildings.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display list of buildings and support search",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 10592,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Navigating to /admin/buildings...\n"
+                        },
+                        {
+                          "text": "Current URL: http://localhost:5173/admin/buildings\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-29T16:33:40.333Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8fd70f20b5ce267d780e-942a3e4065d6e93a1186",
+              "file": "admin/buildings.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "should open Add Building modal",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 15976,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('heading', { name: 'To├á nh├á', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { name: 'To├á nh├á', exact: true })\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('heading', { name: 'To├á nh├á', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { name: 'To├á nh├á', exact: true })\u001b[22m\n\n    at C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts:39:79",
+                        "location": {
+                          "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                          "column": 79,
+                          "line": 39
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 37 |\u001b[39m\n \u001b[90m 38 |\u001b[39m     \u001b[90m// Check if modal is open\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 39 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'heading'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'To├á nh├á'\u001b[39m\u001b[33m,\u001b[39m exact\u001b[33m:\u001b[39m \u001b[36mtrue\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 40 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m'T├¬n to├á nh├á'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 41 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 42 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                            "column": 79,
+                            "line": 39
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('heading', { name: 'To├á nh├á', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { name: 'To├á nh├á', exact: true })\u001b[22m\n\n\n  37 |\n  38 |     // Check if modal is open\n> 39 |     await expect(page.getByRole('heading', { name: 'To├á nh├á', exact: true })).toBeVisible();\n     |                                                                               ^\n  40 |     await expect(page.getByLabel('T├¬n to├á nh├á')).toBeVisible();\n  41 |   });\n  42 |\n    at C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts:39:79"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "Navigating to /admin/buildings...\n"
+                        },
+                        {
+                          "text": "Current URL: http://localhost:5173/admin/buildings\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-29T16:33:40.405Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\toduc\\Downloads\\SmartStay\\test-results\\admin-buildings-Admin-Buil-5580c-uld-open-Add-Building-modal-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\toduc\\Downloads\\SmartStay\\test-results\\admin-buildings-Admin-Buil-5580c-uld-open-Add-Building-modal-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                        "column": 79,
+                        "line": 39
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "8fd70f20b5ce267d780e-aa98f68747394a8c321e",
+              "file": "admin/buildings.spec.ts",
+              "line": 32,
+              "column": 3
+            },
+            {
+              "title": "should navigate to building detail",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 15391,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('h1')\nExpected substring: \u001b[32m\"Keangnam Landmark\"\u001b[39m\nError: strict mode violation: locator('h1') resolved to 2 elements:\n    1) <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1> aka getByRole('heading', { name: 'SmartStay BMS' })\n    2) <h1 class=\"text-[28px] font-black text-primary tracking-tighter leading-none\">Keangnam Landmark</h1> aka getByRole('heading', { name: 'Keangnam Landmark' })\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    - locator resolved to <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1>\u001b[22m\n\u001b[2m    - unexpected value \"SmartStay BMS\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('h1')\nExpected substring: \u001b[32m\"Keangnam Landmark\"\u001b[39m\nError: strict mode violation: locator('h1') resolved to 2 elements:\n    1) <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1> aka getByRole('heading', { name: 'SmartStay BMS' })\n    2) <h1 class=\"text-[28px] font-black text-primary tracking-tighter leading-none\">Keangnam Landmark</h1> aka getByRole('heading', { name: 'Keangnam Landmark' })\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    - locator resolved to <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1>\u001b[22m\n\u001b[2m    - unexpected value \"SmartStay BMS\"\u001b[22m\n\n    at C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts:52:38",
+                        "location": {
+                          "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                          "column": 38,
+                          "line": 52
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 50 |\u001b[39m     \u001b[90m// Check if navigated to detail page\u001b[39m\n \u001b[90m 51 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/buildings\\/.*/\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 52 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m))\u001b[33m.\u001b[39mtoContainText(buildingName \u001b[33m||\u001b[39m \u001b[32m''\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 53 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 54 |\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m 55 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                            "column": 38,
+                            "line": 52
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('h1')\nExpected substring: \u001b[32m\"Keangnam Landmark\"\u001b[39m\nError: strict mode violation: locator('h1') resolved to 2 elements:\n    1) <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1> aka getByRole('heading', { name: 'SmartStay BMS' })\n    2) <h1 class=\"text-[28px] font-black text-primary tracking-tighter leading-none\">Keangnam Landmark</h1> aka getByRole('heading', { name: 'Keangnam Landmark' })\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    - locator resolved to <h1 class=\"text-xl font-display font-bold whitespace-nowrap tracking-tight\">ΓÇª</h1>\u001b[22m\n\u001b[2m    - unexpected value \"SmartStay BMS\"\u001b[22m\n\n\n  50 |     // Check if navigated to detail page\n  51 |     await expect(page).toHaveURL(/.*\\/buildings\\/.*/);\n> 52 |     await expect(page.locator('h1')).toContainText(buildingName || '');\n     |                                      ^\n  53 |   });\n  54 | });\n  55 |\n    at C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts:52:38"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "Navigating to /admin/buildings...\n"
+                        },
+                        {
+                          "text": "Current URL: http://localhost:5173/admin/buildings\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-29T16:33:40.087Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\Users\\toduc\\Downloads\\SmartStay\\test-results\\admin-buildings-Admin-Buil-a5763-navigate-to-building-detail-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\toduc\\Downloads\\SmartStay\\test-results\\admin-buildings-Admin-Buil-a5763-navigate-to-building-detail-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\toduc\\Downloads\\SmartStay\\tests\\admin\\buildings.spec.ts",
+                        "column": 38,
+                        "line": 52
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "8fd70f20b5ce267d780e-979957b0d3ccf5f6c395",
+              "file": "admin/buildings.spec.ts",
+              "line": 43,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-29T16:33:12.910Z",
+    "duration": 46072.195,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

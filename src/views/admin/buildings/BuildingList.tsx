@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Building2, MapPin, Home, Users, 
@@ -56,10 +56,10 @@ const BuildingList = () => {
         /* 2.1.1 Card Grid Layout */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {buildings?.map((building) => (
-            <div
+            <Link
               key={building.id}
-              onClick={() => navigate(`/buildings/${building.id}`)}
-              className="group card-container p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md"
+              to={`/admin/buildings/${building.id}`}
+              className="group card-container p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md block"
             >
               {/* Hero Image */}
               <div className="relative h-60 overflow-hidden">
@@ -108,18 +108,17 @@ const BuildingList = () => {
                        ))}
                        <div className="w-8 h-8 rounded-full border-2 border-white bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shadow-sm">+9</div>
                     </div>
-                     <button 
-                        onClick={(e) => { e.stopPropagation(); navigate(`/buildings/${building.id}`); }}
+                      <div 
                         className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:gap-3 transition-all"
-                     >
-                        Chi tiết toà nhà <ArrowRight size={14} />
-                     </button>
+                      >
+                         Chi tiết toà nhà <ArrowRight size={14} />
+                      </div>
                  </div>
               </div>
 
               {/* Status Strip (2.1.1) */}
               <div className={cn("h-1.5 w-full", getStatusColor(building.occupancyRate))} />
-            </div>
+            </Link>
           ))}
         </div>
       )}

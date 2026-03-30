@@ -133,27 +133,27 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div className="space-y-1.5 relative">
-                    <label className="text-[10px] font-black text-muted uppercase">Mã toà nhà *</label>
-                    <input {...register('buildingCode')} disabled={isEditing} className={cn("input-base w-full", errors.buildingCode && "border-danger")} />
+                    <label htmlFor="buildingCode" className="text-[10px] font-black text-muted uppercase">Mã toà nhà</label>
+                    <input id="buildingCode" {...register('buildingCode')} disabled placeholder="Tự động tạo" className={cn("input-base w-full opacity-60 cursor-not-allowed", errors.buildingCode && "border-danger")} />
                     {errors.buildingCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5">{(errors.buildingCode.message as any)}</p>}
                  </div>
                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Tên toà nhà *</label>
-                    <input {...register('buildingName')} className={cn("input-base w-full", errors.buildingName && "border-danger")} />
+                    <label htmlFor="buildingName" className="text-[10px] font-black text-muted uppercase">Tên toà nhà *</label>
+                    <input id="buildingName" {...register('buildingName')} className={cn("input-base w-full", errors.buildingName && "border-danger")} />
                     {errors.buildingName?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5">{(errors.buildingName.message as any)}</p>}
                  </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase">Loại hình</label>
-                    <select {...register('type')} className="input-base w-full">
+                    <label htmlFor="buildingType" className="text-[10px] font-black text-muted uppercase">Loại hình</label>
+                    <select id="buildingType" {...register('type')} className="input-base w-full">
                        <option value="Apartment">Căn hộ</option><option value="Office">Văn phòng</option>
                        <option value="Mixed">Hỗn hợp</option><option value="Shophouse">Shophouse</option>
                     </select>
                  </div>
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-muted uppercase">Số tầng</label>
-                    <input type="number" {...register('totalFloors', { valueAsNumber: true })} className="input-base w-full" />
+                    <label htmlFor="totalFloors" className="text-[10px] font-black text-muted uppercase">Số tầng</label>
+                    <input id="totalFloors" type="number" {...register('totalFloors', { valueAsNumber: true })} className="input-base w-full" />
                  </div>
               </div>
            </div>
@@ -186,8 +186,8 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                  </div>
               </div>
               <div className="space-y-1.5">
-                 <label className="text-[10px] font-black text-muted uppercase">Địa chỉ chi tiết</label>
-                 <input {...register('address')} className={cn("input-base w-full", errors.address && "border-danger")} placeholder="VD: Số 1 Phạm Hùng..." />
+                 <label htmlFor="buildingAddress" className="text-[10px] font-black text-muted uppercase">Địa chỉ chi tiết</label>
+                 <input id="buildingAddress" {...register('address')} className={cn("input-base w-full", errors.address && "border-danger")} placeholder="VD: Số 1 Phạm Hùng..." />
               </div>
            </div>
 

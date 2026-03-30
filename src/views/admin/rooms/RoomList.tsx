@@ -7,7 +7,7 @@ import {
   Zap, Droplets, MapPin, Maximize
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { roomService } from '@/services/roomService';
 import { Room, RoomStatus } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -304,10 +304,10 @@ const RoomList = () => {
       ) : viewMode === 'Grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {rooms?.map((room) => (
-            <div 
+            <Link 
               key={room.id}
-              onClick={() => navigate(`/rooms/${room.id}`)}
-              className="group card-container p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md"
+              to={`/admin/rooms/${room.id}`}
+              className="group card-container p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md block"
             >
               <div className="relative h-56 overflow-hidden bg-slate-100">
                 <img 
@@ -353,12 +353,11 @@ const RoomList = () => {
                 </div>
 
                 <div className="flex items-center justify-between gap-3 pt-2">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); navigate(`/rooms/${room.id}`); }}
-                      className="flex-1 h-12 bg-bg text-muted group-hover:bg-primary group-hover:text-white transition-all rounded-xl text-[10px] font-black uppercase tracking-[3px] shadow-sm active:scale-95"
+                    <div 
+                      className="flex-1 h-12 bg-bg text-muted group-hover:bg-primary group-hover:text-white transition-all rounded-xl text-[10px] font-black uppercase tracking-[3px] shadow-sm active:scale-95 flex items-center justify-center"
                     >
                        {t('pages.rooms.roomDetail')}
-                    </button>
+                    </div>
                     {canManage && (
                       <button 
                         onClick={(e) => handleEditRoom(room, e)}
@@ -369,7 +368,7 @@ const RoomList = () => {
                     )}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       ) : (
@@ -394,7 +393,7 @@ const RoomList = () => {
                   <tr 
                     key={room.id} 
                     className="group hover:bg-white/80 cursor-pointer transition-all"
-                    onClick={() => navigate(`/rooms/${room.id}`)}
+                    onClick={() => navigate(`/admin/rooms/${room.id}`)}
                   >
                     <td className="px-8 py-4">
                       <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md border-2 border-white group-hover:scale-110 transition-transform bg-slate-100">

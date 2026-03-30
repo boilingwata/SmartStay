@@ -1,9 +1,12 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
 # Build output
 dist/
 dist-ssr/
+build/
 *.tsbuildinfo
 
 # Environment variables
@@ -14,30 +17,43 @@ dist-ssr/
 # Editor / IDE
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
 .idea/
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+.history/
+*.orig
 
-# Vite / Build artifacts
-vite.config.d.ts
-vite.config.js
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# AI & Temporary
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# AI & Tooling
 .agents/
 .claude/
 .qodo/
 .mcp.json
 skills-lock.json
 *.tmp
-*.log
+.turbo
+.next
 
 # Testing & Reports
 playwright-report/
 test-results/
+blob-report/
 .playwright-cli/
 .playwright-mcp/
 audit-screenshots/
@@ -46,3 +62,9 @@ output/
 AUDIT.md
 CLAUDE.md
 IMPROVEMENTS.md
+coverage/
+.nyc_output/
+
+# Vite
+vite.config.d.ts
+vite.config.js

@@ -7,7 +7,7 @@ import {
 import { Asset } from '@/models/Asset';
 import { supabase } from '@/lib/supabase';
 import { unwrap, buildingScoped } from '@/lib/supabaseHelpers';
-import { mapRoomStatus, mapAssetStatus } from '@/lib/enumMaps';
+import { mapRoomStatus, mapAssetStatus, mapContractStatus } from '@/lib/enumMaps';
 import type { DbRoomStatus } from '@/types/supabase';
 
 // --- Row interfaces ---
@@ -27,8 +27,24 @@ interface RoomRow {
   base_rent: number | null
   condition_score: number | null
   status: string | null
+  description: string | null
+  last_maintenance_date: string | null
   is_deleted: boolean | null
   buildings?: { name: string } | null
+}
+
+interface RoomContractRow {
+  id: number
+  contract_code: string
+  start_date: string
+  end_date: string
+  monthly_rent: number | null
+  status: string | null
+  contract_tenants?: {
+    id: number
+    is_primary: boolean | null
+    tenants?: { id: number; full_name: string } | null
+  }[] | null
 }
 
 interface RoomAssetRow {
@@ -78,21 +94,53 @@ function toRoom(row: RoomRow): Room {
   };
 }
 
-function toRoomDetail(row: RoomRow, assets: RoomAssetRow[], history: StatusHistoryRow[], meters: RoomMeter[]): RoomDetail {
+function toRoomDetail(
+  row: RoomRow,
+  assets: RoomAssetRow[],
+  history: StatusHistoryRow[],
+  meters: RoomMeter[],
+  contracts: RoomContractRow[]
+): RoomDetail {
   const room = toRoom(row);
   const amenities = Array.isArray(row.amenities) ? (row.amenities as string[]) : [];
+
+  // Collect tenant names from active contracts
+  const activeContracts = contracts.filter(c => c.status === 'active');
+  const tenantNames: string[] = [];
+  for (const c of activeContracts) {
+    for (const ct of (c.contract_tenants ?? [])) {
+      const name = ct.tenants?.full_name;
+      if (name && !tenantNames.includes(name)) tenantNames.push(name);
+    }
+  }
+
+  // Map contracts to ContractSummary for the Contracts tab
+  const contractSummaries = contracts.map(c => ({
+    id: String(c.id),
+    contractCode: c.contract_code,
+    startDate: c.start_date,
+    endDate: c.end_date,
+    monthlyRent: c.monthly_rent ?? 0,
+    status: mapContractStatus.fromDb(c.status ?? 'draft') as import('@/models/Contract').ContractStatus,
+    tenantName: (c.contract_tenants?.find(ct => ct.is_primary) ?? c.contract_tenants?.[0])?.tenants?.full_name ?? '',
+  }));
+
   return {
     ...room,
+    description: (row as unknown as { description?: string }).description ?? undefined,
+    lastMaintenanceDate: (row as unknown as { last_maintenance_date?: string }).last_maintenance_date ?? undefined,
     maxOccupancy: row.max_occupants ?? 2,
     furnishing: 'Unfurnished',
     directionFacing: ((row.facing as string | null) ?? 'N') as import('@/models/Room').DirectionFacing,
     hasBalcony: row.has_balcony ?? false,
     conditionScore: row.condition_score ?? 5,
+    tenantNames: tenantNames.length > 0 ? tenantNames : undefined,
     images: [],
     amenities,
     meters,
     assets: assets.map(toRoomAsset),
     statusHistory: history.map(toStatusHistory),
+    contracts: contractSummaries,
   };
 }
 
@@ -194,8 +242,8 @@ export const roomService = {
       throw new Error(`[roomService] Invalid room id: "${id}"`);
     }
 
-    // Fetch room, assets, history, and meters in parallel
-    const [row, assetRows, historyRows, meterRows] = await Promise.all([
+    // Fetch room, assets, history, meters, and contracts in parallel
+    const [row, assetRows, historyRows, meterRows, contractRows] = await Promise.all([
       unwrap(
         supabase
           .from('rooms')
@@ -228,10 +276,29 @@ export const roomService = {
           .order('reading_date', { ascending: false })
           .limit(12)
       ) as unknown as Promise<MeterReadingRow[]>,
+
+      // Fetch all contracts for this room (active + historical)
+      (async () => {
+        try {
+          return await unwrap(
+            supabase
+              .from('contracts')
+              .select(`
+                id, contract_code, start_date, end_date, monthly_rent, status,
+                contract_tenants(id, is_primary, tenants(id, full_name))
+              `)
+              .eq('room_id', numId)
+              .eq('is_deleted', false)
+              .order('start_date', { ascending: false })
+          ) as unknown as RoomContractRow[];
+        } catch {
+          return [] as RoomContractRow[];
+        }
+      })(),
     ]);
 
     const meters = toMeters(meterRows, numId);
-    return toRoomDetail(row, assetRows, historyRows, meters);
+    return toRoomDetail(row, assetRows, historyRows, meters, contractRows);
   },
 
   getRoomHandoverChecklist: async (_roomId: string): Promise<HandoverChecklist[]> => {
@@ -309,6 +376,19 @@ export const roomService = {
     ) as unknown as RoomRow;
 
     return toRoom(row);
+  },
+
+  deleteRoom: async (id: string): Promise<void> => {
+    const numId = Number(id);
+    if (!Number.isFinite(numId)) {
+      throw new Error(`[roomService] Invalid room id: "${id}"`);
+    }
+    await unwrap(
+      supabase
+        .from('rooms')
+        .update({ is_deleted: true })
+        .eq('id', numId)
+    );
   },
 
   getAssets: async (filters?: AssetFilters): Promise<Asset[]> => {

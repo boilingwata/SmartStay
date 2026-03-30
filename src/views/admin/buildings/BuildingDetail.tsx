@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, Home, Building2, MapPin, 
   Info, Image as ImageIcon, Users, 
@@ -146,6 +146,24 @@ const BuildingDetail = () => {
     queryFn: () => buildingService.getBuildingDetail(id!)
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => buildingService.deleteBuilding(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buildings'] });
+      toast.success('Đã xoá toà nhà thành công');
+      navigate('/admin/buildings');
+    },
+    onError: (err: Error) => {
+      toast.error(`Không thể xoá toà nhà: ${err.message}`);
+    }
+  });
+
+  const handleDelete = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xoá toà nhà này không? Tất cả dữ liệu liên quan sẽ bị ẩn.')) {
+      deleteMutation.mutate();
+    }
+  };
+
   if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
   if (!building) return <div>Toà nhà không tồn tại.</div>;
 
@@ -215,6 +233,16 @@ const BuildingDetail = () => {
           >
             <Edit size={18} /> Cập nhật
           </button>
+          
+          <button 
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            className="w-11 h-11 bg-white border border-danger/20 text-danger rounded-xl flex items-center justify-center hover:bg-danger/5 transition-all disabled:opacity-50"
+            title="Xoá toà nhà"
+          >
+            {deleteMutation.isPending ? <Spinner size="sm" /> : <Trash2 size={18} />}
+          </button>
+
           {/* B9 FIX: Real CSV report download */}
           <button 
             onClick={handleExportReport}

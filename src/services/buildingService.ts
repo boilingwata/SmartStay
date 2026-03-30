@@ -168,10 +168,39 @@ export const buildingService = {
     };
   },
 
-  // Province/district/ward — kept as static data (no DB tables for these)
-  getProvinces: async () => MOCK_PROVINCES,
-  getDistricts: async (provinceId: string) => MOCK_DISTRICTS[provinceId] || [],
-  getWards: async (districtId: string) => MOCK_WARDS[districtId] || [],
+  // Get real location data from Vietnam Open API
+  getProvinces: async () => {
+    try {
+      const res = await fetch('https://provinces.open-api.vn/api/p/');
+      if (!res.ok) return MOCK_PROVINCES;
+      const data = await res.json();
+      return data.map((p: any) => ({ id: String(p.code), name: p.name }));
+    } catch {
+      return MOCK_PROVINCES;
+    }
+  },
+  getDistricts: async (provinceId: string) => {
+    if (!provinceId) return [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceId}?depth=2`);
+      if (!res.ok) return MOCK_DISTRICTS[provinceId] || [];
+      const data = await res.json();
+      return (data.districts || []).map((d: any) => ({ id: String(d.code), name: d.name }));
+    } catch {
+      return MOCK_DISTRICTS[provinceId] || [];
+    }
+  },
+  getWards: async (districtId: string) => {
+    if (!districtId) return [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/d/${districtId}?depth=2`);
+      if (!res.ok) return MOCK_WARDS[districtId] || [];
+      const data = await res.json();
+      return (data.wards || []).map((w: any) => ({ id: String(w.code), name: w.name }));
+    } catch {
+      return MOCK_WARDS[districtId] || [];
+    }
+  },
 
   checkBuildingCodeUnique: async (name: string): Promise<boolean> => {
     // buildingCode is derived from DB id — not stored as a column.
@@ -252,6 +281,15 @@ export const buildingService = {
       managementEmail: data.managementEmail ?? '',
       isDeleted: row.is_deleted ?? false,
     };
+  },
+
+  deleteBuilding: async (id: string): Promise<void> => {
+    await unwrap(
+      supabase
+        .from('buildings')
+        .update({ is_deleted: true })
+        .eq('id', Number(id))
+    );
   },
 
   createOwner: async (data: CreateOwnerData): Promise<Owner> => {

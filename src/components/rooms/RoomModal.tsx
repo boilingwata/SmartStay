@@ -191,13 +191,13 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
                      </select>
                  </div>
                  <div className="space-y-2 relative">
-                    <label className="text-[10px] font-black text-muted uppercase">Mã phòng *</label>
-                    <input {...register('roomCode')} placeholder="VD: A-101" className={cn("input-base w-full", errors.roomCode && "border-danger")} />
+                    <label htmlFor="roomCode" className="text-[10px] font-black text-muted uppercase">Mã phòng *</label>
+                    <input id="roomCode" {...register('roomCode')} placeholder="VD: A-101" className={cn("input-base w-full", errors.roomCode && "border-danger")} />
                     {errors.roomCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5">{String(errors.roomCode.message)}</p>}
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Tầng số</label>
-                    <input type="number" {...register('floorNumber', { valueAsNumber: true })} className="input-base w-full" />
+                    <label htmlFor="floorNumber" className="text-[10px] font-black text-muted uppercase">Tầng số</label>
+                    <input id="floorNumber" type="number" {...register('floorNumber', { valueAsNumber: true })} className="input-base w-full" />
                  </div>
               </div>
            </div>
@@ -208,26 +208,14 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="space-y-2 col-span-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Loại phòng</label>
-                    <select {...register('roomType')} className="input-base w-full">
+                    <label htmlFor="roomType" className="text-[10px] font-black text-muted uppercase">Loại phòng</label>
+                    <select id="roomType" {...register('roomType')} className="input-base w-full">
                        <option value="Studio">Studio</option><option value="1BR">1 Phòng ngủ</option>
                        <option value="2BR">2 Phòng ngủ</option><option value="3BR">3 Phòng ngủ</option>
                        <option value="Penthouse">Penthouse</option><option value="Commercial">Kinh doanh</option>
                     </select>
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Diện tích (m2)</label>
-                    <input type="number" {...register('areaSqm', { valueAsNumber: true })} className="input-base w-full" />
-                 </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Giá thuê CB (VND)</label>
-                    <input type="number" {...register('baseRentPrice', { valueAsNumber: true })} className="input-base w-full font-bold text-primary" />
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Hướng cửa/ban công</label>
                     <select {...register('directionFacing')} className="input-base w-full">
                        <option value="S">Nam (S)</option><option value="N">Bắc (N)</option>
                        <option value="E">Đông (E)</option><option value="W">Tây (W)</option>
