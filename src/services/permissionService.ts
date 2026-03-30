@@ -3,7 +3,7 @@ import { ROLE_PERMISSION_CONFIG } from '@/config/rolePermissions';
 /**
  * Permissions Service
  *
- * MK-01 / PRM-01 FIX: Imports from @/config/rolePermissions instead of @/mocks/adminMocks.
+ * PRM-01 FIX: Imports from @/config/rolePermissions for static definition.
  * The `role_permissions` table does NOT exist in the `smartstay` schema.
  * Permissions are managed via static configuration for security — changes require
  * a code deploy, preventing accidental escalation via a UI bug.

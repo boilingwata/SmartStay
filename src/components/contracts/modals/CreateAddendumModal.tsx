@@ -3,6 +3,8 @@ import { X, FilePlus, AlertCircle, Upload, Check } from 'lucide-react';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
 
+import portalAddendumService from '@/services/portalAddendumService';
+
 interface CreateAddendumModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -11,6 +13,7 @@ interface CreateAddendumModalProps {
 
 export const CreateAddendumModal = ({ isOpen, onClose, contract }: CreateAddendumModalProps) => {
   const [formData, setFormData] = useState({
+    contractId: contract?.id,
     addendumCode: `PL-${contract?.contractCode}-01`,
     type: 'PriceChange',
     title: '',
@@ -19,18 +22,41 @@ export const CreateAddendumModal = ({ isOpen, onClose, contract }: CreateAddendu
     fileUrl: '',
     content: ''
   });
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!isOpen) return null;
 
   const isSignedWithoutFile = formData.status === 'Signed' && !formData.fileUrl;
 
-  const handleSubmit = () => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const url = await portalAddendumService.uploadAddendumFile(file);
+      setFormData({ ...formData, fileUrl: url });
+      toast.success('Đã tải tệp lên thành công');
+    } catch (error: any) {
+      toast.error(`Lỗi tải tệp: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (isSignedWithoutFile) {
       toast.error('FileUrl BẮT BUỘC khi Status=Signed -- Phụ lục không có file không có giá trị pháp lý');
       return;
     }
-    toast.success('Đã lưu phụ lục hợp đồng');
-    onClose();
+
+    try {
+      await portalAddendumService.createAddendum(formData as any);
+      toast.success('Đã lưu phụ lục hợp đồng');
+      onClose();
+    } catch (error: any) {
+      toast.error(`Không thể lưu phụ lục: ${error.message}`);
+    }
   };
 
   return (
@@ -113,14 +139,26 @@ export const CreateAddendumModal = ({ isOpen, onClose, contract }: CreateAddendu
               {formData.fileUrl ? (
                 <>
                   <Check className="text-success" size={32} />
-                  <p className="text-small font-bold text-success">File đã được chọn: addendum_signed.pdf</p>
+                  <p className="text-small font-bold text-success truncate max-w-full">
+                    {formData.fileUrl.split('/').pop()}
+                  </p>
                   <button onClick={() => setFormData({...formData, fileUrl: ''})} className="text-[10px] text-danger underline font-bold uppercase">Xóa file</button>
+                </>
+              ) : isUploading ? (
+                <>
+                   <div className="animate-spin text-primary">
+                      <Upload size={32} />
+                   </div>
+                   <p className="text-small font-bold text-primary italic">Đang tải tệp lên...</p>
                 </>
               ) : (
                 <>
                   <Upload className="text-muted/30" size={32} />
-                  <p className="text-small text-muted font-medium text-center">Kéo thả hoặc <span className="text-primary font-bold cursor-pointer">tải lên</span> file scan phụ lục.</p>
-                  <button onClick={() => setFormData({...formData, fileUrl: 'mock_url'})} className="btn-outline scale-75">Simulate Upload</button>
+                  <p className="text-small text-muted font-medium text-center">Kéo thả hoặc nhấn vào để tải lên file scan phụ lục.</p>
+                  <label className="mt-2 btn-outline cursor-pointer overflow-hidden relative">
+                    Chọn tệp
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileUpload} accept=".pdf,.doc,.docx" />
+                  </label>
                 </>
               )}
             </div>
@@ -131,9 +169,10 @@ export const CreateAddendumModal = ({ isOpen, onClose, contract }: CreateAddendu
           <button onClick={onClose} className="btn-outline">Hủy bỏ</button>
           <button 
             onClick={handleSubmit}
+            disabled={isUploading || isSignedWithoutFile}
             className={cn(
               "btn-primary",
-              isSignedWithoutFile && "opacity-50 cursor-not-allowed grayscale"
+              (isUploading || isSignedWithoutFile) && "opacity-50 cursor-not-allowed grayscale"
             )}
           >
             Lưu phụ lục

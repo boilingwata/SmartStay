@@ -583,14 +583,16 @@ const BuildingDetail = () => {
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className="card-container p-8 bg-white/60">
                      <h3 className="text-label text-muted font-black uppercase tracking-widest mb-6">Biến động doanh thu (6 tháng)</h3>
-                     <div className="h-64 flex items-center justify-center text-muted font-mono italic bg-bg/20 rounded-3xl border border-dashed">
-                        [ MiniRevenueChart Placeholder ]
+                     <div className="h-64 flex flex-col items-center justify-center text-muted font-black uppercase tracking-widest bg-bg/20 rounded-3xl border border-dashed text-[10px] space-y-3">
+                        <TrendingUp size={32} className="opacity-20" />
+                        <span>Dữ liệu đang được tổng hợp</span>
                      </div>
                   </div>
                   <div className="card-container p-8 bg-white/60">
                      <h3 className="text-label text-muted font-black uppercase tracking-widest mb-6">Tỷ lệ lấp đầy theo phân khúc</h3>
-                     <div className="h-64 flex items-center justify-center text-muted font-mono italic bg-bg/20 rounded-3xl border border-dashed">
-                        [ MiniOccupancyChart Placeholder ]
+                     <div className="h-64 flex flex-col items-center justify-center text-muted font-black uppercase tracking-widest bg-bg/20 rounded-3xl border border-dashed text-[10px] space-y-3">
+                        <Users size={32} className="opacity-20" />
+                        <span>Dữ liệu đang được tổng hợp</span>
                      </div>
                   </div>
                </div>

@@ -49,20 +49,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const handleUpload = async (fileToUpload: UploadingFile) => {
     setFiles(prev => prev.map(f => f.id === fileToUpload.id ? { ...f, status: 'uploading' } : f));
     
-    // Simulated upload logic for demonstration
-    // In real app, use axios or fetch with FormData and onUploadProgress
     try {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 20;
-        setFiles(prev => prev.map(f => f.id === fileToUpload.id ? { ...f, progress } : f));
-        if (progress >= 100) {
-          clearInterval(interval);
-          const mockUrl = URL.createObjectURL(fileToUpload.file); // Mock URL
-          setFiles(prev => prev.map(f => f.id === fileToUpload.id ? { ...f, status: 'completed', url: mockUrl } : f));
-          onUpload([mockUrl]);
-        }
-      }, 200);
+      // In production: use supabase.storage.from('bucket').upload()
+      // For now, we use a simple async delay to show UI feedback before completion
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const fileUrl = URL.createObjectURL(fileToUpload.file); 
+      setFiles(prev => prev.map(f => f.id === fileToUpload.id ? { ...f, status: 'completed', progress: 100, url: fileUrl } : f));
+      onUpload([fileUrl]);
     } catch (error) {
       setFiles(prev => prev.map(f => f.id === fileToUpload.id ? { ...f, status: 'error' } : f));
       toast.error(`Lỗi khi tải lên ${fileToUpload.file.name}`);

@@ -104,11 +104,11 @@ const TenantDetail = () => {
   // Checklist #4: Onboarding Confetti
   const handleOnboardingAction = (key: string) => {
     toast.success(`Đã cập nhật bước: ${key}`);
-    // Simulated confetti if reached 100%
-    if (onboarding && (onboarding.completionPercent >= 80 || key === 'isRoomHandovered')) {
+    // Check for completion to celebrate
+    if (onboarding && (onboarding.completionPercent >= 100 || key === 'isRoomHandovered')) {
       setShowConfetti(true);
-      toast.success('CHÚC MỪNG! Quy trình Onboarding đã hoàn tất 100%.', {
-        description: 'Dữ liệu cư dân đã được đồng bộ vào Ledger bảo mật.',
+      toast.success('CHÚC MỪNG! Quy trình Onboarding đã hoàn tất.', {
+        description: 'Dữ liệu cư dân đã được đồng bộ chính xác.',
         icon: <CheckCircle2 className="text-success" />,
         duration: 8000
       });
@@ -120,7 +120,7 @@ const TenantDetail = () => {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center gap-4">
         <Spinner />
-        <p className="text-label text-muted font-bold animate-pulse uppercase tracking-[3px]">Carregando Perfil...</p>
+        <p className="text-label text-muted font-black animate-pulse uppercase tracking-[3px]">Đang tải thông tin cư dân...</p>
       </div>
     );
   }
@@ -167,18 +167,10 @@ const TenantDetail = () => {
           <button className="btn-outline-sm flex items-center gap-2" onClick={() => navigate(-1)}>
              Quay lại
           </button>
-          {/* B21 FIX: Message button with simulated send */}
           <button
             className="btn-outline flex items-center gap-2 px-6"
             onClick={() => {
-              toast.promise(
-                new Promise((res) => setTimeout(res, 900)),
-                {
-                  loading: `Đang gửi tin nhắn tới ${profile.fullName}...`,
-                  success: 'Tin nhắn đã được gửi!',
-                  error: 'Gửi thất bại. Vui lòng thử lại.',
-                }
-              );
+              toast.info(`Tính năng gửi tin nhắn trực tiếp cho ${profile.fullName} đang được cấu hình.`);
             }}
           >
             <MessageSquare size={16} /> Gửi tin nhắn

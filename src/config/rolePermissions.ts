@@ -1,11 +1,10 @@
 /**
  * Static Role Permission Configuration
  *
- * MK-01 / PRM-01 / ROL-01 FIX:
- * This file extracts the role permission definitions from the mocks/ directory
- * into a proper static configuration module. The data is identical but lives
- * in the correct location (config/) rather than in mocks/ which implies
- * the data is only for development/testing.
+ * PRM-01 / ROL-01 FIX:
+ * This file contains the role permission definitions as a proper static
+ * configuration module. The data lives in the correct location (config/)
+ * to ensure production stability and logical separation from dynamic data.
  *
  * DESIGN DECISION: Permissions are statically defined because:
  *  1. No `role_permissions` table exists in the DB schema.

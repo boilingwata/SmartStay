@@ -181,8 +181,7 @@ const ServiceRequests: React.FC = () => {
     if (!selectedAvailable) return;
     setProcessing(true);
     // NOTE: No 'service_requests' table in DB. Subscription changes
-    // are managed by staff via contract_services. Notify the user to contact management.
-    await new Promise(r => setTimeout(r, 600));
+    // are managed by staff via contract_services.
     toast.success(`Đã gửi yêu cầu đăng ký: ${selectedAvailable.name}. Quản lý sẽ sớm phê duyệt.`);
     setProcessing(false);
     setSelectedAvailable(null);
@@ -192,7 +191,6 @@ const ServiceRequests: React.FC = () => {
     if (!selectedCurrent) return;
     setProcessing(true);
     // NOTE: Same as above — cancellation is processed by staff. 
-    await new Promise(r => setTimeout(r, 600));
     toast.success(`Đã gửi yêu cầu hủy: ${selectedCurrent.name}. Sẽ có hiệu lực từ kỳ tiếp theo.`);
     setProcessing(false);
     setSelectedCurrent(null);

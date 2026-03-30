@@ -46,20 +46,19 @@ const InvoiceDetail = () => {
   // 3.2.1 Logic PDF generation (Checklist #8)
   const handleDownloadPDF = async () => {
     toast.promise(
-      new Promise((resolve) => {
-        setTimeout(() => {
-          // Simulate: GET /api/invoices/:id/pdf -> blob
-          const blob = new Blob(['Invoice PDF Content'], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.setAttribute('download', `Invoice-${invoice.invoiceCode}.pdf`);
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          resolve(true);
-        }, 1500);
-      }),
+      (async () => {
+        // In production: const response = await fetch(`/api/invoices/${id}/pdf`);
+        // const blob = await response.blob();
+        const blob = new Blob(['Invoice PDF Content'], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Invoice-${invoice.invoiceCode}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return true;
+      })(),
       {
         loading: 'Đang tạo bản PDF...',
         success: 'Tải về thành công!',

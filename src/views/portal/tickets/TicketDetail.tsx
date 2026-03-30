@@ -1,214 +1,221 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, CheckCircle2, User, MoreVertical, Paperclip } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, User, Paperclip } from 'lucide-react';
 import { m, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketService } from '@/services/ticketService';
 import { Ticket, TicketComment } from '@/models/Ticket';
 import { cn } from '@/utils';
+import { Spinner } from '@/components/ui';
 
 const TicketDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [comments, setComments] = useState<TicketComment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState('');
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const [ticketData, commentData] = await Promise.all([
-          ticketService.getTicketDetail(id),
-          ticketService.getTicketComments(id)
-        ]);
-        setTicket(ticketData);
-        setComments(commentData);
-      } catch (error) {
-        console.error('Error fetching ticket detail:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+  const { data: ticket, isLoading: ticketLoading } = useQuery({
+    queryKey: ['portal-ticket', id],
+    queryFn: () => ticketService.getTicketDetail(id!),
+    enabled: !!id
+  });
 
-  const handleSend = async () => {
-    if (!newComment.trim() || !id) return;
-    try {
-      const sent = await ticketService.addComment(id, newComment);
-      setComments([...comments, sent]);
+  const { data: comments = [], isLoading: commentsLoading } = useQuery({
+    queryKey: ['portal-ticket-comments', id],
+    queryFn: () => ticketService.getTicketComments(id!),
+    enabled: !!id
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (content: string) => ticketService.addComment(id!, content),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal-ticket-comments', id] });
       setNewComment('');
-    } catch (error) {
-      console.error('Error sending comment:', error);
     }
+  });
+
+  const handleSend = () => {
+    if (!newComment.trim() || !id || addCommentMutation.isPending) return;
+    addCommentMutation.mutate(newComment);
   };
 
-  if (loading) {
+  const isLoading = ticketLoading || commentsLoading;
+
+  if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-white min-h-[80vh]">
-        <div className="w-12 h-12 border-4 border-slate-100 border-t-[#0D8A8A] rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-400 font-black animate-pulse uppercase tracking-[3px]">SmartStay Loading</p>
+      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-transparent min-h-[80vh]">
+        <Spinner size="lg" />
+        <p className="text-sm text-slate-400 font-black animate-pulse uppercase tracking-[3px]">Đang tải dữ liệu...</p>
       </div>
     );
   }
 
-  if (!ticket) return null;
+  if (!ticket) return (
+    <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 min-h-[80vh]">
+      <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center">
+        <ArrowLeft size={32} />
+      </div>
+      <p className="text-sm font-black text-slate-400 uppercase tracking-widest leading-none">Không tìm thấy yêu cầu</p>
+      <button onClick={() => navigate('/portal/tickets')} className="text-teal-600 font-black uppercase text-xs tracking-widest underline">Quay lại</button>
+    </div>
+  );
 
   return (
-    <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-6 duration-700 font-sans">
+    <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-6 duration-700 font-sans h-full bg-white relative">
       
-      {/* Tab Switcher Header */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-40">
-        <div className="max-w-[900px] mx-auto flex">
+      {/* Header Sticky Container */}
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100 px-5 pt-8">
+        <div className="flex items-center gap-4 mb-4">
+           <button onClick={() => navigate('/portal/tickets')} className="w-10 h-10 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 active:scale-90 transition-all">
+              <ArrowLeft size={20} />
+           </button>
+           <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-teal-600/60 uppercase tracking-[3px] truncate">{ticket.ticketCode}</p>
+              <h1 className="text-lg font-black text-slate-900 truncate leading-none uppercase tracking-tight">{ticket.title}</h1>
+           </div>
+        </div>
+
+        <div className="flex border-t border-slate-50">
           <button 
             onClick={() => setActiveTab('info')}
             className={cn(
-              "flex-1 py-5 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden",
-              activeTab === 'info' ? "text-[#0D8A8A]" : "text-slate-400 hover:text-slate-600"
+              "flex-1 py-4 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden",
+              activeTab === 'info' ? "text-teal-600" : "text-slate-400"
             )}
           >
-            <span>Thông tin Ticket</span>
-            {activeTab === 'info' && <m.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#0D8A8A]" />}
+            <span>Tổng quan</span>
+            {activeTab === 'info' && <m.div layoutId="tab-active" className="absolute bottom-0 left-0 right-0 h-1 bg-teal-500 shadow-[0_-2px_10px_rgba(20,184,166,0.3)]" />}
           </button>
           <button 
             onClick={() => setActiveTab('chat')}
             className={cn(
-              "flex-1 py-5 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden",
-              activeTab === 'chat' ? "text-[#0D8A8A]" : "text-slate-400 hover:text-slate-600"
+              "flex-1 py-4 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden",
+              activeTab === 'chat' ? "text-teal-600" : "text-slate-400"
             )}
           >
             <div className="flex items-center justify-center gap-2">
-              <span>Hội thoại</span>
-              {comments.length > 0 && <span className="bg-[#0D8A8A] text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">{comments.length}</span>}
+              <span>Thảo luận</span>
+              {comments.length > 0 && <span className="bg-teal-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/20">{comments.length}</span>}
             </div>
-            {activeTab === 'chat' && <m.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#0D8A8A]" />}
+            {activeTab === 'chat' && <m.div layoutId="tab-active" className="absolute bottom-0 left-0 right-0 h-1 bg-teal-500 shadow-[0_-2px_10px_rgba(20,184,166,0.3)]" />}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-        <div className="p-5 md:p-8 w-full xl:max-w-[900px] mx-auto animate-in fade-in duration-500">
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="p-6 pb-40 max-w-[900px] mx-auto animate-in fade-in duration-500">
           
           {activeTab === 'info' ? (
             <div className="space-y-6">
-              {/* Ticket Info Hero */}
-              <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-xl shadow-slate-200/20 space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[3px]">{ticket.ticketCode}</div>
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{ticket.title}</h2>
-                  </div>
-                  <div className={cn(
-                     "px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border",
-                     ticket.status === 'Open' ? "bg-blue-50 text-blue-600 border-blue-100" :
-                     ticket.status === 'InProgress' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                     ticket.status === 'Resolved' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                     "bg-slate-50 text-slate-500 border-slate-200"
-                  )}>
-                    {ticket.status}
-                  </div>
+              <div className="bg-slate-50/50 p-8 rounded-[40px] border border-slate-100 space-y-8 shadow-inner relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-8 opacity-5 text-teal-500 group-hover:scale-110 transition-transform">
+                    <User size={120} strokeWidth={1} />
+                 </div>
+                 
+                 <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
+                    <div className={cn(
+                       "px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[4px] border shadow-sm",
+                       ticket.status === 'Open' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                       ticket.status === 'InProgress' ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
+                       ticket.status === 'Resolved' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                       "bg-slate-50 text-slate-500 border-slate-100"
+                    )}>
+                      {ticket.status}
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-y border-slate-50">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Loại yêu cầu</p>
-                    <p className="text-xs font-bold text-slate-700 uppercase">{ticket.type}</p>
+                <div className="grid grid-cols-2 gap-8 py-8 border-y border-slate-100 relative z-10">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phân loại</p>
+                    <p className="text-sm font-black text-slate-700 uppercase tracking-tight">{ticket.type}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mức độ ưu tiên</p>
-                    <p className={cn("text-xs font-bold uppercase", 
-                      ticket.priority === 'Critical' ? 'text-red-600' : 
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Độ ưu tiên</p>
+                    <p className={cn("text-sm font-black uppercase tracking-tight", 
+                      ticket.priority === 'Critical' ? 'text-rose-600' : 
                       ticket.priority === 'High' ? 'text-orange-600' : 
                       'text-teal-600'
                     )}>
                       {ticket.priority}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Căn hộ</p>
-                    <p className="text-xs font-bold text-slate-700">{ticket.roomCode || 'N/A'}</p>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Căn hộ</p>
+                    <p className="text-sm font-black text-slate-700">{ticket.roomCode || 'BQL'}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ngày gửi</p>
-                    <p className="text-xs font-bold text-slate-700">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</p>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gửi ngày</p>
+                    <p className="text-sm font-black text-slate-700">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Mô tả nội dung</p>
-                   <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100">
-                      <p className="text-[14px] text-slate-700 leading-relaxed font-medium">{ticket.description}</p>
+                <div className="space-y-4 pt-4 relative z-10">
+                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nội dung chi tiết</p>
+                   <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm min-h-[120px]">
+                      <p className="text-[15px] text-slate-700 leading-relaxed font-medium tracking-tight italic">"{ticket.description}"</p>
                    </div>
                 </div>
               </div>
 
-              {/* Quick Chat Preview Action */}
               <button 
                 onClick={() => setActiveTab('chat')}
-                className="w-full h-[72px] bg-[#0D8A8A] text-white rounded-[32px] font-black shadow-2xl shadow-[#0D8A8A]/30 flex items-center justify-center gap-4 active:scale-95 transition-all uppercase tracking-[0.3em] text-xs"
+                className="w-full h-16 bg-slate-900 text-white rounded-[32px] font-black shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 active:scale-95 transition-all uppercase tracking-[3px] text-xs"
               >
+                Gửi phản hồi cho BQL
                 <Send size={18} />
-                BẮT ĐẦU TRÒ CHUYỆN VỚI BQL
               </button>
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Conversation Section Header */}
-              <div className="flex items-center gap-4 pb-4">
-                 <div className="h-px flex-1 bg-slate-100" />
-                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-[4px]">Lịch sử hội thoại</span>
-                 <div className="h-px flex-1 bg-slate-100" />
-              </div>
-
-              {/* Conversation Thread */}
-              {comments.map((msg, idx) => {
-                const isStaff = msg.authorRole === 'Staff';
-                return (
-                  <m.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    key={msg.id} 
-                    className={cn(
-                      "flex gap-3",
-                      isStaff ? "justify-start" : "justify-end"
-                    )}
-                  >
-                    {isStaff && (
-                      <div className="w-10 h-10 rounded-2xl bg-[#0D8A8A] flex items-center justify-center text-white mt-1 shadow-lg shadow-[#0D8A8A]/20 shrink-0">
-                        <User size={20} strokeWidth={2.5} />
+            <div className="space-y-8 pb-32">
+              <AnimatePresence mode="popLayout">
+                {comments.map((msg, idx) => {
+                  const isStaff = msg.authorRole === 'Staff';
+                  return (
+                    <m.div 
+                      layout
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      key={msg.id} 
+                      className={cn(
+                        "flex gap-4 items-end",
+                        isStaff ? "justify-start" : "justify-end"
+                      )}
+                    >
+                      {isStaff && (
+                        <div className="w-12 h-12 rounded-2xl bg-teal-600 flex items-center justify-center text-white shadow-xl shadow-teal-500/20 shrink-0 mb-3 grayscale-[0.5] hover:grayscale-0 transition-all">
+                          <User size={24} strokeWidth={2.5} />
+                        </div>
+                      )}
+                      <div className={cn("max-w-[80%] space-y-2", !isStaff && "flex flex-col items-end")}>
+                        <div className={cn(
+                          "p-6 rounded-[32px] shadow-lg transform-gpu transition-all",
+                          isStaff 
+                            ? "bg-white text-slate-800 rounded-bl-none border border-slate-100 shadow-slate-200/50" 
+                            : "bg-teal-600 text-white rounded-br-none shadow-teal-600/20"
+                        )}>
+                          {isStaff && <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest mb-2 opacity-70">Ban quản lý</p>}
+                          <p className="text-[15px] font-black leading-relaxed tracking-tight">{msg.content}</p>
+                        </div>
+                        <p className={cn(
+                          "text-[9px] text-slate-300 font-black uppercase tracking-widest px-2",
+                          isStaff ? "text-left" : "text-right"
+                        )}>
+                          {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(msg.createdAt).toLocaleDateString('vi-VN')}
+                        </p>
                       </div>
-                    )}
-                    <div className={cn("max-w-[85%] space-y-2", !isStaff && "flex flex-col items-end")}>
-                      <div className={cn(
-                        "p-5 rounded-[28px] shadow-sm transform-gpu transition-all",
-                        isStaff 
-                          ? "bg-white text-slate-800 rounded-tl-none border border-slate-100 shadow-slate-200/50" 
-                          : "bg-[#0D8A8A] text-white rounded-tr-none shadow-[#0D8A8A]/20"
-                      )}>
-                        {isStaff && <p className="text-[10px] font-black text-[#0D8A8A] uppercase tracking-widest mb-1.5 opacity-70">Ban quản lý</p>}
-                        <p className="text-[14px] font-medium leading-relaxed tracking-tight">{msg.content}</p>
-                      </div>
-                      <p className={cn(
-                        "text-[10px] text-slate-400 font-bold px-1",
-                        isStaff ? "text-left" : "text-right"
-                      )}>
-                        {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </m.div>
-                );
-              })}
+                    </m.div>
+                  );
+                })}
+              </AnimatePresence>
               
               {ticket.status === 'Resolved' && (
-                <div className="flex flex-col items-center gap-4 py-8">
-                   <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center text-teal-500 border border-teal-100 shadow-inner">
-                     <CheckCircle2 size={32} strokeWidth={2.5} />
+                <div className="flex flex-col items-center gap-4 py-12 border-t border-slate-50">
+                   <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center border-4 border-white shadow-2xl shadow-emerald-500/10">
+                     <CheckCircle2 size={40} strokeWidth={3} />
                    </div>
-                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-[4px]">Vấn đề đã xử lý xong</p>
+                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-[4px]">Vấn đề đã hoàn tất xử lý</p>
                 </div>
               )}
             </div>
@@ -216,36 +223,33 @@ const TicketDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Enhanced Input Area */}
       {activeTab === 'chat' && ticket.status !== 'Closed' && (
-        <div className="absolute bottom-0 left-0 right-0 p-5 bg-white/80 backdrop-blur-xl border-t border-slate-100 z-50">
-          <div className="max-w-[900px] mx-auto flex gap-3 bg-slate-50/80 rounded-[28px] p-2 items-center border border-slate-100 shadow-inner">
-            <button className="w-10 h-10 text-slate-400 hover:text-[#0D8A8A] flex items-center justify-center transition-colors">
-              <Paperclip size={20} />
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/95 backdrop-blur-xl border-t border-slate-100 z-50 shadow-[0_-20px_50px_rgba(0,0,0,0.02)]">
+          <div className="max-w-[900px] mx-auto flex gap-4 bg-slate-50/80 rounded-[32px] p-3 items-center border border-slate-100 shadow-inner">
+            <button className="w-12 h-12 text-slate-400 hover:text-teal-600 flex items-center justify-center transition-all active:scale-90">
+              <Paperclip size={22} />
             </button>
             <input 
               type="text" 
-              placeholder="Nhập phản hồi cho BQL..."
+              placeholder="Gửi phản hồi cho BQL..."
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              className="flex-1 bg-transparent px-2 py-3 border-none focus:ring-0 text-[14px] font-medium text-slate-700 placeholder:text-slate-400"
+              disabled={addCommentMutation.isPending}
+              className="flex-1 bg-transparent px-3 py-4 border-none focus:ring-0 text-[15px] font-black text-slate-700 placeholder:text-slate-300 placeholder:uppercase placeholder:tracking-widest placeholder:text-[10px]"
               onKeyPress={(e: React.KeyboardEvent) => e.key === 'Enter' && handleSend()}
             />
             <button 
               onClick={handleSend}
-              disabled={!newComment.trim()}
+              disabled={!newComment.trim() || addCommentMutation.isPending}
               className={cn(
-                "w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95",
-                newComment.trim() 
-                  ? "bg-[#0D8A8A] text-white shadow-[#0D8A8A]/30" 
+                "w-12 h-12 rounded-[20px] flex items-center justify-center shadow-2xl transition-all active:scale-90",
+                newComment.trim() && !addCommentMutation.isPending
+                  ? "bg-teal-600 text-white shadow-teal-600/30" 
                   : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
               )}
             >
-              <Send size={20} strokeWidth={2.5} className={cn(newComment.trim() && "translate-x-0.5 -translate-y-0.5")} />
+              {addCommentMutation.isPending ? <Spinner size="sm" /> : <Send size={24} strokeWidth={3} className="translate-x-0.5 -translate-y-0.5" />}
             </button>
-          </div>
-          <div className="pt-3 flex justify-center pb-2">
-             <span className="text-[10px] font-black text-slate-200 uppercase tracking-[4px]">SmartStay Secure Chat</span>
           </div>
         </div>
       )}

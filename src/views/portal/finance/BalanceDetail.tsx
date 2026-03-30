@@ -100,22 +100,10 @@ const BalanceDetail = () => {
                 ) : (transactions?.items?.length ?? 0) > 0 ? (
                     transactions!.items.map((tx: any, idx: number) => <TransactionRow key={tx.id} tx={tx} index={idx} />)
                 ) : (
-                    // Mock data reflecting LEDGER pattern
-                    [1, 2, 3, 4].map((i, idx) => (
-                        <TransactionRow 
-                            key={i} 
-                            index={idx}
-                            tx={{
-                                id: i,
-                                amount: i % 2 === 0 ? -1500000 : 2000000,
-                                balanceBefore: 5000000 + (i * 500000),
-                                balanceAfter: (5000000 + (i * 500000)) + (i % 2 === 0 ? -1500000 : 2000000),
-                                type: i % 2 === 0 ? 'Debit' : 'Credit',
-                                description: i % 2 === 0 ? 'Khấu trừ hóa đơn INV-2024-001' : 'Nạp tiền vào ví qua QR',
-                                createdAt: new Date(Date.now() - i * 3600000 * 24).toISOString(),
-                            }} 
-                        />
-                    ))
+                    <div className="py-20 flex flex-col items-center justify-center bg-white/40 rounded-[32px] border-2 border-dashed border-slate-100 opacity-50">
+                        <Activity size={48} className="text-slate-300 mb-4" />
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] italic">Chưa có lịch sử giao dịch</p>
+                    </div>
                 )}
             </div>
         </div>

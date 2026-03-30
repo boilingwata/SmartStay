@@ -493,15 +493,12 @@ const BulkMeterEntry = () => {
             </div>
 
             <div className="flex flex-col gap-6 pt-6">
-               <button 
-                 onClick={() => {
-                   toast.promise(new Promise(res => setTimeout(res, 2000)), {
-                       loading: '🚀 Đang đồng bộ hóa dữ liệu vào hệ thống...',
-                       success: '🎉 Tất cả chỉ số đã được ghi nhận thành công!',
-                       error: '❌ Có lỗi xảy ra trong quá trình đồng bộ.'
-                   });
-                   setTimeout(() => navigate('/admin/meters'), 2200);
-                 }}
+                <button 
+                  onClick={() => {
+                    // In production: await meterService.bulkSaveReadings(readings);
+                    toast.success('🎉 Tất cả chỉ số đã được ghi nhận thành công!');
+                    navigate('/admin/meters');
+                  }}
                  className="group relative w-full h-24 rounded-[40px] bg-slate-900 overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] transition-all hover:scale-[1.01] active:scale-[0.98]"
                >
                   <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-700" />

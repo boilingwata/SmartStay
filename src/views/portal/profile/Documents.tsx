@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
@@ -9,33 +9,39 @@ import {
   Receipt,
   FilePlus,
   ArrowRight,
-  FolderOpen
+  FolderOpen,
+  ShieldCheck,
+  CreditCard,
+  FileBadge
 } from 'lucide-react';
 import { cn, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
+import portalDocumentService from '@/services/portalDocumentService';
 
 const Documents = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromOnboarding = searchParams.get('from') === 'onboarding';
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock data for Documents
-  const mockDocuments = {
-    items: [
-      { id: '1', name: 'Hợp đồng thuê phòng 902 - Signed.pdf', size: '2.4 MB', type: 'Contract', date: '2024-03-01', status: 'Signed' },
-      { id: '2', name: 'Biên lai thanh toán INV-2024-001.pdf', size: '840 KB', type: 'Receipt', date: '2024-03-10', status: 'Paid' },
-      { id: '3', name: 'Phụ lục hợp đồng - Diện tích.pdf', size: '1.2 MB', type: 'Addendum', date: '2024-03-12', status: 'Pending' },
-      { id: '4', name: 'Nội quy tòa nhà 2024.pdf', size: '3.1 MB', type: 'Policy', date: '2024-01-01', status: 'Active' },
-      { id: '5', name: 'Biên lai tiền điện tháng 02.pdf', size: '420 KB', type: 'Receipt', date: '2024-02-28', status: 'Paid' },
-    ]
-  };
+  const { data: documents = [], isLoading } = useQuery({
+    queryKey: ['portal-documents'],
+    queryFn: () => portalDocumentService.getDocuments()
+  });
+
+  const filteredDocs = documents.filter(doc => 
+    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    doc.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const categories = [
-    { label: 'Hợp đồng', count: 1, icon: FileCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
-    { label: 'Biên lai', count: 8, icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Phụ lục', count: 1, icon: FilePlus, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Hợp đồng', count: documents.filter(d => d.type === 'Contract').length, icon: FileCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+    { label: 'Biên lai', count: documents.filter(d => d.type === 'Receipt').length, icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { label: 'Giấy tờ', count: documents.filter(d => d.type === 'ID').length, icon: FilePlus, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
+
+  if (isLoading) return <div className="py-20 flex justify-center items-center"><Spinner /></div>;
 
   return (
     <div className={cn(
@@ -79,6 +85,8 @@ const Documents = () => {
                     type="text" 
                     placeholder="Tìm kiếm tài liệu của bạn..."
                     className="w-full h-16 bg-white rounded-3xl pl-14 pr-6 text-base font-bold border-2 border-transparent focus:border-primary/10 shadow-xl shadow-primary/5 transition-all outline-none placeholder:text-muted/40"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                 />
             </div>
 
@@ -86,13 +94,19 @@ const Documents = () => {
             <div className="space-y-6 text-left">
                 <div className="flex items-center justify-between px-2">
                     <h3 className="text-[12px] font-black text-primary/40 uppercase tracking-[0.3em] flex items-center gap-2">
-                        <FolderOpen size={18} className="text-primary" /> Tệp tin gần đây
+                        <FolderOpen size={18} className="text-primary" /> Tệp tin ({filteredDocs.length})
                     </h3>
-                    <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:opacity-70 transition-opacity">Xem tất cả</button>
                 </div>
 
                 <div className="space-y-4">
-                    {mockDocuments.items.map((doc) => <DocumentCard key={doc.id} doc={doc} />)}
+                    {filteredDocs.length > 0 ? (
+                        filteredDocs.map((doc) => <DocumentCard key={doc.id} doc={doc} />)
+                    ) : (
+                        <div className="py-12 flex flex-col items-center text-center opacity-40">
+                            <FolderOpen size={48} className="mb-4 text-slate-300" />
+                            <p className="text-[13px] font-black uppercase tracking-widest text-slate-400">Không tìm thấy tài liệu nào</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -102,22 +116,45 @@ const Documents = () => {
 
 const DocumentCard = ({ doc }: { doc: any }) => {
   const isContract = doc.type === 'Contract';
+  const isReceipt = doc.type === 'Receipt';
+
+  const downloadFile = () => {
+    if (doc.url) {
+      window.open(doc.url, '_blank');
+    } else {
+      toast.error('Tài liệu chưa có bản kỹ thuật số để tải về');
+    }
+  };
 
   return (
     <div className="bg-white p-6 rounded-[36px] shadow-sm border border-slate-50 flex items-center justify-between group active:scale-[0.99] transition-all">
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 overflow-hidden">
             <div className={cn(
                 "w-12 h-12 rounded-[22px] flex items-center justify-center transition-transform group-hover:scale-110 shadow-inner",
-                isContract ? "bg-teal-50 text-teal-600" : "bg-orange-50 text-orange-600"
+                isContract ? "bg-teal-50 text-teal-600" : 
+                isReceipt ? "bg-orange-50 text-orange-600" : 
+                "bg-blue-50 text-blue-600"
             )}>
-                <FileText size={24} strokeWidth={2} />
+                {isContract ? <ShieldCheck size={24} /> : 
+                 isReceipt ? <CreditCard size={24} /> : 
+                 <FileBadge size={24} />}
             </div>
-            <div className="space-y-1">
-                <h4 className="text-[13px] font-black text-slate-800 tracking-tight leading-none uppercase truncate max-w-[160px]">{doc.name}</h4>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{formatDate(doc.date)} • {doc.size}</p>
+            <div className="space-y-1 overflow-hidden">
+                <h4 className="text-[13px] font-black text-slate-800 tracking-tight leading-none uppercase truncate group-hover:text-teal-600 transition-colors">{doc.name}</h4>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    {doc.date ? formatDate(doc.date) : '—'} • {doc.category}
+                </p>
             </div>
         </div>
-        <button onClick={() => toast.info('Chức năng đang phát triển để kết nối Backend')} className="w-10 h-10 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center group-hover:bg-[#0D8A8A] group-hover:text-white transition-all shadow-sm">
+        <button 
+            onClick={downloadFile}
+            className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm shrink-0",
+                doc.url 
+                    ? "bg-[#0D8A8A] text-white hover:scale-110 active:scale-95 shadow-teal-500/20" 
+                    : "bg-slate-50 text-slate-300 pointer-events-none"
+            )}
+        >
             <Download size={18} />
         </button>
     </div>

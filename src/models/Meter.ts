@@ -47,3 +47,18 @@ export interface MeterBillCalculation {
   vatPercent: number;
   envFee?: number; // Water only
 }
+
+export interface ConsumptionStats {
+  electric: {
+    current: number;
+    usage: number;
+    unit: string;
+    trend: number;
+  };
+  water: {
+    current: number;
+    usage: number;
+    unit: string;
+    trend: number;
+  };
+}

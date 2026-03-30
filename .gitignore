@@ -29,6 +29,10 @@ build/
 
 # OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
 
@@ -41,6 +45,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # AI & Tooling
+.agent/
 .agents/
 .claude/
 .qodo/
@@ -49,6 +54,8 @@ skills-lock.json
 *.tmp
 .turbo
 .next
+.supabase/
+supabase/.temp/
 
 # Testing & Reports
 playwright-report/
@@ -64,6 +71,8 @@ CLAUDE.md
 IMPROVEMENTS.md
 coverage/
 .nyc_output/
+test-results*.json
+junit.xml
 
 # Vite
 vite.config.d.ts

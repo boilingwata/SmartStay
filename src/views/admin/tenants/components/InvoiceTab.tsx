@@ -15,12 +15,8 @@ interface InvoiceTabProps {
 export const InvoiceTab: React.FC<InvoiceTabProps> = ({ invoices }) => {
   const navigate = useNavigate();
   
-  // Dummy data for visual excellence if empty
-  const displayInvoices = invoices || [
-    { id: 'INV-001', code: 'INV/2024/001', amount: 3500000, status: 'Pending', dueDate: '2024-03-05' },
-    { id: 'INV-002', code: 'INV/2024/002', amount: 15450000, status: 'Paid', dueDate: '2024-02-05' },
-    { id: 'INV-003', code: 'INV/2024/003', amount: 1200000, status: 'Overdue', dueDate: '2024-01-05' },
-  ];
+  // B80 FIX: Remove hardcoded mock invoices.
+  const displayInvoices = invoices || [];
   
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-10">

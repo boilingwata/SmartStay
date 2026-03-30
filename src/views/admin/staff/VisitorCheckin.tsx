@@ -16,22 +16,7 @@ const VisitorCheckin = () => {
 
   // Mock scan handler
   const handleScan = () => {
-    setLoading(true);
-    // Simulate finding a visitor registration
-    setTimeout(() => {
-      setVisitor({
-        id: 'VIS-9921',
-        name: 'Nguyễn Văn A',
-        cccd: '001092001XXX',
-        room: 'P.1205',
-        tenantName: 'Lê Minh Tâm',
-        expectedAt: '2026-03-08 14:00',
-        purpose: 'Giao hàng / Lắp đặt',
-        status: 'Pending'
-      });
-      setLoading(false);
-      toast.success('Đã tìm thấy thông tin đăng ký!');
-    }, 1000);
+    toast.info('Tính năng kiểm tra khách đang được phát triển và đồng bộ với hệ thống an ninh.');
   };
 
   const handleAction = (status: 'CheckedIn' | 'Cancelled') => {
@@ -143,8 +128,8 @@ const VisitorCheckin = () => {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-20">
                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-6"><AlertCircle size={32} /></div>
-               <p className="text-body font-black uppercase tracking-widest">Chưa có thông tin</p>
-               <p className="text-[12px] italic">Vui lòng quét QR hoặc nhập CCCD để hiển thị</p>
+               <p className="text-body font-black uppercase tracking-widest">Đang phát triển</p>
+               <p className="text-[12px] italic">Dữ liệu đăng ký khách sẽ được tự động đồng bộ khi hoàn tất cấu hình.</p>
             </div>
           )}
         </div>

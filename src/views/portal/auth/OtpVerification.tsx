@@ -66,7 +66,7 @@ const OtpVerification: React.FC = () => {
   const handleVerify = async (code: string) => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // In production: await authService.verifyEmailOtp(code);
       
       if (code === '123456') {
         toast.success('Xác thực thành công!');

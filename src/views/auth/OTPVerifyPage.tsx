@@ -58,11 +58,9 @@ const OTPVerifyPage = () => {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      toast.success('Xác thực thành công!');
-      navigate(getAuthenticatedHomePath(useAuthStore.getState().user));
-      setIsSubmitting(false);
-    }, 1500);
+    toast.success('Xác thực thành công!');
+    navigate(getAuthenticatedHomePath(useAuthStore.getState().user));
+    setIsSubmitting(false);
   };
 
   return (

@@ -406,8 +406,6 @@ export const invoiceService = {
 
   // B32 FIX: sendNotification — toast-promise backed, logs to console (no notifications table yet)
   sendNotification: async (invoiceId: string): Promise<void> => {
-    // No notifications table in schema yet — simulate a delay and resolve
-    await new Promise((res) => setTimeout(res, 800));
     // In production: insert into a notifications table or call edge function
     console.info(`[invoiceService] Notification sent for invoice ${invoiceId}`);
   },

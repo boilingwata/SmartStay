@@ -6,7 +6,7 @@ import { permissionService } from './permissionService';
 /**
  * Role Service
  *
- * ROL-01 / MK-01 FIX: Imports from @/config/rolePermissions instead of @/mocks/adminMocks.
+ * ROL-01 FIX: Imports from @/config/rolePermissions for static definition.
  * `updateRolePermissions()` logs a clear warning because there is no DB table to persist
  * changes to. The UI should disable this action or show a tooltip explaining this limitation.
  */

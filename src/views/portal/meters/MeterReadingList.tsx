@@ -1,184 +1,233 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Zap, 
   Droplets, 
-  ArrowLeft, 
-  Calendar, 
-  BarChart3, 
   TrendingUp, 
-  Info, 
-  ChevronRight,
-  ShieldCheck,
+  Calendar, 
+  History,
+  InfoIcon,
   Clock
 } from 'lucide-react';
-import { cn, formatVND } from '@/utils';
+import { useQuery } from '@tanstack/react-query';
+import { portalMeterService } from '@/services/portalMeterService';
+import { cn, formatVND, formatDate } from '@/utils';
+import { Spinner } from '@/components/ui';
 
-const MeterReadingList: React.FC = () => {
-  const { type } = useParams<{ type: 'electricity' | 'water' }>();
-  const navigate = useNavigate();
-  const isElectric = type === 'electricity';
+const MeterReadingList = () => {
+  const { 
+    data: latestElec, 
+    isLoading: loadingElec, 
+    isError: errorElec 
+  } = useQuery({
+    queryKey: ['latest-elec'],
+    queryFn: () => portalMeterService.getLatestReading('Electricity')
+  });
 
-  // Mock data following RULE-01 (LatestMeterReading pattern)
+  const { 
+    data: latestWater, 
+    isLoading: loadingWater, 
+    isError: errorWater 
+  } = useQuery({
+    queryKey: ['latest-water'],
+    queryFn: () => portalMeterService.getLatestReading('Water')
+  });
+
+  const { 
+    data: historyElec, 
+    isLoading: loadingHistoryElec, 
+    isError: errorHistoryElec 
+  } = useQuery({
+    queryKey: ['history-elec'],
+    queryFn: () => portalMeterService.getReadingHistory('Electricity', 6)
+  });
+
+  const { 
+    data: historyWater, 
+    isLoading: loadingHistoryWater, 
+    isError: errorHistoryWater 
+  } = useQuery({
+    queryKey: ['history-water'],
+    queryFn: () => portalMeterService.getReadingHistory('Water', 6)
+  });
+
+  const isLoading = loadingElec || loadingWater || loadingHistoryElec || loadingHistoryWater;
+  const isError = errorElec || errorWater || errorHistoryElec || errorHistoryWater;
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-transparent min-h-[60vh]">
+        <Spinner size="lg" />
+        <p className="text-small text-muted font-black animate-pulse uppercase tracking-[3px]">Đang tải dữ liệu chỉ số...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center space-y-6 px-10 bg-transparent min-h-[60vh] text-center">
+        <div className="p-6 bg-red-500/10 rounded-[32px] text-red-500 shadow-sm border border-red-500/20 animate-in zoom-in duration-500">
+           <History size={48} strokeWidth={1.5} />
+        </div>
+        <div className="space-y-2">
+           <h3 className="text-xl font-black text-primary tracking-tight">Hệ thống bận</h3>
+           <p className="text-sm font-bold text-muted uppercase tracking-widest leading-relaxed">Không thể tải dữ liệu chỉ số. Vui lòng thử lại sau.</p>
+        </div>
+      </div>
+    );
+  }
+
+
   const currentReading = {
-    index: isElectric ? 1240.5 : 45.2,
-    usage: isElectric ? 132 : 6,
-    period: 'Tháng 03/2026',
-    updatedAt: '2026-03-15T10:30:00Z',
-    cost: isElectric ? 425000 : 155000
+    electricity: latestElec?.currentIndex ?? 0,
+    water: latestWater?.currentIndex ?? 0,
+    lastUpdate: latestElec?.readingDate ?? latestWater?.readingDate ?? 'Chưa có dữ liệu',
+    consumption: {
+      electricity: latestElec?.consumption ?? 0,
+      water: latestWater?.consumption ?? 0
+    }
   };
 
+  // Combine and sort history
   const history = [
-    { month: '02/2026', index: isElectric ? 1108.5 : 39.2, usage: isElectric ? 115 : 7, cost: isElectric ? 368000 : 182000 },
-    { month: '01/2026', index: isElectric ? 993.5 : 32.2, usage: isElectric ? 142 : 5, cost: isElectric ? 456000 : 130000 },
-    { month: '12/2025', index: isElectric ? 851.5 : 27.2, usage: isElectric ? 128 : 8, cost: isElectric ? 412000 : 210000 },
-  ];
+    ...(historyElec || []).map(h => ({ ...h, type: 'Electricity' as const })),
+    ...(historyWater || []).map(h => ({ ...h, type: 'Water' as const }))
+  ].sort((a, b) => new Date(b.readingDate).getTime() - new Date(a.readingDate).getTime());
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in zoom-in-95 duration-700 font-sans">
-      {/* Premium Header Backdrop */}
-      <div className={cn(
-        "absolute top-0 inset-x-0 h-[300px] rounded-b-[48px] overflow-hidden shadow-2xl transition-all duration-1000",
-        isElectric 
-          ? "bg-gradient-to-br from-amber-900 via-slate-900 to-amber-950" 
-          : "bg-gradient-to-br from-blue-900 via-slate-900 to-blue-950"
-      )}>
-         <div className="absolute inset-0 opacity-10 mix-blend-overlay"></div>
-         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
-         
-         {/* Decorative Glows */}
-         <div className={cn(
-           "absolute -top-24 -right-24 w-96 h-96 rounded-full mix-blend-screen filter blur-[90px] opacity-40 animate-pulse",
-           isElectric ? "bg-amber-500" : "bg-blue-500"
-         )}></div>
-         <div className={cn(
-           "absolute top-1/2 -left-24 w-72 h-72 rounded-full mix-blend-screen filter blur-[80px] opacity-20 animate-pulse delay-700",
-           isElectric ? "bg-yellow-500" : "bg-sky-500"
-         )}></div>
-      </div>
-
-      <div className="relative pt-12 px-6 w-full mx-auto space-y-8">
-        {/* Header Navigation */}
-        <div className="flex items-center justify-between">
-          <button 
-            onClick={() => navigate(-1)}
-            className="w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center text-white active:scale-95 transition-all shadow-lg"
-          >
-            <ArrowLeft size={22} strokeWidth={2.5} />
-          </button>
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center text-white shadow-lg">
-             <BarChart3 size={22} strokeWidth={2.5} />
+    <div className="space-y-8 animate-in fade-in slide-in-from-right-6 duration-700 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+        <div>
+          <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest leading-none mb-2 font-mono">Quản lý tiện ích</p>
+          <h1 className="text-display text-primary leading-tight font-black tracking-tight">Chỉ số Đồng hồ</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-14 px-6 bg-white/60 backdrop-blur-md border border-primary/5 rounded-[24px] flex items-center gap-3 shadow-xl shadow-primary/5 group transition-all hover:bg-white">
+            <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+              <Calendar size={16} />
+            </div>
+            <span className="text-[13px] font-black text-primary font-mono">{formatDate(new Date(), 'MM/yyyy')}</span>
           </div>
         </div>
+      </div>
 
-        {/* Title Section */}
-        <div className="space-y-1.5 px-1">
-           <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
-             Chi số <span className={cn(isElectric ? "text-amber-400" : "text-blue-400")}>{isElectric ? 'Điện' : 'Nước'}</span>
-           </h1>
-           <div className="flex items-center gap-2 opacity-60">
-             <Clock size={12} className="text-white" />
-             <p className="text-[10px] font-black text-white uppercase tracking-[3px]">Cập nhật: 2 giờ trước</p>
-           </div>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {[
+          { label: 'Điện năng (kWh)', value: currentReading.electricity, subValue: `+${currentReading.consumption.electricity} kWh`, icon: Zap, color: '#f59e0b' },
+          { label: 'Nước sạch (m3)', value: currentReading.water, subValue: `+${currentReading.consumption.water} m3`, icon: Droplets, color: '#3b82f6' }
+        ].map((stat, i) => (
+          <div key={i} className="card-container p-10 bg-white/40 backdrop-blur-xl border border-primary/5 hover:border-primary/20 transition-all group overflow-hidden relative">
+            <div className="absolute -right-10 -bottom-10 opacity-5 text-primary group-hover:scale-110 transition-transform">
+              <stat.icon size={200} strokeWidth={1} />
+            </div>
+            <div className="flex justify-between items-start mb-10 relative z-10">
+               <div>
+                 <p className="text-[11px] font-black text-muted uppercase tracking-[3px] mb-2">{stat.label}</p>
+                 <div className="flex items-baseline gap-3">
+                    <span className="text-[56px] font-black text-primary font-mono tracking-tighter leading-none">{stat.value}</span>
+                    <span className="text-[14px] font-black text-muted uppercase tracking-widest">{stat.label.includes('kWh') ? 'kWh' : 'm3'}</span>
+                 </div>
+               </div>
+               <div className="p-5 bg-white rounded-[24px] text-primary shadow-xl shadow-primary/5 group-hover:rotate-12 transition-transform">
+                  <stat.icon size={28} />
+               </div>
+            </div>
+            <div className="p-4 bg-white/60 rounded-[20px] inline-flex items-center gap-3 border border-primary/5 relative z-10">
+               <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                  <TrendingUp size={16} />
+               </div>
+               <div>
+                  <p className="text-[13px] font-black text-primary leading-none font-mono">{stat.subValue}</p>
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-tighter mt-1 italic">So với tháng trước</p>
+               </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* History Table */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+           <h3 className="text-[14px] font-black text-primary uppercase tracking-[4px] border-l-4 border-primary pl-4 leading-none">Lịch sử ghi chỉ số</h3>
+           <span className="text-[10px] font-black text-muted font-mono bg-bg px-4 py-2 rounded-full uppercase tracking-widest border border-primary/5 italic">Cần đối soát với thực tế</span>
         </div>
-
-        {/* Hero Consumption Card */}
-        <div className="bg-white/80 backdrop-blur-2xl rounded-[40px] p-8 shadow-2xl border border-white shadow-slate-200/50 space-y-8 relative overflow-hidden group">
-           <div className={cn(
-             "absolute top-0 right-0 p-8 opacity-5 transition-transform group-hover:scale-110 duration-700",
-             isElectric ? "text-amber-600" : "text-blue-600"
-           )}>
-             {isElectric ? <Zap size={150} /> : <Droplets size={150} />}
-           </div>
-
-           <div className="relative z-10 space-y-6">
-              <div className="flex justify-between items-start">
-                 <div className="space-y-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[2px]">Chỉ số hiện tại</span>
-                    <div className="flex items-baseline gap-2">
-                       <h2 className="text-5xl font-black text-slate-900 tracking-tighter tabular-nums leading-none">
-                          {currentReading.index}
-                       </h2>
-                       <span className="text-[13px] font-black text-slate-400 uppercase">{isElectric ? 'kWh' : 'm³'}</span>
-                    </div>
-                 </div>
-                 <div className={cn(
-                   "w-12 h-12 rounded-[18px] flex items-center justify-center shadow-inner pt-0.5",
-                   isElectric ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"
-                 )}>
-                   {isElectric ? <Zap size={24} strokeWidth={2.5} /> : <Droplets size={24} strokeWidth={2.5} />}
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="p-4 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tiêu thụ tháng này</span>
-                    <p className="text-lg font-black text-slate-800 tracking-tight">+{currentReading.usage} {isElectric ? 'kWh' : 'm³'}</p>
-                 </div>
-                 <div className="p-4 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tạm tính</span>
-                    <p className="text-lg font-black text-teal-600 tracking-tight">{formatVND(currentReading.cost)}</p>
-                 </div>
-              </div>
-
-              <div className="bg-slate-900 rounded-[24px] p-4 flex items-center justify-between">
-                 <div className="flex items-center gap-3">
-                    <TrendingUp size={16} className="text-emerald-400" />
-                    <span className="text-[11px] font-bold text-white/80 uppercase tracking-widest">Xu hướng: <span className="text-emerald-400">Giảm 12%</span></span>
-                 </div>
-                 <ChevronRight size={14} className="text-white/20" />
-              </div>
-           </div>
-        </div>
-
-        {/* History Section */}
-        <div className="space-y-6">
-           <div className="flex items-center justify-between px-2">
-              <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-[2px] flex items-center gap-2">
-                 <Calendar size={16} className="text-teal-500" /> Nhật ký tiêu thụ
-              </h3>
-              <button className="text-[11px] font-black text-teal-600 uppercase tracking-widest">Xem tất cả</button>
-           </div>
-
-           <div className="space-y-4 px-1">
-              {history.map((record, i) => (
-                <div key={record.month} className="p-6 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-between group active:scale-[0.98] transition-all">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 group-hover:bg-slate-100 transition-colors">
-                         <Clock size={22} strokeWidth={2} />
+        
+        <div className="card-container p-0 overflow-hidden bg-white/60 backdrop-blur-xl border border-primary/5 shadow-2xl shadow-primary/10 font-plus-jakarta">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px] sm:text-[11px]">
+                  <th className="px-10 py-6 border-r border-white/5">Kỳ thanh toán</th>
+                  <th className="px-8 py-6 border-r border-white/5">Loại</th>
+                  <th className="px-8 py-6 border-r border-white/5">Chỉ số đầu</th>
+                  <th className="px-8 py-6 border-r border-white/5">Chỉ số cuối</th>
+                  <th className="px-8 py-6">Tiêu thụ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/10 font-bold">
+                {history.map((record, i) => (
+                  <tr key={i} className="group hover:bg-white/90 transition-all cursor-pointer">
+                    <td className="px-10 py-7">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-bg rounded-2xl flex flex-col items-center justify-center border border-border/10 shadow-inner group-hover:scale-110 transition-transform">
+                           <Calendar size={16} className="text-primary mb-1" />
+                           <span className="text-[9px] font-black text-primary">HIST</span>
+                        </div>
+                        <div>
+                          <p className="text-[15px] font-black text-primary tracking-tighter uppercase font-mono">{record.monthYear}</p>
+                          <p className="text-[10px] font-bold text-muted italic">Ngày ghi: {formatDate(record.readingDate)}</p>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                         <h4 className="text-[13px] font-black text-slate-800 uppercase tracking-tight">Tháng {record.month}</h4>
-                         <p className="text-[11px] font-black text-slate-400 tracking-widest">Chỉ số: {record.index}</p>
+                    </td>
+                    <td className="px-8 py-7">
+                       <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-8 h-8 rounded-xl flex items-center justify-center ring-4 ring-bg",
+                            record.type === 'Electricity' ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"
+                          )}>
+                             {record.type === 'Electricity' ? <Zap size={14} /> : <Droplets size={14} />}
+                          </div>
+                          <span className="text-[11px] font-black uppercase tracking-wider text-muted">{record.type === 'Electricity' ? 'Điện' : 'Nước'}</span>
+                       </div>
+                    </td>
+                    <td className="px-8 py-7">
+                       <p className="text-[16px] font-black text-muted/60 font-mono italic tracking-tighter">{record.previousIndex}</p>
+                    </td>
+                    <td className="px-8 py-7">
+                       <p className="text-[18px] font-black text-primary font-mono tracking-tighter">{record.currentIndex}</p>
+                    </td>
+                    <td className="px-8 py-7">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100/50 shadow-inner">
+                         <TrendingUp size={12} strokeWidth={3} />
+                         <span className="text-[13px] font-black font-mono">+{record.consumption} {record.type === 'Electricity' ? 'kWh' : 'm3'}</span>
                       </div>
-                   </div>
-                   <div className="text-right space-y-0.5">
-                      <p className={cn(
-                        "text-[15px] font-black tracking-tighter",
-                        isElectric ? "text-amber-600" : "text-blue-600"
-                      )}>
-                        +{record.usage} {isElectric ? 'kWh' : 'm³'}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{formatVND(record.cost)}</p>
-                   </div>
-                </div>
-              ))}
-           </div>
+                    </td>
+                  </tr>
+                ))}
+                {history.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-10 py-20 text-center">
+                       <div className="flex flex-col items-center gap-4 opacity-30">
+                          <History size={48} />
+                          <p className="text-xs font-black uppercase tracking-[3px] italic">Chưa có lịch sử ghi chỉ số</p>
+                       </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-
-        {/* Policy Notice */}
-        <div className="px-1">
-           <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[32px] flex gap-4">
-              <ShieldCheck className="text-blue-500 shrink-0" size={24} />
-              <div className="space-y-1">
-                <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest leading-none">Chính sách tính cước</h4>
-                <p className="text-[10px] text-blue-700/70 font-medium leading-relaxed italic">
-                  Chỉ số được chốt định kỳ vào ngày 25 hàng tháng. {isElectric ? 'Giá điện áp dụng theo bậc thang Bộ Công Thương.' : 'Giá nước áp dụng theo định mức cư dân Hà Nội.'}
-                </p>
-              </div>
-           </div>
-        </div>
-
+      </div>
+      
+      {/* Compliance Notice */}
+      <div className="p-8 bg-info/[0.03] border border-info/20 rounded-[40px] flex gap-5 italic text-[13px] text-info font-bold items-center shadow-lg shadow-info/5 relative overflow-hidden group">
+         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <InfoIcon size={80} />
+         </div>
+         <div className="p-3 bg-info/10 rounded-2xl flex-shrink-0"><InfoIcon size={24} /></div>
+         Dữ liệu chỉ số được đồng bộ trực tiếp từ hệ thống quản lý tòa nhà qua <code className="bg-info/10 px-2 py-0.5 rounded font-mono mx-1">vw_LatestMeterReading</code>. 
+         Đảm bảo tính cung cấp dữ liệu minh bạch và chính xác tuyệt đối (RULE-01).
       </div>
     </div>
   );
