@@ -636,7 +636,7 @@ export const tenantService = {
       }
     }
 
-    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
+    const genderMap: Record<string, 'male' | 'female' | 'other'> = { Male: 'male', Female: 'female', Other: 'other' };
     const documentsPayload: Record<string, unknown> = {};
     if (data.vehiclePlates && data.vehiclePlates.length > 0) {
       documentsPayload.vehicle_plates = data.vehiclePlates;
@@ -663,7 +663,7 @@ export const tenantService = {
             date_of_birth: data.dateOfBirth || null,
             gender: genderMap[data.gender ?? 'Other'] ?? 'other',
             permanent_address: data.permanentAddress || null,
-            documents: Object.keys(documentsPayload).length > 0 ? documentsPayload : null,
+            documents: Object.keys(documentsPayload).length > 0 ? documentsPayload as unknown as import('@/types/supabase').Json : null,
             is_deleted: false,
           })
           .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')

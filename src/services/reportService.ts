@@ -51,9 +51,10 @@ function daysBetween(a: string, b: string): number {
 // ---------------------------------------------------------------------------
 
 const EMPTY_OCCUPANCY_KPI: OccupancyKPI = {
-  avgOccupancyRate: 0, avgOccupancyDelta: 0, occupiedRooms: 0, 
+  avgOccupancyRate: 0, avgOccupancyDelta: 0, occupiedRooms: 0,
   vacantRooms: 0, maintenanceRooms: 0, reservedRooms: 0,
   longestVacantRoom: { roomCode: '', days: 0 }, avgVacancyDays: 0, sparklineData: [],
+  statusCounts: { occupied: 0, vacant: 0, maintenance: 0, reserved: 0 },
 };
 const EMPTY_FINANCIAL_KPI: FinancialKPI = {
   totalRevenue: 0, totalRevenueDelta: 0, netRevenue: 0,
@@ -199,6 +200,7 @@ export const reportService = {
         },
         avgVacancyDays: total > 0 ? Math.round((vacant.length / total) * 30) : 0,
         sparklineData: [],
+        statusCounts: { occupied, vacant: vacant.length, maintenance, reserved },
       };
     } catch { return EMPTY_OCCUPANCY_KPI; }
   },

@@ -455,7 +455,7 @@ const BuildingDetail = () => {
           </button>
           <div className="flex items-center gap-4">
            <img 
-              src={heroImage || building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} 
+              src={building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} 
               className="w-16 h-16 rounded-2xl object-cover shadow-lg" 
               alt={building.buildingName} 
             />

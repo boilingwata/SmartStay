@@ -195,7 +195,7 @@ export const buildingService = {
       .single();
 
     if (buildingWithOwner?.profiles) {
-      const profiles = buildingWithOwner.profiles as ProfileRow;
+      const profiles = buildingWithOwner.profiles as unknown as ProfileRow;
       const prefs = (profiles.preferences as any) || {};
       detail.managementPhone = profiles.phone || '';
       detail.managementEmail = prefs.email || '';
