@@ -1,26 +1,16 @@
-# Research Findings: Portal Mock Data
+# Findings: BuildingList.tsx Redesign & Bug Fix
 
-## 1. Meter Modules
-- **File**: `src/views/portal/meters/MeterReadingList.tsx`
-- **Current State**: 100% Mock. Local `currentReading` and `history` objects.
-- **Rule Requirement**: RULE-01 (Must use `vw_LatestMeterReading` for `CurrentIndex`).
-- **Missing**: A service to fetch current readings and history for the logged-in tenant's room.
+## Discovery: Component Architecture
+- **SidePanel**: Named export `SidePanel` in `@/components/ui/SidePanel`. Usage needs `{ SidePanel }`.
+- **Icons**: Extended list of Lucide icons needed for advanced search/sort/view logic.
+- **Ternary Chain**: Complex nested ternary used for Loading -> Empty -> Grid -> List states.
 
-## 2. Finance Modules
-- **Files**: `src/views/portal/finance/PaymentHistory.tsx`, `src/views/portal/finance/BalanceDetail.tsx`
-- **Current State**: Using `portalFinanceService`, but has hardcoded "fallback" cards when data is empty.
-- **Refactor**: Remove fallbacks. Ensure `EmptyState` is shown instead.
+## Error Analysis (IDE Snapshot)
+- `Cannot find name 'SidePanel'`: Missing import (Applied in T4).
+- `Cannot find name 'LayoutGrid' etc.`: Missing lucide-react icons (Applied in T4).
+- `Syntax errors near line 496`: Likely due to structural mismatch in the large JSX return or extra closing tags from previous edits.
 
-## 3. Amenity Modules
-- **File**: `src/views/portal/amenities/MyBookings.tsx`
-- **Current State**: Using `useState(mockBookings)`.
-- **Missing**: `portalAmenityService.ts` to fetch from `amenity_bookings` table.
-
-## 4. DB Structures to Verify
-- `vw_LatestMeterReading`: Exists? (Used in RULE-01).
-- `amenity_bookings`: Needed for `MyBookings.tsx`.
-- `balance_history`: Used in `portalFinanceService.ts`.
-
-## 5. UI elements to fix
-- `CreateAddendumModal.tsx`: Has a "Simulate Upload" button with hardcoded `mock_url`.
-- `FileUpload.tsx`: Common mock pattern for URL creation.
+## Resolution Approach
+- Clean up the `lucide-react` import block.
+- Verify exact JSX closure counts.
+- Ensure all conditional rendering blocks are correctly wrapped in `{}`.

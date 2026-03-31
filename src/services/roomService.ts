@@ -232,6 +232,24 @@ export const roomService = {
     if (filters?.minPrice !== undefined) query = query.gte('base_rent', filters.minPrice);
     if (filters?.maxPrice !== undefined) query = query.lte('base_rent', filters.maxPrice);
 
+    // Sorting
+    const sortFieldMap: Record<string, string> = {
+      price: 'base_rent',
+      area: 'area_sqm',
+      floor: 'floor_number',
+      code: 'room_code',
+      created_at: 'created_at'
+    };
+    const sortField = sortFieldMap[filters?.sortBy || 'code'] || 'room_code';
+    query = query.order(sortField, { ascending: filters?.sortOrder !== 'desc' });
+
+    // Pagination
+    if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+      const from = (filters.page - 1) * filters.pageSize;
+      const to = from + filters.pageSize - 1;
+      query = query.range(from, to);
+    }
+
     const rows = await unwrap(query) as unknown as RoomRow[];
     return rows.map(toRoom);
   },

@@ -27,7 +27,15 @@ export interface InvoiceFilter {
   tenantId?: string;
   page?: number;
   limit?: number;
+  // Advanced filters
+  minAmount?: number;
+  maxAmount?: number;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  roomCode?: string;
+  hasViewed?: boolean;
 }
+
 
 // ---------------------------------------------------------------------------
 // Internal DB row shapes (used only inside this file via `as unknown as`)
@@ -203,93 +211,100 @@ const INVOICE_SELECT = `
 
 export const invoiceService = {
   getInvoices: async (filters: InvoiceFilter = {}): Promise<PaginatedResult<Invoice>> => {
+    const {
+      buildingId,
+      status,
+      search,
+      period,
+      tenantId,
+      page = 1,
+      limit = 10,
+      minAmount,
+      maxAmount,
+      dueDateFrom,
+      dueDateTo,
+      roomCode,
+    } = filters;
+
+    // 1. Base query (apply basic filters that work directly on `invoices` table)
     let query = supabase
       .from('invoices')
-      .select(INVOICE_SELECT, { count: 'exact' })
-      .order('created_at', { ascending: false });
+      .select(INVOICE_SELECT, { count: 'exact' });
 
-    if (filters.status) {
-      // Map frontend status → DB status; for 'Unpaid' we use in() to cover all three DB variants
-      if (filters.status === 'Unpaid') {
-        query = query.in('status', ['draft', 'pending_payment', 'partially_paid'] as DbInvoiceStatus[]);
+    if (status) {
+      if (status === 'Unpaid') {
+        query = query.in('status', ['draft', 'pending_payment', 'partially_payment'] as DbInvoiceStatus[]);
       } else {
-        query = query.eq('status', mapInvoiceStatus.toDb(filters.status) as DbInvoiceStatus);
+        query = query.eq('status', mapInvoiceStatus.toDb(status) as DbInvoiceStatus);
       }
     }
+    if (dueDateFrom) query = query.gte('due_date', dueDateFrom);
+    if (dueDateTo) query = query.lte('due_date', dueDateTo);
 
-    if (filters.period) {
-      // billing_period is stored as a date; match the YYYY-MM prefix
-      query = query.like('billing_period', `${filters.period}%`);
-    }
+    // Determine if we need to do in-memory filtering for nested relations or complex criteria
+    const isInMemoryNeeded = !!(buildingId || tenantId || search || minAmount !== undefined || maxAmount !== undefined || roomCode);
+    
+    // If we need in-memory filtering, we should fetch a larger batch 
+    // to ensure we capture enough matches for the current page.
+    const typedPage = Math.max(1, Number(page));
+    const typedLimit = Math.max(1, Number(limit));
 
-    if (filters.search) {
-      // Search against invoice_code (contracts.contract_code is not directly filterable via PostgREST text search here)
-      query = query.ilike('invoice_code', `%${filters.search}%`);
-    }
 
-    // Defaulting logic: only paginate if both are provided, otherwise return a large batch
-    const typedPage = filters.page !== undefined ? Math.max(1, Math.floor(Number(filters.page) || 1)) : undefined;
-    const typedLimit = filters.limit !== undefined ? Math.max(1, Math.floor(Number(filters.limit) || 10)) : undefined;
-
-    if (typedPage !== undefined && typedLimit !== undefined) {
+    if (!isInMemoryNeeded) {
       const from = (typedPage - 1) * typedLimit;
       const to = from + typedLimit - 1;
       query = query.range(from, to);
+    } else {
+      // Limit the "deep scan" to 1000 items for performance
+      query = query.limit(1000);
     }
 
     const { data, error, count } = await query;
     if (error) throw new Error(`Failed to fetch invoices: ${error.message}`);
     if (!data) throw new Error('Failed to fetch invoices: no data returned');
 
-    const rows = data as unknown as DbInvoiceRow[];
-    let items = rows.map(mapDbRowToInvoice);
+    let items = (data as unknown as DbInvoiceRow[]).map(mapDbRowToInvoice);
 
-    // Building filter: applied in-memory because PostgREST JS client does not
-    // support filtering on deeply nested join columns via dotted paths.
-    // INV-01 FIX: recalculate `total` after each in-memory filter so pagination
-    // doesn't show phantom pages beyond the actual filtered result size.
-    if (filters.buildingId) {
-      const numBuildingId = Number(filters.buildingId);
-      if (Number.isFinite(numBuildingId)) {
-        const targetBuildingId = String(numBuildingId);
-        items = items.filter((inv) => String(inv.buildingId) === targetBuildingId);
-      }
+    // Apply in-memory filters
+    if (isInMemoryNeeded) {
+      items = items.filter((item) => {
+        const matchesBuilding = !buildingId || String(item.buildingId) === String(buildingId);
+        const matchesTenant = !tenantId || String(item.tenantId) === String(tenantId);
+        const matchesAmountRange = 
+          (minAmount === undefined || item.totalAmount >= minAmount) &&
+          (maxAmount === undefined || item.totalAmount <= maxAmount);
+        const matchesRoom = !roomCode || item.roomCode.toLowerCase().includes(roomCode.toLowerCase());
+        
+        let matchesSearch = true;
+        if (search) {
+          const s = search.toLowerCase();
+          matchesSearch =
+            item.invoiceCode.toLowerCase().includes(s) ||
+            item.tenantName.toLowerCase().includes(s) ||
+            item.roomCode.toLowerCase().includes(s) ||
+            item.contractCode.toLowerCase().includes(s);
+        }
+
+        return matchesBuilding && matchesTenant && matchesSearch && matchesAmountRange && matchesRoom;
+      });
     }
 
-    // Tenant filter: applied in-memory for the same reason
-    if (filters.tenantId) {
-      const numTenantId = Number(filters.tenantId);
-      if (Number.isFinite(numTenantId)) {
-        const targetTenantId = String(numTenantId);
-        items = items.filter((inv) => String(inv.tenantId) === targetTenantId);
-      }
-    }
+    const filteredTotal = isInMemoryNeeded ? items.length : (count ?? 0);
 
-    // Additional in-memory search for tenant name (can't be filtered server-side via PostgREST join)
-    // The DB query already filters invoice_code via ilike; this supplements tenant name matching.
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
-      items = items.filter(
-        (inv) =>
-          inv.invoiceCode.toLowerCase().includes(s) ||
-          (inv.tenantName ?? '').toLowerCase().includes(s) ||
-          (inv.contractCode ?? '').toLowerCase().includes(s)
-      );
+    // Apply client-side pagination on the filtered results
+    if (isInMemoryNeeded) {
+      const start = (typedPage - 1) * typedLimit;
+      items = items.slice(start, start + typedLimit);
     }
-
-    // INV-01: Use item count after in-memory filtering as the source-of-truth total.
-    // If no in-memory filter was applied the DB count is still accurate.
-    const filteredTotal = (filters.buildingId || filters.tenantId || filters.search)
-      ? items.length
-      : (count ?? 0);
 
     return {
       items,
       total: filteredTotal,
-      page: typedPage ?? 1,
-      limit: typedLimit ?? filteredTotal,
+      page: typedPage,
+      limit: typedLimit,
     };
   },
+
 
   getInvoiceCounts: async (): Promise<Record<InvoiceStatus | 'All', number>> => {
     const rows = await unwrap(

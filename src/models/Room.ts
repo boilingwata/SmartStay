@@ -127,6 +127,10 @@ export interface RoomFilters {
   minPrice?: number;
   maxPrice?: number;
   hasMeter?: boolean;
+  sortBy?: 'price' | 'area' | 'floor' | 'code' | 'created_at';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CreateRoomData {

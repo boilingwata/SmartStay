@@ -8,12 +8,11 @@ import {
   Edit2, Trash2, X, ArrowRight, UserCheck
 } from 'lucide-react';
 import { ticketService } from '@/services/ticketService';
-import { userService } from '@/services/userService';
 import { Ticket, TicketComment, TicketStatus, TicketPriority } from '@/models/Ticket';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { cn, formatVND } from '@/utils';
+import { cn } from '@/utils';
 import { format, parseISO, differenceInMinutes, formatDistanceToNow, isAfter, subDays } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { vi } from 'date-fns/locale/vi';
 import { toast } from 'sonner';
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
@@ -66,7 +65,7 @@ const TicketDetail = () => {
   // B40 FIX: staff list for assignment dropdown
   const { data: staffList } = useQuery({
     queryKey: ['staff-list'],
-    queryFn: () => userService.getUsers({ role: 'Staff', isActive: true }),
+    queryFn: () => ticketService.getStaff(),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -108,7 +107,7 @@ const TicketDetail = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      {/* 4.2.1 Header & Breadcrumb */}
+      {/* Header & Breadcrumb */}
       <div className="flex items-center justify-between">
         <button 
           onClick={() => navigate('/admin/tickets')}
@@ -117,19 +116,18 @@ const TicketDetail = () => {
           <div className="p-2 group-hover:bg-primary/5 rounded-xl transition-all">
              <ArrowLeft size={18} />
           </div>
-          <span className="text-small font-bold">Back to Command Center</span>
+          <span className="text-small font-bold">Quay lại danh sách</span>
         </button>
         
         <div className="flex items-center gap-3">
-           <button className="btn-outline px-4 h-10 border-border/30 hover:bg-white"><Copy size={16} /> Export PDF</button>
+           <button className="btn-outline px-4 h-10 border-border/30 hover:bg-white"><Copy size={16} /> Xuất PDF</button>
            <button className="p-2 hover:bg-bg rounded-xl transition-all"><MoreVertical size={20} /></button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-        {/* 4.2.2 Left: Ticket Info & Comments (65%) */}
+        {/* Left Area (65%) */}
         <div className="lg:col-span-8 space-y-10">
-           {/* Ticket Main Card */}
            <div className="card-container p-10 relative overflow-hidden group">
               <div className="relative z-10 flex flex-col gap-8">
                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
@@ -152,7 +150,7 @@ const TicketDetail = () => {
                     
                     <div className="flex flex-col items-end gap-3 shrink-0">
                        <div className="text-right">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">Created At</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">Ngày tạo</p>
                           <p className="text-small font-bold text-primary">{format(parseISO(ticket.createdAt), 'dd/MM/yyyy HH:mm')}</p>
                        </div>
                     </div>
@@ -168,13 +166,12 @@ const TicketDetail = () => {
                     </div>
                  </div>
 
-                 {/* Reporter & Location */}
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="card-container p-6 bg-white shadow-sm border-border/10 hover:shadow-md transition-all">
                        <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
                           <User size={12} /> Người báo cáo
                        </p>
-                       <Link to={`/tenants/${ticket.tenantId}`} className="flex items-center gap-3 group">
+                       <Link to={`/admin/tenants/${ticket.tenantId}`} className="flex items-center gap-3 group">
                           <img src={ticket.tenantAvatar || 'https://i.pravatar.cc/150'} className="w-10 h-10 rounded-2xl object-cover border-2 border-white shadow-md" alt="" />
                           <div>
                              <p className="text-small font-black text-primary group-hover:underline">{ticket.tenantName}</p>
@@ -187,7 +184,7 @@ const TicketDetail = () => {
                        <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
                           <Home size={12} /> Vị trí
                        </p>
-                       <Link to={`/rooms/${ticket.roomId}`} className="block group">
+                       <Link to={`/admin/rooms/${ticket.roomId}`} className="block group">
                           <p className="text-small font-black text-primary group-hover:underline">Phòng {ticket.roomCode}</p>
                           <p className="text-[10px] text-muted font-bold truncate">{ticket.buildingName}</p>
                        </Link>
@@ -195,11 +192,11 @@ const TicketDetail = () => {
 
                     <div className="card-container p-6 bg-white shadow-sm border-border/10">
                        <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
-                          <Clock size={12} /> SLA Deadline
+                          <Clock size={12} /> Thời hạn SLA
                        </p>
                        <p className={cn(
-                         "text-small font-black",
-                         isAfter(new Date(), parseISO(ticket.slaDeadline)) ? "text-danger" : "text-warning"
+                          "text-small font-black",
+                          isAfter(new Date(), parseISO(ticket.slaDeadline)) ? "text-danger" : "text-warning"
                        )}>
                           {format(parseISO(ticket.slaDeadline), 'dd/MM/yyyy HH:mm')}
                        </p>
@@ -212,7 +209,6 @@ const TicketDetail = () => {
               <AlertCircle size={200} className="absolute -top-20 -right-20 text-primary/5 rotate-12" />
            </div>
 
-           {/* 4.2.4 Comments Thread */}
            <div className="space-y-8">
               <div className="flex items-center justify-between">
                  <h3 className="text-h3 text-primary font-black uppercase tracking-widest flex items-center gap-3">
@@ -221,7 +217,6 @@ const TicketDetail = () => {
                  </h3>
               </div>
 
-              {/* New Comment Box */}
               <div className="card-container p-6 bg-white shadow-xl shadow-primary/5 border-primary/10">
                  <textarea 
                    className="w-full bg-bg/20 rounded-2xl p-6 text-body font-medium placeholder:text-muted outline-none focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all min-h-[120px]"
@@ -264,7 +259,6 @@ const TicketDetail = () => {
                  </div>
               </div>
 
-              {/* Comments List */}
               <div className="space-y-6 relative">
                  <div className="absolute left-8 top-0 bottom-0 w-1 bg-border/10 -z-10" />
                  {comments?.map((comment) => (
@@ -294,12 +288,6 @@ const TicketDetail = () => {
                           <div className="card-container p-6 bg-white shadow-sm border-border/5 text-body font-medium text-primary">
                              {comment.content}
                           </div>
-                          {canEditComment(comment.createdAt) && (
-                             <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-muted/60 pl-2">
-                                <button className="hover:text-primary transition-colors flex items-center gap-1"><Edit2 size={12} /> Sửa</button>
-                                <button className="hover:text-danger transition-colors flex items-center gap-1"><Trash2 size={12} /> Xóa</button>
-                             </div>
-                          )}
                        </div>
                     </div>
                  ))}
@@ -307,9 +295,8 @@ const TicketDetail = () => {
            </div>
         </div>
 
-        {/* 4.2.3 Right: Status & Assignment (35%) */}
+        {/* Right Area (35%) */}
         <div className="lg:col-span-4 space-y-8 sticky top-32">
-           {/* Status Card */}
            <div className="card-container p-8 space-y-8 shadow-2xl shadow-primary/5">
               <div className="space-y-4">
                  <p className="text-[11px] font-black uppercase tracking-[3px] text-muted">Trạng thái ticket</p>
@@ -323,7 +310,6 @@ const TicketDetail = () => {
                     <p className="text-[11px] font-black uppercase tracking-[3px] text-muted">Người xử lý</p>
                     <UserCheck size={14} className="text-muted/40" />
                   </div>
-                  {/* B40: Assignment dropdown */}
                   <select
                     className="input-base w-full text-small font-bold"
                     value={ticket.assignedToId ?? ''}
@@ -332,7 +318,7 @@ const TicketDetail = () => {
                   >
                     <option value="">-- Chưa phân công --</option>
                     {staffList?.map((s) => (
-                      <option key={s.id} value={s.id}>{s.fullName}</option>
+                      <option key={s.id} value={s.id}>{s.fullName} ({s.role})</option>
                     ))}
                   </select>
                   {ticket.assignedToName && (
@@ -340,13 +326,12 @@ const TicketDetail = () => {
                       <img src={ticket.assignedToAvatar || 'https://i.pravatar.cc/150'} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow" alt="" />
                       <div>
                         <p className="text-small font-black text-primary">{ticket.assignedToName}</p>
-                        <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Đang xử lý</p>
+                        <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Đang hoạt động</p>
                       </div>
                     </div>
                   )}
                </div>
 
-              {/* 4.2.3 Status Transitions */}
               <div className="space-y-3 pt-6 border-t border-border/10">
                  {ticket.status === 'Open' && (
                     <button 
@@ -384,25 +369,17 @@ const TicketDetail = () => {
               </div>
            </div>
 
-           {/* Assignment/Status History */}
            <div className="card-container p-8 space-y-6">
               <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[3px] text-muted">
-                 <History size={16} /> Lịch sử thay đổi
+                 <History size={16} /> Lịch sử thay đổi (Mới nhất)
               </div>
               <div className="space-y-8 relative">
                  <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-border/20" />
                  <div className="flex gap-4 relative z-10 animate-in slide-in-from-right-4">
                     <div className="w-4 h-4 bg-primary rounded-full mt-1 shrink-0 border-4 border-white shadow-md shadow-primary/20" />
                     <div>
-                        <p className="text-[11px] font-bold text-primary">Phạm Quản Lý đã tạo ticket mới</p>
-                        <p className="text-[10px] text-muted font-medium mt-1">{format(subDays(new Date(), 2), 'HH:mm dd/MM/yyyy')}</p>
-                    </div>
-                 </div>
-                 <div className="flex gap-4 relative z-10 animate-in slide-in-from-right-4 duration-700">
-                    <div className="w-4 h-4 bg-primary rounded-full mt-1 shrink-0 border-4 border-white shadow-md shadow-primary/20" />
-                    <div>
-                        <p className="text-[11px] font-bold text-primary">Tự động tính SLA Deadline: 2 giờ</p>
-                        <p className="text-[10px] text-muted font-medium mt-1">{format(subDays(new Date(), 2), 'HH:mm dd/MM/yyyy')}</p>
+                        <p className="text-[11px] font-bold text-primary">Báo cáo mới được khởi tạo</p>
+                        <p className="text-[10px] text-muted font-medium mt-1">{format(parseISO(ticket.createdAt), 'HH:mm dd/MM/yyyy')}</p>
                     </div>
                  </div>
               </div>
@@ -410,7 +387,6 @@ const TicketDetail = () => {
         </div>
       </div>
 
-      {/* Resolution/Cancellation Modal */}
       {showStatusModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setShowStatusModal(false)} />

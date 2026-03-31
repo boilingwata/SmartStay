@@ -49,8 +49,8 @@ export const Select = ({
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} className={cn("space-y-2 w-full relative", className)}>
-      {label && <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">{label}</label>}
+    <div ref={containerRef} className={cn("space-y-2.5 w-full relative", className)}>
+      {label && <label className="text-[11px] text-slate-500 font-black uppercase tracking-[2px] ml-1">{label}</label>}
       
       <div className="relative">
         <button
@@ -58,18 +58,19 @@ export const Select = ({
           disabled={disabled}
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "input-base h-14 flex items-center justify-between transition-all w-full",
-            isOpen && "border-blue-700/40 ring-4 ring-blue-900/5 shadow-xl shadow-blue-900/5",
-            disabled && "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed shadow-none"
+            "h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-2xl flex items-center justify-between transition-all w-full font-bold text-slate-900",
+            "hover:bg-white hover:border-primary/30 active:scale-[0.99]",
+            isOpen && "bg-white border-primary shadow-xl shadow-primary/10 ring-4 ring-primary/5",
+            disabled && "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed shadow-none active:scale-100"
           )}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            {Icon && <Icon size={18} className="text-muted shrink-0" />}
-            <span className={cn("text-[14px] font-bold truncate", !selectedOption && "text-slate-300")}>
+            {Icon && <Icon size={18} className={cn("shrink-0", isOpen ? "text-primary/70" : "text-slate-400")} />}
+            <span className={cn("text-[14px] font-bold truncate", !selectedOption && "text-slate-400 font-medium italic")}>
               {selectedOption ? selectedOption.label : placeholder}
             </span>
           </div>
-          <ChevronDown size={18} className={cn("text-muted transition-transform duration-300", isOpen && "rotate-180")} />
+          <ChevronDown size={18} className={cn("transition-transform duration-500", isOpen ? "rotate-180 text-primary" : "text-slate-400")} />
         </button>
 
         {isOpen && (

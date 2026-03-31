@@ -10,8 +10,10 @@ import {
 import { cn } from '@/utils';
 import { Owner } from '@/models/Owner';
 import { buildingService } from '@/services/buildingService';
+import { fileService } from '@/services/fileService';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/Feedback';
 
 interface OwnerModalProps {
   isOpen: boolean;
@@ -22,7 +24,10 @@ interface OwnerModalProps {
 }
 
 export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmitting }: OwnerModalProps) => {
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
     defaultValues: initialData || {
       fullName: '',
       phone: '',
@@ -34,7 +39,25 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
     }
   });
 
+  const avatarUrl = watch('avatarUrl');
+
   if (!isOpen) return null;
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const url = await fileService.uploadFile(file);
+      setValue('avatarUrl', url);
+      toast.success('Tải ảnh lên thành công!');
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi khi tải ảnh lên');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 overflow-y-auto">
@@ -48,11 +71,11 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                  <User size={40} className="group-hover:scale-110 transition-transform duration-500" />
               </div>
               <div>
-                <h2 className="text-[40px] font-black leading-tight tracking-tighter mb-4">
+                <h2 className="text-[40px] font-black leading-tight tracking-tighter mb-4 font-tnr">
                   {initialData ? 'Cập nhật' : 'Thêm mới'} <br/>
                   <span className="text-secondary italic">Chủ sở hữu</span>
                 </h2>
-                <p className="text-small text-white/50 font-medium leading-relaxed">
+                <p className="text-small text-white/50 font-medium leading-relaxed font-tnr">
                   Thiết lập hồ sơ định danh cho cư dân, nhà đầu tư hoặc đơn vị vận hành.
                 </p>
               </div>
@@ -61,9 +84,9 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
            <div className="relative z-10 p-8 bg-white/5 rounded-[40px] border border-white/10 backdrop-blur-lg">
               <div className="flex items-center gap-3 mb-4">
                  <div className="w-1.5 h-6 bg-secondary rounded-full"></div>
-                 <p className="text-[10px] font-black uppercase tracking-[3px] text-white/40">Bảo mật dữ liệu</p>
+                 <p className="text-[10px] font-black uppercase tracking-[3px] text-white/40 font-tnr">Bảo mật dữ liệu</p>
               </div>
-              <p className="text-[11px] italic text-white/70 leading-relaxed font-medium">
+              <p className="text-[11px] italic text-white/70 leading-relaxed font-medium font-tnr">
                 "Thông tin PII như CCCD và số điện thoại sẽ được mã hóa và phân quyền truy cập nghiêm ngặt."
               </p>
            </div>
@@ -75,15 +98,15 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
         <div className="flex-1 p-8 md:p-14 overflow-y-auto custom-scrollbar bg-slate-50/30">
            <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
               <section className="space-y-8">
-                <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                   <ShieldCheck size={18} className="text-primary" />
-                   <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Thông tin định danh</h3>
-                </div>
+                 <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <ShieldCheck size={18} className="text-primary" />
+                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest font-tnr">Thông tin định danh</h3>
+                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Full Name */}
                   <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Họ và tên <span className="text-danger">*</span></label>
+                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Họ và tên <span className="text-danger">*</span></label>
                     <div className="relative group">
                        <User size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
                        <input 
@@ -97,7 +120,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
 
                   {/* CCCD / Passport */}
                   <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Số CCCD / Passport <span className="text-danger">*</span></label>
+                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Số CCCD / Passport <span className="text-danger">*</span></label>
                     <div className="relative group">
                        <Fingerprint size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
                        <input 
@@ -111,7 +134,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
 
                   {/* Phone */}
                   <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Số điện thoại <span className="text-danger">*</span></label>
+                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Số điện thoại <span className="text-danger">*</span></label>
                     <div className="relative group">
                        <Phone size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
                        <input 
@@ -125,7 +148,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
 
                   {/* Email */}
                   <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Địa chỉ Email</label>
+                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Địa chỉ Email</label>
                     <div className="relative group">
                        <Mail size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
                        <input 
@@ -139,15 +162,15 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
               </section>
 
               <section className="space-y-8">
-                <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                   <MapPin size={18} className="text-secondary" />
-                   <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Địa chỉ & Pháp lý</h3>
-                </div>
+                 <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <MapPin size={18} className="text-secondary" />
+                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest font-tnr">Địa chỉ & Pháp lý</h3>
+                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                    {/* Tax Code */}
                    <div className="space-y-3">
-                      <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Mã số thuế</label>
+                      <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Mã số thuế</label>
                       <div className="relative group">
                          <Tag size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-secondary transition-colors" />
                          <input 
@@ -160,7 +183,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
 
                    {/* Address */}
                    <div className="space-y-3">
-                      <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Địa chỉ thường trú</label>
+                      <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1 font-tnr">Địa chỉ thường trú</label>
                       <div className="relative group">
                          <MapPin size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-secondary transition-colors" />
                          <input 
@@ -174,18 +197,40 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
               </section>
 
               <section className="space-y-8">
-                 <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                    <Camera size={18} className="text-accent" />
-                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Ảnh đại diện</h3>
-                 </div>
+                  <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+                     <Camera size={18} className="text-accent" />
+                     <h3 className="text-h3 text-primary font-black uppercase tracking-widest font-tnr">Ảnh đại diện</h3>
+                  </div>
                  
-                 <div className="flex items-center gap-8 bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
-                    <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-primary/10 shadow-lg shrink-0">
-                       <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" className="w-full h-full object-cover grayscale opacity-50" />
+                 <div className="flex items-center gap-8 bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-primary/10 shadow-lg shrink-0 relative bg-slate-50">
+                       <img 
+                          src={avatarUrl || "https://cdn-icons-png.flaticon.com/512/149/149071.png"} 
+                          className={cn("w-full h-full object-cover transition-all duration-700", isUploading && "opacity-30 blur-[2px]")} 
+                       />
+                       {isUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                             <Spinner size="sm" />
+                          </div>
+                       )}
                     </div>
                     <div className="space-y-2">
-                       <button type="button" className="btn-outline h-10 px-6 text-[11px] font-black uppercase tracking-wider">Tải ảnh lên</button>
-                       <p className="text-[10px] text-muted italic font-medium">Hỗ trợ JPG, PNG. Dung lượng tối đa 2MB.</p>
+                       <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          onChange={handleFileChange} 
+                          accept="image/*" 
+                          className="hidden" 
+                       />
+                       <button 
+                          type="button" 
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                          className="btn-outline h-10 px-6 text-[11px] font-black uppercase tracking-wider font-tnr disabled:opacity-50"
+                       >
+                          {isUploading ? 'Đang tải...' : 'Tải ảnh lên'}
+                       </button>
+                       <p className="text-[10px] text-muted italic font-medium font-tnr">Hỗ trợ JPG, PNG. Dung lượng tối đa 2MB.</p>
                     </div>
                  </div>
               </section>
@@ -194,19 +239,19 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
               <div className="pt-10 flex items-center justify-between border-t border-slate-200">
                  <div className="flex items-center gap-3 text-muted">
                     <ShieldAlert size={16} />
-                    <p className="text-[11px] font-medium italic">Vui lòng kiểm tra kỹ thông tin định danh trước khi lưu.</p>
+                    <p className="text-[11px] font-medium italic font-tnr">Vui lòng kiểm tra kỹ thông tin định danh trước khi lưu.</p>
                  </div>
                  <div className="flex gap-4">
                     <button 
                        type="button" 
                        onClick={onClose} 
-                       className="px-10 h-14 rounded-2xl font-black uppercase tracking-[2px] text-[11px] text-muted hover:bg-white transition-all border border-transparent hover:border-slate-200"
+                       className="px-10 h-14 rounded-2xl font-black uppercase tracking-[2px] text-[11px] text-muted hover:bg-white transition-all border border-transparent hover:border-slate-200 font-tnr"
                     >
                        Hủy bỏ
                     </button>
                     <button 
                        type="submit" 
-                       className="group px-14 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-[3px] text-[11px] shadow-2xl shadow-primary/30 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-3"
+                       className="group px-14 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-[3px] text-[11px] shadow-2xl shadow-primary/30 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-3 font-tnr"
                        disabled={isSubmitting}
                     >
                        {isSubmitting ? 'Đang lưu...' : (

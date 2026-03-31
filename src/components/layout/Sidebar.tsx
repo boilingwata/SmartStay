@@ -57,6 +57,7 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
     groupKey: "sidebar.operations",
     items: [
       { labelKey: "sidebar.allTickets", route: "/admin/tickets", icon: AlertCircle, permission: "ticket.view.all" },
+      { labelKey: "sidebar.meters", route: "/admin/meters", icon: Gauge, permission: "meter.view" },
       { labelKey: "sidebar.meterEntry", route: "/admin/meters/bulk", icon: Gauge, permission: "meter.entry" },
       { labelKey: "sidebar.visitorCheckin", route: "/admin/staff/visitor-checkin", icon: UserPlus, permission: "visitor.checkin" },
       { labelKey: "sidebar.amenityCheckin", route: "/admin/staff/amenity-checkin", icon: Waves, permission: "amenity.checkin" },

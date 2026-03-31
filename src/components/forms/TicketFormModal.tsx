@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { 
-  X, AlertCircle, Building, Home, User, 
+  X, Building, Home, User, 
   Type, Flag, Calendar, Clipboard, Send,
-  Upload, Paperclip, Clock
+  Upload, Clock, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/utils';
-import { TicketType, TicketPriority } from '@/models/Ticket';
+import { TicketType, TicketPriority, TicketStatus } from '@/models/Ticket';
 import { SelectAsync } from '@/components/ui/SelectAsync';
 import { buildingService } from '@/services/buildingService';
 import { roomService } from '@/services/roomService';
 import { tenantService } from '@/services/tenantService';
+import { ticketService } from '@/services/ticketService';
 import { toast } from 'sonner';
+
+// Safe Font Stack for Vietnamese
+const SAFE_FONT = { fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
 
 type TicketFormData = {
   buildingId: string;
@@ -23,6 +28,7 @@ type TicketFormData = {
   description: string;
   assignedToId?: string;
   slaDeadline?: string;
+  status?: TicketStatus;
 };
 
 interface TicketModalProps {
@@ -35,15 +41,20 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
   const { register, handleSubmit, watch, setValue, control, formState: { errors } } = useForm<TicketFormData>({
     defaultValues: {
       type: 'Maintenance',
-      priority: 'Medium'
+      priority: 'Medium',
+      status: 'Open'
     }
+  });
+
+  const { data: staffList } = useQuery({
+    queryKey: ['staff-list'],
+    queryFn: () => ticketService.getStaff(),
+    enabled: isOpen
   });
 
   const selectedType = watch('type');
   const selectedBuilding = watch('buildingId');
-  const selectedRoom = watch('roomId');
 
-  // 4.3 Emergency auto-priority (Vibecoding Checklist #3)
   useEffect(() => {
     if (selectedType === 'Emergency') {
       setValue('priority', 'Critical');
@@ -53,37 +64,30 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md" onClick={onClose} />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300" style={SAFE_FONT}>
+      {/* Background Overlay */}
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative w-full max-w-5xl bg-white rounded-[44px] shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[95vh] animate-in zoom-in-95 duration-500">
-        {/* Decorative Sidebar */}
-        <div className="md:w-[35%] bg-primary p-12 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
-           <div className="relative z-10 space-y-8">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
-                 <AlertCircle size={32} />
+      {/* Modal Container (Simplified) */}
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+           <div className="flex items-center gap-3 text-primary">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                 <Clipboard size={20} />
               </div>
-              <div>
-                 <h2 className="text-[40px] font-black leading-tight tracking-tighter mb-4">Mở Ticket Mới</h2>
-                 <p className="text-small text-white/60 font-medium leading-relaxed">Ghi nhận sự cố hoặc yêu cầu dịch vụ từ cư dân. Đảm bảo phân loại đúng để kích hoạt SLA tự động.</p>
-              </div>
+              <h2 className="text-xl font-bold tracking-tight">Tạo yêu cầu mới</h2>
            </div>
-           
-           <div className="relative z-10 p-6 bg-white/10 rounded-3xl border border-white/20 backdrop-blur-md transition-all hover:bg-white/15">
-              <p className="text-[10px] font-black uppercase tracking-[3px] text-slate-300 mb-2">Vibecoding Hint</p>
-              <p className="text-[11px] italic text-white/80 font-medium">"Hệ thống sẽ tự động đặt độ ưu tiên cao nhất cho các yêu cầu KHẨN CẤP."</p>
-           </div>
-
-           <AlertCircle size={350} className="absolute -bottom-20 -left-20 text-white/5 rotate-12" />
+           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl transition-all text-slate-400">
+              <X size={20} />
+           </button>
         </div>
 
-        {/* Form Area */}
-        <div className="flex-1 p-8 md:p-12 overflow-y-auto custom-scrollbar bg-bg/5">
-           <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-              {/* Building & Room Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Tòa nhà *</label>
+        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Location Group */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Tòa nhà *</label>
                     <Controller 
                       name="buildingId"
                       control={control}
@@ -92,7 +96,7 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                          <SelectAsync 
                            placeholder="Chọn tòa nhà..."
                            icon={Building}
-                           className={errors.buildingId ? "border-danger" : ""}
+                           className={errors.buildingId ? "border-red-500" : ""}
                            value={field.value}
                            onChange={field.onChange}
                             loadOptions={async (search) => {
@@ -104,8 +108,8 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                     />
                  </div>
 
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Phòng (Tùy chọn)</label>
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Phòng (Tùy chọn)</label>
                     <Controller 
                       name="roomId"
                       control={control}
@@ -129,63 +133,63 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                  </div>
               </div>
 
-              {/* Type & Priority Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Loại yêu cầu *</label>
-                    <div className="relative group">
-                       <Type size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted transition-colors group-focus-within:text-primary" />
+              {/* Classification Group */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Loại yêu cầu *</label>
+                    <div className="relative">
+                       <Type size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                        <select 
                          {...register('type')}
-                         className="input-base pl-12 h-14 bg-white"
+                         className="w-full h-12 pl-12 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-primary transition-all font-bold text-sm"
                        >
                           <option value="Maintenance">Sửa chữa / Bảo trì</option>
-                          <option value="Complaint">Khiêu nại / Phản ánh</option>
+                          <option value="Complaint">Khiếu nại / Phản ánh</option>
                           <option value="ServiceRequest">Yêu cầu dịch vụ</option>
                           <option value="Inquiry">Yêu cầu thông tin</option>
-                          <option value="Emergency">Trường hợp KHẨN CẤP</option>
+                          <option value="Emergency">Khẩn cấp !!!</option>
                        </select>
                     </div>
                  </div>
 
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Mức độ ưu tiên *</label>
-                    <div className="relative group">
-                       <Flag size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted transition-colors group-focus-within:text-primary" />
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Độ ưu tiên *</label>
+                    <div className="relative">
+                       <Flag size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                        <select 
                          {...register('priority')}
                          className={cn(
-                           "input-base pl-12 h-14 font-black uppercase tracking-widest text-[11px] bg-white",
-                           selectedType === 'Emergency' && "bg-danger/5 border-danger text-danger pointer-events-none"
+                           "w-full h-12 pl-12 bg-slate-50 border border-slate-200 rounded-xl outline-none transition-all font-bold text-sm",
+                           selectedType === 'Emergency' && "bg-red-50 border-red-200 text-red-600 pointer-events-none"
                          )}
                          disabled={selectedType === 'Emergency'}
                        >
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                          <option value="Critical">Critical</option>
+                          <option value="Low">Thấp (Low)</option>
+                          <option value="Medium">Trung bình (Medium)</option>
+                          <option value="High">Cao (High)</option>
+                          <option value="Critical">Khẩn cấp (Critical)</option>
                        </select>
                     </div>
                  </div>
               </div>
 
-              {/* Title & Reporter Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Báo cáo bởi cư dân</label>
+              {/* Assignment & Reporter Group */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Cư dân yêu cầu</label>
                     <Controller 
                       name="tenantId"
                       control={control}
                       render={({ field }) => (
                          <SelectAsync 
-                           placeholder="Tìm tên cư dân..."
+                           placeholder="Chọn cư dân..."
                            icon={User}
                            value={field.value}
                            onChange={field.onChange}
                             loadOptions={async (search) => {
                                const tenants = await tenantService.getTenants({ search });
                                return tenants.map(t => ({ 
-                                 label: `${t.fullName} (${t.currentRoomCode || 'Không phòng'})`, 
+                                 label: `${t.fullName} (${t.currentRoomCode || 'N/A'})`, 
                                  value: String(t.id) 
                                }));
                             }}
@@ -194,8 +198,8 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                     />
                  </div>
 
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Nhân viên phụ trách</label>
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Nhân viên xử lý</label>
                     <Controller 
                       name="assignedToId"
                       control={control}
@@ -205,96 +209,81 @@ export const TicketFormModal = ({ isOpen, onClose, onSubmit }: TicketModalProps)
                            icon={ShieldCheck}
                            value={field.value}
                            onChange={field.onChange}
-                           loadOptions={async () => [
-                              { label: 'Lê Kỹ Thuật (Phòng KT)', value: 'S1' },
-                              { label: 'Phạm Quản Lý (Admin)', value: 'S2' }
-                           ]}
+                           loadOptions={async (search) => {
+                              const list = staffList || await ticketService.getStaff();
+                              const filtered = search 
+                                ? list.filter(s => s.fullName.toLowerCase().includes(search.toLowerCase()))
+                                : list;
+                              return filtered.map(s => ({ label: `${s.fullName} (${s.role})`, value: s.id }));
+                           }}
                          />
                       )}
                     />
                  </div>
               </div>
 
-              {/* Title Input */}
-              <div className="space-y-3">
-                 <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Tiêu đề ngắn gọn *</label>
-                 <div className="relative group">
-                    <Clipboard size={18} className="absolute left-4 top-4 text-muted group-focus-within:text-primary" />
-                    <input 
-                      {...register('title', { 
-                        required: 'Vui lòng nhập tiêu đề',
-                        minLength: { value: 5, message: 'Tiêu đề quá ngắn' }
-                      })}
-                      className={cn("input-base pl-12 h-14 bg-white", errors.title && "border-danger bg-danger/5")}
-                      placeholder="Ví dụ: Thang máy block A kêu to, Hỏng vòi nước P.101..."
-                    />
-                 </div>
-                 {errors.title && <p className="text-[10px] text-danger font-black uppercase tracking-widest">{errors.title.message}</p>}
+              {/* Content Group */}
+              <div className="space-y-2">
+                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Tiêu đề *</label>
+                 <input 
+                   {...register('title', { required: 'Vui lòng nhập tiêu đề' })}
+                   className="w-full h-12 px-6 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-primary transition-all font-bold text-sm"
+                   placeholder="Nhập tiêu đề ngắn gọn..."
+                 />
+                 {errors.title && <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest mt-1">{errors.title.message}</p>}
               </div>
 
-              {/* Description Input */}
-              <div className="space-y-3">
-                 <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Mô tả chi tiết</label>
+              <div className="space-y-2">
+                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Mô tả chi tiết</label>
                  <textarea 
                     {...register('description')}
-                    className="input-base p-6 bg-white min-h-[120px] leading-relaxed font-medium"
-                    placeholder="Mô tả sự cố, thời gian phát hiện, vị trí chính xác..."
+                    className="w-full p-6 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-primary transition-all min-h-[100px] text-sm font-medium"
+                    placeholder="Mô tả cụ thể vấn đề hoặc yêu cầu..."
                  />
               </div>
 
-              {/* Files Upload Placeholder */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">SLA Deadline (Bỏ trống để tự động)</label>
-                    <div className="relative group">
-                       <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Hạn xử lý (SLA)</label>
+                    <div className="relative">
+                       <Clock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                        <input 
                          type="datetime-local" 
                          {...register('slaDeadline')}
-                         className="input-base pl-12 h-14 bg-white"
+                         className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-bold"
                        />
                     </div>
                  </div>
 
-                 <div className="space-y-3">
-                    <label className="text-[11px] text-muted font-black uppercase tracking-[2px]">Hình ảnh / File đính kèm</label>
-                    <div className="p-4 border-2 border-dashed border-border/30 rounded-3xl bg-white/40 flex items-center gap-4 cursor-pointer hover:border-primary/40 transition-all group">
-                       <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                          <Upload size={18} />
-                       </div>
-                       <div>
-                          <p className="text-[11px] font-black uppercase text-primary">Tải lên tài liệu</p>
-                          <p className="text-[9px] text-muted font-bold">Tối đa 5 files (JPG, PNG, PDF)</p>
-                       </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Ảnh đính kèm</label>
+                    <div className="h-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3 px-4 cursor-pointer hover:border-primary/40 group transition-all">
+                       <Upload size={16} className="text-slate-400 group-hover:text-primary" />
+                       <span className="text-[11px] font-bold text-slate-400 group-hover:text-primary italic">Chọn file/ảnh...</span>
                     </div>
                  </div>
-              </div>
-
-              {/* Form Actions */}
-              <div className="pt-8 flex justify-end gap-4 border-t border-border/10">
-                 <button 
-                   type="button" 
-                   onClick={onClose} 
-                   className="px-8 h-12 text-[11px] font-black uppercase tracking-[2px] text-muted hover:text-primary transition-all"
-                 >
-                    Hủy bỏ
-                 </button>
-                 <button 
-                   type="submit" 
-                   className="btn-primary pl-10 pr-10 h-14 rounded-[32px] flex items-center gap-3 shadow-2xl shadow-primary/20 active:scale-95 transition-all"
-                 >
-                    <span className="text-[13px] font-black uppercase tracking-[3px]">Tạo Ticket</span>
-                    <Send size={20} />
-                 </button>
               </div>
            </form>
         </div>
 
-        <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-bg rounded-2xl text-muted transition-all"><X size={24} /></button>
+        {/* Actions */}
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+           <button 
+             type="button" 
+             onClick={onClose} 
+             className="px-6 h-12 text-sm font-bold text-slate-600 hover:text-slate-900 transition-all"
+           >
+              Hủy
+           </button>
+           <button 
+             onClick={handleSubmit(onSubmit)}
+             className="px-10 h-12 bg-primary text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-primary/10 hover:bg-primary-hover active:scale-95 transition-all"
+           >
+              <span>Lưu Vé Hỗ Trợ</span>
+              <Send size={18} />
+           </button>
+        </div>
       </div>
     </div>
   );
 };
-
-// Mock ShieldCheck since it might not be in lucide version
-const ShieldCheck = ({ size, className }: any) => <Clipboard size={size} className={className} />;

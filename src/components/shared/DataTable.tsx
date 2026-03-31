@@ -18,12 +18,13 @@ import {
 } from 'lucide-react';
 
 export interface RowAction<T> {
-  label?: string;
+  label?: string | ((row: T) => string);
   onClick?: (row: T) => void;
   icon?: React.ReactNode;
   variant?: 'default' | 'danger';
   type?: 'action' | 'divider';
 }
+
 
 const ActionDropdown = <T,>({ actions, row }: { actions: RowAction<T>[]; row: T }) => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -62,8 +63,9 @@ const ActionDropdown = <T,>({ actions, row }: { actions: RowAction<T>[]; row: T 
                     )}
                   >
                     {action.icon && <span className="opacity-70">{action.icon}</span>}
-                    {action.label}
+                    {typeof action.label === 'function' ? action.label(row) : action.label}
                   </button>
+
                 );
               })}
             </div>

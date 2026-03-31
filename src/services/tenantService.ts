@@ -38,6 +38,7 @@ interface DbContractTenantJoined {
     rooms: {
       id: number;
       room_code: string;
+      building_id: number;
     } | null;
   } | null;
 }
@@ -110,7 +111,7 @@ export const tenantService = {
     const contractLinks = await unwrap(
       supabase
         .from('contract_tenants')
-        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code))')
+        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code, building_id))')
     ) as unknown as DbContractTenantJoined[];
 
     // Build a lookup: tenantId → list of contract links
@@ -124,12 +125,20 @@ export const tenantService = {
     const summaries: TenantSummary[] = tenants.map((t) => {
       const links = linksByTenant.get(t.id) ?? [];
 
-      // An active contract is one with status='active' and not deleted
-      const activeLink = links.find(
-        (l) => l.contracts?.status === 'active' && !l.contracts?.is_deleted
-      );
+      const getScore = (status: string | null | undefined): number => {
+        if (status === 'active') return 3;
+        if (status === 'draft' || status === 'pending_signature') return 2;
+        if (status === 'expired' || status === 'terminated') return 1;
+        return 0;
+      };
 
-      const hasActiveContract = !!activeLink;
+      // Find the most relevant contract link:
+      // Priority: active > draft/pending_signature > everything else
+      const activeLink = [...links].sort((a, b) => {
+        return getScore(b.contracts?.status) - getScore(a.contracts?.status);
+      })[0];
+
+      const hasActiveContract = activeLink?.contracts?.status === 'active';
       const status = deriveTenantStatus(hasActiveContract);
       const onboardingPercent = computeOnboardingPercent(t as DbTenantRow, hasActiveContract);
 
@@ -144,9 +153,12 @@ export const tenantService = {
           ? String(activeLink.contracts.room_id)
           : undefined,
         currentRoomCode: activeLink?.contracts?.rooms?.room_code ?? undefined,
+        currentBuildingId: activeLink?.contracts?.rooms?.building_id != null 
+          ? String(activeLink.contracts.rooms.building_id) 
+          : undefined,
         avatarUrl: undefined,
-        onboardingPercent,
-        hasActiveContract,
+        onboardingPercent: onboardingPercent,
+        hasActiveContract: hasActiveContract,
         isRepresentative: activeLink?.is_primary ?? false,
       };
 
@@ -156,7 +168,7 @@ export const tenantService = {
     // Apply filters
     let result = summaries;
 
-    if (filters?.status && filters.status !== 'All') {
+    if (filters?.status && filters.status !== 'All' && (Array.isArray(filters.status) ? filters.status.length > 0 : true)) {
       const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
       result = result.filter((t) => statuses.includes(t.status));
     }
@@ -169,6 +181,25 @@ export const tenantService = {
           t.phone.includes(s) ||
           (t.email ?? '').toLowerCase().includes(s)
       );
+    }
+
+    if (filters?.hasActiveContract !== undefined) {
+      const active = filters.hasActiveContract === true || filters.hasActiveContract === 'true';
+      result = result.filter((t) => t.hasActiveContract === active);
+    }
+
+    if (filters?.onboardingComplete !== undefined) {
+      const complete = filters.onboardingComplete === true || filters.onboardingComplete === 'true';
+      if (complete) {
+        result = result.filter((t) => t.onboardingPercent === 100);
+      } else {
+        result = result.filter((t) => t.onboardingPercent < 100);
+      }
+    }
+
+    if (filters?.buildingId) {
+      const bId = String(filters.buildingId);
+      result = result.filter((t) => t.currentBuildingId === bId);
     }
 
     return result;

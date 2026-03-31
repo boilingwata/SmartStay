@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { mapTicketStatus, mapPriority } from '@/lib/enumMaps';
 import type { DbTicketStatus, DbPriorityType } from '@/types/supabase';
+import { mapTicketStatus, mapPriority, mapRole } from '@/lib/enumMaps';
 import {
   Ticket,
   TicketComment,
@@ -140,19 +140,19 @@ function mapDbRowToTicket(row: DbTicketRow): Ticket {
     priority: mapPriority.fromDb(row.priority ?? 'normal') as TicketPriority,
     status: mapTicketStatus.fromDb(row.status ?? 'new') as TicketStatus,
 
-    buildingId: String(building?.id ?? ''),
+    buildingId: building?.id ? String(building.id) : '',
     buildingName: building?.name ?? '',
-    roomId: room ? String(row.room_id) : undefined,
+    roomId: row.room_id ? String(row.room_id) : undefined,
     roomCode: room?.room_code ?? undefined,
 
     tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
-    tenantName: (row.tenants as unknown as { full_name: string } | null)?.full_name ?? undefined,
+    tenantName: (row.tenants as any)?.full_name ?? undefined,
 
     assignedToId: row.assigned_to ?? undefined,
     assignedToName: assignedProfile?.full_name ?? undefined,
     assignedToAvatar: assignedProfile?.avatar_url ?? undefined,
 
-    slaDeadline: calcSlaDeadline(createdAt, row.priority),
+    slaDeadline: row.resolved_at ? row.resolved_at : (row as any).sla_deadline_at || calcSlaDeadline(createdAt, row.priority),
     resolvedAt: row.resolved_at ?? undefined,
 
     resolutionNote: row.resolution_notes ?? undefined,
@@ -195,52 +195,73 @@ export const ticketService = {
     assignedTo?: string;
     search?: string;
     buildingId?: string | number | null;
+    roomId?: string | number | null;
     type?: string | string[];
     slaBreached?: boolean;
+    dateRange?: { from?: string; to?: string };
   }): Promise<Ticket[]> => {
     let query = supabase
       .from('tickets')
       .select(TICKET_SELECT)
       .order('created_at', { ascending: false });
 
+    // Server-side status filter
     if (filters?.status && filters.status !== 'All') {
-      if (Array.isArray(filters.status)) {
+      if (Array.isArray(filters.status) && filters.status.length > 0) {
         const dbStatuses = filters.status.map(s => mapTicketStatus.toDb(s) as DbTicketStatus);
         query = query.in('status', dbStatuses);
-      } else {
+      } else if (!Array.isArray(filters.status)) {
         query = query.eq('status', mapTicketStatus.toDb(filters.status) as DbTicketStatus);
       }
     }
 
+    // Server-side priority filter
     if (filters?.priority && filters.priority !== 'All') {
-      if (Array.isArray(filters.priority)) {
+      if (Array.isArray(filters.priority) && filters.priority.length > 0) {
         const dbPriorities = filters.priority.map(p => mapPriority.toDb(p) as DbPriorityType);
         query = query.in('priority', dbPriorities);
-      } else {
+      } else if (!Array.isArray(filters.priority)) {
         query = query.eq('priority', mapPriority.toDb(filters.priority) as DbPriorityType);
       }
     }
 
-    if (filters?.assignedTo) {
+    // Server-side type (category) filter
+    if (filters?.type && filters.type !== 'All') {
+      if (Array.isArray(filters.type) && filters.type.length > 0) {
+        query = query.in('category', filters.type);
+      } else if (!Array.isArray(filters.type)) {
+        query = query.eq('category', filters.type);
+      }
+    }
+
+    // Server-side assignedTo filter
+    if (filters?.assignedTo && filters.assignedTo !== 'All') {
       query = query.eq('assigned_to', filters.assignedTo);
+    }
+
+    // Server-side roomId filter
+    if (filters?.roomId != null && filters.roomId !== '') {
+      query = query.eq('room_id', Number(filters.roomId));
+    }
+
+    // Server-side Date Range filter
+    if (filters?.dateRange?.from) {
+      query = query.gte('created_at', filters.dateRange.from);
+    }
+    if (filters?.dateRange?.to) {
+      query = query.lte('created_at', filters.dateRange.to);
     }
 
     const rows = (await unwrap(query)) as unknown as DbTicketRow[];
     let tickets = rows.map(mapDbRowToTicket);
 
-    // Building filter: applied in-memory since it's a nested join field.
-    // Normalise both sides to string to avoid string vs number mismatch.
+    // Building filter: applied in-memory (Supabase nested filter is complex for this schema)
     if (filters?.buildingId != null && filters.buildingId !== '') {
       const targetBuildingId = String(filters.buildingId);
       tickets = tickets.filter((t) => t.buildingId === targetBuildingId);
     }
 
-    // Type (category) filter: applied in-memory after fetch
-    if (filters?.type && filters.type !== 'All') {
-      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
-      tickets = tickets.filter((t) => types.includes(t.type));
-    }
-
+    // Client-side text search
     if (filters?.search) {
       const s = filters.search.toLowerCase();
       tickets = tickets.filter(
@@ -256,7 +277,7 @@ export const ticketService = {
       const now = new Date();
       tickets = tickets.filter((t) => {
         const deadline = new Date(t.slaDeadline ?? '');
-        const isBreached = !isNaN(deadline.getTime()) && now > deadline;
+        const isBreached = !isNaN(deadline.getTime()) && now > deadline && t.status !== 'Resolved' && t.status !== 'Closed';
         return filters.slaBreached ? isBreached : !isBreached;
       });
     }
@@ -350,26 +371,29 @@ export const ticketService = {
   },
 
   createTicket: async (
-    ticket: Omit<Ticket, 'id' | 'ticketCode' | 'createdAt' | 'updatedAt'>
+    ticket: Omit<Ticket, 'id' | 'ticketCode' | 'createdAt' | 'updatedAt' | 'buildingId' | 'buildingName'>
   ): Promise<Ticket> => {
-    const row = (await unwrap(
-      supabase
-        .from('tickets')
-        .insert({
-          tenant_id: ticket.tenantId ? Number(ticket.tenantId) : null,
-          room_id: ticket.roomId ? Number(ticket.roomId) : null,
-          subject: ticket.title,
-          description: ticket.description,
-          category: ticket.type,
-          priority: mapPriority.toDb(ticket.priority) as import('@/types/supabase').DbPriorityType,
-          status: mapTicketStatus.toDb(ticket.status) as import('@/types/supabase').DbTicketStatus,
-          assigned_to: ticket.assignedToId ?? null,
-        })
-        .select(TICKET_SELECT)
-        .single()
-    )) as unknown as DbTicketRow;
+    // 1. Insert first
+    const { data: newRow, error: insertError } = await supabase
+      .from('tickets')
+      .insert({
+        tenant_id: ticket.tenantId ? Number(ticket.tenantId) : null,
+        room_id: ticket.roomId ? Number(ticket.roomId) : null,
+        subject: ticket.title,
+        description: ticket.description,
+        category: ticket.type,
+        priority: mapPriority.toDb(ticket.priority) as DbPriorityType,
+        status: mapTicketStatus.toDb(ticket.status || 'Open') as DbTicketStatus,
+        assigned_to: ticket.assignedToId || null,
+        // Calculate SLA if provided or let it use default in DB/Mapper if we had a trigger
+      })
+      .select('id')
+      .single();
 
-    return mapDbRowToTicket(row);
+    if (insertError) throw insertError;
+
+    // 2. Fetch full detail to ensure joins work and ticketCode is generated
+    return ticketService.getTicketDetail(String(newRow.id));
   },
 
   updateTicketStatus: async (id: string, status: TicketStatus): Promise<boolean> => {
@@ -462,7 +486,25 @@ export const ticketService = {
     return true;
   },
 
-  // Staff ratings are not stored in a dedicated table — return empty
+  // Fetch all profiles with staff/admin role
+  getStaff: async (): Promise<{ id: string; fullName: string; avatarUrl: string | null; role: string }[]> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, role')
+      .in('role', ['staff', 'admin'])
+      .eq('is_active', true)
+      .order('full_name');
+
+    if (error) throw error;
+
+    return data.map(d => ({
+      id: d.id,
+      fullName: d.full_name,
+      avatarUrl: d.avatar_url,
+      role: mapRole.fromDb(d.role),
+    }));
+  },
+
   getStaffRatings: async (
     _staffId: string
   ): Promise<{ average: number; summary: Record<number, number>; list: StaffServiceRating[] }> => {

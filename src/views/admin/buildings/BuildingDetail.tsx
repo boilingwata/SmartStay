@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { buildingService } from '@/services/buildingService';
 import { roomService } from '@/services/roomService';
-import { BuildingDetail as BuildingDetailType } from '@/models/Building';
+import { BuildingDetail as BuildingDetailType, BuildingImage } from '@/models/Building';
 import { Room } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND, formatDate } from '@/utils';
@@ -130,6 +130,8 @@ const BuildingDetail = () => {
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const setBuilding = useUIStore((s) => s.setBuilding);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const [heroImage, setHeroImage] = useState<string | null>(null);
+  const [galleryImages, setGalleryImages] = useState<BuildingImage[]>([]);
 
   // Set the active building context so RoomModal defaults to this building
   useEffect(() => {
@@ -212,7 +214,11 @@ const BuildingDetail = () => {
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-4">
-             <img src={building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} className="w-16 h-16 rounded-2xl object-cover shadow-lg" alt="" />
+           <img 
+              src={heroImage || building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} 
+              className="w-16 h-16 rounded-2xl object-cover shadow-lg" 
+              alt={building.buildingName} 
+            />
              <div>
                 <div className="flex items-center gap-2 mb-1">
                    <h1 className="text-[28px] font-black text-primary tracking-tighter leading-none">{building.buildingName}</h1>
@@ -540,20 +546,38 @@ const BuildingDetail = () => {
                      accept="image/*"
                      multiple
                      className="hidden"
-                     onChange={(e) => {
-                       const files = Array.from(e.target.files ?? []);
-                       if (files.length > 0) {
-                         toast.promise(
-                           new Promise(res => setTimeout(res, 1200)),
-                           {
-                             loading: `Đang tải lên ${files.length} ảnh...`,
-                             success: `Đã chọn ${files.length} ảnh — tính năng lưu trữ đang được phát triển.`,
-                             error: 'Tải ảnh thất bại.',
+                   onChange={async (e) => {
+                     const files = Array.from(e.target.files ?? []);
+                     if (files.length > 0) {
+                       toast.promise(
+                         (async () => {
+                           const newImages: any[] = [];
+                           for (const file of files) {
+                             const uploadedUrl = await buildingService.uploadBuildingImage(id!, file);
+                             newImages.push({
+                               id: Math.random().toString(36).substr(2, 9),
+                               url: uploadedUrl,
+                               isMain: !heroImage && newImages.length === 0,
+                               sortOrder: galleryImages.length + newImages.length
+                             });
                            }
-                         );
-                       }
-                       e.target.value = '';
-                     }}
+                           
+                           if (newImages.length > 0 && !heroImage) {
+                             setHeroImage(newImages[0].url);
+                           }
+                           
+                           setGalleryImages(prev => [...prev, ...newImages]);
+                           return newImages.length;
+                         })(),
+                         {
+                           loading: `Đang tải lên ${files.length} ảnh...`,
+                           success: (count) => `Đã thêm ${count} ảnh vào bộ sưu tập!`,
+                           error: 'Tải ảnh thất bại.',
+                         }
+                       );
+                     }
+                     e.target.value = '';
+                   }}
                    />
                    <button 
                       onClick={() => photoInputRef.current?.click()}
@@ -562,7 +586,14 @@ const BuildingDetail = () => {
                   </div>
                </div>
                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {building.images.map((img) => (
+                                     {galleryImages.length === 0 && building.images.length === 0 && (
+                      <div className="col-span-full h-64 flex flex-col items-center justify-center text-muted gap-4 bg-bg/20 rounded-[40px] border border-dashed">
+                         <ImageIcon size={48} className="opacity-20" />
+                         <p className="text-[10px] font-black uppercase tracking-widest">Chưa có hình ảnh nào trong bộ sưu tập</p>
+                      </div>
+                   )}
+                   {[...building.images, ...galleryImages].map((img) => (
+
                     <div key={img.id} className="group relative aspect-[4/3] rounded-[32px] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1 cursor-zoom-in">
                        <img src={img.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">

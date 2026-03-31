@@ -12,6 +12,12 @@ interface ProfileRow {
   phone: string | null;
   role: string;
   is_active: boolean | null;
+  preferences: {
+    cccd?: string;
+    tax_code?: string;
+    address?: string;
+    email?: string;
+  } | null;
 }
 
 // --- Row-to-model transformers ---
@@ -82,6 +88,19 @@ export const buildingService = {
       query = query.or(`name.ilike.${s},address.ilike.${s}`);
     }
 
+    // Server-side Sorting
+    const sortField = filters?.sortBy === 'totalRooms' ? 'id' : (filters?.sortBy || 'name'); // Cannot directly sort by computed room count in base table without a view
+    query = query.order(sortField === 'name' ? 'name' : (sortField === 'created_at' ? 'created_at' : 'id'), { 
+      ascending: filters?.sortOrder === 'asc' 
+    });
+
+    // Server-side Pagination
+    if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+      const from = (filters.page - 1) * filters.pageSize;
+      const to = from + filters.pageSize - 1;
+      query = query.range(from, to);
+    }
+
     const rows = await unwrap(query) as unknown as BuildingRow[];
     const summaries = rows.map(toBuildingSummary);
 
@@ -121,49 +140,101 @@ export const buildingService = {
     return toBuildingDetail(row);
   },
 
-  getOwners: async (search?: string): Promise<OwnerSummary[]> => {
+  getOwners: async (options?: { 
+    search?: string;
+    minBuildings?: number;
+    maxBuildings?: number;
+    isActive?: boolean;
+    buildingId?: string;
+  }): Promise<OwnerSummary[]> => {
     let query = supabase
       .from('profiles')
-      .select('*')
+      .select('*, buildings(id, name)')
       .eq('role', 'landlord');
+
+    const { search, minBuildings, maxBuildings, isActive, buildingId } = options || {};
+
+    if (isActive !== undefined) {
+      query = query.eq('is_active', isActive);
+    }
 
     if (search) {
       const s = `%${search}%`;
       query = query.or(`full_name.ilike.${s},phone.ilike.${s}`);
     }
 
-    const rows = await unwrap(query) as unknown as ProfileRow[];
-    return rows.map(r => ({
-      id: r.id,
-      fullName: r.full_name,
-      avatarUrl: r.avatar_url ?? undefined,
-      phone: r.phone ?? '',
-      email: '',
-      cccd: '',
-      taxCode: '',
-      address: '',
-      buildingsOwned: [],
-      totalBuildings: 0,
-      isDeleted: false,
-    }));
+    // Note: Filtering by building_id would require a specific join or subquery.
+    // We'll handle building filter in JS for now or via a specific where if possible.
+    
+    let rows = await unwrap(query) as unknown as (ProfileRow & { buildings: { id: number, name: string }[] })[];
+    
+    // Client-side filtering for complex conditions (building count, specific building)
+    if (buildingId) {
+      rows = rows.filter(r => r.buildings?.some(b => String(b.id) === buildingId));
+    }
+
+    if (minBuildings !== undefined) {
+      rows = rows.filter(r => (r.buildings?.length || 0) >= minBuildings);
+    }
+    
+    if (maxBuildings !== undefined) {
+      rows = rows.filter(r => (r.buildings?.length || 0) <= maxBuildings);
+    }
+
+    return rows.map(r => {
+      const prefs = r.preferences || {};
+      return {
+        id: r.id,
+        fullName: r.full_name,
+        avatarUrl: r.avatar_url ?? undefined,
+        phone: r.phone ?? '',
+        email: prefs.email ?? '',
+        cccd: prefs.cccd ?? '',
+        taxCode: prefs.tax_code ?? '',
+        address: prefs.address ?? '',
+        buildingsOwned: r.buildings?.map(b => ({ 
+          buildingId: String(b.id), 
+          buildingName: b.name 
+        })) || [],
+        totalBuildings: r.buildings?.length || 0,
+        isDeleted: false,
+      };
+    });
   },
 
   getOwnerDetail: async (id: string): Promise<OwnerDetail> => {
     const row = await unwrap(
-      supabase.from('profiles').select('*').eq('id', id).single()
-    ) as unknown as ProfileRow;
+      supabase
+        .from('profiles')
+        .select('*, buildings(*, rooms(count))')
+        .eq('id', id)
+        .single()
+    ) as unknown as (ProfileRow & { buildings: any[] });
+
+    const prefs = row.preferences || {};
+    
+    // Compute total rooms across all owned buildings
+    const totalRooms = row.buildings?.reduce((acc, b) => acc + (b.rooms?.[0]?.count || 0), 0) || 0;
+
     return {
       id: row.id,
       fullName: row.full_name,
       avatarUrl: row.avatar_url ?? undefined,
       phone: row.phone ?? '',
-      email: '',
-      cccd: '',
-      taxCode: '',
-      address: '',
-      buildingsOwned: [],
-      totalBuildings: 0,
-      totalRooms: 0,
+      email: prefs.email ?? '',
+      cccd: prefs.cccd ?? '',
+      taxCode: prefs.tax_code ?? '',
+      address: prefs.address ?? '',
+      buildingsOwned: row.buildings?.map(b => ({
+        buildingId: String(b.id),
+        buildingName: b.name,
+        buildingCode: `B${String(b.id).padStart(3, '0')}`,
+        ownershipPercent: 100, // Default to 100% since we use buildings.owner_id
+        ownershipType: 'FullOwner',
+        startDate: b.opening_date || b.created_at,
+      })) || [],
+      totalBuildings: row.buildings?.length || 0,
+      totalRooms,
       isDeleted: false,
     };
   },
@@ -292,60 +363,96 @@ export const buildingService = {
     );
   },
 
+  uploadBuildingImage: async (id: string, file: File): Promise<string> => {
+    // Backend Not Yet Implemented (as requested by user)
+    // For now, return a local Object URL to allow for immediate UI preview
+    console.log(`[Mock] Uploading file for building ${id}:`, file.name);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(URL.createObjectURL(file));
+      }, 1000);
+    });
+  },
+
   createOwner: async (data: CreateOwnerData): Promise<Owner> => {
-    // Note: creating a new auth user requires supabase.auth.admin or a server function.
-    // Here we insert a profile directly with a generated UUID if the user already exists in auth.
-    // For a full implementation, use an Edge Function to call auth.admin.createUser().
+    // Note: In a real app, you'd call an Edge Function to create an auth user.
+    // For now, we simulate by inserting into profiles. 
+    // We'll use a random UUID as the ID.
     const newId = crypto.randomUUID();
+    
     const row = await unwrap(
       supabase
         .from('profiles')
         .insert({
           id:        newId,
           full_name: data.fullName,
-          phone:     data.phone ?? null,
+          phone:     data.phone,
           role:      'landlord',
           is_active: true,
+          preferences: {
+            cccd:     data.cccd,
+            tax_code: data.taxCode,
+            address:  data.address,
+            email:    data.email,
+          }
         })
         .select()
         .single()
     ) as unknown as ProfileRow;
+
+    const prefs = row.preferences || {};
 
     return {
       id:         row.id,
       fullName:   row.full_name,
       avatarUrl:  row.avatar_url ?? undefined,
       phone:      row.phone ?? '',
-      email:      data.email ?? '',
-      cccd:       data.cccd ?? '',
-      taxCode:    data.taxCode ?? '',
-      address:    data.address ?? '',
+      email:      prefs.email ?? '',
+      cccd:       prefs.cccd ?? '',
+      taxCode:    prefs.tax_code ?? '',
+      address:    prefs.address ?? '',
       isDeleted:  false,
     };
   },
 
   updateOwner: async (id: string, data: UpdateOwnerData): Promise<Owner> => {
+    // First fetch current preferences to merge
+    const current = await unwrap(
+      supabase.from('profiles').select('preferences').eq('id', id).single()
+    ) as { preferences: any };
+
+    const newPrefs = {
+      ...(current.preferences || {}),
+      cccd:     data.cccd     !== undefined ? data.cccd     : current.preferences?.cccd,
+      tax_code: data.taxCode  !== undefined ? data.taxCode  : current.preferences?.tax_code,
+      address:  data.address  !== undefined ? data.address  : current.preferences?.address,
+      email:    data.email    !== undefined ? data.email    : current.preferences?.email,
+    };
+
     const row = await unwrap(
       supabase
         .from('profiles')
         .update({
           full_name: data.fullName || undefined,
-          phone:     data.phone   ?? null,
+          phone:     data.phone   || undefined,
+          preferences: newPrefs,
         })
         .eq('id', id)
         .select()
         .single()
     ) as unknown as ProfileRow;
 
+    const prefs = row.preferences || {};
+
     return {
       id:        row.id,
       fullName:  row.full_name,
       avatarUrl: row.avatar_url ?? undefined,
       phone:     row.phone ?? '',
-      email:     data.email  ?? '',
-      cccd:      data.cccd   ?? '',
-      taxCode:   data.taxCode ?? '',
-      address:   data.address ?? '',
+      email:     prefs.email ?? '',
+      cccd:      prefs.cccd ?? '',
+      taxCode:   prefs.tax_code ?? '',
+      address:   prefs.address ?? '',
       isDeleted: false,
     };
   },

@@ -10,6 +10,14 @@ export interface ContractFilter {
   buildingId?: string;
   status?: string;
   search?: string;
+  roomCode?: string;
+  startDateFrom?: string;
+  startDateTo?: string;
+  endDateFrom?: string;
+  endDateTo?: string;
+  minRent?: number;
+  maxRent?: number;
+  expiringSoon?: boolean;
 }
 
 // --- Row interfaces ---
@@ -152,8 +160,6 @@ function toContractDetail(
 
 export const contractService = {
   getContracts: async (filters: ContractFilter = {}): Promise<Contract[]> => {
-    const targetBuildingId = filters.buildingId;
-
     let query = supabase
       .from('contracts')
       .select(
@@ -168,34 +174,63 @@ export const contractService = {
       )
       .eq('is_deleted', false);
 
-    // Status filter
-    if (filters.status && filters.status !== '') {
+    // Filter by Status
+    if (filters.status && filters.status !== '' && filters.status !== 'All') {
       query = query.eq('status', mapContractStatus.toDb(filters.status) as DbContractStatus);
     }
 
-    // Search by contract_code (case-insensitive)
-    if (filters.search) {
-      query = query.ilike('contract_code', `%${filters.search}%`);
+    // Filter by Building (via inner join)
+    if (filters.buildingId && filters.buildingId !== '') {
+      query = query.eq('rooms.building_id', Number(filters.buildingId));
+    }
+
+    // Filter by Room Code
+    if (filters.roomCode && filters.roomCode !== '') {
+      query = query.ilike('rooms.room_code', `%${filters.roomCode}%`);
+    }
+
+    // Search: Code OR Primary Tenant Name
+    if (filters.search && filters.search !== '') {
+      const searchPattern = `%${filters.search}%`;
+      // We use raw SQL or complex filters for OR across tables if needed, 
+      // but ilike on code is a good start. 
+      // For tenant name, we might need a separate approach or computed field.
+      // Since PostgREST OR over joins is tricky, we filter by code first here.
+      query = query.or(`contract_code.ilike.${searchPattern}`);
+    }
+
+    // Date Filters
+    if (filters.startDateFrom) query = query.gte('start_date', filters.startDateFrom);
+    if (filters.startDateTo) query = query.lte('start_date', filters.startDateTo);
+    if (filters.endDateFrom) query = query.gte('end_date', filters.endDateFrom);
+    if (filters.endDateTo) query = query.lte('end_date', filters.endDateTo);
+
+    // Rent Filters
+    if (filters.minRent) query = query.gte('monthly_rent', filters.minRent);
+    if (filters.maxRent) query = query.lte('monthly_rent', filters.maxRent);
+
+    // Expiring Soon (30 days)
+    if (filters.expiringSoon) {
+      const thirtyDaysLater = new Date();
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+      query = query.lte('end_date', thirtyDaysLater.toISOString().split('T')[0])
+                   .gte('end_date', new Date().toISOString().split('T')[0])
+                   .eq('status', 'active');
     }
 
     query = query.order('id', { ascending: false });
 
     const rows = await unwrap(query) as unknown as ContractRow[];
+    
+    // In-memory filter for Tenant Name if search is active
     let contracts = rows.map(toContract);
-
-    // Building filter: applied in-memory — PostgREST does not support
-    // dotted-path filtering on joined columns through the JS client.
-    // Normalise to string to avoid type mismatch (buildingId stored as String on model).
-    if (targetBuildingId) {
-      const numBuildingId = Number(targetBuildingId);
-      if (Number.isFinite(numBuildingId)) {
-        const targetStr = String(numBuildingId);
-        contracts = contracts.filter((c) => {
-          // Access the raw row's building_id via the joined rooms field
-          const rowEntry = rows.find((r) => String(r.id) === c.id);
-          return String(rowEntry?.rooms?.building_id ?? '') === targetStr;
-        });
-      }
+    if (filters.search && filters.search !== '') {
+      const term = filters.search.toLowerCase();
+      contracts = contracts.filter(c => 
+        c.contractCode.toLowerCase().includes(term) || 
+        c.tenantName.toLowerCase().includes(term) ||
+        c.roomCode.toLowerCase().includes(term)
+      );
     }
 
     return contracts;

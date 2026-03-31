@@ -8,11 +8,10 @@ import {
   Filter, 
   RotateCcw, 
   LayoutGrid, 
-  Eye, 
   Edit3, 
   History, 
   ShieldAlert,
-  ArrowRight
+  ChevronDown
 } from "lucide-react";
 
 import { 
@@ -31,16 +30,15 @@ import {
 } from "@/utils/serviceHelpers";
 import { 
   DataTable, 
-  FilterPanel, 
-  FilterConfig,
-  StatusBadge,
   RowAction
 } from "@/components/shared";
 import { useConfirm } from "@/hooks/useConfirm";
-import { cn, formatDate } from "@/utils";
+import { cn } from "@/utils";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
 import UpdatePriceModal from "@/components/service/UpdatePriceModal";
-import { EmptyState, ErrorBanner } from "@/components/ui/StatusStates";
+import { ErrorBanner } from "@/components/ui/StatusStates";
+import { QuickFilterChips } from "@/components/ui/QuickFilterChips";
+import { MobileSortDropdown } from "@/components/ui/MobileSortDropdown";
 
 const ServiceCatalog: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,18 +51,22 @@ const ServiceCatalog: React.FC = () => {
   const [showUpdatePrice, setShowUpdatePrice] = useState(false);
   const [targetService, setTargetService] = useState<Service | null>(null);
 
-  // Filter state from URL
+  // Unified Filter State from URL
   const filters: ServiceFilter = useMemo(() => {
     return {
       page: Number(searchParams.get("page")) || 1,
       limit: Number(searchParams.get("limit")) || 10,
       search: searchParams.get("search") || "",
       serviceType: (searchParams.get("serviceType") as ServiceType) || undefined,
-      isActive: searchParams.get("isActive") === "false" ? false : true, // default true
+      isActive: searchParams.get("status") === "active" ? true : 
+                searchParams.get("status") === "inactive" ? false : undefined,
       sortBy: searchParams.get("sortBy") || "serviceName",
       sortDir: (searchParams.get("sortDir") as "asc" | "desc") || "asc",
     };
   }, [searchParams]);
+
+  // Derived status for UI
+  const currentStatus = searchParams.get("status") || "all";
 
   // Main Query
   const { data, isLoading, isError, refetch } = useQuery({
@@ -72,55 +74,37 @@ const ServiceCatalog: React.FC = () => {
     queryFn: () => getServices(filters),
   });
 
-  // Toggle Active Mutation (Optimistic Update)
+  // Toggle Active Mutation
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => 
       toggleServiceActive(id, isActive),
-    onMutate: async ({ id, isActive }) => {
-      await queryClient.cancelQueries({ queryKey: ["services", filters] });
-      const previousData = queryClient.getQueryData<{ data: Service[]; total: number }>(["services", filters]);
-      
-      if (previousData) {
-        queryClient.setQueryData(["services", filters], {
-          ...previousData,
-          data: previousData.data.map(s => s.serviceId === id ? { ...s, isActive } : s)
-        });
-      }
-      return { previousData };
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["services", filters], context.previousData);
-      }
-      toast.error("Không thể thay đổi trạng thái dịch vụ");
-    },
-    onSuccess: (data, variables) => {
+    onSuccess: (_, variables) => {
       toast.success(`Đã ${variables.isActive ? "kích hoạt" : "vô hiệu hóa"} dịch vụ`);
-    },
-    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
+    },
+    onError: () => {
+      toast.error("Không thể thay đổi trạng thái dịch vụ");
     }
   });
 
   const handleToggleActive = async (service: Service) => {
     const newStatus = !service.isActive;
-    
-    if (!newStatus) { // Confirming deactivation
+    if (!newStatus) {
       const isConfirmed = await confirm({
         title: "Vô hiệu hóa dịch vụ?",
-        description: `Dịch vụ '${service.serviceName}' (${service.serviceCode}) sẽ không thể chọn khi tạo hợp đồng mới. Bạn có chắc chắn?`,
+        description: `Dịch vụ '${service.serviceName}' (${service.serviceCode}) sẽ không thể chọn khi tạo hợp đồng mới.`,
         variant: "danger",
         confirmLabel: "Vô hiệu hóa",
       });
       if (!isConfirmed) return;
     }
-
     toggleMutation.mutate({ id: service.serviceId, isActive: newStatus });
   };
 
-  const handleFilterChange = (newValues: Record<string, any>) => {
+  // Unified Filter Change
+  const updateFilters = (newValues: Record<string, any>) => {
     const params = new URLSearchParams(searchParams);
-    params.set("page", "1"); // Reset page on filter change
+    if (!newValues.page) params.set("page", "1"); // Reset pagination on non-page changes
     
     Object.entries(newValues).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
@@ -132,28 +116,9 @@ const ServiceCatalog: React.FC = () => {
     setSearchParams(params);
   };
 
-  const filterConfigs: FilterConfig[] = [
-    {
-      key: "search",
-      label: "Tìm kiếm",
-      type: "text",
-      placeholder: "Tìm theo tên dịch vụ...",
-      className: "lg:col-span-2"
-    },
-    {
-      key: "serviceType",
-      label: "Loại dịch vụ",
-      type: "select",
-      options: Object.entries(SERVICE_TYPE_LABELS).map(([val, label]) => ({
-        label, value: val
-      }))
-    },
-    {
-      key: "isActive",
-      label: "Chỉ hiện hoạt động",
-      type: "toggle",
-    }
-  ];
+  const handleReset = () => {
+    setSearchParams({ page: "1", limit: "10", status: "all" });
+  };
 
   const columns = [
     {
@@ -161,19 +126,14 @@ const ServiceCatalog: React.FC = () => {
       header: "Dịch vụ",
       accessorKey: "serviceName",
       cell: ({ row }: { row: { original: Service } }) => (
-        <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
-          {row.original.serviceName}
-        </span>
-      )
-    },
-    {
-      id: "serviceCode",
-      header: "Mã",
-      accessorKey: "serviceCode",
-      cell: ({ row }: { row: { original: Service } }) => (
-        <span className="text-[11px] text-slate-500 font-mono font-black uppercase tracking-wider bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200/50">
-          {row.original.serviceCode}
-        </span>
+        <div className="flex flex-col">
+            <span className="font-bold text-slate-900 group-hover:text-primary transition-colors">
+            {row.original.serviceName}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono uppercase">
+                {row.original.serviceCode}
+            </span>
+        </div>
       )
     },
     {
@@ -182,7 +142,7 @@ const ServiceCatalog: React.FC = () => {
       accessorKey: "serviceType",
       cell: ({ row }: { row: { original: Service } }) => (
         <span className={cn(
-          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider",
           SERVICE_TYPE_COLORS[row.original.serviceType] || "bg-slate-100 text-slate-600 shadow-sm"
         )}>
           {SERVICE_TYPE_LABELS[row.original.serviceType] || row.original.serviceType}
@@ -198,41 +158,30 @@ const ServiceCatalog: React.FC = () => {
           <span className="text-sm font-black text-slate-900 tabular-nums">
             {formatVND(row.original.currentPrice)}
           </span>
-          <div className="flex items-center gap-1.5 opacity-60">
-             <div className="w-1 h-1 rounded-full bg-slate-400" />
-             <span className="text-[10px] text-slate-500 font-medium italic">
-                từ {formatDate(row.original.currentPriceEffectiveFrom)}
-             </span>
-          </div>
+          <span className="text-[10px] text-slate-400 italic">
+            / {row.original.unit}
+          </span>
         </div>
       )
     },
     {
-      id: "unit",
-      header: "Đơn vị",
-      accessorKey: "unit",
-      enableSorting: false,
-      cell: ({ row }: { row: { original: Service } }) => (
-        <span className="text-[11px] font-black text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/50 shadow-sm">
-           {row.original.unit}
-        </span>
-      )
-    },
-    {
       id: "isActive",
-      header: "Phục vụ",
+      header: "Trạng thái",
       accessorKey: "isActive",
       cell: ({ row }: { row: { original: Service } }) => (
         <button
-            onClick={() => handleToggleActive(row.original)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleActive(row.original);
+            }}
             className={cn(
-                "w-12 h-6 rounded-full relative transition-all p-1",
-                row.original.isActive ? "bg-green-500 shadow-[0_4px_12px_-4px_rgba(34,197,94,0.6)]" : "bg-slate-200"
+                "w-10 h-5 rounded-full relative transition-all p-0.5",
+                row.original.isActive ? "bg-green-500" : "bg-slate-200"
             )}
         >
             <div className={cn(
-                "w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ease-out transform",
-                row.original.isActive ? "translate-x-6 scale-110" : "translate-x-0"
+                "w-4 h-4 bg-white rounded-full shadow-sm transition-all",
+                row.original.isActive ? "translate-x-5" : "translate-x-0"
             )} />
         </button>
       )
@@ -241,59 +190,49 @@ const ServiceCatalog: React.FC = () => {
 
   const rowActions: RowAction<Service>[] = [
     {
-      label: "Xem chi tiết",
-      icon: <Eye size={16} />,
-      onClick: (row: Service) => {
-        setSelectedServiceId(row.serviceId);
-        setModalMode("view");
-      }
-    },
-    {
-      label: "Chỉnh sửa cơ bản",
+      label: "Xem & Sửa",
       icon: <Edit3 size={16} />,
-      onClick: (row: Service) => {
-        setSelectedServiceId(row.serviceId);
+      onClick: (service: Service) => {
+        setSelectedServiceId(service.serviceId);
         setModalMode("edit");
       }
     },
     {
-      label: "Cập nhật giá mới",
+      label: "Cập nhật giá",
       icon: <History size={16} />,
-      onClick: (row: Service) => {
-        setTargetService(row);
+      onClick: (service: Service) => {
+        setTargetService(service);
         setShowUpdatePrice(true);
       }
     },
+    { type: 'divider' as const },
     {
-      type: 'divider' as const
-    },
-    {
-      label: "Vô hiệu hóa",
+      label: (service) => service.isActive ? "Vô hiệu hóa" : "Kích hoạt",
       icon: <ShieldAlert size={16} />,
       variant: 'danger' as const,
-      onClick: (row: Service) => handleToggleActive(row)
+      onClick: (service: Service) => handleToggleActive(service)
     }
   ];
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in duration-700">
-      {/* Page Header */}
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-in fade-in duration-700">
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-5">
-           <div className="w-16 h-16 bg-gradient-to-br from-primary to-blue-600 rounded-[28px] flex items-center justify-center text-white shadow-2xl shadow-primary/30 rotate-3 hover:rotate-0 transition-transform duration-500">
+           <div className="hidden sm:flex w-16 h-16 bg-gradient-to-br from-primary to-blue-600 rounded-[28px] items-center justify-center text-white shadow-2xl shadow-primary/30 rotate-3 hover:rotate-0 transition-transform duration-500">
               <LayoutGrid size={32} />
            </div>
            <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                     Dịch vụ & Giá
                 </h1>
-                <span className="bg-primary/10 text-primary text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-[2px] border border-primary/20">
+                <span className="hidden sm:inline-block bg-primary/10 text-primary text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-[2px] border border-primary/20">
                     {data?.total || 0} mục
                 </span>
               </div>
               <p className="text-slate-500 text-sm font-medium mt-1">
-                Thiết lập danh mục dịch vụ và cấu hình <span className="text-slate-900 font-bold underline decoration-primary/30 underline-offset-4 cursor-help" title="Theo RULE-08: Lịch sử giá là bất biến">lịch sử giá bất biến (RULE-08)</span>.
+                Quản lý phí & dịch vụ theo quy tắc <span className="text-slate-900 font-bold underline decoration-primary/30 underline-offset-4 cursor-help" title="Lịch sử giá là bất biến">bất biến (RULE-08)</span>.
               </p>
            </div>
         </div>
@@ -303,106 +242,145 @@ const ServiceCatalog: React.FC = () => {
             setModalMode("create");
             setSelectedServiceId(null);
           }}
-          className="group relative px-10 h-16 bg-slate-900 text-white rounded-[24px] font-black text-[12px] uppercase tracking-[3px] shadow-2xl shadow-slate-200 overflow-hidden hover:translate-y-[-4px] active:translate-y-[0] transition-all"
+          className="w-full md:w-auto group relative px-8 h-14 bg-slate-900 text-white rounded-[22px] font-black text-[11px] uppercase tracking-[2px] overflow-hidden hover:translate-y-[-2px] transition-all"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-primary to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative flex items-center gap-3">
-            <Plus size={22} className="group-hover:rotate-90 transition-transform duration-500" />
-            Thêm dịch vụ mới
+          <div className="relative flex items-center justify-center gap-3">
+            <Plus size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+            Thêm dịch vụ
           </div>
         </button>
       </div>
 
-      {/* Filters */}
-      <FilterPanel 
-        filters={filterConfigs}
-        values={filters}
-        onChange={handleFilterChange}
-        activeCount={Object.entries(filters).filter(([k,v]) => k !== 'page' && k !== 'limit' && k !== 'sortBy' && k !== 'sortDir' && v !== undefined && v !== "" && v !== true).length}
-        onReset={() => setSearchParams({ page: "1", limit: "10", isActive: "true" })}
-      />
+      {/* FILTER ARCHITECTURE */}
+      <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-6 lg:col-span-8 relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-slate-100 rounded-xl group-focus-within:bg-primary/10 transition-colors">
+                    <Search size={18} className="text-slate-400 group-focus-within:text-primary transition-colors" />
+                  </div>
+                  <input 
+                    type="text"
+                    placeholder="Tìm kiếm theo tên dịch vụ hoặc mã..."
+                    value={filters.search}
+                    onChange={(e) => updateFilters({ search: e.target.value })}
+                    className="w-full h-14 pl-16 pr-6 bg-white border border-slate-100 rounded-2xl outline-none focus:border-primary shadow-sm hover:shadow-md focus:shadow-xl focus:shadow-primary/5 transition-all text-sm font-bold text-slate-800"
+                  />
+              </div>
 
-      {/* Main Content Area */}
-      {isLoading ? (
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl overflow-hidden p-1">
-           <table className="w-full text-left">
-              <thead><tr className="bg-slate-50/50"><td className="px-8 py-5 h-4 bg-slate-100 animate-pulse m-2 rounded" colSpan={6}/></tr></thead>
-              <tbody>
-                {[1,2,3,4,5].map(i => (
-                  <tr key={i} className="border-b border-slate-50 animate-pulse">
-                    <td className="px-8 py-6"><div className="h-4 w-32 bg-slate-100 rounded" /></td>
-                    <td className="px-8 py-6"><div className="h-4 w-20 bg-slate-50 rounded" /></td>
-                    <td className="px-8 py-6"><div className="h-4 w-24 bg-slate-100 rounded" /></td>
-                    <td className="px-8 py-6"><div className="h-4 w-16 bg-slate-50 rounded" /></td>
-                    <td className="px-8 py-6"><div className="h-4 w-12 bg-slate-100 rounded" /></td>
-                    <td className="px-8 py-6"><div className="h-4 w-6 bg-slate-50 rounded ml-auto" /></td>
-                  </tr>
-                ))}
-              </tbody>
-           </table>
-        </div>
-      ) : isError ? (
-        <ErrorBanner message="Không thể tải danh sách dịch vụ" onRetry={refetch} />
-      ) : data?.data.length === 0 ? (
-        <div className="bg-white rounded-[40px] border border-dashed border-slate-200 py-32 flex flex-col items-center justify-center text-center">
-            <EmptyState 
-                title="Chưa có dịch vụ nào" 
-                message="Hãy tạo dịch vụ đầu tiên để bắt đầu quản lý phí của tòa nhà."
-            />
-            <button
-                onClick={() => setModalMode("create")}
-                className="mt-8 flex items-center gap-2 text-primary font-black uppercase text-xs tracking-widest hover:underline"
-            >
-                <Plus size={16} /> Thêm ngay
-            </button>
-        </div>
-      ) : (
-        <div className="shadow-2xl shadow-slate-200/50 rounded-[32px] overflow-hidden">
-            <DataTable 
-                columns={columns}
-                data={data?.data ?? []}
-                total={data?.total ?? 0}
-                pagination={{
-                    page: filters.page,
-                    limit: filters.limit,
-                    onChange: (p, l) => handleFilterChange({ page: p, limit: l })
-                }}
-                sorting={{
-                    sortBy: filters.sortBy || "serviceName",
-                    sortDir: filters.sortDir || "asc",
-                    onChange: (b, d) => handleFilterChange({ sortBy: b, sortDir: d })
-                }}
-                rowActions={rowActions}
-                rowClassName={(row) => !row.isActive ? "opacity-60 bg-slate-50/30" : ""}
-            />
-        </div>
-      )}
+              <div className="md:col-span-3 lg:col-span-2 relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none">
+                     <Filter size={14} />
+                  </div>
+                  <select
+                    value={filters.serviceType || ""}
+                    onChange={(e) => updateFilters({ serviceType: e.target.value })}
+                    className="w-full h-14 pl-10 pr-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-primary shadow-sm text-xs font-black uppercase tracking-widest text-slate-600 appearance-none transition-all cursor-pointer hover:bg-slate-50"
+                  >
+                    <option value="">Tất cả loại</option>
+                    {Object.entries(SERVICE_TYPE_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={14} />
+              </div>
 
-      {/* Modals */}
+              <MobileSortDropdown 
+                className="md:col-span-3 lg:col-span-2"
+                options={[
+                    { label: 'Tên (A-Z)', value: 'serviceName', dir: 'asc' },
+                    { label: 'Tên (Z-A)', value: 'serviceName', dir: 'desc' },
+                    { label: 'Giá cao nhất', value: 'currentPrice', dir: 'desc' },
+                    { label: 'Giá thấp nhất', value: 'currentPrice', dir: 'asc' },
+                ]}
+                currentValue={filters.sortBy || "serviceName"}
+                currentDir={filters.sortDir || "asc"}
+                onChange={(sortBy, sortDir) => updateFilters({ sortBy, sortDir })}
+              />
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+              <QuickFilterChips 
+                value={currentStatus}
+                onChange={(val) => updateFilters({ status: val })}
+                options={[
+                    { label: 'Tất cả', value: 'all' },
+                    { label: 'Hoạt động', value: 'active', color: 'bg-green-500' },
+                    { label: 'Tạm dừng', value: 'inactive', color: 'bg-red-500' },
+                ]}
+              />
+
+              <button 
+                onClick={handleReset}
+                className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary transition-colors pr-2"
+              >
+                  <RotateCcw size={14} />
+                  Đặt lại bộ lọc
+              </button>
+          </div>
+      </div>
+
+      {/* Main Table Area */}
+      <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 space-y-4">
+             {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-16 w-full bg-slate-50 animate-pulse rounded-2xl" />
+             ))}
+          </div>
+        ) : isError ? (
+          <ErrorBanner message="Không thể tải danh sách dịch vụ" onRetry={refetch} />
+        ) : data?.data.length === 0 ? (
+          <div className="py-24 flex flex-col items-center justify-center text-center px-6">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <Search size={32} className="text-slate-200" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Không tìm thấy kết quả</h3>
+              <p className="text-slate-500 text-sm max-w-xs mb-8">
+                Hãy thử điều chỉnh lại bộ lọc hoặc tìm kiếm với từ khóa khác.
+              </p>
+              <button 
+                onClick={handleReset}
+                className="px-6 h-10 border-2 border-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all text-slate-900"
+              >
+                Xóa tất cả bộ lọc
+              </button>
+          </div>
+        ) : (
+          <DataTable 
+            columns={columns}
+            data={data?.data ?? []}
+            total={data?.total ?? 0}
+            pagination={{
+                page: filters.page,
+                limit: filters.limit,
+                onChange: (p, l) => updateFilters({ page: p, limit: l })
+            }}
+            sorting={{
+                sortBy: filters.sortBy || "serviceName",
+                sortDir: filters.sortDir || "asc",
+                onChange: (b, d) => updateFilters({ sortBy: b, sortDir: d })
+            }}
+            rowActions={rowActions}
+            rowClassName={(row) => !row.isActive ? "bg-slate-50/50 grayscale-[0.5]" : ""}
+          />
+        )}
+      </div>
+
       <ServiceDetailModal
         open={modalMode !== null}
-        onClose={() => {
-            setModalMode(null);
-            setSelectedServiceId(null);
-        }}
+        onClose={() => { setModalMode(null); setSelectedServiceId(null); }}
         serviceId={selectedServiceId}
         mode={modalMode || "view"}
-        onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["services"] });
-        }}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["services"] })}
       />
 
       {targetService && (
         <UpdatePriceModal
             open={showUpdatePrice}
-            onClose={() => {
-                setShowUpdatePrice(false);
-                setTargetService(null);
-            }}
+            onClose={() => { setShowUpdatePrice(false); setTargetService(null); }}
             service={targetService}
-            onSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ["services"] });
-            }}
+            onSuccess={() => queryClient.invalidateQueries({ queryKey: ["services"] })}
         />
       )}
     </div>

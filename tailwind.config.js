@@ -64,10 +64,12 @@ export default {
         full: "var(--radius-full)",
       },
       fontFamily: {
-        sans: ["DM Sans", "sans-serif"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
         display: ["Syne", "sans-serif"],
-        mono: ["IBM Plex Mono", "monospace"],
+        serif: ["Times New Roman", "Georgia", "Cambria", "Times", "serif"],
+        mono: ["IBM Plex Mono", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
       },
+
       // 2.5 Breakpoints
       screens: {
         'xs': '480px',

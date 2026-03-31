@@ -19,6 +19,7 @@
     "tenants": "Tenants",
     "rooms": "Rooms",
     "buildings": "Buildings",
+    "meters": "Meters",
     "meterEntry": "Meter Entry",
     "visitorCheckin": "Visitor Check-in",
     "amenityCheckin": "Amenity Check-in",
