@@ -13,19 +13,20 @@ interface ContractTabProps {
 }
 
 export const ContractTab: React.FC<ContractTabProps> = ({ contract }) => {
-  // If no contract provided, show empty state or a default mock for demonstration
-  const displayContract = contract || {
-    id: 'CON-1',
-    contractCode: 'CON-MAN-123456',
-    roomCode: '34.05',
-    buildingName: 'The Manor Office',
-    status: 'Active',
-    startDate: '2024-01-01',
-    endDate: '2025-01-01',
-    rentPriceSnapshot: 15000000,
-    type: 'Residential',
-    isRepresentative: true,
-  } as Contract;
+  if (!contract) {
+    return (
+      <div className="card-container p-20 text-center space-y-4 bg-white/40 border-dashed border-2">
+        <div className="w-20 h-20 bg-bg rounded-full flex items-center justify-center text-muted mx-auto">
+          <History size={40} />
+        </div>
+        <h3 className="text-h3 font-black text-primary uppercase tracking-widest">Chưa có hợp đồng</h3>
+        <p className="text-small text-muted italic max-w-xs mx-auto">Cư dân này hiện chưa tham gia vào bất kỳ hợp đồng thuê nào trong hệ thống.</p>
+        <button className="btn-primary px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">+ Tạo hợp đồng mới</button>
+      </div>
+    );
+  }
+
+  const displayContract = contract;
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">

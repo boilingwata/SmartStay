@@ -88,10 +88,8 @@ const LoginPage = () => {
       data.attempts = 0;
       toast.error(`Quá ${MAX_ATTEMPTS} lần thất bại. Tài khoản bị khóa 5 phút.`);
     }
-    setLockoutData(data);
     checkLockout();
   };
-
   const setQuickLogin = (user: string, pass: string) => {
     setForm({ ...form, username: user, password: pass });
     toast.info('Đã chọn tài khoản mẫu');
@@ -280,12 +278,12 @@ const LoginPage = () => {
             {/* Quick Access Section — only visible in development */}
             {import.meta.env.DEV && (
             <div className="mt-10 pt-8 border-t border-slate-100 animate-in fade-in duration-1000">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center mb-5 italic">Truy cập nhanh (Dev)</p>
-               <div className="grid grid-cols-2 gap-4">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center mb-5 italic">Gợi ý truy cập (Dev)</p>
+               <div className="flex justify-center">
                   <button
                     type="button"
                     onClick={() => setQuickLogin('admin@smartstay.vn', 'Admin@123456')}
-                    className="flex flex-col items-center p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group"
+                    className="flex flex-col items-center p-4 px-10 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group w-full"
                   >
                      <span className="text-xs font-black text-primary uppercase tracking-tighter">System Admin</span>
                      <span className="text-[9px] text-muted font-bold uppercase tracking-widest mt-1">Quản trị viên</span>

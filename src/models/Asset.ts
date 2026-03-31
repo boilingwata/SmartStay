@@ -9,9 +9,15 @@ export interface Asset {
   condition: AssetCondition;
   roomId?: string;
   roomCode?: string;
+  buildingName?: string;
   purchaseDate?: string;
   purchasePrice?: number;
   warrantyExpiry?: string;
+  lastMaintenance?: string;
+  serialNumber?: string;
+  brand?: string;
+  model?: string;
+  quantity?: number;
   images?: string[];
   note?: string;
 }

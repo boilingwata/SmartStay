@@ -3,7 +3,7 @@ import { OwnerSummary, OwnerDetail, Owner, CreateOwnerData, UpdateOwnerData } fr
 
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { MOCK_PROVINCES, MOCK_DISTRICTS, MOCK_WARDS } from '@/mocks/systemMocks';
+import { FALLBACK_PROVINCES, FALLBACK_DISTRICTS, FALLBACK_WARDS } from '@/constants/administrative';
 import { assertNoLikelyMojibake } from '@/utils';
 
 interface ProfileRow {
@@ -13,6 +13,12 @@ interface ProfileRow {
   phone: string | null;
   role: string;
   is_active: boolean | null;
+  preferences: {
+    cccd?: string;
+    tax_code?: string;
+    address?: string;
+    email?: string;
+  } | null;
 }
 
 // --- Row-to-model transformers ---
@@ -73,7 +79,7 @@ function toBuildingSummary(row: BuildingRow): BuildingSummary {
     longitude: row.longitude ?? undefined,
     isDeleted: row.is_deleted ?? false,
     totalRooms,
-    occupiedRooms: 0, // Will be computed with a subquery later
+    occupiedRooms: 0,
     occupancyRate: 0,
   };
 }
@@ -102,10 +108,21 @@ export const buildingService = {
       query = query.or(`name.ilike.${s},address.ilike.${s}`);
     }
 
+    // Server-side Sorting
+    const sortField = filters?.sortBy === 'totalRooms' ? 'id' : (filters?.sortBy || 'name');
+    query = query.order(sortField === 'name' ? 'name' : (sortField === 'created_at' ? 'created_at' : 'id'), {
+      ascending: filters?.sortOrder === 'asc'
+    });
+
+    if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+      const from = (filters.page - 1) * filters.pageSize;
+      const to = from + filters.pageSize - 1;
+      query = query.range(from, to);
+    }
+
     const rows = await unwrap(query) as unknown as BuildingRow[];
     const summaries = rows.map(toBuildingSummary);
 
-    // Compute occupancy per building by querying occupied rooms
     const buildingIds = rows.map(r => r.id);
     if (buildingIds.length > 0) {
       const { data: occupiedData } = await supabase
@@ -157,6 +174,44 @@ export const buildingService = {
       isMain: img.is_main,
       sortOrder: img.sort_order,
     }));
+
+    detail.totalRooms = row.rooms?.[0]?.count ?? 0;
+
+    // Fetch occupied rooms count separately
+    const { count: occupiedCount } = await supabase
+      .from('rooms')
+      .select('*', { count: 'exact', head: true })
+      .eq('building_id', Number(id))
+      .eq('status', 'occupied');
+
+    detail.occupiedRooms = occupiedCount ?? 0;
+    detail.occupancyRate = detail.totalRooms > 0 ? Math.round((detail.occupiedRooms / detail.totalRooms) * 100) : 0;
+
+    // Fetch owner profile for management contact info
+    const { data: buildingWithOwner } = await supabase
+      .from('buildings')
+      .select('*, profiles!owner_id(*)')
+      .eq('id', Number(id))
+      .single();
+
+    if (buildingWithOwner?.profiles) {
+      const profiles = buildingWithOwner.profiles as ProfileRow;
+      const prefs = (profiles.preferences as any) || {};
+      detail.managementPhone = profiles.phone || '';
+      detail.managementEmail = prefs.email || '';
+
+      // Populate ownership info from the primary owner
+      detail.ownership = [{
+        id: String(id) + '_primary',
+        ownerId: profiles.id,
+        ownerName: profiles.full_name,
+        ownerAvatar: profiles.avatar_url || undefined,
+        ownershipPercent: 100,
+        ownershipType: 'FullOwner',
+        startDate: row.opening_date || row.created_at || '',
+      }];
+    }
+
     return detail;
   },
 
@@ -206,54 +261,106 @@ export const buildingService = {
     if (error) throw new Error(error.message);
   },
 
-  getOwners: async (search?: string): Promise<OwnerSummary[]> => {
+  getOwners: async (options?: {
+    search?: string;
+    minBuildings?: number;
+    maxBuildings?: number;
+    isActive?: boolean;
+    buildingId?: string;
+  }): Promise<OwnerSummary[]> => {
     let query = supabase
       .from('profiles')
-      .select('*')
+      .select('*, buildings(id, name)')
       .eq('role', 'landlord');
+
+    const { search, minBuildings, maxBuildings, isActive, buildingId } = options || {};
+
+    if (isActive !== undefined) {
+      query = query.eq('is_active', isActive);
+    }
 
     if (search) {
       const s = `%${search}%`;
       query = query.or(`full_name.ilike.${s},phone.ilike.${s}`);
     }
 
-    const rows = await unwrap(query) as unknown as ProfileRow[];
-    return rows.map(r => ({
-      id: r.id,
-      fullName: r.full_name,
-      avatarUrl: r.avatar_url ?? undefined,
-      phone: r.phone ?? '',
-      email: '',
-      cccd: '',
-      taxCode: '',
-      address: '',
-      buildingsOwned: [],
-      totalBuildings: 0,
-      isDeleted: false,
-    }));
+    // Note: Filtering by building_id would require a specific join or subquery.
+    // We'll handle building filter in JS for now or via a specific where if possible.
+
+    let rows = await unwrap(query) as unknown as (ProfileRow & { buildings: { id: number, name: string }[] })[];
+
+    // Client-side filtering for complex conditions (building count, specific building)
+    if (buildingId) {
+      rows = rows.filter(r => r.buildings?.some(b => String(b.id) === buildingId));
+    }
+
+    if (minBuildings !== undefined) {
+      rows = rows.filter(r => (r.buildings?.length || 0) >= minBuildings);
+    }
+
+    if (maxBuildings !== undefined) {
+      rows = rows.filter(r => (r.buildings?.length || 0) <= maxBuildings);
+    }
+
+    return rows.map(r => {
+      const prefs = r.preferences || {};
+      return {
+        id: r.id,
+        fullName: r.full_name,
+        avatarUrl: r.avatar_url ?? undefined,
+        phone: r.phone ?? '',
+        email: prefs.email ?? '',
+        cccd: prefs.cccd ?? '',
+        taxCode: prefs.tax_code ?? '',
+        address: prefs.address ?? '',
+        buildingsOwned: r.buildings?.map(b => ({
+          buildingId: String(b.id),
+          buildingName: b.name
+        })) || [],
+        totalBuildings: r.buildings?.length || 0,
+        isDeleted: false,
+      };
+    });
   },
 
   getOwnerDetail: async (id: string): Promise<OwnerDetail> => {
     const row = await unwrap(
-      supabase.from('profiles').select('*').eq('id', id).single()
-    ) as unknown as ProfileRow;
+      supabase
+        .from('profiles')
+        .select('*, buildings(*, rooms(count))')
+        .eq('id', id)
+        .single()
+    ) as unknown as (ProfileRow & { buildings: any[] });
+
+    const prefs = row.preferences || {};
+
+    // Compute total rooms across all owned buildings
+    const totalRooms = row.buildings?.reduce((acc, b) => acc + (b.rooms?.[0]?.count || 0), 0) || 0;
+
     return {
       id: row.id,
       fullName: row.full_name,
       avatarUrl: row.avatar_url ?? undefined,
       phone: row.phone ?? '',
-      email: '',
-      cccd: '',
-      taxCode: '',
-      address: '',
-      buildingsOwned: [],
-      totalBuildings: 0,
-      totalRooms: 0,
+      email: prefs.email ?? '',
+      cccd: prefs.cccd ?? '',
+      taxCode: prefs.tax_code ?? '',
+      address: prefs.address ?? '',
+      buildingsOwned: row.buildings?.map(b => ({
+        buildingId: String(b.id),
+        buildingName: b.name,
+        buildingCode: `B${String(b.id).padStart(3, '0')}`,
+        ownershipPercent: 100, // Default to 100% since we use buildings.owner_id
+        ownershipType: 'FullOwner',
+        startDate: b.opening_date || b.created_at,
+      })) || [],
+      totalBuildings: row.buildings?.length || 0,
+      totalRooms,
       isDeleted: false,
     };
   },
 
-  // Province/district/ward — kept as static data (no DB tables for these)
+  // Province/district/ward — fetch from Vietnam Open API with fallback to constants
   getBuildingRevenueChart: async (buildingId: string): Promise<{ month: string; revenue: number; collected: number }[]> => {
     try {
       // Step 1: room IDs for this building
@@ -308,9 +415,39 @@ export const buildingService = {
     } catch { return []; }
   },
 
-  getProvinces: async () => MOCK_PROVINCES,
-  getDistricts: async (provinceId: string) => MOCK_DISTRICTS[provinceId] || [],
-  getWards: async (districtId: string) => MOCK_WARDS[districtId] || [],
+  // Get real location data from Vietnam Open API with fallback
+  getProvinces: async () => {
+    try {
+      const res = await fetch('https://provinces.open-api.vn/api/p/');
+      if (!res.ok) return FALLBACK_PROVINCES;
+      const data = await res.json();
+      return data.map((p: any) => ({ id: String(p.code), name: p.name }));
+    } catch {
+      return FALLBACK_PROVINCES;
+    }
+  },
+  getDistricts: async (provinceId: string) => {
+    if (!provinceId) return [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceId}?depth=2`);
+      if (!res.ok) return FALLBACK_DISTRICTS[provinceId] || [];
+      const data = await res.json();
+      return (data.districts || []).map((d: any) => ({ id: String(d.code), name: d.name }));
+    } catch {
+      return FALLBACK_DISTRICTS[provinceId] || [];
+    }
+  },
+  getWards: async (districtId: string) => {
+    if (!districtId) return [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/d/${districtId}?depth=2`);
+      if (!res.ok) return FALLBACK_WARDS[districtId] || [];
+      const data = await res.json();
+      return (data.wards || []).map((w: any) => ({ id: String(w.code), name: w.name }));
+    } catch {
+      return FALLBACK_WARDS[districtId] || [];
+    }
+  },
 
   checkBuildingCodeUnique: async (name: string): Promise<boolean> => {
     // buildingCode is derived from DB id — not stored as a column.
@@ -393,6 +530,26 @@ export const buildingService = {
     };
   },
 
+  deleteBuilding: async (id: string): Promise<void> => {
+    await unwrap(
+      supabase
+        .from('buildings')
+        .update({ is_deleted: true })
+        .eq('id', Number(id))
+    );
+  },
+
+  uploadBuildingImage: async (id: string, file: File): Promise<string> => {
+    // Backend Not Yet Implemented (as requested by user)
+    // For now, return a local Object URL to allow for immediate UI preview
+    console.log(`[Mock] Uploading file for building ${id}:`, file.name);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(URL.createObjectURL(file));
+      }, 1000);
+    });
+  },
+
   createOwner: async (data: CreateOwnerData): Promise<Owner> => {
     // profiles.id is a FK → auth.users.id, so we cannot insert a profile with a
     // random UUID from the client side — there would be no matching auth.users row.
@@ -421,6 +578,19 @@ export const buildingService = {
   updateOwner: async (id: string, data: UpdateOwnerData): Promise<Owner> => {
     validateOwnerTextEncoding(data);
 
+    // First fetch current preferences to merge
+    const current = await unwrap(
+      supabase.from('profiles').select('preferences').eq('id', id).single()
+    ) as { preferences: any };
+
+    const newPrefs = {
+      ...(current.preferences || {}),
+      cccd:     data.cccd     !== undefined ? data.cccd     : current.preferences?.cccd,
+      tax_code: data.taxCode  !== undefined ? data.taxCode  : current.preferences?.tax_code,
+      address:  data.address  !== undefined ? data.address  : current.preferences?.address,
+      email:    data.email    !== undefined ? data.email    : current.preferences?.email,
+    };
+
     const row = await unwrap(
       supabase
         .from('profiles')
@@ -428,21 +598,24 @@ export const buildingService = {
           full_name: data.fullName || undefined,
           avatar_url: data.avatarUrl === undefined ? undefined : data.avatarUrl ?? null,
           phone:     data.phone   ?? null,
+          preferences: newPrefs,
         })
         .eq('id', id)
         .select()
         .single()
     ) as unknown as ProfileRow;
 
+    const prefs = row.preferences || {};
+
     return {
       id:        row.id,
       fullName:  row.full_name,
       avatarUrl: row.avatar_url ?? undefined,
       phone:     row.phone ?? '',
-      email:     data.email  ?? '',
-      cccd:      data.cccd   ?? '',
-      taxCode:   data.taxCode ?? '',
-      address:   data.address ?? '',
+      email:     prefs.email ?? '',
+      cccd:      prefs.cccd ?? '',
+      taxCode:   prefs.tax_code ?? '',
+      address:   prefs.address ?? '',
       isDeleted: false,
     };
   },

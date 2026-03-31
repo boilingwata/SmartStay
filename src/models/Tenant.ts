@@ -11,6 +11,7 @@ export interface Tenant {
   status: TenantStatus;
   currentRoomId?: string;
   currentRoomCode?: string;
+  currentBuildingId?: string;
   avatarUrl?: string;
   onboardingPercent: number;
 }

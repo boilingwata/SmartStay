@@ -48,20 +48,10 @@ const PaymentHistory = () => {
               <PaymentCard key={payment.id} payment={payment} onClick={() => navigate(`/portal/invoices/${payment.invoiceId}`)} />
             ))
           ) : (
-            // Mock data for demonstration if API is empty
-            [1, 2, 3].map((i) => (
-              <PaymentCard 
-                key={i} 
-                payment={{
-                  id: `PAY-${1000 + i}`,
-                  amount: 5500000,
-                  method: i % 2 === 0 ? 'Chuyển khoản' : 'Ví điện tử',
-                  status: 'Success',
-                  createdAt: new Date(Date.now() - i * 86400000 * 30).toISOString(),
-                  description: `Thanh toán tiền phòng tháng ${12 - i}/2023`
-                }} 
-              />
-            ))
+            <div className="py-24 flex flex-col items-center justify-center bg-white/40 rounded-[48px] border-2 border-dashed border-slate-100 opacity-50 shadow-inner">
+               <CreditCard size={48} className="text-slate-200 mb-6" strokeWidth={1.5} />
+               <p className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] italic">Chưa có lịch sử thanh toán</p>
+            </div>
           )}
         </div>
     </div>

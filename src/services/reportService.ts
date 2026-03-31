@@ -51,7 +51,8 @@ function daysBetween(a: string, b: string): number {
 // ---------------------------------------------------------------------------
 
 const EMPTY_OCCUPANCY_KPI: OccupancyKPI = {
-  avgOccupancyRate: 0, avgOccupancyDelta: 0, occupiedRooms: 0,
+  avgOccupancyRate: 0, avgOccupancyDelta: 0, occupiedRooms: 0, 
+  vacantRooms: 0, maintenanceRooms: 0, reservedRooms: 0,
   longestVacantRoom: { roomCode: '', days: 0 }, avgVacancyDays: 0, sparklineData: [],
 };
 const EMPTY_FINANCIAL_KPI: FinancialKPI = {
@@ -178,6 +179,8 @@ export const reportService = {
       const total = rooms.length;
       const occupied = rooms.filter(r => r.status === 'occupied').length;
       const vacant = rooms.filter(r => r.status === 'available');
+      const maintenance = rooms.filter(r => r.status === 'maintenance').length;
+      const reserved = rooms.filter(r => r.status === 'reserved').length;
       const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0;
       const longestVacant = vacant[0];
 
@@ -185,6 +188,9 @@ export const reportService = {
         avgOccupancyRate: occupancyRate,
         avgOccupancyDelta: 0,
         occupiedRooms: occupied,
+        vacantRooms: vacant.length,
+        maintenanceRooms: maintenance,
+        reservedRooms: reserved,
         longestVacantRoom: {
           roomCode: longestVacant?.room_code ?? '',
           days: longestVacant?.created_at
@@ -199,13 +205,19 @@ export const reportService = {
 
   getOccupancyTrend: async (filters: ReportFilter): Promise<OccupancyTrendPoint[]> => {
     try {
-      // Fetch rooms and buildings separately, then active contracts for each month
-      const { data: roomData } = await supabase
-        .from('rooms').select('id, building_id').eq('is_deleted', false);
+      let roomQ = supabase.from('rooms').select('id, building_id').eq('is_deleted', false);
+      if (filters.buildingIds?.length) roomQ = roomQ.in('building_id', filters.buildingIds);
+      const { data: roomData } = await roomQ;
+      
       const { data: bldData } = await supabase
         .from('buildings').select('id, name').eq('is_deleted', false);
+      
+      const roomIds = (roomData ?? []).map(r => r.id);
+      if (roomIds.length === 0) return [];
+
       const { data: contractData } = await supabase
         .from('contracts').select('id, room_id, start_date, end_date, status')
+        .in('room_id', roomIds)
         .not('status', 'in', '("cancelled","terminated")');
 
       const rooms = (roomData ?? []) as SimpleRoomRow[];
@@ -309,12 +321,40 @@ export const reportService = {
   // ── Finance ──────────────────────────────────────────────────────────────
   getFinancialKPI: async (filters: ReportFilter): Promise<FinancialKPI> => {
     try {
-      // Invoices only — no join needed since filtering by billing_period is enough
+      let contractIds: number[] = [];
+      
+      if (filters.buildingIds?.length) {
+        // Step 1: Get rooms for these buildings
+        const { data: rooms } = await supabase
+          .from('rooms')
+          .select('id')
+          .in('building_id', filters.buildingIds)
+          .eq('is_deleted', false);
+        
+        const roomIds = (rooms ?? []).map(r => r.id);
+        if (roomIds.length === 0) return EMPTY_FINANCIAL_KPI;
+
+        // Step 2: Get contracts for these rooms
+        const { data: contracts } = await supabase
+          .from('contracts')
+          .select('id')
+          .in('room_id', roomIds)
+          .eq('is_deleted', false);
+        
+        contractIds = (contracts ?? []).map(c => c.id);
+        if (contractIds.length === 0) return EMPTY_FINANCIAL_KPI;
+      }
+
+      // Step 3: Fetch invoices
       let q = supabase
         .from('invoices')
         .select('id, total_amount, amount_paid, balance_due, status, billing_period')
         .gte('billing_period', filters.from)
         .lte('billing_period', filters.to);
+
+      if (contractIds.length > 0) {
+        q = q.in('contract_id', contractIds);
+      }
 
       const { data: invoices } = await q;
       const rows = (invoices ?? []) as SimpleInvoiceRow[];
@@ -327,11 +367,18 @@ export const reportService = {
 
       const soon = new Date();
       soon.setDate(soon.getDate() + 30);
-      const { count: expiring } = await supabase
+      
+      let contractQuery = supabase
         .from('contracts')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'active')
         .lte('end_date', soon.toISOString().slice(0, 10));
+
+      if (contractIds.length > 0) {
+        contractQuery = contractQuery.in('id', contractIds);
+      }
+
+      const { count: expiring } = await contractQuery;
 
       return {
         totalRevenue,
@@ -348,11 +395,39 @@ export const reportService = {
 
   getFinancialChart: async (filters: ReportFilter): Promise<FinancialChartPoint[]> => {
     try {
-      const { data } = await supabase
+      let contractIds: number[] = [];
+      
+      if (filters.buildingIds?.length) {
+        const { data: rooms } = await supabase
+          .from('rooms')
+          .select('id')
+          .in('building_id', filters.buildingIds)
+          .eq('is_deleted', false);
+        
+        const roomIds = (rooms ?? []).map(r => r.id);
+        if (roomIds.length === 0) return [];
+
+        const { data: contracts } = await supabase
+          .from('contracts')
+          .select('id')
+          .in('room_id', roomIds)
+          .eq('is_deleted', false);
+        
+        contractIds = (contracts ?? []).map(c => c.id);
+        if (contractIds.length === 0) return [];
+      }
+
+      let q = supabase
         .from('invoices')
         .select('total_amount, amount_paid, balance_due, status, billing_period')
         .gte('billing_period', filters.from)
         .lte('billing_period', filters.to);
+
+      if (contractIds.length > 0) {
+        q = q.in('contract_id', contractIds);
+      }
+
+      const { data } = await q;
 
       const byMonth = new Map<string, { revenue: number; collected: number; debt: number }>();
       for (const row of (data ?? []) as SimpleInvoiceRow[]) {

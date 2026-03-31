@@ -59,8 +59,7 @@ export const OwnershipModal = ({ isOpen, onClose, buildingId, currentOwnerships,
     }
 
     try {
-      // simulate save
-      await new Promise(r => setTimeout(r, 600));
+      // In production: await buildingService.addOwner(buildingId, formData);
       toast.success('Gán chủ sở hữu thành công');
       onSuccess();
       onClose();

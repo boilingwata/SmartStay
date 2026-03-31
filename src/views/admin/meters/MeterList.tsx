@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
-  Building, Home, Zap, Droplets, AlertCircle, 
-  Activity, Search, Download, 
-  History, TrendingUp, ChevronRight, Inbox
+  Zap, Droplets, AlertCircle, 
+  Activity, Download, 
+  History, TrendingUp, ChevronRight, Inbox, ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/utils';
-import { Select } from '@/components/ui/Select';
-import { SelectAsync } from '@/components/ui/SelectAsync';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Spinner, Skeleton } from '@/components/ui/Feedback';
+import { Skeleton } from '@/components/ui/Feedback';
 import { useQuery } from '@tanstack/react-query';
 import { meterService } from '@/services/meterService';
 import { buildingService } from '@/services/buildingService';
@@ -18,57 +15,76 @@ import { Meter } from '@/models/Meter';
 import { MeterReadingModal } from '@/components/forms/MeterReadingModal';
 import useUIStore from '@/stores/uiStore';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { MeterFilterBar } from '@/components/meters/MeterFilterBar';
+import { MeterAdvancedFilter } from '@/components/meters/MeterAdvancedFilter';
+import { format, parseISO } from 'date-fns';
 
 const MeterList = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const activeBuildingId = useUIStore((s) => s.activeBuildingId);
-  const setBuilding = useUIStore((s) => s.setBuilding);
-  const [roomId, setRoomId] = useState('');
-  const [meterType, setMeterType] = useState<'Electricity' | 'Water' | ''>('');
-  const [meterStatus, setMeterStatus] = useState<'Active' | 'Inactive' | 'Replaced'>('Active');
-  const [search, setSearch] = useState('');
-  const [isMissingOnly, setIsMissingOnly] = useState(false);
   
+  const [filters, setFilters] = useState({
+    buildingId: activeBuildingId ? String(activeBuildingId) : '',
+    roomId: '',
+    meterType: '' as 'Electricity' | 'Water' | '',
+    meterStatus: 'Active',
+    search: '',
+    missingOnly: false,
+    monthYear: '', // YYYY-MM
+  });
+
+  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
   
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeter, setSelectedMeter] = useState<Meter | null>(null);
 
+  useEffect(() => {
+    setFilters(f => ({ ...f, buildingId: activeBuildingId ? String(activeBuildingId) : '' }));
+  }, [activeBuildingId]);
+
   const { data: meters, isLoading, refetch } = useQuery({
-    queryKey: ['meters', activeBuildingId, roomId, meterType, meterStatus, search, isMissingOnly, page],
+    queryKey: ['meters', filters, page],
     queryFn: () => meterService.getMeters({ 
-      buildingId: activeBuildingId ? String(activeBuildingId) : undefined, 
-      roomId: roomId || undefined, 
-      type: meterType || undefined,
-      status: meterStatus,
-      search: search || undefined,
-      missingOnly: isMissingOnly,
+      buildingId: filters.buildingId || undefined, 
+      roomId: filters.roomId || undefined, 
+      type: filters.meterType || undefined,
+      status: filters.meterStatus,
+      search: filters.search || undefined,
+      missingOnly: filters.missingOnly,
       page,
       limit: PAGE_SIZE,
     })
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['meter-stats', filters.buildingId],
+    queryFn: () => meterService.getMeterStatistics({ buildingId: filters.buildingId })
+  });
+
   const totalPages = Math.max(1, Math.ceil((meters?.total ?? 0) / PAGE_SIZE));
 
-  // B34 FIX: Generate and download CSV from current meters
   const handleDownloadCSV = () => {
     const data = meters?.data ?? [];
     if (data.length === 0) {
       toast.warning('Không có dữ liệu để xuất.');
       return;
     }
-    const headers = ['Mã đồng hồ', 'Phòng', 'Loại', 'Chỉ số mới nhất', 'Tháng', 'Trạng thái'];
+    const headers = ['Mã đồng hồ', 'Phòng', 'Loại', 'Chỉ số cũ', 'Chỉ số mới', 'Tiêu thụ', 'Tháng', 'Ngày ghi'];
     const rows = data.map(m => [
       m.meterCode,
       m.roomCode,
       m.meterType === 'Electricity' ? 'Điện' : 'Nước',
+      m.previousReadingIndex ?? '',
       m.latestReadingIndex ?? '',
+      m.usage ?? '',
       m.latestMonthYear ?? '',
-      m.meterStatus,
+      m.readingDate ? format(parseISO(m.readingDate), 'dd/MM/yyyy HH:mm') : '',
     ]);
-    const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const csvContent = "\uFEFF" + [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -86,222 +102,227 @@ const MeterList = () => {
     setIsModalOpen(true);
   };
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.buildingId && filters.buildingId !== String(activeBuildingId)) count++;
+    if (filters.roomId) count++;
+    if (filters.meterStatus && filters.meterStatus !== 'Active') count++;
+    if (filters.monthYear) count++;
+    return count;
+  }, [filters, activeBuildingId]);
+
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
-      {/* 5.1.1 Header & Actions */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-700 pb-20">
+      {/* Header & Interactive Stats */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-[44px] font-black leading-tight tracking-tighter text-slate-900">
-            Đồng hồ <span className="text-primary italic">& Chỉ số</span>
-          </h1>
-          <p className="text-small text-muted font-bold uppercase tracking-[2px] mt-2">
-            Quản lý chỉ số điện nước & Lịch sử ghi nhận
-          </p>
+           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+             Thống kê <span className="text-primary italic">Đồng hồ</span>
+           </h1>
+           <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mt-1">Hệ thống đo lường thông minh</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate('/admin/meters/bulk')}
-            className="btn-primary h-14"
-          >
-            <History size={18} />
-            <span>Ghi hàng loạt</span>
-          </button>
-          <button 
-            onClick={handleDownloadCSV}
-            className="h-14 w-14 flex items-center justify-center rounded-[20px] bg-white text-muted hover:text-primary transition-all shadow-xl shadow-slate-200/50 active:scale-95 border border-white"
-            title="Xuất CSV"
-          >
-            <Download size={22} />
-          </button>
-        </div>
-      </div>
+        <div className="flex flex-wrap items-center gap-3">
+           {/* Interactive Stats Panel */}
+           <div className="flex items-center gap-4 bg-white px-6 py-3 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+              <button 
+                onClick={() => setFilters({ ...filters, meterType: '', missingOnly: false })}
+                className="flex items-center gap-2 pr-4 border-r border-slate-100 hover:opacity-70 transition-opacity"
+              >
+                 <Activity size={14} className="text-primary" />
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tổng:</span>
+                 <span className="text-sm font-black text-slate-800">{stats?.total || 0}</span>
+              </button>
+              <button 
+                onClick={() => setFilters({ ...filters, meterType: 'Electricity', missingOnly: false })}
+                className="flex items-center gap-2 pr-4 border-r border-slate-100 hover:opacity-70 transition-opacity"
+              >
+                 <Zap size={14} className="text-amber-500" />
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Điện:</span>
+                 <span className="text-sm font-black text-slate-800">{stats?.electricity || 0}</span>
+              </button>
+              <button 
+                onClick={() => setFilters({ ...filters, meterType: 'Water', missingOnly: false })}
+                className="flex items-center gap-2 pr-4 border-r border-slate-100 hover:opacity-70 transition-opacity"
+              >
+                 <Droplets size={14} className="text-blue-500" />
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nước:</span>
+                 <span className="text-sm font-black text-slate-800">{stats?.water || 0}</span>
+              </button>
+              <button 
+                onClick={() => setFilters({ ...filters, meterType: '', missingOnly: true })}
+                className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+              >
+                 <AlertCircle size={14} className="text-red-500 animate-pulse" />
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chưa nhập:</span>
+                 <span className="text-sm font-black text-red-600">{stats?.missing || 0}</span>
+              </button>
+           </div>
 
-      {/* 5.1.1 Filter Panel */}
-      <div className="card-container p-8 animate-in slide-in-from-top-4 duration-500 relative z-20 overflow-visible border-none bg-white/60 backdrop-blur-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)]">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-start">
-          <div>
-            <SelectAsync 
-              label="Tòa nhà"
-              placeholder="Tất cả tòa nhà"
-              icon={Building}
-              value={activeBuildingId ? String(activeBuildingId) : ''}
-              loadOptions={async (search) => {
-                const buildings = await buildingService.getBuildings({ search });
-                return buildings.map(b => ({ label: b.buildingName, value: String(b.id) }));
-              }}
-              onChange={(val) => setBuilding(val)} 
-            />
-          </div>
+           <div className="h-10 w-px bg-slate-200 mx-2 hidden xl:block" />
 
-          <div>
-            <SelectAsync 
-              label="Phòng"
-              placeholder="Tất cả phòng"
-              icon={Home}
-              value={roomId}
-              loadOptions={async (search) => {
-                 const rooms = await roomService.getRooms({
-                   buildingId: activeBuildingId ? String(activeBuildingId) : undefined,
-                   search: search || undefined,
-                 });
-                 return rooms.map(r => ({ label: `Phòng ${r.roomCode}`, value: String(r.id) }));
-              }}
-              onChange={(val) => setRoomId(val)} 
-            />
-          </div>
-
-          <div>
-            <Select 
-              label="Loại đồng hồ"
-              placeholder="Tất cả"
-              icon={Zap}
-              options={[
-                { label: 'Tất cả loại', value: '' },
-                { label: 'Điện (Electricity)', value: 'Electricity' },
-                { label: 'Nước (Water)', value: 'Water' }
-              ]}
-              value={meterType}
-              onChange={(val) => setMeterType(val as any)}
-            />
-          </div>
-
-          <div>
-            <Select 
-              label="Trạng thái"
-              placeholder="Đang hoạt động"
-              icon={Activity}
-              options={[
-                { label: 'Đang hoạt động', value: 'Active' },
-                { label: 'Tạm dừng', value: 'Inactive' },
-                { label: 'Đã thay mới', value: 'Replaced' }
-              ]}
-              value={meterStatus}
-              onChange={(val) => setMeterStatus(val as any)}
-            />
-          </div>
-
-          <div>
-            <div className="space-y-2">
-               <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Tìm kiếm</label>
-               <div className="relative group">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
-                  <input 
-                    type="text" 
-                    placeholder="Mã/Số phòng..."
-                    className="input-base pl-12 h-14 w-full"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-               </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="space-y-2">
-               <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Bộ lọc nhanh</label>
-               <button 
-                 onClick={() => setIsMissingOnly(!isMissingOnly)}
-                 className={cn(
-                   "flex h-14 w-full items-center justify-center gap-3 rounded-[20px] cursor-pointer transition-all border-2 font-black uppercase tracking-widest text-[11px]",
-                   isMissingOnly ? "bg-danger text-white border-danger shadow-lg shadow-danger/20" : "bg-bg border-transparent text-muted hover:bg-slate-100"
-                 )}
-               >
-                  <AlertCircle size={18} className={isMissingOnly ? "animate-pulse" : ""} />
-                  Chưa nhập
-               </button>
-            </div>
-          </div>
+           <div className="flex items-center gap-2">
+              <button 
+                onClick={() => navigate('/admin/meters/bulk')}
+                className="h-12 px-6 flex items-center gap-2 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-hover transition-all active:scale-95"
+              >
+                 <History size={18} />
+                 <span>Chốt hàng loạt</span>
+              </button>
+              <button 
+                onClick={handleDownloadCSV}
+                className="h-12 w-12 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm active:scale-95"
+                title="Xuất CSV"
+              >
+                <Download size={20} />
+              </button>
+           </div>
         </div>
       </div>
 
-      {/* 5.1.2 DataTable */}
-      <div className="card-container overflow-hidden bg-white/40 border-border/5">
+      {/* Modern Filter Section */}
+      <div className="space-y-4">
+        <MeterFilterBar 
+          filters={filters}
+          setFilters={(f) => {
+            setFilters(f);
+            setPage(1);
+          }}
+          isAdvancedExpanded={isAdvancedExpanded}
+          setIsAdvancedExpanded={setIsAdvancedExpanded}
+          activeFilterCount={activeFilterCount}
+          stats={stats}
+        />
+
+        <div className={cn(
+           "bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-500",
+           isAdvancedExpanded ? "p-4 pt-0" : "h-0 border-none p-0 overflow-hidden"
+        )}>
+          <MeterAdvancedFilter 
+            filters={filters}
+            onChange={(f) => {
+              setFilters(f);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilters({
+                buildingId: activeBuildingId ? String(activeBuildingId) : '',
+                roomId: '',
+                meterType: '',
+                meterStatus: 'Active',
+                search: '',
+                missingOnly: false,
+                monthYear: '',
+              });
+              setPage(1);
+            }}
+            isExpanded={isAdvancedExpanded}
+            onClose={() => setIsAdvancedExpanded(false)}
+          />
+        </div>
+      </div>
+
+      {/* DataTable */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500 mt-6">
         <div className="overflow-x-auto">
            <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-900/5 backdrop-blur-sm border-b border-border/5">
+              <thead className="bg-slate-50 border-b border-slate-200">
                  <tr>
-                    <th className="px-8 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Mã đồng hồ</th>
-                    <th className="px-6 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Phòng</th>
-                    <th className="px-6 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Loại thiết bị</th>
-                    <th className="px-6 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Chỉ số mới nhất</th>
-                    <th className="px-6 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Kỳ chốt</th>
-                    <th className="px-6 py-6 text-[10px] font-black text-muted uppercase tracking-[3px]">Trạng thái</th>
-                    <th className="px-8 py-6 text-right text-[10px] font-black text-muted uppercase tracking-[3px]">Thao tác</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px]">Mã đồng hồ</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px]">Phòng</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-center">Loại</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-right">Chỉ số cũ</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-right">Chỉ số mới</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-right">Tiêu thụ</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-center">Kỳ chốt</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[2px] text-right">Ngày ghi</th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black text-slate-500 uppercase tracking-[2px]">Thao tác</th>
                  </tr>
               </thead>
               <tbody>
                  {isLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i} className="border-b border-border/5">
-                        <td className="px-8 py-6"><Skeleton className="h-6 w-32" /></td>
-                        <td className="px-6 py-6"><Skeleton className="h-6 w-24" /></td>
-                        <td className="px-6 py-6"><Skeleton className="h-8 w-20 rounded-full" /></td>
-                        <td className="px-6 py-6"><Skeleton className="h-8 w-24" /></td>
-                        <td className="px-6 py-6"><Skeleton className="h-6 w-16" /></td>
-                        <td className="px-6 py-6"><Skeleton className="h-8 w-24 rounded-full" /></td>
-                        <td className="px-8 py-6 text-right"><Skeleton className="h-10 w-24 ml-auto rounded-xl" /></td>
+                      <tr key={i} className="border-b border-slate-50">
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full mx-auto" /></td>
+                        <td className="px-6 py-4 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                        <td className="px-6 py-4 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                        <td className="px-6 py-4 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                        <td className="px-6 py-4 text-center"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                        <td className="px-6 py-4 text-right"><Skeleton className="h-4 w-24 ml-auto" /></td>
+                        <td className="px-6 py-4 text-right"><Skeleton className="h-10 w-24 ml-auto rounded-xl" /></td>
                       </tr>
                     ))
                  ) : meters?.data?.length === 0 ? (
                     <tr>
-                       <td colSpan={7} className="py-24 text-center">
+                       <td colSpan={9} className="py-24 text-center">
                           <div className="flex flex-col items-center justify-center opacity-30">
                             <Inbox size={64} className="mb-4 text-primary" strokeWidth={1} />
                             <p className="text-[14px] font-black uppercase tracking-[4px] text-slate-800">Không tìm thấy dữ liệu</p>
-                            <p className="text-small font-bold mt-2">Vui lòng điều chỉnh bộ lọc hoặc tìm kiếm khác</p>
+                            <p className="text-xs font-bold mt-2">Vui lòng điều chỉnh bộ lọc hoặc tìm kiếm khác</p>
                           </div>
                        </td>
                     </tr>
                  ) : (
                     meters?.data?.map((meter: Meter) => (
-                       <tr key={meter.id} className="group border-b border-border/5 hover:bg-white/50 transition-all">
-                          <td className="px-8 py-6">
-                             <Link to={`/admin/meters/${meter.id}/readings`} className="font-mono text-[13px] font-black text-primary hover:underline flex items-center gap-2">
+                       <tr key={meter.id} className="group border-b border-slate-50 hover:bg-slate-50/50 transition-all">
+                          <td className="px-6 py-4">
+                             <Link to={`/admin/meters/${meter.id}/readings`} className="font-mono text-[13px] font-black text-slate-900 group-hover:text-primary flex items-center gap-2">
                                {meter.meterCode}
                                <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
                              </Link>
                           </td>
-                          <td className="px-6 py-6">
-                             <Link to={`/admin/rooms/${meter.roomId}`} className="text-small font-black text-slate-700 hover:text-primary transition-colors">
-                                Phòng {meter.roomCode}
+                          <td className="px-6 py-4">
+                             <Link to={`/admin/rooms/${meter.roomId}`} className="text-sm font-bold text-slate-600 hover:text-primary transition-colors">
+                                P.{meter.roomCode}
                              </Link>
                           </td>
-                          <td className="px-6 py-6">
-                             <div className={cn(
-                               "flex items-center gap-2 px-3 py-1 rounded-full w-fit",
-                               meter.meterType === 'Electricity' ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
-                             )}>
-                                {meter.meterType === 'Electricity' ? <Zap size={12} fill="currentColor" /> : <Droplets size={12} fill="currentColor" />}
-                                <span className="text-[10px] font-black uppercase tracking-tighter">
-                                   {meter.meterType === 'Electricity' ? 'Điện' : 'Nước'}
-                                </span>
+                          <td className="px-6 py-4">
+                             <div className="flex justify-center">
+                               <div className={cn(
+                                 "flex items-center gap-1.5 px-3 py-1 rounded-full w-fit",
+                                 meter.meterType === 'Electricity' ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+                               )}>
+                                  {meter.meterType === 'Electricity' ? <Zap size={10} fill="currentColor" /> : <Droplets size={10} fill="currentColor" />}
+                                  <span className="text-[9px] font-black uppercase tracking-tighter">
+                                     {meter.meterType === 'Electricity' ? 'Điện' : 'Nước'}
+                                  </span>
+                               </div>
                              </div>
                           </td>
-                          <td className="px-6 py-6 font-mono">
-                             <span className="text-[16px] font-black text-slate-800">
-                                {Number(meter.latestReadingIndex || 0).toLocaleString()}
-                             </span>
-                             <p className="text-[9px] text-muted font-bold uppercase tracking-tighter mt-1 italic opacity-60">RULE-01 Source</p>
+                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-slate-400">
+                             {meter.previousReadingIndex?.toLocaleString() ?? '--'}
                           </td>
-                          <td className="px-6 py-6 font-mono font-bold text-slate-600">
+                          <td className="px-6 py-4 text-right font-mono text-[15px] font-black text-slate-900">
+                             {meter.latestReadingIndex?.toLocaleString() ?? '--'}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <span className={cn(
+                               "px-2 py-1 rounded-lg font-mono text-sm font-black",
+                               (meter.usage ?? 0) > 0 ? "bg-primary/5 text-primary" : "text-slate-300"
+                             )}>
+                               {(meter.usage ?? 0).toLocaleString()}
+                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-center font-mono font-bold text-slate-600 text-[13px]">
                              {meter.latestMonthYear || '--'}
                           </td>
-                          <td className="px-6 py-6">
-                             <StatusBadge status={meter.meterStatus} />
+                          <td className="px-6 py-4 text-right text-[12px] font-bold text-slate-500 italic">
+                             {meter.readingDate ? format(parseISO(meter.readingDate), 'dd/MM/yy HH:mm') : '--'}
                           </td>
-                          <td className="px-8 py-6 text-right">
-                             <div className="flex justify-end gap-3">
+                          <td className="px-6 py-4 text-right">
+                             <div className="flex justify-end gap-2">
                                 <button 
                                   onClick={() => handleOpenReadingModal(meter)}
-                                  className="h-11 w-11 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-lg shadow-primary/5 active:scale-90"
+                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all active:scale-90"
                                   title="Nhập chỉ số"
                                 >
                                    <History size={18} />
                                 </button>
                                 <button 
                                   onClick={() => navigate(`/admin/meters/${meter.id}/readings`)}
-                                  className="h-11 w-11 flex items-center justify-center rounded-xl bg-bg border border-border/50 text-muted hover:text-primary transition-all active:scale-90"
+                                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:text-primary transition-all active:scale-90"
                                   title="Lịch sử tiêu thụ"
                                 >
                                    <TrendingUp size={18} />
@@ -316,43 +337,41 @@ const MeterList = () => {
         </div>
         
         {/* Pagination */}
-        <div className="p-8 border-t border-border/5 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-6">
-           <p className="text-small text-muted font-bold uppercase tracking-wider">
+        <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-6">
+           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Hiển thị {meters?.data?.length || 0} trong {meters?.total || 0} đồng hồ
            </p>
            <div className="flex items-center gap-2">
               <button
-                className={cn('h-11 px-6 rounded-xl border text-[11px] font-black uppercase transition-all',
-                  page <= 1 ? 'border-border text-muted opacity-50 cursor-not-allowed' : 'border-primary/30 text-primary hover:bg-primary/5 cursor-pointer'
+                className={cn('h-10 px-4 rounded-xl border text-[11px] font-black uppercase transition-all flex items-center gap-2',
+                  page <= 1 ? 'border-slate-100 text-slate-300 cursor-not-allowed' : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary bg-white shadow-sm'
                 )}
                 disabled={page <= 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-              >Trước</button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
-                Math.max(0, page - 3), Math.min(totalPages, page + 2)
-              ).map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={cn('h-11 w-11 rounded-xl text-[11px] font-black uppercase transition-all',
-                    p === page
-                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                      : 'bg-white border border-border text-muted hover:border-primary/30 hover:text-primary'
-                  )}
-                >{p}</button>
-              ))}
+              >
+                <ChevronLeft size={16} />
+                Trước
+              </button>
+              
+              <div className="flex items-center px-4 font-mono text-sm font-bold text-slate-400">
+                Trang {page} / {totalPages}
+              </div>
+
               <button
-                className={cn('h-11 px-6 rounded-xl border text-[11px] font-black uppercase transition-all',
-                  page >= totalPages ? 'border-border text-muted opacity-50 cursor-not-allowed' : 'border-primary/30 text-primary hover:bg-primary/5 cursor-pointer'
+                className={cn('h-10 px-4 rounded-xl border text-[11px] font-black uppercase transition-all flex items-center gap-2',
+                  page >= totalPages ? 'border-slate-100 text-slate-300 cursor-not-allowed' : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary bg-white shadow-sm'
                 )}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              >Sau</button>
+              >
+                Sau
+                <ChevronRight size={16} />
+              </button>
            </div>
         </div>
       </div>
       
-      {/* 5.2 Meter Reading Modal */}
+      {/* Meter Reading Modal */}
       <MeterReadingModal 
         isOpen={isModalOpen}
         meter={selectedMeter}

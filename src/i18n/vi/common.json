@@ -8,29 +8,34 @@
   "sidebar": {
     "commandCenter": "TRUNG TÂM ĐIỀU KHIỂN",
     "activeBuilding": "Tòa nhà đang chọn",
-    "coreSystem": "HỆ THỐNG CHÍNH",
+    "system": "HỆ THỐNG",
+    "customers": "KHÁCH HÀNG",
+    "finance": "TÀI CHÍNH",
     "operations": "VẬN HÀNH",
+    "communication": "TRUYỀN THÔNG & BÁO CÁO",
     "settings": "CÀI ĐẶT",
     "dashboard": "Tổng quan",
-    "myTickets": "Vé của tôi",
     "contracts": "Hợp đồng",
+    "contractAddendums": "Phụ lục HĐ",
     "invoices": "Hóa đơn",
     "payments": "Thanh toán",
     "tenants": "Cư dân",
     "rooms": "Phòng",
     "buildings": "Tòa nhà",
+    "meters": "Quản lý đồng hồ",
     "meterEntry": "Nhập số điện/nước",
     "visitorCheckin": "Kiểm tra Khách",
     "amenityCheckin": "Kiểm tra Tiện ích",
     "assets": "Tài sản",
-    "allTickets": "Tất cả Vé yêu cầu",
+    "allTickets": "Vé yêu cầu",
     "reports": "Báo cáo",
     "announcements": "Thông báo",
     "owners": "Chủ sở hữu",
     "services": "Dịch vụ & Giá",
     "electricityPolicy": "Chính sách Điện",
     "waterPolicy": "Chính sách Nước",
-    "users": "Người dùng",
+    "users": "Nhân viên & Người dùng",
+    "permissions": "Phân quyền",
     "systemConfig": "Cấu hình hệ thống",
     "auditLogs": "Nhật ký hoạt động"
   },
@@ -106,6 +111,17 @@
     "VNPay": "VNPay",
     "Momo": "MoMo",
     "ZaloPay": "ZaloPay"
+  },
+  "buildingType": {
+    "Apartment": "Căn hộ",
+    "Office": "Văn phòng",
+    "Mixed": "Tổng hợp",
+    "Shophouse": "Shophouse"
+  },
+  "performanceTier": {
+    "low": "Cần chú ý (<70%)",
+    "medium": "Ổn định (70-90%)",
+    "high": "Hiệu suất cao (>90%)"
   },
   "assetType": {
     "Furniture": "Nội thất",
@@ -183,9 +199,22 @@
       "overdueAlert": "{{count}} hóa đơn quá hạn — Tổng nợ: {{amount}}",
       "overdueHint": "Yêu cầu nhắc nhở thanh toán để đảm bảo dòng tiền.",
       "filterOverdue": "Lọc quá hạn",
+      "overdueBannerTitle": "hóa đơn quá hạn",
+      "overdueTotal": "Tổng nợ",
       "searchPlaceholder": "Tìm theo mã HĐ, tên cư dân...",
       "allBuildings": "Tất cả tòa nhà",
       "filter": "Lọc",
+      "advancedFilter": "Bộ lọc nâng cao",
+      "minAmount": "Giá từ",
+      "maxAmount": "Đến",
+      "dateFrom": "Từ ngày",
+      "dateTo": "Đến ngày",
+      "roomCodePlaceholder": "Mã phòng (VD: A-101)...",
+      "locationOther": "Vị trí & Khác",
+      "appliedActive": "Đang áp dụng bộ lọc nâng cao",
+      "periodLabel": "Kỳ thanh toán",
+
+      "dueDateLabel": "Hạn chót",
       "tabs": {
         "all": "Tất cả",
         "unpaid": "Chưa trả",
@@ -195,9 +224,11 @@
       },
       "table": {
         "invoiceCode": "Mã Hóa Đơn",
+        "target": "Đối tượng / Phòng",
         "contractRoom": "Hợp đồng / Phòng",
         "tenant": "Cư dân",
         "period": "Kỳ",
+        "amount": "Số tiền",
         "totalAmount": "Tổng tiền",
         "remaining": "Còn lại",
         "status": "Trạng thái",
@@ -213,6 +244,7 @@
       "more": "Thêm",
       "copiedCode": "Đã sao chép mã hóa đơn"
     },
+
     "tickets": {
       "title": "Yêu cầu & Sự cố",
       "description": "Trung tâm điều hành hỗ trợ cư dân, quản lý kỹ thuật và xử lý khiếu nại.",
@@ -259,6 +291,7 @@
       "areaRange": "Diện tích (m2)",
       "floorRange": "Tầng (Floor)",
       "roomType": "Loại phòng",
+      "advancedFilters": "Bộ lọc nâng cao",
       "baseRent": "Giá thuê cơ bản",
       "roomDetail": "Chi tiết phòng",
       "table": {
@@ -282,6 +315,29 @@
       "searchPlaceholder": "Tìm theo Tên, SĐT, CCCD...",
       "allBuildings": "Tất cả tòa nhà",
       "createSuccess": "Hồ sơ cư dân {{name}} đã được tạo thành công!"
+    },
+    "buildings": {
+      "title": "Danh mục Toà nhà",
+      "description": "Quản lý hiệu suất khai thác và tài chính trên từng bất động sản.",
+      "searchPlaceholder": "Tìm tên toà nhà, khu vực...",
+      "allTypes": "Tất cả loại hình",
+      "advancedFilters": "Bộ lọc nâng cao",
+      "sorting": {
+        "title": "Sắp xếp theo",
+        "name": "Tên toà nhà (A-Z)",
+        "totalRooms": "Số lượng phòng",
+        "occupancyRate": "Tỉ lệ lấp đầy",
+        "created_at": "Mới nhất"
+      },
+      "filters": {
+        "occupancy": "Tình trạng lấp đầy",
+        "capacity": "Quy mô (Số phòng)",
+        "allCapacities": "Mọi quy mô",
+        "small": "Nhỏ (<10 phòng)",
+        "medium": "Vừa (10-30 phòng)",
+        "large": "Lớn (>30 phòng)"
+      },
+      "create": "Thêm toà nhà mới"
     }
   },
   "actions": {

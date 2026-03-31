@@ -26,7 +26,7 @@ const ForgotPassword: React.FC = () => {
   const handleIdentifierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // In production: await authService.sendResetOtp(identifier);
     setLoading(false);
     setStep(2);
     setTimer(30);
@@ -65,7 +65,7 @@ const ForgotPassword: React.FC = () => {
 
   const handleOtpVerify = async (code: string) => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // In production: await authService.verifyResetOtp(identifier, code);
     setLoading(false);
     if (code === '123456') {
       setStep(3);
@@ -83,10 +83,11 @@ const ForgotPassword: React.FC = () => {
       return;
     }
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // In production: await authService.resetPassword(identifier, password);
     setLoading(false);
     setStep(4);
-    setTimeout(() => navigate('/portal/login'), 3000);
+    // Navigation should be user-triggered or a very short auto-redirect
+    setTimeout(() => navigate('/portal/login'), 2000);
   };
 
   const renderStep = () => {

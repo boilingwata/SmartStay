@@ -138,27 +138,32 @@ const ContractView = () => {
                 <span className="text-[9px] font-bold text-teal-600 italic">Cam kết không thay đổi</span>
               </div>
               <div className="space-y-4">
-                {(contract?.services && contract.services.length > 0 ? contract.services : [
-                   { id: 'fallback-1', serviceName: 'Điện dân dụng', unitPriceSnapshot: 3500, unit: 'kWh', quantity: 1, totalPerCycle: 3500 },
-                   { id: 'fallback-2', serviceName: 'Nước sinh hoạt', unitPriceSnapshot: 25000, unit: 'm3', quantity: 1, totalPerCycle: 25000 },
-                   { id: 'fallback-3', serviceName: 'Quản lý & Vệ sinh', unitPriceSnapshot: 150000, unit: 'Tháng', quantity: 1, totalPerCycle: 150000 }
-                ] as ContractService[]).map((svc: ContractService, idx: number) => {
-                  const Icon = getServiceIcon(svc.serviceName);
-                  return (
-                    <div key={svc.id || idx} className="bg-white p-6 rounded-[32px] border border-slate-100 flex items-center justify-between hover:shadow-xl hover:-translate-y-1 transition-all group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
-                          <Icon size={20} />
+                {(contract?.services || []).length > 0 ? (
+                  (contract?.services || []).map((svc: ContractService, idx: number) => {
+                    const Icon = getServiceIcon(svc.serviceName);
+                    return (
+                      <div key={svc.id || idx} className="bg-white p-6 rounded-[32px] border border-slate-100 flex items-center justify-between hover:shadow-xl hover:-translate-y-1 transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
+                            <Icon size={20} />
+                          </div>
+                          <span className="text-sm font-black text-slate-700 uppercase tracking-tight">{svc.serviceName}</span>
                         </div>
-                        <span className="text-sm font-black text-slate-700 uppercase tracking-tight">{svc.serviceName}</span>
+                        <div className="text-right">
+                          <p className="text-[15px] font-black text-teal-600 font-display">{formatVND(svc.unitPriceSnapshot)}</p>
+                          <p className="text-[10px] text-slate-400 font-medium lowercase italic pr-1">/{svc.unit}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[15px] font-black text-teal-600 font-display">{formatVND(svc.unitPriceSnapshot)}</p>
-                        <p className="text-[10px] text-slate-400 font-medium lowercase italic pr-1">/{svc.unit}</p>
-                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="bg-white/50 border border-slate-100 rounded-[32px] p-10 text-center space-y-2">
+                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mx-auto">
+                       <Zap size={20} />
                     </div>
-                  );
-                })}
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Chưa có dịch vụ đính kèm</p>
+                  </div>
+                )}
               </div>
             </div>
 

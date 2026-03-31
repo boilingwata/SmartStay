@@ -15,12 +15,20 @@ interface InvoiceTabProps {
 export const InvoiceTab: React.FC<InvoiceTabProps> = ({ invoices }) => {
   const navigate = useNavigate();
   
-  // Dummy data for visual excellence if empty
-  const displayInvoices = invoices || [
-    { id: 'INV-001', code: 'INV/2024/001', amount: 3500000, status: 'Pending', dueDate: '2024-03-05' },
-    { id: 'INV-002', code: 'INV/2024/002', amount: 15450000, status: 'Paid', dueDate: '2024-02-05' },
-    { id: 'INV-003', code: 'INV/2024/003', amount: 1200000, status: 'Overdue', dueDate: '2024-01-05' },
-  ];
+  const displayInvoices = invoices || [];
+
+  if (displayInvoices.length === 0) {
+    return (
+      <div className="card-container p-20 text-center space-y-4 bg-white/40 border-dashed border-2">
+        <div className="w-20 h-20 bg-bg rounded-full flex items-center justify-center text-muted mx-auto">
+          <FileText size={40} />
+        </div>
+        <h3 className="text-h3 font-black text-primary uppercase tracking-widest">Chưa có hoá đơn</h3>
+        <p className="text-small text-muted italic max-w-xs mx-auto">Cư dân này hiện chưa có phát sinh hoá đơn tài chính nào.</p>
+        <button className="btn-primary px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">+ Tạo hoá đơn đầu tiên</button>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-10">

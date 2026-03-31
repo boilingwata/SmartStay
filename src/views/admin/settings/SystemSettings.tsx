@@ -9,10 +9,8 @@ const SystemSettings: React.FC = () => {
 
   const handleSave = () => {
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast.success('Đã lưu cấu hình hệ thống thành công');
-    }, 1000);
+    setSaving(false);
+    toast.success('Đã lưu cấu hình hệ thống thành công');
   };
 
   const tabs = [

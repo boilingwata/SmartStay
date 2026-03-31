@@ -58,6 +58,14 @@ export interface Amenity {
 }
 export interface BuildingFilters {
   search?: string;
+  type?: BuildingType;
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'name' | 'totalRooms' | 'occupancyRate' | 'created_at';
+  sortOrder?: 'asc' | 'desc';
+  minRooms?: number;
+  maxRooms?: number;
+  occupancyBracket?: 'low' | 'medium' | 'high';
 }
 
 export interface CreateBuildingData {

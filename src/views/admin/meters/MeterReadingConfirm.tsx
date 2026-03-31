@@ -16,13 +16,10 @@ const MeterReadingConfirm = () => {
   const stats = state?.stats || { valid: 12, error: 2, pending: 1 };
   const meterType = state?.meterType || 'Electricity';
 
-  const handleCommit = () => {
-    toast.promise(new Promise(res => setTimeout(res, 2000)), {
-      loading: 'Đang lưu dữ liệu vào hệ thống...',
-      success: 'Đã lưu tất cả chỉ số thành công!',
-      error: 'Lỗi khi lưu dữ liệu.'
-    });
-    setTimeout(() => navigate('/admin/meters'), 2200);
+  const handleCommit = async () => {
+    // In production: await meterService.bulkSaveReadings(state.readings);
+    toast.success('Đã lưu tất cả chỉ số thành công!');
+    navigate('/admin/meters');
   };
 
   return (

@@ -57,12 +57,12 @@ const OwnerDetail = () => {
                 )}
              </div>
              <div>
-                <div className="flex items-center gap-3">
-                   <h1 className="text-display text-primary">{owner.fullName}</h1>
-                   <span className="px-3 py-1 bg-primary text-white text-[10px] font-black rounded-lg uppercase tracking-widest shadow-lg shadow-primary/20">
-                      Standard Owner
-                   </span>
-                </div>
+                 <div className="flex items-center gap-3">
+                    <h1 className="text-display text-primary font-tnr tracking-tighter">{owner.fullName}</h1>
+                    <span className="px-3 py-1 bg-primary text-white text-[10px] font-black rounded-lg uppercase tracking-widest shadow-lg shadow-primary/20">
+                       Chủ đầu tư chính
+                    </span>
+                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-small text-muted font-medium mt-1">
                    <span className="flex items-center gap-1.5"><Phone size={14} /> {owner.phone}</span>
                    <span className="flex items-center gap-1.5"><Mail size={14} /> {owner.email}</span>
@@ -86,7 +86,7 @@ const OwnerDetail = () => {
         {/* Left: General Stats & Summary */}
         <div className="lg:col-span-4 space-y-8">
           <div className="card-container p-8 space-y-8 bg-white shadow-xl shadow-primary/5">
-             <h3 className="text-h3 text-primary border-b pb-4">Thông tin pháp lý</h3>
+             <h3 className="text-h3 text-primary border-b pb-4 font-tnr">Thông tin pháp lý</h3>
              
              <div className="space-y-6">
                 <div>
@@ -137,7 +137,7 @@ const OwnerDetail = () => {
         {/* Right: Buildings Owned */}
         <div className="lg:col-span-8 space-y-8">
           <div className="flex items-center justify-between px-2">
-             <h2 className="text-h2 text-primary flex items-center gap-3">
+             <h2 className="text-h2 text-primary flex items-center gap-3 font-tnr">
                 <Home size={24} /> Bất động sản đang quản lý
              </h2>
              <button className="flex items-center gap-2 text-[11px] font-black uppercase text-primary hover:gap-3 transition-all">
@@ -185,7 +185,7 @@ const OwnerDetail = () => {
 
           {/* Activity Logs for Owner */}
           <div className="card-container p-8 space-y-6 bg-white overflow-hidden shadow-xl shadow-primary/5">
-              <h3 className="text-h3 text-primary flex items-center gap-3">
+              <h3 className="text-h3 text-primary flex items-center gap-3 font-tnr">
                  <History size={20} /> Nhật ký hoạt động
               </h3>
               <div className="space-y-6">

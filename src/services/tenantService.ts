@@ -44,6 +44,7 @@ interface DbContractTenantJoined {
     rooms: {
       id: number;
       room_code: string;
+      building_id: number;
     } | null;
   } | null;
 }
@@ -165,7 +166,7 @@ export const tenantService = {
     const contractLinks = await unwrap(
       supabase
         .from('contract_tenants')
-        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code))')
+        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code, building_id))')
     ) as unknown as DbContractTenantJoined[];
 
     // Build a lookup: tenantId → list of contract links
@@ -179,12 +180,20 @@ export const tenantService = {
     const summaries: TenantSummary[] = tenants.map((t) => {
       const links = linksByTenant.get(t.id) ?? [];
 
-      // An active contract is one with status='active' and not deleted
-      const activeLink = links.find(
-        (l) => l.contracts?.status === 'active' && !l.contracts?.is_deleted
-      );
+      const getScore = (status: string | null | undefined): number => {
+        if (status === 'active') return 3;
+        if (status === 'draft' || status === 'pending_signature') return 2;
+        if (status === 'expired' || status === 'terminated') return 1;
+        return 0;
+      };
 
-      const hasActiveContract = !!activeLink;
+      // Find the most relevant contract link:
+      // Priority: active > draft/pending_signature > everything else
+      const activeLink = [...links].sort((a, b) => {
+        return getScore(b.contracts?.status) - getScore(a.contracts?.status);
+      })[0];
+
+      const hasActiveContract = activeLink?.contracts?.status === 'active';
       const status = deriveTenantStatus(hasActiveContract);
       const onboardingPercent = computeOnboardingPercent(t as DbTenantRow, hasActiveContract);
 
@@ -199,6 +208,9 @@ export const tenantService = {
           ? String(activeLink.contracts.room_id)
           : undefined,
         currentRoomCode: activeLink?.contracts?.rooms?.room_code ?? undefined,
+        currentBuildingId: activeLink?.contracts?.rooms?.building_id != null
+          ? String(activeLink.contracts.rooms.building_id)
+          : undefined,
         avatarUrl: extractAvatarUrl(t.documents),
         onboardingPercent,
         hasActiveContract,
@@ -211,7 +223,7 @@ export const tenantService = {
     // Apply filters
     let result = summaries;
 
-    if (filters?.status && filters.status !== 'All') {
+    if (filters?.status && filters.status !== 'All' && (Array.isArray(filters.status) ? filters.status.length > 0 : true)) {
       const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
       result = result.filter((t) => statuses.includes(t.status));
     }
@@ -224,6 +236,25 @@ export const tenantService = {
           t.phone.includes(s) ||
           (t.email ?? '').toLowerCase().includes(s)
       );
+    }
+
+    if (filters?.hasActiveContract !== undefined) {
+      const active = filters.hasActiveContract === true || filters.hasActiveContract === 'true';
+      result = result.filter((t) => t.hasActiveContract === active);
+    }
+
+    if (filters?.onboardingComplete !== undefined) {
+      const complete = filters.onboardingComplete === true || filters.onboardingComplete === 'true';
+      if (complete) {
+        result = result.filter((t) => t.onboardingPercent === 100);
+      } else {
+        result = result.filter((t) => t.onboardingPercent < 100);
+      }
+    }
+
+    if (filters?.buildingId) {
+      const bId = String(filters.buildingId);
+      result = result.filter((t) => t.currentBuildingId === bId);
     }
 
     return result;
@@ -287,9 +318,8 @@ export const tenantService = {
       gender: mapGender.fromDb(row.gender ?? 'other') as 'Male' | 'Female' | 'Other',
       dateOfBirth: row.date_of_birth ?? '',
       permanentAddress: row.permanent_address ?? '',
-      // Fields not stored in DB — sensible defaults
-      cccdIssuedDate: '',
-      cccdIssuedPlace: '',
+      cccdIssuedDate: (docs?.cccd_issued_date as string) ?? '',
+      cccdIssuedPlace: (docs?.cccd_issued_place as string) ?? '',
       nationality,
       occupation,
       vehiclePlates,
@@ -297,6 +327,88 @@ export const tenantService = {
     };
 
     return profile;
+  },
+
+  /**
+   * Return all contracts associated with a tenant.
+   */
+  getTenantContracts: async (tenantId: string): Promise<import('@/models/Contract').Contract[]> => {
+    const numericId = Number(tenantId);
+    const contractLinks = await unwrap(
+      supabase
+        .from('contract_tenants')
+        .select(`
+          contract_id,
+          is_primary,
+          contracts(
+            id, uuid, contract_code, room_id, start_date, end_date,
+            monthly_rent, payment_cycle_months, status, is_deleted,
+            rooms(id, room_code, building_id, buildings(name))
+          )
+        `)
+        .eq('tenant_id', numericId)
+    ) as unknown as any[];
+
+    return (contractLinks ?? [])
+      .filter(l => l.contracts && !l.contracts.is_deleted)
+      .map(l => {
+        const c = l.contracts;
+        const room = c.rooms;
+        return {
+          id: String(c.id),
+          contractCode: c.contract_code,
+          roomId: String(c.room_id),
+          roomCode: room?.room_code ?? '',
+          buildingName: room?.buildings?.name ?? '',
+          tenantName: '', // Will be filled if needed
+          status: (c.status.charAt(0).toUpperCase() + c.status.slice(1)) as any,
+          rentPriceSnapshot: c.monthly_rent ?? 0,
+          startDate: c.start_date,
+          endDate: c.end_date,
+          paymentCycle: c.payment_cycle_months ?? 1,
+          isRepresentative: l.is_primary ?? false,
+          type: 'Residential' as any,
+          autoRenew: false
+        };
+      });
+  },
+
+  /**
+   * Return all invoices for all contracts associated with a tenant.
+   */
+  getTenantInvoices: async (tenantId: string): Promise<any[]> => {
+    const numericId = Number(tenantId);
+    
+    // 1. Get all contract IDs for this tenant
+    const contractLinks = await unwrap(
+      supabase
+        .from('contract_tenants')
+        .select('contract_id')
+        .eq('tenant_id', numericId)
+    ) as unknown as { contract_id: number }[];
+
+    const contractIds = contractLinks?.map(l => l.contract_id) ?? [];
+    if (contractIds.length === 0) return [];
+
+    // 2. Fetch invoices for these contracts
+    const invoices = await unwrap(
+      supabase
+        .from('invoices')
+        .select('id, invoice_code, billing_period, total_amount, amount_paid, due_date, status, contract_id')
+        .in('contract_id', contractIds)
+        .order('due_date', { ascending: false })
+    );
+
+    return (invoices ?? []).map(inv => ({
+      id: String(inv.id),
+      code: inv.invoice_code,
+      billingPeriod: inv.billing_period,
+      amount: inv.total_amount,
+      amountPaid: inv.amount_paid,
+      dueDate: inv.due_date,
+      status: (inv.status ? (inv.status.charAt(0).toUpperCase() + inv.status.slice(1).replace('_', ' ')) : 'Unpaid') as any,
+      contractId: String(inv.contract_id)
+    }));
   },
 
   /**
@@ -436,13 +548,15 @@ export const tenantService = {
 
     const isPersonalInfoConfirmed = !!(row.full_name && row.id_number && row.date_of_birth);
     const isCCCDUploaded = hasCCCDDoc;
-    const isEmergencyContactAdded = !!row.emergency_contact_name;
+        const isEmergencyContactAdded = !!row.emergency_contact_name;
     const isContractSigned = !!activeContract;
     const isDepositPaid =
       !!activeContract?.contracts?.deposit_status &&
       ['received', 'partially_refunded'].includes(activeContract.contracts.deposit_status);
-    // Room handover has no DB field — default to false
-    const isRoomHandovered = false;
+    
+    // Room handover derived from active contract + room status if possible
+    // For now, if contract is active, we assume room is handovered unless there's a specific flag
+    const isRoomHandovered = !!activeContract && activeContract.contracts?.status === 'active';
 
     const steps = [
       isPersonalInfoConfirmed,
@@ -469,7 +583,27 @@ export const tenantService = {
   },
 
   /**
+   * Check whether a given CCCD/id_number already exists (including soft-deleted rows).
+   * Returns the tenant row if found, null otherwise.
+   */
+  checkIdNumberExists: async (idNumber: string): Promise<{ id: number; full_name: string; is_deleted: boolean } | null> => {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id, full_name, is_deleted')
+      .eq('id_number', idNumber)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[tenantService] checkIdNumberExists error:', error);
+      return null;
+    }
+    return data as { id: number; full_name: string; is_deleted: boolean } | null;
+  },
+
+  /**
    * Create a new tenant record in the `tenants` table.
+   * Pre-validates uniqueness of id_number to provide a friendly error
+   * instead of a raw PostgreSQL constraint violation.
    */
   createTenant: async (data: {
     fullName: string;
@@ -485,9 +619,21 @@ export const tenantService = {
     avatarUrl?: string;
   }): Promise<TenantSummary> => {
     const normalizedIdNumber = normalizeIdNumber(data.cccd);
-    const existingTenant = await tenantService.findTenantByIdNumber(normalizedIdNumber);
-    if (existingTenant) {
-      throw new Error(`CCCD ${normalizedIdNumber} đã tồn tại trong hồ sơ cư dân ${existingTenant.fullName}.`);
+
+    // --- Pre-flight: check for duplicate CCCD ---
+    if (normalizedIdNumber) {
+      const existing = await tenantService.checkIdNumberExists(normalizedIdNumber);
+      if (existing) {
+        if (existing.is_deleted) {
+          throw new Error(
+            `Số CCCD "${normalizedIdNumber}" đã tồn tại trong hệ thống (cư dân "${existing.full_name}" đã bị xoá). Vui lòng liên hệ quản trị viên để khôi phục hồ sơ.`
+          );
+        } else {
+          throw new Error(
+            `Số CCCD "${normalizedIdNumber}" đã được đăng ký bởi cư dân "${existing.full_name}". Mỗi CCCD chỉ được dùng cho một cư dân.`
+          );
+        }
+      }
     }
 
     const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
@@ -504,6 +650,7 @@ export const tenantService = {
     if (data.occupation) {
       documentsPayload.occupation = data.occupation.trim();
     }
+
     try {
       const row = await unwrap(
         supabase
@@ -532,17 +679,21 @@ export const tenantService = {
         status: 'CheckedOut',
         currentRoomId: undefined,
         currentRoomCode: undefined,
+        currentBuildingId: undefined,
         avatarUrl: extractAvatarUrl(row.documents),
         onboardingPercent: computeOnboardingPercent(row, false),
         hasActiveContract: false,
         isRepresentative: false,
       };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không thể tạo cư dân.';
-      if (isDuplicateIdNumberError(message)) {
-        throw new Error(`CCCD ${normalizedIdNumber} đã tồn tại trong hệ thống.`);
+    } catch (err: unknown) {
+      const message = (err as Error)?.message ?? '';
+      if (message.includes('duplicate key') && message.includes('id_number')) {
+        throw new Error(`Số CCCD "${normalizedIdNumber}" đã tồn tại trong hệ thống.`);
       }
-      throw error;
+      if (message.includes('duplicate key') && message.includes('phone')) {
+        throw new Error(`Số điện thoại "${data.phone}" đã được đăng ký. Vui lòng dùng số khác.`);
+      }
+      throw err;
     }
   },
 

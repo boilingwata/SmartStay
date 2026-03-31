@@ -32,6 +32,7 @@ export interface RoomDetail extends Room {
   meters: RoomMeter[];
   assets: RoomAsset[];
   statusHistory: RoomStatusHistory[];
+  contracts: RoomContractSummary[];
 }
 
 export interface RoomImage {
@@ -67,6 +68,16 @@ export interface RoomStatusHistory {
   changedBy: string;
   reason?: string;
   contractId?: string;
+}
+
+export interface RoomContractSummary {
+  id: string;
+  contractCode: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  status: import('@/models/Contract').ContractStatus;
+  tenantName: string;
 }
 
 export interface HandoverChecklist {
@@ -116,6 +127,10 @@ export interface RoomFilters {
   minPrice?: number;
   maxPrice?: number;
   hasMeter?: boolean;
+  sortBy?: 'price' | 'area' | 'floor' | 'code' | 'created_at';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CreateRoomData {

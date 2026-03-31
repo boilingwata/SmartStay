@@ -19,12 +19,10 @@ const ChangePasswordPage = () => {
     if (form.current === form.password) return toast.error('Mật khẩu mới phải khác mật khẩu cũ');
     
     setLoading(true);
-    setTimeout(() => {
-      // Logic to clear ForceChangePassword flag
-      toast.success('Đã cập nhật mật khẩu mới. Chào mừng trở lại!');
-      navigate('/');
-      setLoading(false);
-    }, 1500);
+    // Logic to clear ForceChangePassword flag
+    toast.success('Đã cập nhật mật khẩu mới. Chào mừng trở lại!');
+    navigate('/');
+    setLoading(false);
   };
 
   return (

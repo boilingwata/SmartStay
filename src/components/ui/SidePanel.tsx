@@ -6,6 +6,7 @@ interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }
@@ -14,6 +15,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   isOpen, 
   onClose, 
   title, 
+  icon,
   children, 
   footer 
 }) => {
@@ -30,11 +32,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   if (!shouldRender) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex overflow-hidden">
+    <div className={cn("fixed inset-0 z-[100] flex overflow-hidden", !isOpen && "pointer-events-none")}>
       {/* 4.1 Backdrop Layer */}
       <div 
         className={cn(
-          "absolute inset-0 bg-primary/20 backdrop-blur-sm transition-opacity duration-500",
+          "absolute inset-0 bg-primary/20 backdrop-blur-sm transition-opacity duration-500 pointer-events-auto",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -42,14 +44,17 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* 4.1 Drawer Layer (380px) */}
       <aside 
-        onAnimationEnd={handleAnimationEnd}
+        onTransitionEnd={handleAnimationEnd}
         className={cn(
-          "absolute right-0 top-0 h-full w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-500 ease-out",
+          "absolute right-0 top-0 h-full w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-500 ease-out pointer-events-auto",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
         <header className="h-16 px-6 border-b border-border flex items-center justify-between bg-bg/20">
-          <h3 className="text-h3 text-primary truncate">{title}</h3>
+          <div className="flex items-center gap-3">
+             {icon && <div className="text-primary">{icon}</div>}
+             <h3 className="text-h3 text-primary truncate">{title}</h3>
+          </div>
           <button 
             onClick={onClose}
             className="p-2 hover:bg-bg rounded-lg text-muted hover:text-danger transition-colors"

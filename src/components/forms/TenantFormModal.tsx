@@ -28,6 +28,7 @@ type TenantFormData = {
   permanentAddress?: string;
   isRepresentative?: boolean;
   avatarUrl?: string;
+  vehiclePlates?: string[];
 };
 
 interface TenantModalProps {

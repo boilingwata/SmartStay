@@ -13,8 +13,10 @@ import { OwnerSummary, Owner } from '@/models/Owner';
 import { cn } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { usePermission } from '@/hooks/usePermission';
+import { useDebounce } from '@/hooks/useDebounce';
 import { OwnerModal } from './OwnerModal';
 import { toast } from 'sonner';
+import { exportToCSV } from '@/utils/exportUtils';
 
 const DEFAULT_OWNER_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
@@ -23,8 +25,15 @@ const OwnerList = () => {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermission();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
   const [showSensitive, setShowSensitive] = useState<string[]>([]);
   
+  // Filter states
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
+  const [minBuildings, setMinBuildings] = useState<number | undefined>(undefined);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | undefined>(undefined);
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
@@ -32,8 +41,18 @@ const OwnerList = () => {
   const canViewPII = hasPermission('owner.view_pii');
 
   const { data: owners, isLoading } = useQuery<OwnerSummary[]>({
-    queryKey: ['owners', search],
-    queryFn: () => buildingService.getOwners(search)
+    queryKey: ['owners', debouncedSearch, filterActive, minBuildings, selectedBuildingId],
+    queryFn: () => buildingService.getOwners({ 
+      search: debouncedSearch, 
+      isActive: filterActive, 
+      minBuildings,
+      buildingId: selectedBuildingId
+    })
+  });
+
+  const { data: buildings } = useQuery({
+    queryKey: ['buildings-minimal'],
+    queryFn: () => buildingService.getBuildings()
   });
 
   // Mutations
@@ -73,19 +92,38 @@ const OwnerList = () => {
     return val.substring(0, 4) + ' •••• ' + val.substring(val.length - 4);
   };
 
+  const handleExport = () => {
+    if (!owners) return;
+    const exportData = owners.map(o => ({
+      'Họ tên': o.fullName,
+      'Số điện thoại': o.phone,
+      'Email': o.email,
+      'Số nhà sở hữu': o.totalBuildings,
+      'Mã số thuế': o.taxCode,
+      'CCCD': o.cccd
+    }));
+    exportToCSV(exportData, 'Danh_sach_chu_so_huu');
+    toast.success('Đã xuất file thành công');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-display text-primary">Quản lý Chủ sở hữu</h1>
-          <p className="text-body text-muted">Danh sách đối tác, nhà đầu tư và chủ bất động sản trong hệ thống.</p>
+          <h1 className="text-display text-primary font-tnr tracking-tight">Quản lý Chủ sở hữu</h1>
+          <p className="text-body text-muted italic font-medium">Danh sách đối tác, nhà đầu tư và chủ bất động sản trong hệ thống.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-outline flex items-center gap-2 h-11"><Download size={18} /> Export</button>
+          <button 
+            className="btn-outline flex items-center gap-2 h-11 font-tnr" 
+            onClick={handleExport}
+          >
+            <Download size={18} /> Export
+          </button>
           <button 
             onClick={handleOpenCreate}
-            className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20"
+            className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20 font-tnr"
           >
             <Plus size={18} /> Thêm chủ sở hữu
           </button>
@@ -93,20 +131,83 @@ const OwnerList = () => {
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap gap-4">
-         <div className="relative flex-1 min-w-[300px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <input 
-              type="text" 
-              placeholder="Tìm theo tên, email, số điện thoại hoặc mã định danh..." 
-              className="input-base w-full pl-12 h-12 shadow-sm focus:shadow-lg transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-         </div>
-         <button className="w-12 h-12 bg-white rounded-2xl border border-primary/10 flex items-center justify-center text-muted hover:text-primary hover:shadow-lg transition-all">
-            <Filter size={18} />
-         </button>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4">
+           <div className="relative flex-1 min-w-[300px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
+              <input 
+                type="text" 
+                placeholder="Tìm theo tên, email, số điện thoại hoặc mã định danh..." 
+                className="input-base w-full pl-12 h-12 shadow-sm focus:shadow-lg transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+           </div>
+           <button 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={cn(
+                "h-12 px-6 rounded-2xl border flex items-center gap-2 transition-all font-bold text-small",
+                isFilterOpen ? "bg-primary text-white border-primary shadow-xl" : "bg-white text-muted border-primary/10 hover:shadow-lg"
+              )}
+           >
+              <Filter size={18} />
+              <span className="font-tnr">Bộ lọc nâng cao</span>
+           </button>
+        </div>
+
+        {/* Advanced Filter Panel */}
+        {isFilterOpen && (
+          <div className="card-container p-6 bg-white/50 backdrop-blur-xl border-dashed border-primary/20 animate-in slide-in-from-top-4 duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-1 font-tnr">Tài sản sở hữu</label>
+                <select 
+                  className="input-base h-11 text-small border-slate-200"
+                  value={minBuildings || ''}
+                  onChange={(e) => setMinBuildings(e.target.value ? Number(e.target.value) : undefined)}
+                >
+                  <option value="">Tất cả quy mô</option>
+                  <option value="1">Ít nhất 1 tòa</option>
+                  <option value="3">Ít nhất 3 tòa</option>
+                  <option value="5">Ít nhất 5 tòa</option>
+                  <option value="10">Chủ đầu tư lớn (10+)</option>
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-1 font-tnr">Trạng thái tài khoản</label>
+                <div className="flex gap-2 p-1 bg-bg/50 rounded-xl border border-border/50">
+                  <button 
+                    onClick={() => setFilterActive(undefined)}
+                    className={cn("flex-1 h-9 rounded-lg text-[11px] font-black uppercase transition-all", filterActive === undefined ? "bg-white shadow-sm text-primary" : "text-muted hover:text-primary")}
+                  >Tất cả</button>
+                  <button 
+                    onClick={() => setFilterActive(true)}
+                    className={cn("flex-1 h-9 rounded-lg text-[11px] font-black uppercase transition-all", filterActive === true ? "bg-white shadow-sm text-success" : "text-muted hover:text-success")}
+                  >Hoạt động</button>
+                  <button 
+                    onClick={() => setFilterActive(false)}
+                    className={cn("flex-1 h-9 rounded-lg text-[11px] font-black uppercase transition-all", filterActive === false ? "bg-white shadow-sm text-danger" : "text-muted hover:text-danger")}
+                  >Đã khóa</button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-1 font-tnr">Lọc theo Tòa nhà</label>
+                <select 
+                  className="input-base h-11 text-small border-slate-200"
+                  value={selectedBuildingId || ''}
+                  onChange={(e) => setSelectedBuildingId(e.target.value || undefined)}
+                >
+                  <option value="">Tất cả tòa nhà</option>
+                  {buildings?.map(b => (
+                    <option key={b.id} value={b.id}>{b.buildingName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -116,10 +217,10 @@ const OwnerList = () => {
            <table className="w-full text-left">
               <thead className="bg-bg/50 border-b">
                  <tr>
-                    <th className="px-6 py-4 text-label text-muted">Tên & Thông tin liên lạc</th>
-                    <th className="px-6 py-4 text-label text-muted">Số nhà sở hữu</th>
-                    <th className="px-6 py-4 text-label text-muted">Mã số thuế</th>
-                    <th className="px-6 py-4 text-label text-muted">Định danh (CCCD)</th>
+                    <th className="px-6 py-4 text-label text-muted font-bold uppercase tracking-widest font-tnr">Tên & Thông tin liên lạc</th>
+                    <th className="px-6 py-4 text-label text-muted font-bold uppercase tracking-widest font-tnr">Số nhà sở hữu</th>
+                    <th className="px-6 py-4 text-label text-muted font-bold uppercase tracking-widest font-tnr">Mã số thuế</th>
+                    <th className="px-6 py-4 text-label text-muted font-bold uppercase tracking-widest font-tnr">Định danh (CCCD)</th>
                     <th className="px-6 py-4 text-label text-right"></th>
                  </tr>
               </thead>

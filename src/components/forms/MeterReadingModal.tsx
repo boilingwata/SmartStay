@@ -31,36 +31,52 @@ export const MeterReadingModal = ({ isOpen, onClose, meter, onSuccess }: Reading
   const [latestReading, setLatestReading] = useState<LatestMeterReading | null>(null);
   const [isLoadingLatest, setIsLoadingLatest] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ReadingFormData>({
     defaultValues: {
-      monthYear: new Date().toISOString().slice(0, 7), // YYYY-MM
-      readingDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+      monthYear: new Date().toISOString().slice(0, 7),
+      readingDate: new Date().toISOString().slice(0, 10),
     }
   });
 
   const currentIndex = watch('currentIndex');
   const previousIndex = latestReading?.currentIndex || 0;
-  const consumption = currentIndex ? (currentIndex - previousIndex) : 0;
-  const isError = currentIndex && currentIndex < previousIndex;
+  const consumption = currentIndex ? (Number(currentIndex) - previousIndex) : 0;
+  const isError = currentIndex && Number(currentIndex) < previousIndex;
 
   const [isDuplicate, setIsDuplicate] = useState(false);
   const selectedMonthYear = watch('monthYear');
 
-  // 5.6.7 Duplicate reading warning
+  // Dynamic month generation
+  const monthOptions = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const val = d.toISOString().slice(0, 7);
+    const label = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+    return { label, value: val };
+  });
+
+  // Real-time duplicate reading check
   useEffect(() => {
      if (meter?.id && selectedMonthYear) {
-        // In a real app, this would be an API call: GET /api/meter-readings?meterId=X&monthYear=Y
-        // Mocking the check
-        if (selectedMonthYear === '2026-03') { 
-           setIsDuplicate(true);
-        } else {
-           setIsDuplicate(false);
-        }
+        const checkDuplicate = async () => {
+           try {
+              const res = await meterService.getReadings({ 
+                 meterId: meter.id, 
+                 monthYear: selectedMonthYear,
+                 limit: 1 
+              });
+              setIsDuplicate(res.data.length > 0);
+           } catch (e) {
+              setIsDuplicate(false);
+           }
+        };
+        checkDuplicate();
      }
   }, [meter, selectedMonthYear]);
 
-  // 5.2 Pre-fetch PreviousIndex (RULE-01)
+  // Pre-fetch Latest Reading (RULE-01)
   useEffect(() => {
     if (isOpen && meter?.id) {
        const fetchLatest = async () => {
@@ -78,13 +94,20 @@ export const MeterReadingModal = ({ isOpen, onClose, meter, onSuccess }: Reading
     }
   }, [isOpen, meter]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const file = e.target.files?.[0];
+     if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => setPreviewImage(reader.result as string);
+        reader.readAsDataURL(file);
+        toast.info("Đã chọn ảnh đồng hồ để gửi.");
+     }
+  };
+
   const onFormSubmit = async (data: ReadingFormData) => {
     if (!meter) return;
-    if (isDuplicate) {
-       toast.warning("Bạn đang ghi chồng chỉ số đã tồn tại.");
-    }
     if (isError) {
-       toast.error(`Chỉ số hiện tại (${currentIndex}) không được nhỏ hơn chỉ số kỳ trước (${previousIndex})`);
+       toast.error(`Chỉ số hiện tại (${currentIndex}) không hợp lệ.`);
        return;
     }
 
@@ -94,14 +117,15 @@ export const MeterReadingModal = ({ isOpen, onClose, meter, onSuccess }: Reading
           meterId: meter.id,
           monthYear: data.monthYear,
           readingDate: data.readingDate,
-          currentIndex: data.currentIndex,
-          note: data.note
+          currentIndex: Number(data.currentIndex),
+          note: data.note,
+          readingImageUrl: previewImage || undefined // Simulation of real upload
        });
-       toast.success(`Đã ghi nhận chỉ số cho ${meter.meterCode}`);
+       toast.success(`Ghi nhận hoàn tất cho ${meter.meterCode}`);
        onSuccess();
        onClose();
     } catch (err) {
-       toast.error("Lỗi khi gửi chỉ số. Vui lòng thử lại.");
+       toast.error("Lỗi khi gửi dữ liệu.");
     } finally {
        setIsSubmitting(false);
     }
@@ -109,163 +133,187 @@ export const MeterReadingModal = ({ isOpen, onClose, meter, onSuccess }: Reading
 
   if (!isOpen || !meter) return null;
 
+  const isElec = meter.meterType === 'Electricity';
+
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md" onClick={onClose} />
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-500">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-3xl" onClick={onClose} />
       
-      <div className="relative w-full max-w-xl bg-white rounded-[44px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
-         <div className="p-8 md:p-12">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-10">
-               <div className="flex items-center gap-4">
+      <div className="relative w-full max-w-2xl bg-white/70 backdrop-blur-3xl rounded-[56px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border border-white overflow-hidden animate-in zoom-in-95 duration-700">
+         <div className="p-10 md:p-14">
+            {/* High-Fidelity Header */}
+            <div className="flex items-start justify-between mb-12">
+               <div className="flex items-center gap-6">
                   <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center border-2 shadow-inner",
-                    meter.meterType === 'Electricity' ? "bg-amber-100 border-amber-200 text-amber-600" : "bg-blue-100 border-blue-200 text-blue-600"
+                    "w-20 h-20 rounded-[32px] flex items-center justify-center border border-white shadow-2xl transition-all animate-float",
+                    isElec ? "bg-amber-400 text-white shadow-amber-400/30" : "bg-blue-500 text-white shadow-blue-500/30"
                   )}>
-                     {meter.meterType === 'Electricity' ? <Zap size={28} fill="currentColor" /> : <Droplets size={28} fill="currentColor" />}
+                     {isElec ? <Zap size={40} fill="currentColor" /> : <Droplets size={40} fill="currentColor" />}
                   </div>
                   <div>
-                     <h2 className="text-[28px] font-black leading-tight tracking-tighter text-slate-900">Ghi chỉ số {meter.meterType === 'Electricity' ? 'Điện' : 'Nước'}</h2>
-                     <p className="text-[13px] font-black uppercase tracking-[2px] text-muted">Mã ĐH: {meter.meterCode} • Phòng {meter.roomCode}</p>
+                     <h2 className="text-[36px] font-black leading-none tracking-tighter text-slate-900 mb-2">Ghi chỉ số {isElec ? 'Điện' : 'Nước'}</h2>
+                     <p className="text-[14px] font-bold uppercase tracking-[4px] text-slate-400">ID: {meter.meterCode} • <span className="text-primary italic">Unit {meter.roomCode}</span></p>
                   </div>
                </div>
-               <button onClick={onClose} className="p-3 hover:bg-bg rounded-2xl transition-all text-muted"><X size={24} /></button>
+               <button onClick={onClose} className="w-12 h-12 flex items-center justify-center bg-slate-100 hover:bg-danger hover:text-white rounded-2xl transition-all active:scale-90 text-slate-400"><X size={24} /></button>
             </div>
 
-            {/* Reading Command Center */}
-            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-8">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-10">
+               {/* Information Row */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-6">
                      <Select 
-                       label="Kỳ tháng ghi số"
-                       placeholder="Chọn tháng"
+                       label="Tháng chốt kỳ"
+                       placeholder="Chọn kỳ hóa đơn"
                        icon={Calendar}
-                       options={[
-                         { label: 'Tháng 03/2026', value: '2026-03' },
-                         { label: 'Tháng 02/2026', value: '2026-02' },
-                         { label: 'Tháng 01/2026', value: '2026-01' },
-                       ]}
+                       options={monthOptions}
                        value={selectedMonthYear}
                        onChange={(val) => setValue('monthYear', val)}
                      />
 
                      <div className="space-y-2">
-                        <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Ngày ghi nhận</label>
+                        <label className="text-[11px] text-slate-400 font-black uppercase tracking-[2px] ml-1">Ngày cập nhật</label>
                         <div className="relative group">
-                           <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
-                           <input 
-                             type="date" 
-                             {...register('readingDate', { required: true })}
-                             className="input-base pl-12 h-14"
-                           />
+                           <Calendar size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" />
+                           <input type="date" {...register('readingDate')} className="input-base h-16 pl-14 bg-slate-50 border-none font-bold" />
                         </div>
                      </div>
                   </div>
 
                   <div className="space-y-6">
                      <div className="space-y-2">
-                        <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Chỉ số kỳ trước (RULE-01)</label>
-                        <div className="h-14 bg-slate-900/5 rounded-[20px] flex items-center px-6 border border-slate-100">
-                           <span className="text-[20px] font-black font-mono text-slate-400">
+                        <label className="text-[11px] text-slate-400 font-black uppercase tracking-[2px] ml-1">Số cũ (Rule-01 Ref)</label>
+                        <div className="h-16 bg-slate-100/50 rounded-3xl flex items-center px-6 border border-white shadow-inner">
+                           <span className="text-[22px] font-black font-mono text-slate-400 tracking-tighter">
                               {isLoadingLatest ? '...' : previousIndex.toLocaleString()}
                            </span>
-                           <span className="ml-auto text-[10px] font-black uppercase text-slate-400 tracking-tighter">Chỉ số chốt kỳ trước</span>
+                           <span className="ml-auto text-[9px] font-black uppercase text-slate-300 tracking-widest">{isElec ? 'kWh' : 'm3'}</span>
                         </div>
                      </div>
 
                      <div className="space-y-2">
-                        <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Chỉ số hiện tại</label>
-                        <div className="relative group">
+                        <label className={cn("text-[11px] font-black uppercase tracking-[2px] ml-1", isError ? "text-danger" : "text-primary")}>Chỉ số mới nhất</label>
+                        <div className={cn(
+                          "relative h-16 rounded-3xl border-2 transition-all group flex items-center px-6",
+                          isError ? "border-danger bg-danger/5" : "border-slate-100 bg-white shadow-xl focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10"
+                        )}>
                            <input 
-                             type="number" 
-                             autoFocus
-                             {...register('currentIndex', { required: true, min: 0 })}
-                             className={cn(
-                                "input-base h-14 pl-6 text-[24px] font-black font-mono tracking-tighter",
-                                isError ? "border-danger text-danger bg-danger/5" : "text-primary"
-                             )}
-                             placeholder="000.00"
+                              type="number"
+                              step="any"
+                              autoFocus 
+                              {...register('currentIndex', { required: true })}
+                              className={cn(
+                                "w-full bg-transparent text-[28px] font-black font-mono tracking-tighter outline-none leading-none",
+                                isError ? "text-danger" : "text-slate-900"
+                              )}
+                              placeholder="000.0"
                            />
-                           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase text-muted tracking-widest">{meter.meterType === 'Electricity' ? 'kWh' : 'm3'}</span>
+                           <div className="bg-slate-900 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest leading-none shrink-0 group-focus-within:bg-primary transition-colors">
+                              {isElec ? 'kWh' : 'm3'}
                            </div>
                         </div>
                      </div>
                   </div>
                </div>
 
-               {/* Result Summary */}
+               {/* Result Glass Card */}
                <div className={cn(
-                  "p-6 rounded-[28px] flex items-center justify-between transition-all",
-                  isError ? "bg-danger/10 text-danger border border-danger/20" : 
-                  isDuplicate ? "bg-amber-100 text-amber-700 border border-amber-200" :
-                  "bg-primary/5 text-primary border border-primary/20"
+                  "relative group p-8 rounded-[40px] border transition-all duration-500 flex items-center justify-between overflow-hidden",
+                  isError ? "bg-danger/10 border-danger/20 text-danger shadow-[0_20px_40px_-15px_rgba(239,68,68,0.2)]" :
+                  isDuplicate ? "bg-amber-400/10 border-amber-400/20 text-amber-600 shadow-xl shadow-amber-400/5" :
+                  "bg-primary/5 border-primary/20 text-primary shadow-xl shadow-primary/5"
                )}>
-                  <div className="flex items-center gap-4">
-                     <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", 
-                        isError ? "bg-danger/20" : 
-                        isDuplicate ? "bg-amber-500/20" : "bg-primary/20"
+                  <div className="relative z-10 flex items-center gap-6">
+                     <div className={cn("w-16 h-16 rounded-3xl flex items-center justify-center transition-transform group-hover:rotate-12", 
+                        isError ? "bg-danger/20" : isDuplicate ? "bg-amber-400/20" : "bg-primary/20"
                      )}>
-                        {isError ? <AlertCircle size={20} /> : isDuplicate ? <Info size={20} /> : <TrendingUp size={20} />}
+                        {isError ? <AlertCircle size={32} /> : isDuplicate ? <Info size={32} /> : <TrendingUp size={32} />}
                      </div>
                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Lượng tiêu thụ (kWh/m3)</p>
-                        <p className="text-[20px] font-black tracking-tighter">{consumption.toLocaleString()}</p>
+                        <p className="text-[11px] font-black uppercase tracking-[3px] opacity-60 mb-1">Tiêu thụ trong kỳ</p>
+                        <div className="flex items-baseline gap-2">
+                           <span className="text-[36px] font-black tracking-tighter leading-none">{consumption.toLocaleString()}</span>
+                           <span className="text-[12px] font-black uppercase tracking-widest">{isElec ? 'kWh' : 'm3'}</span>
+                        </div>
                      </div>
                   </div>
-                  {isError ? (
-                     <p className="text-[11px] font-black uppercase tracking-tighter italic mr-4 animate-bounce">Lỗi: Thấp hơn kỳ trước!</p>
-                  ) : isDuplicate ? (
-                     <div className="flex flex-col items-end">
-                        <p className="text-[11px] font-black uppercase tracking-tighter text-amber-600">Cảnh báo: Đã có chỉ số kỳ này</p>
-                        <p className="text-[8px] font-bold uppercase opacity-60">Vẫn có thể ghi đè</p>
-                     </div>
-                  ) : consumption > 0 && (
-                     <CheckCircle size={24} className="text-primary animate-in zoom-in-0 duration-500" />
-                  )}
+
+                  <div className="relative z-10 text-right">
+                     {isError ? (
+                        <p className="text-[12px] font-black uppercase tracking-tight italic animate-pulse">Lỗi: Thấp hơn kỳ trước!</p>
+                     ) : isDuplicate ? (
+                        <div className="flex flex-col items-end">
+                           <p className="text-[12px] font-black uppercase tracking-tight text-amber-500">Đã chốt tháng {selectedMonthYear}</p>
+                           <p className="text-[9px] font-bold uppercase opacity-60">Sẽ thực hiện Ghi đè</p>
+                        </div>
+                     ) : (
+                        consumption > 0 && <CheckCircle size={44} className="text-primary animate-in zoom-in-0 duration-700 opacity-30" />
+                     )}
+                  </div>
+                  
+                  {/* Glass Backdrop Accent */}
+                  {!isError && <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-2xl rounded-full translate-x-10 -translate-y-10" />}
                </div>
 
-               {/* Additional Fields */}
-               <div className="space-y-4">
-                  <div className="space-y-2">
-                     <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Ghi chú (Tùy chọn)</label>
+               {/* Actions & Notes Entry */}
+               <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+                  <div className="md:col-span-3 space-y-2">
+                     <label className="text-[11px] text-slate-400 font-black uppercase tracking-[2px] ml-1">Ghi chú vận hành</label>
                      <textarea 
-                       {...register('note')}
-                       className="input-base p-6 min-h-[100px] bg-slate-50 border-none italic font-medium"
-                       placeholder="Tình trạng đồng hồ, sự cố phát hiện..."
+                        {...register('note')}
+                        className="input-base p-6 min-h-[148px] bg-slate-50 border-none rounded-3xl italic font-medium text-[14px] text-slate-500 focus:bg-white transition-colors"
+                        placeholder="Có sự cố gì không? (Tùy chọn)..."
                      />
                   </div>
 
-                  {/* Photo Upload Placeholder */}
-                  <div className="p-6 border-2 border-dashed border-slate-200 rounded-[32px] bg-white flex items-center gap-6 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all group">
-                     <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-lg shadow-primary/5">
-                        <Camera size={24} />
+                  <div className="md:col-span-2 space-y-2">
+                     <label className="text-[11px] text-slate-400 font-black uppercase tracking-[2px] ml-1">Hình ảnh đối chiếu</label>
+                     <div className="relative group min-h-[148px]">
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
+                        <div className={cn(
+                           "absolute inset-0 border-2 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all",
+                           previewImage ? "border-primary bg-primary/[0.02]" : "border-slate-200 bg-white group-hover:border-primary/40 group-hover:bg-primary/5"
+                        )}>
+                           {previewImage ? (
+                              <div className="relative w-full h-full p-2">
+                                 <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-2xl" />
+                                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
+                                    <Camera size={24} className="text-white" />
+                                 </div>
+                              </div>
+                           ) : (
+                              <>
+                                 <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-primary transition-colors border border-slate-100"><Camera size={24} /></div>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Tải ảnh lên<br/>(Max 5MB)</p>
+                              </>
+                           )}
+                        </div>
                      </div>
-                     <div className="flex-1">
-                        <p className="text-[13px] font-black uppercase text-primary tracking-wider">Chụp ảnh đồng hồ</p>
-                        <p className="text-[11px] text-muted font-medium">Xác nhận bằng hình ảnh minh bạch (Max 5MB)</p>
-                     </div>
-                     <Upload size={20} className="text-muted group-hover:text-primary transition-colors" />
                   </div>
                </div>
 
-               {/* Form Actions */}
-               <div className="pt-8">
+               {/* Premium Submit Button */}
+               <div className="pt-4 flex flex-col gap-6">
                   <button 
                     type="submit" 
                     disabled={isSubmitting || isError || isLoadingLatest}
                     className={cn(
-                      "btn-primary w-full h-[72px] rounded-[32px] flex items-center justify-center gap-4 shadow-2xl shadow-primary/20 transition-all text-[18px]",
-                      (isError || isSubmitting) ? "opacity-50 grayscale cursor-not-allowed" : "active:scale-[0.98] hover:shadow-primary/30"
+                      "group relative w-full h-[88px] rounded-[42px] overflow-hidden transition-all duration-500",
+                      (isError || isSubmitting) 
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed" 
+                        : "bg-slate-900 text-white hover:scale-[1.01] active:scale-[0.98] shadow-[0_45px_100px_-25px_rgba(0,0,0,0.4)]"
                     )}
                   >
-                     {isSubmitting ? <Spinner className="w-8 h-8 border-white/30" /> : (
-                        <>
-                           <span className="font-black uppercase tracking-[6px]">Lưu chỉ số</span>
-                           <CheckCircle size={24} />
-                        </>
-                     )}
+                     <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                     <span className="relative z-10 text-[20px] font-black uppercase tracking-[8px] flex items-center justify-center gap-6">
+                        {isSubmitting ? (
+                          <>Đang ghi nhận <Spinner className="w-8 h-8 border-white/30" /></>
+                        ) : (
+                          <>Lưu chỉ số mới <CheckCircle size={32} /></>
+                        )}
+                     </span>
                   </button>
+                  <p className="text-center text-[10px] font-black text-slate-300 uppercase tracking-[2px]">Tất cả giao dịch được mã hóa và chốt chính xác theo Rule-01</p>
                </div>
             </form>
          </div>

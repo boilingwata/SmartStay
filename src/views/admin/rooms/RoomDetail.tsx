@@ -14,12 +14,13 @@ import {
 } from 'lucide-react';
 import { roomService } from '@/services/roomService';
 import { fileService } from '@/services/fileService';
-import { RoomDetail as RoomDetailType, RoomStatus } from '@/models/Room';
+import { RoomDetail as RoomDetailType, RoomStatus, RoomContractSummary } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { RoomModal } from '@/components/rooms/RoomModal';
+import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
 import { 
   LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip 
 } from 'recharts';
@@ -50,6 +51,7 @@ const RoomDetail = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssignAssetModalOpen, setIsAssignAssetModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -113,6 +115,24 @@ const RoomDetail = () => {
       toast.error(`Không thể cập nhật trạng thái: ${err.message}`);
     }
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => roomService.deleteRoom(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success('Đã xoá phòng thành công');
+      navigate('/admin/rooms');
+    },
+    onError: (err: Error) => {
+      toast.error(`Không thể xoá phòng: ${err.message}`);
+    }
+  });
+
+  const handleDelete = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xoá phòng này không?')) {
+      deleteMutation.mutate();
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -248,8 +268,13 @@ const RoomDetail = () => {
           >
              <Edit size={20} />
           </button>
-          <button className="w-12 h-12 bg-white border border-border/10 rounded-xl text-muted hover:text-danger hover:shadow-xl transition-all flex items-center justify-center">
-             <Trash2 size={20} />
+          <button 
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            className="w-12 h-12 bg-white border border-danger/20 rounded-xl text-danger hover:bg-danger/5 hover:shadow-xl transition-all flex items-center justify-center disabled:opacity-50"
+            title="Xoá phòng"
+          >
+             {deleteMutation.isPending ? <Spinner size="sm" /> : <Trash2 size={20} />}
           </button>
         </div>
       </div>
@@ -291,23 +316,38 @@ const RoomDetail = () => {
 
                 <div className="space-y-8">
                    <h3 className="text-[12px] text-primary font-black uppercase tracking-[4px] border-l-4 border-primary pl-4">Tiện ích căn hộ</h3>
-                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      {room.amenities.map((amenity, i) => (
-                        <div key={i} className="flex flex-col items-center justify-center p-8 bg-white/40 rounded-[40px] border border-transparent hover:border-primary/10 hover:bg-white transition-all group hover:shadow-2xl hover:shadow-primary/10">
-                           <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-inner">
-                              {getAmenityIcon(amenity)}
-                           </div>
-                           <span className="text-[10px] font-black text-primary uppercase tracking-[2px]">{amenity}</span>
-                        </div>
-                      ))}
-                   </div>
+                   {room.amenities && room.amenities.length > 0 ? (
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                       {room.amenities.map((amenity, i) => (
+                         <div key={i} className="flex flex-col items-center justify-center p-8 bg-white/40 rounded-[40px] border border-transparent hover:border-primary/10 hover:bg-white transition-all group hover:shadow-2xl hover:shadow-primary/10">
+                            <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-inner">
+                               {getAmenityIcon(amenity)}
+                            </div>
+                            <span className="text-[10px] font-black text-primary uppercase tracking-[2px]">{amenity}</span>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center justify-center py-12 bg-white/40 rounded-[40px] border-2 border-dashed border-border/20">
+                       <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 text-muted">
+                         <Package size={28} />
+                       </div>
+                       <p className="text-[11px] font-black text-muted uppercase tracking-[3px]">Chưa có tiện ích nào được ghi nhận</p>
+                     </div>
+                   )}
                 </div>
 
                 <div className="space-y-6">
                    <h3 className="text-[12px] text-primary font-black uppercase tracking-[4px] border-l-4 border-primary pl-4">Mô tả chi tiết</h3>
                    <div className="relative">
                       <div className="absolute top-4 left-4 text-primary opacity-10"><Copy size={48} /></div>
-                      <p className="text-body text-text leading-relaxed p-8 bg-white/60 rounded-[40px] border border-border/5 italic relative z-10">"{room.description}"</p>
+                      {room.description ? (
+                        <p className="text-body text-text leading-relaxed p-8 bg-white/60 rounded-[40px] border border-border/5 italic relative z-10">"{room.description}"</p>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-10 bg-white/40 rounded-[40px] border-2 border-dashed border-border/20">
+                          <p className="text-[11px] font-black text-muted uppercase tracking-[3px]">Chưa có mô tả cho phòng này</p>
+                        </div>
+                      )}
                    </div>
                 </div>
               </div>
@@ -561,7 +601,12 @@ const RoomDetail = () => {
                     <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Tài sản gán theo phòng</h3>
                     <p className="text-[10px] text-muted font-bold italic">Danh sách trang thiết bị đi kèm căn hộ.</p>
                   </div>
-                  <button className="btn-primary-sm h-11 px-6 flex items-center gap-2 rounded-xl text-[11px] uppercase tracking-widest font-black"><Plus size={16} /> Gán tài sản mới</button>
+                  <button 
+                    onClick={() => setIsAssignAssetModalOpen(true)}
+                    className="btn-primary-sm h-11 px-6 flex items-center gap-2 rounded-xl text-[11px] uppercase tracking-widest font-black"
+                  >
+                    <Plus size={16} /> Gán tài sản mới
+                  </button>
                </div>
                <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
                  <div className="overflow-x-auto">
@@ -672,15 +717,88 @@ const RoomDetail = () => {
           )}
 
           {activeTab === 'Contracts' && (
-             <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
-                <div className="w-24 h-24 bg-bg rounded-[40px] flex items-center justify-center text-muted border-4 border-dashed border-border/20 group">
-                   <History size={48} className="group-hover:rotate-[-45deg] transition-transform duration-500" />
-                </div>
-                <div className="space-y-2">
-                   <h3 className="text-[18px] font-black text-primary uppercase tracking-[4px]">Lịch sử Thuê phòng</h3>
-                   <p className="text-[13px] text-muted italic font-bold">Dữ liệu đang được đồng bộ hóa từ Phân hệ Hợp đồng (Contracts Module).</p>
-                </div>
-                <button className="btn-outline px-8 h-12 rounded-xl text-[11px] font-black uppercase tracking-[3px]">Đi tới quản lý hợp đồng</button>
+             <div className="space-y-10">
+               <div className="flex justify-between items-center">
+                 <div>
+                   <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Lịch sử Thuê phòng</h3>
+                   <p className="text-[10px] text-muted font-bold italic">Tất cả hợp đồng đã và đang gắn với phòng này.</p>
+                 </div>
+                 <button
+                   onClick={() => navigate('/admin/contracts')}
+                   className="btn-outline-sm px-6 h-11 flex items-center gap-2 rounded-xl text-[11px] font-black uppercase tracking-widest"
+                 >
+                   <History size={16} /> Quản lý hợp đồng
+                 </button>
+               </div>
+
+               {room.contracts && room.contracts.length > 0 ? (
+                 <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
+                   <div className="overflow-x-auto">
+                     <table className="w-full text-left border-collapse">
+                       <thead>
+                         <tr className="bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px]">
+                           <th className="px-8 py-6">Mã hợp đồng</th>
+                           <th className="px-6 py-6 border-l border-white/5">Cư dân</th>
+                           <th className="px-6 py-6 border-l border-white/5">Ngày bắt đầu</th>
+                           <th className="px-6 py-6 border-l border-white/5">Ngày kết thúc</th>
+                           <th className="px-6 py-6 border-l border-white/5">Giá thuê/tháng</th>
+                           <th className="px-8 py-6 border-l border-white/5">Trạng thái</th>
+                           <th className="px-8 py-6 border-l border-white/5 text-right">Thao tác</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-border/10">
+                         {room.contracts.map((c: RoomContractSummary) => (
+                           <tr key={c.id} className="group hover:bg-white/80 transition-all cursor-pointer" onClick={() => navigate(`/admin/contracts/${c.id}`)}>
+                             <td className="px-8 py-6">
+                               <p className="text-[14px] font-black text-primary font-mono tracking-tighter">{c.contractCode || `#${c.id}`}</p>
+                             </td>
+                             <td className="px-6 py-6">
+                               <div className="flex items-center gap-3">
+                                 <div className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm">
+                                   {c.tenantName ? c.tenantName.charAt(0) : '?'}
+                                 </div>
+                                 <span className="text-[13px] font-bold text-text">{c.tenantName || 'Chưa có cư dân'}</span>
+                               </div>
+                             </td>
+                             <td className="px-6 py-6 text-[12px] font-mono text-muted font-bold">{formatDate(c.startDate)}</td>
+                             <td className="px-6 py-6 text-[12px] font-mono text-muted font-bold">{formatDate(c.endDate)}</td>
+                             <td className="px-6 py-6 text-[13px] font-black text-primary font-mono">{formatVND(c.monthlyRent)}</td>
+                             <td className="px-8 py-6">
+                               <StatusBadge status={c.status} size="sm" />
+                             </td>
+                             <td className="px-8 py-6 text-right">
+                               <button
+                                 onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/${c.id}`); }}
+                                 className="w-10 h-10 bg-bg text-muted hover:bg-white hover:text-primary hover:shadow-lg rounded-xl flex items-center justify-center transition-all ml-auto"
+                               >
+                                 <ArrowRight size={16} />
+                               </button>
+                             </td>
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
+                   <div className="w-24 h-24 bg-bg rounded-[40px] flex items-center justify-center text-muted border-4 border-dashed border-border/20 group">
+                     <History size={48} className="group-hover:rotate-[-45deg] transition-transform duration-500" />
+                   </div>
+                   <div className="space-y-2">
+                     <h3 className="text-[18px] font-black text-primary uppercase tracking-[4px]">Chưa có hợp đồng nào</h3>
+                     <p className="text-[13px] text-muted italic font-bold">Phòng này chưa có hợp đồng thuê nào được tạo.</p>
+                   </div>
+                   {room.status === 'Vacant' && (
+                     <button
+                       className="btn-primary px-8 h-12 rounded-xl text-[11px] font-black uppercase tracking-[3px]"
+                       onClick={() => navigate('/admin/contracts/create', { state: { roomId: room.id } })}
+                     >
+                       Tạo hợp đồng mới
+                     </button>
+                   )}
+                 </div>
+               )}
              </div>
           )}
         </div>
@@ -732,6 +850,12 @@ const RoomDetail = () => {
           </div>
         </div>
       )}
+
+      <AssignAssetModal
+        isOpen={isAssignAssetModalOpen}
+        onClose={() => setIsAssignAssetModalOpen(false)}
+        roomId={room.id}
+      />
     </div>
   );
 };

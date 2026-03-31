@@ -75,6 +75,18 @@ const TenantDetail = () => {
     enabled: !!id,
   });
 
+  const { data: contracts } = useQuery({
+    queryKey: ['tenant-contracts', id],
+    queryFn: () => tenantService.getTenantContracts(id || ''),
+    enabled: !!id
+  });
+
+  const { data: invoices } = useQuery({
+    queryKey: ['tenant-invoices', id],
+    queryFn: () => tenantService.getTenantInvoices(id || ''),
+    enabled: !!id
+  });
+
   const { data: contacts } = useQuery<EmergencyContact[]>({
     queryKey: ['tenant-contacts', id],
     queryFn: () => tenantService.getEmergencyContacts(id!),
@@ -114,16 +126,22 @@ const TenantDetail = () => {
 
   const handleOnboardingAction = (key: string) => {
     toast.success(`Đã cập nhật bước: ${key}`);
-    if (onboarding && (onboarding.completionPercent >= 80 || key === 'isRoomHandovered')) {
+    if (onboarding && (onboarding.completionPercent >= 100 || key === 'isRoomHandovered')) {
       setShowConfetti(true);
-      toast.success('Chúc mừng! Quy trình onboarding đã hoàn tất 100%.', {
-        description: 'Dữ liệu cư dân đã được đồng bộ đầy đủ.',
+      toast.success('CHÚC MỪNG! Quy trình Onboarding đã hoàn tất.', {
+        description: 'Dữ liệu cư dân đã được đồng bộ chính xác.',
         icon: <CheckCircle2 className="text-success" />,
         duration: 8000,
       });
       setTimeout(() => setShowConfetti(false), 8000);
     }
   };
+
+  const { data: tenantBalance, isLoading: loadingBalances } = useQuery({
+    queryKey: ['tenant-balance', id],
+    queryFn: () => tenantService.getTenantBalance(id || ''),
+    enabled: activeTab === 'Vi'
+  });
 
   const handleEditSubmit = async (data: {
     fullName: string;
@@ -213,6 +231,9 @@ const TenantDetail = () => {
       </div>
     );
   }
+
+  // Combine loading states for specific tabs if needed
+  const isTabLoading = isLoadingTab(activeTab, loadingOnboarding, loadingTransactions || loadingBalances);
 
   return (
     <div className="relative space-y-8 animate-in fade-in duration-700">
@@ -350,9 +371,15 @@ const TenantDetail = () => {
           />
         ) : null}
         {activeTab === 'Lien he' ? <ContactTab profile={profile} contacts={contacts} /> : null}
-        {activeTab === 'Hop dong' ? <ContractTab /> : null}
-        {activeTab === 'Hoa don' ? <InvoiceTab /> : null}
-        {activeTab === 'Vi' ? <WalletTab transactions={transactions} isLoading={loadingTransactions} /> : null}
+        {activeTab === 'Hop dong' ? <ContractTab contract={contracts?.[0]} /> : null}
+        {activeTab === 'Hoa don' ? <InvoiceTab invoices={invoices} /> : null}
+        {activeTab === 'Vi' ? (
+          <WalletTab
+            balance={tenantBalance?.currentBalance ?? 0}
+            transactions={transactions}
+            isLoading={loadingTransactions || loadingBalances}
+          />
+        ) : null}
         {activeTab === 'Phan hoi' ? <FeedbackTab feedback={feedback} nps={nps} /> : null}
         {activeTab === 'Onboarding' ? (
           <OnboardingTab onboarding={onboarding!} onAction={handleOnboardingAction} onTabChange={setActiveTab} />

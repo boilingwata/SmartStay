@@ -11,7 +11,10 @@ export interface Meter {
   roomId: string;
   roomCode?: string;
   latestReadingIndex?: number; // RULE-01: Derived from vw_LatestMeterReading
+  previousReadingIndex?: number;
+  usage?: number;
   latestMonthYear?: string;
+  readingDate?: string;
   description?: string;
 }
 
@@ -46,4 +49,19 @@ export interface MeterBillCalculation {
   totalAmount: number;
   vatPercent: number;
   envFee?: number; // Water only
+}
+
+export interface ConsumptionStats {
+  electric: {
+    current: number;
+    usage: number;
+    unit: string;
+    trend: number;
+  };
+  water: {
+    current: number;
+    usage: number;
+    unit: string;
+    trend: number;
+  };
 }

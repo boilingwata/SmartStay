@@ -5,18 +5,19 @@ import { formatDate, formatVND, cn } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 
 interface WalletTabProps {
+  balance: number;
   transactions: TenantBalanceTransaction[] | undefined;
   isLoading: boolean;
 }
 
-export const WalletTab: React.FC<WalletTabProps> = ({ transactions, isLoading }) => {
+export const WalletTab: React.FC<WalletTabProps> = ({ balance, transactions, isLoading }) => {
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-20">
       <div className="card-container p-10 bg-slate-900 border-none relative overflow-hidden group">
         <div className="relative z-10">
           <p className="text-[11px] text-white/50 font-black uppercase tracking-widest mb-2">Số dư Ledger hiện hữu</p>
           <h2 className="text-[48px] font-display font-black text-white tracking-tighter leading-none">
-            {formatVND(24500000)}
+            {formatVND(balance)}
           </h2>
         </div>
         <Wallet size={200} className="absolute -bottom-20 -right-20 text-white/5 group-hover:scale-110 transition-transform duration-700" />

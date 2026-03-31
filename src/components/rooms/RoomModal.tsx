@@ -169,15 +169,20 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-10 space-y-10">
-           <div className="space-y-6">
-              <div className="flex items-center gap-3 text-primary">
-                 <Building2 size={18} /><h3 className="text-body font-black uppercase tracking-widest">Thông tin cơ bản</h3>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-10 space-y-12 bg-slate-50/30">
+           {/* Section 1: Basic Info */}
+           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-8 animate-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-primary/5 text-primary rounded-xl flex items-center justify-center border border-primary/10">
+                    <Building2 size={20} />
+                 </div>
+                 <h3 className="text-body font-black uppercase tracking-[2px] text-primary">Thông tin cơ bản</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Toà nhà</label>
-                     <select {...register('buildingId')} disabled={isEditing} className="input-base w-full bg-bg/50">
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                 <div className="space-y-2.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Toà nhà</label>
+                     <select {...register('buildingId')} disabled={isEditing} className="h-14 px-6 bg-slate-100 border border-slate-200 rounded-[20px] w-full font-black text-slate-500 opacity-60 cursor-not-allowed transition-all shadow-sm">
                         {isLoadingBuildings ? (
                            <option value="">Đang tải...</option>
                         ) : (
@@ -190,89 +195,101 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
                         )}
                      </select>
                  </div>
-                 <div className="space-y-2 relative">
-                    <label className="text-[10px] font-black text-muted uppercase">Mã phòng *</label>
-                    <input {...register('roomCode')} placeholder="VD: A-101" className={cn("input-base w-full", errors.roomCode && "border-danger")} />
-                    {errors.roomCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5">{String(errors.roomCode.message)}</p>}
+                 <div className="space-y-2.5 relative">
+                    <label htmlFor="roomCode" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Mã phòng *</label>
+                    <input 
+                      id="roomCode" 
+                      {...register('roomCode')} 
+                      placeholder="VD: A-101" 
+                      className={cn(
+                        "h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all placeholder:text-slate-300 shadow-inner-sm", 
+                        errors.roomCode && "border-danger bg-danger/5"
+                      )} 
+                    />
+                    {errors.roomCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{String(errors.roomCode.message)}</p>}
                  </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Tầng số</label>
-                    <input type="number" {...register('floorNumber', { valueAsNumber: true })} className="input-base w-full" />
+                 <div className="space-y-2.5">
+                    <label htmlFor="floorNumber" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Tầng số</label>
+                    <input 
+                      id="floorNumber" 
+                      type="number" 
+                      {...register('floorNumber', { valueAsNumber: true })} 
+                      className="h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all shadow-inner-sm" 
+                    />
                  </div>
               </div>
            </div>
 
-           <div className="space-y-6">
-              <div className="flex items-center gap-3 text-primary">
-                 <Maximize size={18} /><h3 className="text-body font-black uppercase tracking-widest">Kỹ thuật & Giá thuê</h3>
+           {/* Section 2: Technical & Rent */}
+           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-8 animate-in slide-in-from-bottom-4 duration-700 delay-100">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-secondary/5 text-secondary rounded-xl flex items-center justify-center border border-secondary/10">
+                    <Maximize size={20} />
+                 </div>
+                 <h3 className="text-body font-black uppercase tracking-[2px] text-primary">Kỹ thuật & Đặc điểm</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                 <div className="space-y-2 col-span-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Loại phòng</label>
-                    <select {...register('roomType')} className="input-base w-full">
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                 <div className="space-y-2.5 col-span-2">
+                    <label htmlFor="roomType" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Loại phòng</label>
+                    <select id="roomType" {...register('roomType')} className="h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all cursor-pointer shadow-inner-sm">
                        <option value="Studio">Studio</option><option value="1BR">1 Phòng ngủ</option>
                        <option value="2BR">2 Phòng ngủ</option><option value="3BR">3 Phòng ngủ</option>
                        <option value="Penthouse">Penthouse</option><option value="Commercial">Kinh doanh</option>
                     </select>
                  </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Diện tích (m2)</label>
-                    <input type="number" {...register('areaSqm', { valueAsNumber: true })} className="input-base w-full" />
-                 </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Giá thuê CB (VND)</label>
-                    <input type="number" {...register('baseRentPrice', { valueAsNumber: true })} className="input-base w-full font-bold text-primary" />
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Hướng cửa/ban công</label>
-                    <select {...register('directionFacing')} className="input-base w-full">
+                 <div className="space-y-2.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Hướng phòng</label>
+                    <select {...register('directionFacing')} className="h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all cursor-pointer shadow-inner-sm">
                        <option value="S">Nam (S)</option><option value="N">Bắc (N)</option>
                        <option value="E">Đông (E)</option><option value="W">Tây (W)</option>
                        <option value="SE">Đông Nam (SE)</option>
                     </select>
                  </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Tình trạng nội thất</label>
-                    <select {...register('furnishing')} className="input-base w-full">
+                 <div className="space-y-2.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Nội thất</label>
+                    <select {...register('furnishing')} className="h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all cursor-pointer shadow-inner-sm">
                        <option value="Unfurnished">Nhà trống</option><option value="SemiFurnished">Bán nội thất</option>
                        <option value="FullyFurnished">Đầy đủ nội thất</option>
                     </select>
                  </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted uppercase">Số người tối đa</label>
-                    <input type="number" {...register('maxOccupancy', { valueAsNumber: true })} className="input-base w-full" />
+                 <div className="space-y-2.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Sức chứa tối đa</label>
+                    <input type="number" {...register('maxOccupancy', { valueAsNumber: true })} className="h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] w-full font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all shadow-inner-sm" />
+                 </div>
+                 <div className="space-y-2.5 col-span-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Chất lượng (Condition: {currentCondition}/10)</label>
+                    <div className="flex items-center gap-6 h-14 px-6 bg-slate-50/50 border border-slate-100 rounded-[20px] shadow-inner-sm">
+                       <input type="range" min="1" max="10" step="1" {...register('conditionScore', { valueAsNumber: true })} className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary shadow-inner" />
+                       <span className="text-h4 font-black text-primary w-8 text-center">{currentCondition}</span>
+                    </div>
                  </div>
                  <div className="space-y-4 flex flex-col justify-end">
-                    <label className="flex items-center gap-3 cursor-pointer group pb-2">
+                    <label className="flex items-center gap-3 cursor-pointer group pb-4 ml-1">
                        <div className={cn("w-12 h-6 rounded-full transition-all relative p-1", hasBalcony ? "bg-primary" : "bg-slate-300")}>
                           <div className={cn("w-4 h-4 bg-white rounded-full transition-all shadow-sm", hasBalcony ? "ml-6" : "ml-0")}></div>
                           <input type="checkbox" className="sr-only" {...register('hasBalcony')} />
                        </div>
-                       <span className="text-[10px] font-black uppercase text-muted group-hover:text-primary transition-colors">Có ban công</span>
+                       <span className="text-[11px] font-black uppercase text-slate-500 group-hover:text-primary transition-colors tracking-widest">Có ban công</span>
                     </label>
-                 </div>
-              </div>
-
-              <div className="space-y-2 max-w-md">
-                 <label className="text-[10px] font-black text-muted uppercase">Điểm trạng thái phòng (Condition: {currentCondition}/10)</label>
-                 <div className="flex items-center gap-4 py-2">
-                    <input type="range" min="1" max="10" step="1" {...register('conditionScore', { valueAsNumber: true })} className="flex-1 h-2 bg-bg rounded-lg appearance-none cursor-pointer accent-primary shadow-inner" />
                  </div>
               </div>
            </div>
 
-           <div className="space-y-6">
-              <div className="flex items-center gap-3 text-primary">
-                 <Check size={18} /><h3 className="text-body font-black uppercase tracking-widest">Tiện ích đi kèm</h3>
+           {/* Section 3: Amenities & Description */}
+           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-8 animate-in slide-in-from-bottom-4 duration-700 delay-200">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-accent/5 text-accent rounded-xl flex items-center justify-center border border-accent/10">
+                    <Check size={20} />
+                 </div>
+                 <h3 className="text-body font-black uppercase tracking-[2px] text-primary">Tiện ích & Mô tả</h3>
               </div>
+              
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                  {amenityList.map((item) => (
                     <label key={item.id} className={cn(
-                      "flex flex-col items-center justify-center p-4 rounded-3xl border-2 transition-all cursor-pointer group",
-                      selectedAmenities.includes(item.id) ? "border-primary bg-primary/5 text-primary" : "border-bg bg-bg/20 text-muted grayscale hover:grayscale-0"
+                      "flex flex-col items-center justify-center p-5 rounded-[24px] border-2 transition-all cursor-pointer group",
+                      selectedAmenities.includes(item.id) ? "border-primary bg-primary/[0.03] text-primary shadow-md" : "border-slate-50 bg-slate-50/50 text-slate-400 grayscale hover:grayscale-0 hover:border-slate-200"
                     )}>
                        <input type="checkbox" className="hidden" checked={selectedAmenities.includes(item.id)} onChange={(e) => {
                           const current = [...selectedAmenities];
@@ -288,9 +305,13 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
                     </label>
                  ))}
               </div>
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-muted uppercase">Mô tả/Ghi chú</label>
-                 <textarea {...register('description')} className="input-base w-full min-h-[120px] py-4" placeholder="Nhập mô tả chi tiết về đặc điểm phòng, quy định riêng..." />
+              <div className="space-y-2.5">
+                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Mô tả chi tiết</label>
+                 <textarea 
+                   {...register('description')} 
+                   className="w-full min-h-[160px] px-6 py-5 bg-slate-50/50 border border-slate-200 rounded-[28px] font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all placeholder:text-slate-300 shadow-inner-sm" 
+                   placeholder="Nhập mô tả chi tiết về đặc điểm phòng, quy định riêng..." 
+                 />
               </div>
            </div>
         </form>

@@ -1,11 +1,10 @@
 /**
  * Static Role Permission Configuration
  *
- * MK-01 / PRM-01 / ROL-01 FIX:
- * This file extracts the role permission definitions from the mocks/ directory
- * into a proper static configuration module. The data is identical but lives
- * in the correct location (config/) rather than in mocks/ which implies
- * the data is only for development/testing.
+ * PRM-01 / ROL-01 FIX:
+ * This file contains the role permission definitions as a proper static
+ * configuration module. The data lives in the correct location (config/)
+ * to ensure production stability and logical separation from dynamic data.
  *
  * DESIGN DECISION: Permissions are statically defined because:
  *  1. No `role_permissions` table exists in the DB schema.
@@ -42,6 +41,7 @@ export const ROLE_PERMISSION_CONFIG: RolePermissionConfig = {
     { permissionKey: 'room.view',        module: 'Rooms',      description: 'Xem phòng' },
     { permissionKey: 'ticket.view',      module: 'Tickets',    description: 'Xem ticket' },
     { permissionKey: 'ticket.view.all',  module: 'Tickets',    description: 'Xem tất cả ticket' },
+    { permissionKey: 'meter.view',       module: 'Meters',     description: 'Xem danh sách đồng hồ' },
     { permissionKey: 'meter.entry',      module: 'Meters',     description: 'Nhập đồng hồ' },
     { permissionKey: 'building.view',    module: 'Buildings',  description: 'Xem tòa nhà' },
     { permissionKey: 'building.manage',  module: 'Buildings',  description: 'Quản lý tòa nhà' },
@@ -57,13 +57,13 @@ export const ROLE_PERMISSION_CONFIG: RolePermissionConfig = {
       'contract.view', 'contract.create', 'contract.delete',
       'invoice.view', 'invoice.create', 'payment.view',
       'payment.approve', 'room.view', 'ticket.view',
-      'ticket.view.all', 'meter.entry', 'report.view',
+      'ticket.view.all', 'meter.view', 'meter.entry', 'report.view',
       'building.view', 'building.manage', 'tenant.view', 'tenant.manage',
       'service.manage', 'pii.view', 'system.config',
     ],
     Staff: [
       'contract.view', 'invoice.view', 'payment.view',
-      'room.view', 'ticket.view', 'meter.entry', 'pii.view',
+      'room.view', 'ticket.view', 'meter.view', 'meter.entry', 'pii.view',
       'tenant.view', 'building.view',
     ],
     Viewer: ['contract.view', 'invoice.view', 'room.view', 'ticket.view', 'building.view'],

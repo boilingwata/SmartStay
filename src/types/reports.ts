@@ -26,9 +26,18 @@ export interface OccupancyKPI {
   avgOccupancyRate: number
   avgOccupancyDelta: number
   occupiedRooms: number
+  vacantRooms: number
+  maintenanceRooms: number
+  reservedRooms: number
   longestVacantRoom: { roomCode: string; days: number }
   avgVacancyDays: number
   sparklineData?: { value: number }[]
+  statusCounts: {
+    occupied: number
+    vacant: number
+    maintenance: number
+    reserved: number
+  }
 }
 
 export interface OccupancyTrendPoint {
