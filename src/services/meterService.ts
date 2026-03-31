@@ -82,12 +82,18 @@ function mapReadingRowToMeter(
   const meterType: MeterType = type === 'elec' ? 'Electricity' : 'Water';
 
   let latestIndex: number | undefined;
+  let previousIndex: number | undefined;
+  let usage: number | undefined;
   let latestMonthYear: string | undefined;
+  let readingDate: string | undefined;
 
   if (latestRow) {
-    latestIndex =
-      type === 'elec' ? latestRow.electricity_current : latestRow.water_current;
+    const isElec = type === 'elec';
+    latestIndex = isElec ? latestRow.electricity_current : latestRow.water_current;
+    previousIndex = isElec ? latestRow.electricity_previous : latestRow.water_previous;
+    usage = isElec ? (latestRow.electricity_usage ?? latestIndex - previousIndex) : (latestRow.water_usage ?? latestIndex - previousIndex);
     latestMonthYear = latestRow.billing_period?.slice(0, 7) ?? undefined;
+    readingDate = latestRow.reading_date;
   }
 
   return {
@@ -100,7 +106,10 @@ function mapReadingRowToMeter(
     roomId: String(room.id),
     roomCode: room.room_code,
     latestReadingIndex: latestIndex,
+    previousReadingIndex: previousIndex,
+    usage: usage,
     latestMonthYear: latestMonthYear,
+    readingDate: readingDate,
   };
 }
 
@@ -397,6 +406,45 @@ export const meterService = {
       return handleServiceError(error, 'Không thể gửi chỉ số mới');
     }
   },
+
+  getMeterStatistics: async (params: { buildingId?: string } = {}) => {
+    try {
+      let roomQuery = supabase
+        .from('rooms')
+        .select('id');
+      
+      if (params.buildingId) {
+        roomQuery = roomQuery.eq('building_id', Number(params.buildingId));
+      }
+      
+      const rooms = (await unwrap(roomQuery)) as unknown as { id: number }[];
+      const roomIds = rooms.map(r => r.id);
+      const totalRooms = rooms.length;
+
+      const currentMonth = new Date().toISOString().substring(0, 7);
+
+      const latestReadings = (await unwrap(
+        supabase
+          .from('meter_readings')
+          .select('room_id, billing_period')
+          .in('room_id', roomIds)
+          .like('billing_period', `${currentMonth}%`)
+      )) as unknown as { room_id: number; billing_period: string }[];
+
+      const roomsWithReading = new Set(latestReadings.map(r => r.room_id));
+      const missingCount = totalRooms - roomsWithReading.size;
+
+      // Each room has 1 Elec and 1 Water meter in our virtual model
+      return {
+        total: totalRooms * 2,
+        electricity: totalRooms,
+        water: totalRooms,
+        missing: missingCount * 2, // If a room reading is missing, both elec and water are missing
+      };
+    } catch (error) {
+      return { total: 0, electricity: 0, water: 0, missing: 0 };
+    }
+  }
 };
 
 export default meterService;

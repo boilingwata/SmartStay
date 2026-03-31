@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -19,6 +19,8 @@ import useAuthStore from '@/stores/authStore';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import StaffMyTickets from '@/views/admin/StaffMyTickets';
+
+import { QuickFilterChips, QuickFilterOption } from '@/components/ui/QuickFilterChips';
 
 // Safe Font Stack for Vietnamese
 const SAFE_FONT = { fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
@@ -89,11 +91,8 @@ const TicketList = () => {
     search: '',
     slaBreached: false,
   });
-
   useEffect(() => {
-    if (activeBuildingId) {
-      setFilters(f => ({ ...f, buildingId: String(activeBuildingId) }));
-    }
+    setFilters(f => ({ ...f, buildingId: activeBuildingId ? String(activeBuildingId) : '' }));
   }, [activeBuildingId]);
 
   const { data: tickets, isLoading, isError, refetch } = useQuery<Ticket[]>({
@@ -102,9 +101,68 @@ const TicketList = () => {
   });
 
   const { data: stats } = useQuery({
-    queryKey: ['ticket-stats'],
-    queryFn: () => ticketService.getTicketStatistics()
+    queryKey: ['ticket-stats', activeBuildingId],
+    queryFn: () => ticketService.getTicketStatistics({ buildingId: activeBuildingId })
   });
+
+  const activeQuickFilter = useMemo(() => {
+    const { status, priority, slaBreached, type, roomId, assignedTo, dateRange } = filters;
+    
+    // If any "deep" filters are active, it's custom
+    if (type.length > 0 || roomId !== '' || assignedTo !== '' || dateRange.from !== '' || dateRange.to !== '') {
+      return 'custom';
+    }
+
+    if (slaBreached) return 'sla_breached';
+    if (priority.length === 2 && priority.includes('High') && priority.includes('Critical')) return 'high_priority';
+    if (status.length === 1 && status[0] === 'Open') return 'open';
+    if (status.length === 1 && status[0] === 'InProgress') return 'in_progress';
+    if (status.length === 0 && !slaBreached) return 'all';
+    
+    return 'custom';
+  }, [filters]);
+
+  const quickFilterOptions: QuickFilterOption[] = [
+    { label: 'Tất cả', value: 'all' },
+    { label: 'Chờ nhận', value: 'open', count: stats?.open },
+    { label: 'Đang xử lý', value: 'in_progress', count: stats?.inProgress },
+    { label: 'Quá hạn', value: 'sla_breached', count: stats?.slaBreached, color: 'red' },
+    { label: 'Ưu tiên cao', value: 'high_priority' },
+  ];
+
+  const handleQuickFilterChange = (val: string) => {
+    const baseFilters = {
+      ...filters,
+      status: [] as TicketStatus[],
+      priority: [] as TicketPriority[],
+      slaBreached: false,
+      // Clear deep filters when switching quick filters for better UX
+      type: [] as TicketType[],
+      roomId: '',
+      assignedTo: '',
+      dateRange: { from: '', to: '' },
+    };
+
+    switch (val) {
+      case 'open':
+        setFilters({ ...baseFilters, status: ['Open'] });
+        break;
+      case 'in_progress':
+        setFilters({ ...baseFilters, status: ['InProgress'] });
+        break;
+      case 'sla_breached':
+        setFilters({ ...baseFilters, slaBreached: true });
+        break;
+      case 'high_priority':
+        setFilters({ ...baseFilters, priority: ['High', 'Critical'] });
+        break;
+      case 'all':
+        setFilters(baseFilters);
+        break;
+      default:
+        break;
+    }
+  };
 
   const handleCreateTicket = async (data: any) => {
     try {
@@ -132,23 +190,32 @@ const TicketList = () => {
         </div>
 
         <div className="flex items-center gap-3">
-           {/* Stats Summary Panel - Simplified Row */}
-           <div className="flex items-center gap-4 bg-white px-6 py-3 rounded-2xl border border-slate-200/60 shadow-sm">
-              <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
+           {/* Stats Summary Panel - Simplified Row - Interactive */}
+           <div className="flex items-center gap-4 bg-white px-6 py-3 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
+              <button 
+                onClick={() => handleQuickFilterChange('in_progress')}
+                className="flex items-center gap-2 pr-4 border-r border-slate-100 hover:opacity-70 transition-opacity"
+              >
                  <div className="w-2 h-2 rounded-full bg-blue-500" />
                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Đang xử lý:</span>
                  <span className="text-sm font-black text-slate-800">{stats?.inProgress || 0}</span>
-              </div>
-              <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
+              </button>
+              <button 
+                onClick={() => handleQuickFilterChange('open')}
+                className="flex items-center gap-2 pr-4 border-r border-slate-100 hover:opacity-70 transition-opacity"
+              >
                  <div className="w-2 h-2 rounded-full bg-orange-400" />
                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Chờ nhận:</span>
                  <span className="text-sm font-black text-slate-800">{stats?.open || 0}</span>
-              </div>
-              <div className="flex items-center gap-2">
+              </button>
+              <button 
+                onClick={() => handleQuickFilterChange('sla_breached')}
+                className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+              >
                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quá hạn:</span>
                  <span className="text-sm font-black text-red-600">{stats?.slaBreached || 0}</span>
-              </div>
+              </button>
            </div>
 
            <div className="h-10 w-px bg-slate-200 mx-2" />
@@ -163,53 +230,73 @@ const TicketList = () => {
         </div>
       </div>
 
-      {/* Simplified Search & Advanced Filter Toggle */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-         <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative group">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
-               <input 
-                 type="text" 
-                 placeholder="Tìm theo mã ticket, tiêu đề hoặc nội dung..." 
-                 className="w-full h-12 pl-12 pr-4 bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-primary transition-all outline-none font-medium"
-                 value={filters.search}
-                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-               />
-            </div>
-            <button 
-              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-              className={cn(
-                "flex items-center gap-2 px-5 h-12 rounded-xl font-bold transition-all border",
-                isFilterExpanded ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-              )}
-            >
-               <FilterIcon size={18} />
-               <span>Bộ lọc nâng cao</span>
-               <div className={cn("w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]", !isFilterExpanded && "hidden")}>
-                  {Object.values(filters).filter(v => Array.isArray(v) ? v.length > 0 : !!v && v !== String(activeBuildingId)).length}
-               </div>
-            </button>
-         </div>
-         
-         <div className={cn("mt-4 pt-4 border-t border-slate-100 overflow-hidden transition-all duration-300", isFilterExpanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
-            <TicketAdvancedFilter 
-              filters={filters}
-              onChange={setFilters}
-              onReset={() => setFilters({
-                buildingId: activeBuildingId ? String(activeBuildingId) : '',
-                roomId: '',
-                type: [],
-                priority: [],
-                status: [],
-                assignedTo: '',
-                dateRange: { from: '', to: '' },
-                search: '',
-                slaBreached: false,
-              })}
-              isExpanded={true} 
-              onToggleExpand={() => setIsFilterExpanded(false)}
-            />
-         </div>
+      {/* Modern Filter Section */}
+      <div className="space-y-4">
+        <QuickFilterChips 
+          options={quickFilterOptions}
+          value={activeQuickFilter}
+          onChange={handleQuickFilterChange}
+        />
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
+           <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 relative group">
+                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
+                 <input 
+                   type="text" 
+                   placeholder="Tìm theo mã ticket, tiêu đề hoặc nội dung..." 
+                   className="w-full h-12 pl-12 pr-4 bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-primary transition-all outline-none font-bold text-sm placeholder:font-medium"
+                   value={filters.search}
+                   onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                 />
+              </div>
+              <button 
+                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                className={cn(
+                  "flex items-center gap-2 px-6 h-12 rounded-xl font-bold transition-all border",
+                  isFilterExpanded 
+                    ? "bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200" 
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                )}
+              >
+                 <FilterIcon size={18} className={cn("transition-transform duration-300", isFilterExpanded && "rotate-180")} />
+                 <span>Bộ lọc nâng cao</span>
+                 <div className={cn(
+                   "w-5 h-5 rounded-full flex items-center justify-center text-[10px] ml-1", 
+                   isFilterExpanded ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
+                 )}>
+                    {Object.values(filters).filter(v => Array.isArray(v) ? v.length > 0 : (!!v && v !== String(activeBuildingId) && v !== '')).length}
+                 </div>
+              </button>
+           </div>
+           
+           <div className={cn(
+             "overflow-hidden transition-all duration-500 ease-in-out", 
+             isFilterExpanded ? "mt-4 pt-6 border-t border-slate-100 max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+           )}>
+              <TicketAdvancedFilter 
+                filters={filters}
+                onChange={(newFilters) => {
+                  setFilters(newFilters);
+                }}
+                onReset={() => {
+                  setFilters({
+                    buildingId: activeBuildingId ? String(activeBuildingId) : '',
+                    roomId: '',
+                    type: [],
+                    priority: [],
+                    status: [],
+                    assignedTo: '',
+                    dateRange: { from: '', to: '' },
+                    search: '',
+                    slaBreached: false,
+                  });
+                }}
+                isExpanded={true} 
+                onToggleExpand={() => setIsFilterExpanded(false)}
+              />
+           </div>
+        </div>
       </div>
 
       {isError && <ErrorBanner message="Lỗi hệ thống khi tải dữ liệu." onRetry={() => refetch()} />}

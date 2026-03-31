@@ -71,16 +71,34 @@ const TenantDetail = () => {
     enabled: !!id
   });
 
-  const { data: contacts } = useQuery<EmergencyContact[]>({
-    queryKey: ['tenant-contacts', id],
-    queryFn: () => tenantService.getEmergencyContacts(id!),
-    enabled: activeTab === 'Lien he'
+  const { data: contracts } = useQuery({
+    queryKey: ['tenant-contracts', id],
+    queryFn: () => tenantService.getTenantContracts(id || ''),
+    enabled: !!id
+  });
+
+  const { data: invoices } = useQuery({
+    queryKey: ['tenant-invoices', id],
+    queryFn: () => tenantService.getTenantInvoices(id || ''),
+    enabled: !!id
   });
 
   const { data: onboarding, isLoading: loadingOnboarding } = useQuery<OnboardingProgress>({
     queryKey: ['tenant-onboarding', id],
     queryFn: () => tenantService.getOnboardingProgress(id!),
     enabled: activeTab === 'Onboarding'
+  });
+
+  const { data: contacts } = useQuery<EmergencyContact[]>({
+    queryKey: ['tenant-contacts', id],
+    queryFn: () => tenantService.getEmergencyContacts(id!),
+    enabled: activeTab === 'Lien he'
+  });
+
+  const { data: transactions, isLoading: loadingTransactions } = useQuery<TenantBalanceTransaction[]>({
+    queryKey: ['tenant-transactions', id],
+    queryFn: () => tenantService.getTenantBalanceTransactions(id!),
+    enabled: activeTab === 'Vi'
   });
 
   const { data: feedback } = useQuery<TenantFeedback[]>({
@@ -93,12 +111,6 @@ const TenantDetail = () => {
     queryKey: ['tenant-nps', id],
     queryFn: () => tenantService.getNPSSurveys(id!),
     enabled: activeTab === 'Phan hoi'
-  });
-
-  const { data: transactions, isLoading: loadingTransactions } = useQuery<TenantBalanceTransaction[]>({
-    queryKey: ['tenant-transactions', id],
-    queryFn: () => tenantService.getTenantBalanceTransactions(id!),
-    enabled: activeTab === 'Vi'
   });
 
   // Checklist #4: Onboarding Confetti
@@ -116,6 +128,12 @@ const TenantDetail = () => {
     }
   };
 
+  const { data: tenantBalance, isLoading: loadingBalances } = useQuery({
+    queryKey: ['tenant-balance', id],
+    queryFn: () => tenantService.getTenantBalance(id || ''),
+    enabled: activeTab === 'Vi'
+  });
+
   if (loadingProfile || !profile) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center gap-4">
@@ -124,6 +142,9 @@ const TenantDetail = () => {
       </div>
     );
   }
+
+  // Combine loading states for specific tabs if needed
+  const isTabLoading = isLoadingTab(activeTab, loadingOnboarding, loadingTransactions || loadingBalances);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 relative">
@@ -181,7 +202,6 @@ const TenantDetail = () => {
         </div>
       </div>
 
-      {/* 3.2.1 Tab Navigation */}
       <div className="border-b border-border/20 flex flex-nowrap overflow-x-auto no-scrollbar gap-8">
         {(['Ho so', 'Lien he', 'Hop dong', 'Hoa don', 'Vi', 'Phan hoi', 'Onboarding'] as TabType[]).map(tab => (
           <button
@@ -200,12 +220,11 @@ const TenantDetail = () => {
         ))}
       </div>
 
-      {/* Tab Contents */}
       <div className="min-h-[500px]">
         {activeTab === 'Ho so' && (
           <ProfileTab 
             profile={profile} 
-            canViewPII={canViewPII} 
+            canViewPII={hasPermission('tenant.view_pii')} 
             showSensitive={showSensitive} 
             setShowSensitive={setShowSensitive} 
           />
@@ -214,13 +233,17 @@ const TenantDetail = () => {
           <ContactTab profile={profile} contacts={contacts} />
         )}
         {activeTab === 'Hop dong' && (
-          <ContractTab />
+          <ContractTab contract={contracts?.[0]} />
         )}
         {activeTab === 'Hoa don' && (
-          <InvoiceTab />
+          <InvoiceTab invoices={invoices} />
         )}
         {activeTab === 'Vi' && (
-          <WalletTab transactions={transactions} isLoading={loadingTransactions} />
+          <WalletTab 
+            balance={tenantBalance?.currentBalance ?? 0}
+            transactions={transactions} 
+            isLoading={loadingTransactions || loadingBalances} 
+          />
         )}
         {activeTab === 'Phan hoi' && (
           <FeedbackTab feedback={feedback} nps={nps} />

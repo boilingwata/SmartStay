@@ -161,7 +161,12 @@ const ASSET_STATUS_FROM_DB: StringRecord = {
   in_use: 'Good',
   maintenance: 'Fair',
   disposed: 'Poor',
-  cancelled: 'Poor',
+}
+const ASSET_STATUS_TO_DB: StringRecord = {
+  New: 'in_use',
+  Good: 'in_use',
+  Fair: 'maintenance',
+  Poor: 'disposed',
 }
 
 // --- Exported mappers ---
@@ -175,4 +180,4 @@ export const mapPriority = { fromDb: createMapper(PRIORITY_FROM_DB), toDb: creat
 export const mapPaymentMethod = { fromDb: createMapper(PAYMENT_METHOD_FROM_DB), toDb: createMapper(PAYMENT_METHOD_TO_DB) }
 export const mapDepositStatus = { fromDb: createMapper(DEPOSIT_STATUS_FROM_DB), toDb: createMapper(DEPOSIT_STATUS_TO_DB) }
 export const mapGender = { fromDb: createMapper(GENDER_FROM_DB), toDb: createMapper(GENDER_TO_DB) }
-export const mapAssetStatus = { fromDb: createMapper(ASSET_STATUS_FROM_DB) }
+export const mapAssetStatus = { fromDb: createMapper(ASSET_STATUS_FROM_DB), toDb: createMapper(ASSET_STATUS_TO_DB) }

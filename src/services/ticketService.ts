@@ -309,18 +309,24 @@ export const ticketService = {
     return rows.map(mapDbCommentToTicketComment);
   },
 
-  getTicketStatistics: async (): Promise<TicketStatistics> => {
-    // Aggregate via a single select of status + resolved_at
-    const rows = (await unwrap(
-      supabase
-        .from('tickets')
-        .select('status, resolved_at, created_at, satisfaction_rating, priority')
-    )) as unknown as {
+  getTicketStatistics: async (filters?: { buildingId?: string | number | null }): Promise<TicketStatistics> => {
+    // 10 CRITICAL DATABASE RULES -- RULE-02: Use views for counts? 
+    // Actually, for stats we want status/priority distribution, so we fetch records.
+    let query = supabase
+      .from('tickets')
+      .select('status, resolved_at, created_at, satisfaction_rating, priority, rooms!inner(building_id)');
+
+    if (filters?.buildingId != null && filters.buildingId !== '') {
+      query = query.eq('rooms.building_id', Number(filters.buildingId));
+    }
+
+    const rows = (await unwrap(query)) as unknown as {
       status: string | null;
       resolved_at: string | null;
       created_at: string | null;
       satisfaction_rating: number | null;
       priority: string | null;
+      rooms: { building_id: number };
     }[];
 
     const total = rows.length;

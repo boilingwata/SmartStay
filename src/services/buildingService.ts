@@ -59,7 +59,7 @@ function toBuildingSummary(row: BuildingRow): BuildingSummary {
     longitude: row.longitude ?? undefined,
     isDeleted: row.is_deleted ?? false,
     totalRooms,
-    occupiedRooms: 0, // Will be computed with a subquery later
+    occupiedRooms: 0,
     occupancyRate: 0,
   };
 }
@@ -89,12 +89,11 @@ export const buildingService = {
     }
 
     // Server-side Sorting
-    const sortField = filters?.sortBy === 'totalRooms' ? 'id' : (filters?.sortBy || 'name'); // Cannot directly sort by computed room count in base table without a view
+    const sortField = filters?.sortBy === 'totalRooms' ? 'id' : (filters?.sortBy || 'name');
     query = query.order(sortField === 'name' ? 'name' : (sortField === 'created_at' ? 'created_at' : 'id'), { 
       ascending: filters?.sortOrder === 'asc' 
     });
 
-    // Server-side Pagination
     if (filters?.page !== undefined && filters?.pageSize !== undefined) {
       const from = (filters.page - 1) * filters.pageSize;
       const to = from + filters.pageSize - 1;
@@ -104,7 +103,6 @@ export const buildingService = {
     const rows = await unwrap(query) as unknown as BuildingRow[];
     const summaries = rows.map(toBuildingSummary);
 
-    // Compute occupancy per building by querying occupied rooms
     const buildingIds = rows.map(r => r.id);
     if (buildingIds.length > 0) {
       const { data: occupiedData } = await supabase
@@ -133,11 +131,47 @@ export const buildingService = {
     const row = await unwrap(
       supabase
         .from('buildings')
-        .select('*, rooms(count)')
+        .select('*, rooms(count), profiles!owner_id(*)')
         .eq('id', Number(id))
         .single()
-    ) as unknown as BuildingRow;
-    return toBuildingDetail(row);
+    ) as unknown as (BuildingRow & { profiles: ProfileRow | null });
+    
+    const detail = toBuildingDetail(row);
+    
+    detail.totalRooms = row.rooms?.[0]?.count ?? 0;
+    
+    // Fetch occupied rooms count separately
+    const { count: occupiedCount } = await supabase
+      .from('rooms')
+      .select('*', { count: 'exact', head: true })
+      .eq('building_id', Number(id))
+      .eq('status', 'occupied');
+
+    detail.occupiedRooms = occupiedCount ?? 0;
+    detail.occupancyRate = detail.totalRooms > 0 ? Math.round((detail.occupiedRooms / detail.totalRooms) * 100) : 0;
+
+    // Use property owner contact info as fallback for management
+    if (row.profiles) {
+      const prefs = (row.profiles.preferences as any) || {};
+      detail.managementPhone = row.profiles.phone || '';
+      detail.managementEmail = prefs.email || '';
+      
+      // Populate ownership info from the primary owner
+      detail.ownership = [{
+        id: String(id) + '_primary',
+        ownerId: row.profiles.id,
+        ownerName: row.profiles.full_name,
+        ownerAvatar: row.profiles.avatar_url || undefined,
+        ownershipPercent: 100,
+        ownershipType: 'FullOwner',
+        startDate: row.opening_date || row.created_at || '',
+      }];
+    }
+
+    // Since building_images table is missing from schema, images will be handled via description or empty for now
+    detail.images = [];
+
+    return detail;
   },
 
   getOwners: async (options?: { 

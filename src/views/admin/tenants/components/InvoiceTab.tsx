@@ -15,8 +15,20 @@ interface InvoiceTabProps {
 export const InvoiceTab: React.FC<InvoiceTabProps> = ({ invoices }) => {
   const navigate = useNavigate();
   
-  // B80 FIX: Remove hardcoded mock invoices.
   const displayInvoices = invoices || [];
+
+  if (displayInvoices.length === 0) {
+    return (
+      <div className="card-container p-20 text-center space-y-4 bg-white/40 border-dashed border-2">
+        <div className="w-20 h-20 bg-bg rounded-full flex items-center justify-center text-muted mx-auto">
+          <FileText size={40} />
+        </div>
+        <h3 className="text-h3 font-black text-primary uppercase tracking-widest">Chưa có hoá đơn</h3>
+        <p className="text-small text-muted italic max-w-xs mx-auto">Cư dân này hiện chưa có phát sinh hoá đơn tài chính nào.</p>
+        <button className="btn-primary px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">+ Tạo hoá đơn đầu tiên</button>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-10">

@@ -11,7 +11,10 @@ export interface Meter {
   roomId: string;
   roomCode?: string;
   latestReadingIndex?: number; // RULE-01: Derived from vw_LatestMeterReading
+  previousReadingIndex?: number;
+  usage?: number;
   latestMonthYear?: string;
+  readingDate?: string;
   description?: string;
 }
 

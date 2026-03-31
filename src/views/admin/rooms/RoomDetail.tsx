@@ -18,6 +18,7 @@ import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { RoomModal } from '@/components/rooms/RoomModal';
+import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
 import { 
   LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip 
 } from 'recharts';
@@ -48,6 +49,7 @@ const RoomDetail = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssignAssetModalOpen, setIsAssignAssetModalOpen] = useState(false);
 
   const { data: room, isLoading } = useQuery<RoomDetailType>({
     queryKey: ['room', id],
@@ -481,7 +483,12 @@ const RoomDetail = () => {
                     <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Tài sản gán theo phòng</h3>
                     <p className="text-[10px] text-muted font-bold italic">Danh sách trang thiết bị đi kèm căn hộ.</p>
                   </div>
-                  <button className="btn-primary-sm h-11 px-6 flex items-center gap-2 rounded-xl text-[11px] uppercase tracking-widest font-black"><Plus size={16} /> Gán tài sản mới</button>
+                  <button 
+                    onClick={() => setIsAssignAssetModalOpen(true)}
+                    className="btn-primary-sm h-11 px-6 flex items-center gap-2 rounded-xl text-[11px] uppercase tracking-widest font-black"
+                  >
+                    <Plus size={16} /> Gán tài sản mới
+                  </button>
                </div>
                <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
                  <div className="overflow-x-auto">
@@ -683,6 +690,12 @@ const RoomDetail = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         room={room}
+      />
+
+      <AssignAssetModal 
+        isOpen={isAssignAssetModalOpen}
+        onClose={() => setIsAssignAssetModalOpen(false)}
+        roomId={room.id}
       />
     </div>
   );

@@ -239,8 +239,8 @@ export const tenantService = {
     const status = deriveTenantStatus(hasActiveContract);
     const onboardingPercent = computeOnboardingPercent(row as unknown as DbTenantRow, hasActiveContract);
 
-    // Parse vehiclePlates from documents jsonb if present
-    const docs = row.documents as Record<string, unknown> | null;
+    // Parse vehiclePlates and other PII from documents jsonb if present
+    const docs = row.documents as Record<string, any> | null;
     const vehiclePlates: string[] = Array.isArray(docs?.vehicle_plates)
       ? (docs!.vehicle_plates as string[])
       : [];
@@ -262,16 +262,98 @@ export const tenantService = {
       gender: mapGender.fromDb(row.gender ?? 'other') as 'Male' | 'Female' | 'Other',
       dateOfBirth: row.date_of_birth ?? '',
       permanentAddress: row.permanent_address ?? '',
-      // Fields not stored in DB — sensible defaults
-      cccdIssuedDate: '',
-      cccdIssuedPlace: '',
-      nationality: 'Việt Nam',
-      occupation: '',
+      // Map PII fields from documents JSONB if available, otherwise fallback to defaults
+      cccdIssuedDate: (docs?.cccd_issued_date as string) ?? '',
+      cccdIssuedPlace: (docs?.cccd_issued_place as string) ?? '',
+      nationality: (docs?.nationality as string) ?? 'Việt Nam',
+      occupation: (docs?.occupation as string) ?? '',
       vehiclePlates,
       notes: (docs?.notes as string | undefined) ?? '',
     };
 
     return profile;
+  },
+
+  /**
+   * Return all contracts associated with a tenant.
+   */
+  getTenantContracts: async (tenantId: string): Promise<import('@/models/Contract').Contract[]> => {
+    const numericId = Number(tenantId);
+    const contractLinks = await unwrap(
+      supabase
+        .from('contract_tenants')
+        .select(`
+          contract_id,
+          is_primary,
+          contracts(
+            id, uuid, contract_code, room_id, start_date, end_date,
+            monthly_rent, payment_cycle_months, status, is_deleted,
+            rooms(id, room_code, building_id, buildings(name))
+          )
+        `)
+        .eq('tenant_id', numericId)
+    ) as unknown as any[];
+
+    return (contractLinks ?? [])
+      .filter(l => l.contracts && !l.contracts.is_deleted)
+      .map(l => {
+        const c = l.contracts;
+        const room = c.rooms;
+        return {
+          id: String(c.id),
+          contractCode: c.contract_code,
+          roomId: String(c.room_id),
+          roomCode: room?.room_code ?? '',
+          buildingName: room?.buildings?.name ?? '',
+          tenantName: '', // Will be filled if needed
+          status: (c.status.charAt(0).toUpperCase() + c.status.slice(1)) as any,
+          rentPriceSnapshot: c.monthly_rent ?? 0,
+          startDate: c.start_date,
+          endDate: c.end_date,
+          paymentCycle: c.payment_cycle_months ?? 1,
+          isRepresentative: l.is_primary ?? false,
+          type: 'Residential' as any,
+          autoRenew: false
+        };
+      });
+  },
+
+  /**
+   * Return all invoices for all contracts associated with a tenant.
+   */
+  getTenantInvoices: async (tenantId: string): Promise<any[]> => {
+    const numericId = Number(tenantId);
+    
+    // 1. Get all contract IDs for this tenant
+    const contractLinks = await unwrap(
+      supabase
+        .from('contract_tenants')
+        .select('contract_id')
+        .eq('tenant_id', numericId)
+    ) as unknown as { contract_id: number }[];
+
+    const contractIds = contractLinks?.map(l => l.contract_id) ?? [];
+    if (contractIds.length === 0) return [];
+
+    // 2. Fetch invoices for these contracts
+    const invoices = await unwrap(
+      supabase
+        .from('invoices')
+        .select('id, invoice_code, billing_period, total_amount, amount_paid, due_date, status, contract_id')
+        .in('contract_id', contractIds)
+        .order('due_date', { ascending: false })
+    );
+
+    return (invoices ?? []).map(inv => ({
+      id: String(inv.id),
+      code: inv.invoice_code,
+      billingPeriod: inv.billing_period,
+      amount: inv.total_amount,
+      amountPaid: inv.amount_paid,
+      dueDate: inv.due_date,
+      status: (inv.status ? (inv.status.charAt(0).toUpperCase() + inv.status.slice(1).replace('_', ' ')) : 'Unpaid') as any,
+      contractId: String(inv.contract_id)
+    }));
   },
 
   /**
@@ -411,13 +493,15 @@ export const tenantService = {
 
     const isPersonalInfoConfirmed = !!(row.full_name && row.id_number && row.date_of_birth);
     const isCCCDUploaded = hasCCCDDoc;
-    const isEmergencyContactAdded = !!row.emergency_contact_name;
+        const isEmergencyContactAdded = !!row.emergency_contact_name;
     const isContractSigned = !!activeContract;
     const isDepositPaid =
       !!activeContract?.contracts?.deposit_status &&
       ['received', 'partially_refunded'].includes(activeContract.contracts.deposit_status);
-    // Room handover has no DB field — default to false
-    const isRoomHandovered = false;
+    
+    // Room handover derived from active contract + room status if possible
+    // For now, if contract is active, we assume room is handovered unless there's a specific flag
+    const isRoomHandovered = !!activeContract && activeContract.contracts?.status === 'active';
 
     const steps = [
       isPersonalInfoConfirmed,
