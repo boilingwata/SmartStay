@@ -7,13 +7,15 @@ import { contractSchema, ContractFormData } from '@/schemas/contractSchema';
 import { buildingService } from '@/services/buildingService';
 import { roomService } from '@/services/roomService';
 import { contractService } from '@/services/contractService';
+import { supabase } from '@/lib/supabase';
 import { BuildingSummary } from '@/models/Building';
 import { Room } from '@/models/Room';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
+import { ImageUploadCard } from '@/components/shared/ImageUploadCard';
 import {
   Home, FileText, Zap, ShieldCheck, Building2, Users, AlertCircle, Wallet, Check,
-  ChevronRight, ChevronLeft, Plus, Trash2, Calendar, DoorOpen, CheckCircle2, DollarSign, Clock, ArrowRight, Smartphone, Upload, Search
+  ChevronRight, ChevronLeft, Plus, Trash2, Calendar, DoorOpen, CheckCircle2, DollarSign, Clock, ArrowRight, Search
 } from 'lucide-react';
 import { cn, formatVND } from '@/utils';
 
@@ -78,11 +80,31 @@ const CreateContractWizard = () => {
     }
 
     const isValid = await trigger(fieldsToValidate);
-    if (isValid) {
-      setCurrentStep(prev => Math.min(prev + 1, 4));
-    } else {
+    if (!isValid) {
       toast.error('Vui lòng kiểm tra lại thông tin các trường bắt buộc');
+      return;
     }
+
+    if (currentStep === 1) {
+      const roomId = watch('roomId');
+      if (roomId) {
+        const { data: conflict } = await supabase
+          .from('contracts')
+          .select('contract_code')
+          .eq('room_id', Number(roomId))
+          .in('status', ['active', 'pending_signature'])
+          .eq('is_deleted', false)
+          .limit(1);
+
+        if (conflict && conflict.length > 0) {
+          const code = (conflict[0] as { contract_code: string }).contract_code;
+          toast.error(`Phòng này đã có hợp đồng đang hoạt động (${code}). Vui lòng chọn phòng khác.`);
+          return;
+        }
+      }
+    }
+
+    setCurrentStep(prev => Math.min(prev + 1, 4));
   };
 
   const prevStep = () => {
@@ -190,12 +212,30 @@ const Step1 = () => {
     enabled: !!selectedBuildingId
   });
 
+  const { data: activeContracts } = useQuery({
+    queryKey: ['contracts', 'room-conflict', selectedRoomId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contracts')
+        .select('id, contract_code')
+        .eq('room_id', Number(selectedRoomId))
+        .in('status', ['active', 'pending_signature'])
+        .eq('is_deleted', false)
+        .limit(1);
+      return data ?? [];
+    },
+    enabled: !!selectedRoomId,
+  });
+  const hasActiveContract = (activeContracts?.length ?? 0) > 0;
+
   const { fields, append } = useFieldArray({
     control,
     name: 'tenants'
   });
 
   const representativeId = watch('representativeId');
+  const cccdFrontUrl = watch('cccdFrontUrl');
+  const cccdBackUrl = watch('cccdBackUrl');
   const selectedRoom = selectedRoomId ? (rooms?.find(r => r.id === selectedRoomId) || null) : null;
 
   return (
@@ -235,9 +275,9 @@ const Step1 = () => {
                 <AlertCircle size={12} /> {errors.roomId.message === 'Required' ? 'Vui lòng chọn phòng' : errors.roomId.message}
               </div>
             )}
-            {selectedRoom?.status === 'Occupied' && (
-              <div className="flex items-center gap-1.5 text-destructive text-[10px] font-black uppercase">
-                <AlertCircle size={12} /> Phong dang co hop dong Active
+            {hasActiveContract && (
+              <div className="flex items-center gap-1.5 text-destructive text-[10px] font-black uppercase mt-1 bg-destructive/5 px-3 py-2 rounded-xl">
+                <AlertCircle size={12} /> Phòng này đã có hợp đồng đang hoạt động, không thể tạo hợp đồng mới
               </div>
             )}
           </div>
@@ -318,34 +358,29 @@ const Step1 = () => {
             Thêm cư dân mới
           </Button>
 
-          {/* Docs Placeholder */}
           <div className="p-6 bg-primary/[0.02] border border-dashed border-primary/20 rounded-[32px] space-y-4">
-             <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                   <ShieldCheck size={14} /> Hồ sơ pháp lý (CCCD/Hộ chiếu)
-                </p>
-                <span className="text-[9px] text-muted italic font-medium">Max 5MB per file</span>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="border border-border/40 bg-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/30 cursor-pointer transition-all group">
-                   <div className="w-10 h-10 bg-background rounded-xl flex items-center justify-center text-muted group-hover:text-primary transition-colors text-small">
-                      <Smartphone size={20} />
-                   </div>
-                   <div>
-                      <p className="text-[10px] font-bold text-primary text-left">Mặt trước</p>
-                      <p className="text-[9px] text-muted italic">Chưa tải lên</p>
-                   </div>
-                </div>
-                <div className="border border-border/40 bg-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/30 cursor-pointer transition-all group">
-                   <div className="w-10 h-10 bg-background rounded-xl flex items-center justify-center text-muted group-hover:text-primary transition-colors text-small">
-                      <Smartphone size={20} />
-                   </div>
-                   <div>
-                      <p className="text-[10px] font-bold text-primary text-left">Mặt sau</p>
-                      <p className="text-[9px] text-muted italic">Chưa tải lên</p>
-                   </div>
-                </div>
-             </div>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                <ShieldCheck size={14} /> Hồ sơ pháp lý (CCCD/Hộ chiếu)
+              </p>
+              <span className="text-[9px] text-muted italic font-medium">JPG, PNG, WebP · Max 2MB</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <ImageUploadCard
+                value={cccdFrontUrl}
+                label="Mặt trước"
+                alt="CCCD mặt trước"
+                successMessage="Đã tải mặt trước CCCD thành công"
+                onUploaded={(url) => setValue('cccdFrontUrl', url, { shouldDirty: true })}
+              />
+              <ImageUploadCard
+                value={cccdBackUrl}
+                label="Mặt sau"
+                alt="CCCD mặt sau"
+                successMessage="Đã tải mặt sau CCCD thành công"
+                onUploaded={(url) => setValue('cccdBackUrl', url, { shouldDirty: true })}
+              />
+            </div>
           </div>
           {errors.representativeId && <p className="text-[10px] text-destructive font-black text-center uppercase tracking-widest">{errors.representativeId.message}</p>}
         </div>

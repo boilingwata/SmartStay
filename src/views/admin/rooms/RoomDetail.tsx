@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
+import {
   ArrowLeft, Home, Building2, MapPin, Maximize,
   Info, Image as ImageIcon, Zap, Droplets,
-  Package, History, ClipboardList, Plus, 
+  Package, History, ClipboardList, Plus,
   Edit, Key, Wrench, CheckCircle2, MoreVertical,
   Star, Share2, Printer, Download, Trash2,
   Calendar, User, Clock, Check, Copy,
   ArrowRight, ShieldCheck, Smartphone,
-  Layout, Wind, Refrigerator, Disc
+  Layout, Wind, Refrigerator, Disc,
+  Loader2, ZoomIn, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { roomService } from '@/services/roomService';
+import { fileService } from '@/services/fileService';
 import { RoomDetail as RoomDetailType, RoomStatus } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND, formatDate } from '@/utils';
@@ -48,10 +50,56 @@ const RoomDetail = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const imageCountRef = useRef(0);
 
   const { data: room, isLoading } = useQuery<RoomDetailType>({
     queryKey: ['room', id],
     queryFn: () => roomService.getRoomDetail(id!)
+  });
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      setUploadingCount(files.length);
+      const isFirst = (room?.images?.length ?? 0) === 0;
+      const results = await Promise.allSettled(
+        files.map(async (file, i) => {
+          const url = await fileService.uploadFile(file, file.name);
+          return roomService.addRoomImage(id!, url, isFirst && i === 0);
+        })
+      );
+      setUploadingCount(0);
+      const failed = results.filter(r => r.status === 'rejected').length;
+      if (failed > 0) throw new Error(`${failed} ảnh tải lên thất bại`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      toast.success('Đã tải ảnh lên thành công!');
+    },
+    onError: (err: Error) => {
+      setUploadingCount(0);
+      toast.error(err.message);
+    },
+  });
+
+  const deleteImageMutation = useMutation({
+    mutationFn: (imageId: string) => roomService.deleteRoomImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      toast.success('Đã xóa ảnh.');
+    },
+    onError: () => toast.error('Xóa ảnh thất bại.'),
+  });
+
+  const setMainImageMutation = useMutation({
+    mutationFn: (imageId: string) => roomService.setMainRoomImage(id!, imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      toast.success('Đã đặt ảnh đại diện.');
+    },
+    onError: () => toast.error('Cập nhật ảnh đại diện thất bại.'),
   });
 
   const completeMaintenance = useMutation({
@@ -72,6 +120,22 @@ const RoomDetail = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Keep ref in sync for keyboard handler
+  imageCountRef.current = room?.images?.length ?? 0;
+
+  // Keyboard navigation for image lightbox
+  React.useEffect(() => {
+    if (previewIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      const len = imageCountRef.current;
+      if (e.key === 'Escape') setPreviewIndex(null);
+      if (e.key === 'ArrowRight') setPreviewIndex(i => i !== null ? (i + 1) % len : null);
+      if (e.key === 'ArrowLeft') setPreviewIndex(i => i !== null ? (i - 1 + len) % len : null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [previewIndex]);
 
   if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
   if (!room) return <div>Room not found.</div>;
@@ -308,41 +372,95 @@ const RoomDetail = () => {
                <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Thư viện hình ảnh</h3>
-                    <p className="text-[10px] text-muted font-bold italic">Kéo thả để sắp xếp thứ tự hiển thị.</p>
+                    <p className="text-[10px] text-muted font-bold italic">{room.images.length} ảnh · JPG, PNG, WebP · Tối đa 2MB/ảnh</p>
                   </div>
                   <div className="flex gap-4">
-                     <button className="btn-outline-sm px-6 h-11 flex items-center gap-2 rounded-xl"><ImageIcon size={16} /> Quản lý</button>
-                     <button className="btn-primary-sm px-6 h-11 flex items-center gap-2 rounded-xl"><Plus size={16} /> Tải ảnh lên</button>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        if (files.length > 0) uploadImageMutation.mutate(files);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadImageMutation.isPending}
+                      className="btn-primary-sm px-6 h-11 flex items-center gap-2 rounded-xl disabled:opacity-60"
+                    >
+                      {uploadImageMutation.isPending
+                        ? <><Loader2 size={14} className="animate-spin" /> Đang tải {uploadingCount} ảnh...</>
+                        : <><Plus size={14} /> Thêm ảnh</>}
+                    </button>
                   </div>
                </div>
-               
-               <DndContext 
-                 sensors={sensors}
-                 collisionDetection={closestCenter}
-                 onDragEnd={(e) => {
-                    toast.info('Tính năng kéo thả đang được phát triển');
-                 }}
-               >
-                 <SortableContext 
-                   items={room.images.map(img => img.id)}
-                   strategy={rectSortingStrategy}
-                 >
-                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                     {room.images.map((img) => (
-                       <div key={img.id} className="group relative aspect-square rounded-[40px] overflow-hidden bg-bg shadow-xl hover:shadow-2xl transition-all border-8 border-transparent hover:border-primary/10">
-                          <img src={img.url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-                          {img.isMain && (
-                            <div className="absolute top-6 left-6 px-4 py-1.5 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-2xl backdrop-blur-md">Ảnh đại diện</div>
-                          )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 scale-95 group-hover:scale-100 duration-500">
-                             <button className="w-12 h-12 bg-white rounded-2xl text-primary hover:scale-110 transition-transform flex items-center justify-center shadow-xl hover:bg-primary hover:text-white"><Check size={20} /></button>
-                             <button className="w-12 h-12 bg-white rounded-2xl text-danger hover:scale-110 transition-transform flex items-center justify-center shadow-xl hover:bg-danger hover:text-white"><Trash2 size={20} /></button>
-                          </div>
-                       </div>
-                     ))}
+
+               {room.images.length === 0 && !uploadImageMutation.isPending ? (
+                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                   <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center">
+                     <ImageIcon size={36} className="text-primary/30" />
                    </div>
-                 </SortableContext>
-               </DndContext>
+                   <div>
+                     <p className="text-body font-black text-muted">Chưa có ảnh nào</p>
+                     <p className="text-small text-muted/70 mt-1">Nhấn "Thêm ảnh" để tải ảnh phòng lên.</p>
+                   </div>
+                   <button onClick={() => photoInputRef.current?.click()} className="btn-primary flex items-center gap-2 mt-2">
+                     <Plus size={16} /> Thêm ảnh đầu tiên
+                   </button>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                   {room.images.map((img, idx) => (
+                     <div key={img.id} className="group relative aspect-square rounded-[40px] overflow-hidden bg-bg shadow-xl hover:shadow-2xl transition-all border-8 border-transparent hover:border-primary/10">
+                       <img
+                         src={img.url}
+                         alt=""
+                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 cursor-zoom-in"
+                         onClick={() => setPreviewIndex(idx)}
+                       />
+                       {img.isMain && (
+                         <div className="absolute top-4 left-4">
+                           <span className="flex items-center gap-1 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow">
+                             <Star size={10} fill="currentColor" /> Đại diện
+                           </span>
+                         </div>
+                       )}
+                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                       <div className="absolute top-3 right-3 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                         <button
+                           onClick={() => setPreviewIndex(idx)}
+                           title="Xem ảnh"
+                           className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-primary shadow-lg hover:bg-white"
+                         >
+                           <ZoomIn size={15} />
+                         </button>
+                         {!img.isMain && (
+                           <button
+                             onClick={() => setMainImageMutation.mutate(img.id)}
+                             disabled={setMainImageMutation.isPending}
+                             title="Đặt làm ảnh đại diện"
+                             className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-yellow-500 shadow-lg hover:bg-white disabled:opacity-50"
+                           >
+                             <Star size={15} />
+                           </button>
+                         )}
+                         <button
+                           onClick={() => deleteImageMutation.mutate(img.id)}
+                           disabled={deleteImageMutation.isPending}
+                           title="Xóa ảnh"
+                           className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-danger shadow-lg hover:bg-white disabled:opacity-50"
+                         >
+                           <Trash2 size={15} />
+                         </button>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
             </div>
           )}
 
@@ -568,11 +686,52 @@ const RoomDetail = () => {
         </div>
       </div>
 
-      <RoomModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <RoomModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         room={room}
       />
+
+      {/* Image Lightbox */}
+      {previewIndex !== null && room.images[previewIndex] && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center"
+          onClick={() => setPreviewIndex(null)}
+        >
+          <button onClick={() => setPreviewIndex(null)} className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
+            <X size={20} />
+          </button>
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-white/10 text-white text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-full backdrop-blur-md">
+            {previewIndex + 1} / {room.images.length}
+          </div>
+          {room.images.length > 1 && (
+            <button onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex - 1 + room.images.length) % room.images.length); }} className="absolute left-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
+              <ChevronLeft size={24} />
+            </button>
+          )}
+          <img src={room.images[previewIndex].url} className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl" alt="" onClick={(e) => e.stopPropagation()} />
+          {room.images.length > 1 && (
+            <button onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex + 1) % room.images.length); }} className="absolute right-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
+              <ChevronRight size={24} />
+            </button>
+          )}
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2" onClick={(e) => e.stopPropagation()}>
+            {room.images[previewIndex].isMain ? (
+              <span className="flex items-center gap-1.5 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow">
+                <Star size={11} fill="currentColor" /> Ảnh đại diện
+              </span>
+            ) : (
+              <button
+                onClick={() => setMainImageMutation.mutate(room.images[previewIndex!].id)}
+                disabled={setMainImageMutation.isPending}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-yellow-400 hover:text-yellow-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow backdrop-blur-md transition-all disabled:opacity-50"
+              >
+                <Star size={11} /> Đặt làm ảnh đại diện
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

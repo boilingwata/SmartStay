@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Building2, Users, Home, PieChart, 
   DollarSign, AlertCircle, FileText, MessageSquare,
-  Plus, Calendar, RefreshCcw, ArrowRight,
+  Download, Calendar, RefreshCcw, ArrowRight,
   TrendingUp, Wallet, CheckCircle2, Clock, 
   CreditCard, Smartphone, ShieldAlert, 
   Activity, Check, Copy, CloudLightning
@@ -26,6 +26,34 @@ import { AlertBanner } from '@/components/ui/DashboardUI';
 import StaffDashboard from './staff/StaffDashboard';
 import { useTranslation } from 'react-i18next';
 
+function escapeCsvCell(value: unknown): string {
+  const normalized = value === null || value === undefined ? '' : String(value);
+  const escaped = normalized.replace(/"/g, '""');
+  return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+}
+
+function downloadCsvFile(filename: string, rows: unknown[][]) {
+  const csv = `\uFEFF${rows.map(row => row.map(escapeCsvCell).join(',')).join('\n')}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function toFileSlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'dashboard';
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -34,6 +62,7 @@ const AdminDashboard = () => {
   const setBuilding = useUIStore((s) => s.setBuilding);
   const [period, setPeriod] = useState('Month');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [isExporting, setIsExporting] = useState(false);
 
   // Fetch real buildings from database
   const { data: buildingsList = [] } = useQuery({
@@ -96,6 +125,104 @@ const AdminDashboard = () => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     setLastUpdated(new Date());
     toast.info(t('pages.dashboard.refreshing'));
+  };
+
+  const handleExportReport = async () => {
+    if (isExporting) return;
+
+    setIsExporting(true);
+
+    try {
+      const generatedAt = new Date();
+      const selectedBuilding = activeBuildingId
+        ? buildingsList.find(b => String(b.id) === String(activeBuildingId))
+        : null;
+      const buildingLabel = selectedBuilding?.buildingName ?? t('pages.dashboard.allBuildings');
+
+      const [freshKpis, freshRevenue, freshOccupancy, freshPayments, freshTickets, freshElectricity] = await Promise.all([
+        dashboardService.getKPIs(activeBuildingId || undefined),
+        dashboardService.getRevenueChart(activeBuildingId || undefined),
+        dashboardService.getOccupancy(activeBuildingId || undefined),
+        dashboardService.getRecentPayments(activeBuildingId || undefined),
+        dashboardService.getRecentTickets(activeBuildingId || undefined),
+        dashboardService.getElectricityChart(activeBuildingId || undefined),
+      ]);
+
+      const rows: unknown[][] = [
+        ['Bao cao tong quan SmartStay'],
+        ['Toa nha', buildingLabel],
+        ['Ky bao cao', period],
+        ['Thoi gian xuat', formatDate(generatedAt, 'dd/MM/yyyy HH:mm:ss')],
+        [],
+        ['Tong hop KPI'],
+        ['Chi so', 'Gia tri'],
+        ['Tong toa nha', freshKpis.totalBuildings ?? 0],
+        ['Tong phong', freshKpis.totalRooms ?? 0],
+        ['Phong dang thue', freshKpis.occupiedRooms ?? 0],
+        ['Ty le lap day', `${freshKpis.occupancyRate ?? 0}%`],
+        ['Doanh thu thang nay', formatVND(freshKpis.currentMonthRevenue ?? 0)],
+        ['Cong no qua han', formatVND(freshKpis.totalOverdueBalance ?? 0)],
+        ['Hop dong dang hieu luc', freshKpis.activeContracts ?? 0],
+        ['Ticket dang mo', freshKpis.openTickets ?? 0],
+        [],
+        ['Doanh thu theo thang'],
+        ['Thang', 'Doanh thu', 'Loi nhuan uoc tinh'],
+        ...freshRevenue.map(point => [
+          point.month,
+          formatVND(point.revenue),
+          formatVND(point.profit),
+        ]),
+        [],
+        ['Ty le lap day hien tai'],
+        ['Trang thai', 'So luong'],
+        ['Dang thue', freshOccupancy.occupied],
+        ['Trong', freshOccupancy.vacant],
+        ['Bao tri', freshOccupancy.maintenance],
+        ['Dat truoc', freshOccupancy.reserved],
+        ['Tong ty le lap day', `${freshOccupancy.totalOccupancyRate}%`],
+        [],
+        ['Thanh toan gan day'],
+        ['Ma giao dich', 'Cu dan', 'So tien', 'Phuong thuc', 'Trang thai', 'Thoi gian'],
+        ...freshPayments.map(payment => [
+          payment.transactionCode,
+          payment.tenantName,
+          formatVND(payment.amount),
+          payment.method,
+          payment.status,
+          formatDate(payment.createdAt, 'dd/MM/yyyy HH:mm'),
+        ]),
+        [],
+        ['Su co gan day'],
+        ['Ma phieu', 'Tieu de', 'Phong', 'Uu tien', 'Trang thai', 'Phu trach', 'Tao luc', 'Han SLA'],
+        ...freshTickets.map(ticket => [
+          ticket.ticketCode,
+          ticket.title,
+          ticket.roomName,
+          ticket.priority,
+          ticket.status,
+          ticket.assignedTo ?? '',
+          formatDate(ticket.createdAt, 'dd/MM/yyyy HH:mm'),
+          formatDate(ticket.slaDeadline, 'dd/MM/yyyy HH:mm'),
+        ]),
+        [],
+        ['Dien nang theo thang'],
+        ['Thang', 'kWh'],
+        ...freshElectricity.map(point => [
+          point.month,
+          point.kwh ?? 0,
+        ]),
+      ];
+
+      const filename = `dashboard_${toFileSlug(buildingLabel)}_${generatedAt.toISOString().split('T')[0]}.csv`;
+      downloadCsvFile(filename, rows);
+      setLastUpdated(generatedAt);
+      toast.success('Xuat bao cao thanh cong.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Xuat bao cao that bai.';
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const isError = !kpis && !kpisLoading && !!activeBuildingId;
@@ -197,8 +324,15 @@ const AdminDashboard = () => {
           >
             <RefreshCcw size={18} className={cn("group-active:rotate-180 transition-transform duration-500", isRefreshing && "animate-spin")} />
           </button>
-          <button className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20">
-            <Plus size={18} /> <span className="hidden sm:inline">{t('pages.dashboard.export')}</span>
+          <button
+            onClick={handleExportReport}
+            disabled={isExporting}
+            className={cn(
+              "btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20",
+              isExporting && "opacity-60 cursor-not-allowed"
+            )}
+          >
+            <Download size={18} /> <span className="hidden sm:inline">{isExporting ? 'Dang xuat...' : t('pages.dashboard.export')}</span>
           </button>
         </div>
       </div>

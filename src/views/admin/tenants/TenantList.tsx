@@ -33,7 +33,7 @@ const TenantList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
-  const [statusFilter, setStatusFilter] = useState<TenantStatus[]>(['Active']);
+  const [statusFilter, setStatusFilter] = useState<TenantStatus[]>(['Active', 'CheckedOut']);
   const [hasActiveContract, setHasActiveContract] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [showSensitive, setShowSensitive] = useState<string[]>([]);
@@ -62,6 +62,8 @@ const TenantList = () => {
         nationality: data.nationality,
         occupation: data.occupation,
         permanentAddress: data.permanentAddress,
+        vehiclePlates: data.vehiclePlates,
+        avatarUrl: data.avatarUrl,
       });
       toast.success(`Hồ sơ cư dân ${data.fullName} đã được tạo thành công!`);
       setIsModalOpen(false);

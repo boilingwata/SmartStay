@@ -315,51 +315,57 @@ export const meterService = {
   }) => {
     try {
       const { roomId, type } = parseVirtualId(body.meterId);
-
-      // Find the previous reading to set previous index
-      const prevRow = (await unwrap(
-        supabase
-          .from('meter_readings')
-          .select(
-            'electricity_current, water_current, electricity_previous, water_previous'
-          )
-          .eq('room_id', roomId)
-          .order('billing_period', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      )) as unknown as Pick<
-        DbMeterReadingRow,
-        'electricity_current' | 'water_current' | 'electricity_previous' | 'water_previous'
-      > | null;
-
-      const isElec = type === 'Electricity';
-      const prevElec = prevRow?.electricity_current ?? 0;
-      const prevWater = prevRow?.water_current ?? 0;
-
       const billingPeriod = `${body.monthYear}-01`;
+      const isElec = type === 'Electricity';
 
-      const insertData = {
+      // Load both the current-period row and the latest earlier row so we can
+      // preserve the sibling utility and compute usage from the true previous period.
+      const [existingRow, previousRow] = await Promise.all([
+        unwrap(
+          supabase
+            .from('meter_readings')
+            .select(
+              'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
+            )
+            .eq('room_id', roomId)
+            .eq('billing_period', billingPeriod)
+            .maybeSingle()
+        ) as Promise<DbMeterReadingRow | null>,
+        unwrap(
+          supabase
+            .from('meter_readings')
+            .select(
+              'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
+            )
+            .eq('room_id', roomId)
+            .lt('billing_period', billingPeriod)
+            .order('billing_period', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ) as Promise<DbMeterReadingRow | null>,
+      ]);
+
+      const previousElectricity = existingRow?.electricity_previous ?? previousRow?.electricity_current ?? 0;
+      const previousWater = existingRow?.water_previous ?? previousRow?.water_current ?? 0;
+      const nextElectricity = isElec
+        ? body.currentIndex
+        : (existingRow?.electricity_current ?? previousRow?.electricity_current ?? 0);
+      const nextWater = isElec
+        ? (existingRow?.water_current ?? previousRow?.water_current ?? 0)
+        : body.currentIndex;
+
+      const payload = {
         room_id: roomId,
         billing_period: billingPeriod,
         reading_date: body.readingDate,
-        electricity_previous: isElec ? prevElec : prevElec,
-        electricity_current: isElec ? body.currentIndex : prevElec,
-        electricity_usage: isElec ? body.currentIndex - prevElec : 0,
-        water_previous: !isElec ? prevWater : prevWater,
-        water_current: !isElec ? body.currentIndex : prevWater,
-        water_usage: !isElec ? body.currentIndex - prevWater : 0,
+        previous_reading_id: previousRow?.id ?? null,
+        electricity_previous: previousElectricity,
+        electricity_current: nextElectricity,
+        electricity_usage: Math.max(0, nextElectricity - previousElectricity),
+        water_previous: previousWater,
+        water_current: nextWater,
+        water_usage: Math.max(0, nextWater - previousWater),
       };
-
-      // C-08: Use select-then-update/insert instead of upsert to avoid depending on
-      // a UNIQUE(room_id, billing_period) DB constraint that may not exist.
-      const existingRow = (await unwrap(
-        supabase
-          .from('meter_readings')
-          .select('id')
-          .eq('room_id', roomId)
-          .eq('billing_period', billingPeriod)
-          .maybeSingle()
-      )) as unknown as { id: number } | null;
 
       let row: DbMeterReadingRow;
 
@@ -368,7 +374,7 @@ export const meterService = {
         row = (await unwrap(
           supabase
             .from('meter_readings')
-            .update(insertData)
+            .update(payload)
             .eq('id', existingRow.id)
             .select(
               'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
@@ -380,7 +386,7 @@ export const meterService = {
         row = (await unwrap(
           supabase
             .from('meter_readings')
-            .insert(insertData)
+            .insert(payload)
             .select(
               'id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, reading_date, read_by, created_at'
             )

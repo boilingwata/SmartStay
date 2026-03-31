@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Building, Zap, Droplets, Calendar, 
   ArrowRight, CheckCircle, ChevronLeft, 
   Database, Info, AlertCircle, Trash2, 
   Search, Clipboard, Keyboard, Upload
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { meterService } from '@/services/meterService';
+import { buildingService } from '@/services/buildingService';
 import { Meter, MeterType } from '@/models/Meter';
 import { cn } from '@/utils';
 import { SelectAsync } from '@/components/ui/SelectAsync';
@@ -17,23 +18,36 @@ import { toast } from 'sonner';
 
 import useUIStore from '@/stores/uiStore';
 
+interface BulkMeterEntryLocationState {
+  buildingId?: string;
+  roomId?: string;
+  monthYear?: string;
+  from?: string;
+}
+
 const BulkMeterEntry = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const activeBuildingId = useUIStore((s) => s.activeBuildingId);
+  const locationState = (location.state as BulkMeterEntryLocationState | null) ?? null;
   const [step, setStep] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
-
-  const [buildingId, setBuildingId] = useState(activeBuildingId ? String(activeBuildingId) : 'B1');
+  const [buildingId, setBuildingId] = useState(
+    locationState?.buildingId ?? (activeBuildingId ? String(activeBuildingId) : '')
+  );
+  const [roomId] = useState(locationState?.roomId ?? '');
+  const returnPath = locationState?.from ?? '/admin/meters';
 
   const [meterType, setMeterType] = useState<MeterType>('Electricity');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset page when filters change
   useEffect(() => {
      setCurrentPage(1);
-  }, [buildingId, meterType]);
+  }, [buildingId, meterType, roomId]);
 
-  const [monthYear, setMonthYear] = useState(new Date().toISOString().substring(0, 7));
+  const [monthYear, setMonthYear] = useState(locationState?.monthYear ?? new Date().toISOString().substring(0, 7));
   const [readingDate, setReadingDate] = useState(new Date().toISOString().substring(0, 10));
   const [missingOnly, setMissingOnly] = useState(false);
 
@@ -42,9 +56,21 @@ const BulkMeterEntry = () => {
   
   // Queries
   const { data: meters, isLoading: isLoadingMeters } = useQuery({
-    queryKey: ['meters-bulk', buildingId, meterType, missingOnly],
-    queryFn: () => meterService.getMeters({ buildingId, type: meterType, status: 'Active', missingOnly }),
+    queryKey: ['meters-bulk', buildingId, roomId, meterType, missingOnly],
+    queryFn: () => meterService.getMeters({
+      buildingId: buildingId || undefined,
+      roomId: roomId || undefined,
+      type: meterType,
+      status: 'Active',
+      missingOnly,
+    }),
     enabled: step >= 2
+  });
+
+  const { data: buildings = [] } = useQuery({
+    queryKey: ['buildings-summary'],
+    queryFn: () => buildingService.getBuildings(),
+    staleTime: 10 * 60 * 1000,
   });
 
   // Step 2 Initial Data Sync (RULE-01: Must fetch LatestIndex from View)
@@ -125,12 +151,53 @@ const BulkMeterEntry = () => {
   const paginatedMeters = meters?.data?.slice((currentPage - 1) * pageSize, currentPage * pageSize) || [];
   const totalPages = Math.ceil((meters?.data?.length || 0) / pageSize);
 
+  const handleSubmitReadings = async () => {
+    if (isSubmitting) return;
+
+    const validEntries = (meters?.data ?? [])
+      .map((meter: Meter) => ({ meter, reading: readings[meter.id] }))
+      .filter(({ reading }) => reading?.current !== '' && Number(reading.current) >= reading.prev);
+
+    if (validEntries.length === 0) {
+      toast.error('Chưa có chỉ số hợp lệ để lưu.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const results = await Promise.allSettled(
+        validEntries.map(({ meter, reading }) =>
+          meterService.submitReading({
+            meterId: meter.id,
+            monthYear,
+            currentIndex: Number(reading.current),
+            readingDate,
+            note: reading.note,
+          })
+        )
+      );
+
+      const failedCount = results.filter((result) => result.status === 'rejected').length;
+      const successCount = results.length - failedCount;
+
+      if (failedCount > 0) {
+        toast.error(`Đã lưu ${successCount} chỉ số, nhưng còn ${failedCount} dòng lỗi. Vui lòng kiểm tra lại.`);
+        return;
+      }
+
+      toast.success(`Đã lưu ${successCount} chỉ số thành công.`);
+      navigate(returnPath, { replace: true });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
        {/* Breadcrumbs & Header */}
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-             <button onClick={() => navigate('/admin/meters')} className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-muted hover:text-primary transition-all">
+             <button onClick={() => navigate(returnPath)} className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-muted hover:text-primary transition-all">
                 <ChevronLeft size={24} />
              </button>
              <div>
@@ -162,10 +229,10 @@ const BulkMeterEntry = () => {
                       placeholder="Chọn tòa nhà"
                       icon={Building}
                       value={buildingId}
-                      loadOptions={async () => [
-                        { label: 'The Manor Central Park', value: 'B1' }, 
-                        { label: 'Vinhomes Central Park', value: 'B2' }
-                      ]}
+                      loadOptions={async () => buildings.map((building) => ({
+                        label: building.buildingName,
+                        value: String(building.id),
+                      }))}
                       onChange={setBuildingId}
                    />
 
@@ -174,8 +241,8 @@ const BulkMeterEntry = () => {
                       placeholder="Chọn loại"
                       icon={meterType === 'Electricity' ? Zap : Droplets}
                       options={[
-                        { label: '⚡️ Điện (Electricity)', value: 'Electricity', icon: Zap },
-                        { label: '💧 Nước (Water)', value: 'Water', icon: Droplets }
+                        { label: 'Điện (Electricity)', value: 'Electricity', icon: Zap },
+                        { label: 'Nước (Water)', value: 'Water', icon: Droplets }
                       ]}
                       value={meterType}
                       onChange={(val) => setMeterType(val as any)}
@@ -221,11 +288,11 @@ const BulkMeterEntry = () => {
                   <div className="space-y-6">
                      <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Keyboard size={20} /></div>
-                        <p className="text-[14px] leading-relaxed font-medium">Sử dụng phím **Enter** để chuyển nhanh sang chỉ số của phòng kế tiếp.</p>
+                        <p className="text-[14px] leading-relaxed font-medium">Sử dụng phím Enter để chuyển nhanh sang chỉ số của phòng kế tiếp.</p>
                      </div>
                      <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Clipboard size={20} /></div>
-                        <p className="text-[14px] leading-relaxed font-medium">Bạn có thể dán trực tiếp dữ liệu từ **Excel** vào cột "Số hiện tại".</p>
+                        <p className="text-[14px] leading-relaxed font-medium">Bạn có thể dán trực tiếp dữ liệu từ Excel vào cột "Số hiện tại".</p>
                      </div>
                      <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><AlertCircle size={20} className="text-danger" /></div>
@@ -416,18 +483,15 @@ const BulkMeterEntry = () => {
             </div>
 
             <div className="flex flex-col gap-4">
-               <button 
-                 onClick={() => {
-                   toast.promise(new Promise(res => setTimeout(res, 2000)), {
-                       loading: 'Đang xử lý dữ liệu hàng loạt...',
-                       success: 'Ghi nhận thành công tất cả chỉ số!',
-                       error: 'Lỗi khi gửi dữ liệu.'
-                   });
-                   setTimeout(() => navigate('/admin/meters'), 2200);
-                 }}
-                 className="btn-primary w-full h-20 rounded-[36px] flex items-center justify-center gap-4 text-[20px] font-black uppercase tracking-[6px] shadow-2xl active:scale-[0.98] transition-all"
+               <button
+                 onClick={handleSubmitReadings}
+                 disabled={isSubmitting}
+                 className={cn(
+                   "btn-primary w-full h-20 rounded-[36px] flex items-center justify-center gap-4 text-[20px] font-black uppercase tracking-[6px] shadow-2xl active:scale-[0.98] transition-all",
+                   isSubmitting && "opacity-60 cursor-not-allowed"
+                 )}
                >
-                  Bắt đầu lưu dữ liệu
+                  {isSubmitting ? 'Đang lưu dữ liệu...' : 'Bắt đầu lưu dữ liệu'}
                   <CheckCircle size={32} />
                </button>
                <button onClick={handleBack} className="h-14 text-muted font-black uppercase tracking-[3px] hover:text-slate-900 transition-all">Chỉnh sửa lại</button>
@@ -439,3 +503,4 @@ const BulkMeterEntry = () => {
 };
 
 export default BulkMeterEntry;
+

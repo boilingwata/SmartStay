@@ -141,6 +141,13 @@ export const portalOnboardingService = {
   },
 
   activateResident: async (profileId?: string): Promise<void> => {
+    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
+      const body = profileId ? { profileId } : {};
+      const { error } = await supabase.functions.invoke('activate-resident', { body });
+      if (error) throw new Error(error.message);
+      return;
+    }
+    // Legacy path: single UPDATE with no validation
     const resolvedProfileId = await resolveProfileId(profileId);
     if (!resolvedProfileId) return;
 

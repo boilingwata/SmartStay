@@ -1,45 +1,60 @@
 import { supabase } from '@/lib/supabase';
-import { checkImageIntegrity } from '@/utils/security';
+import { checkImageIntegrity, checkPdfIntegrity } from '@/utils/security';
 
-// Rate-limiting for uploads (max 5 per minute)
 const UPLOAD_TIMESTAMPS: number[] = [];
 const RATE_LIMIT_COUNT = 5;
 const RATE_LIMIT_WINDOW = 60000;
 
+type UploadOptions = {
+  allowedTypes?: string[];
+  maxSize?: number;
+  pathPrefix?: string;
+};
+
 export const fileService = {
   /**
-   * Upload a file to Supabase Storage with MIME validation
+   * Upload a file to Supabase Storage with MIME and signature validation.
+   * Defaults to images to preserve existing callers.
    */
-  uploadFile: async (file: File | Blob, originalName?: string): Promise<string> => {
-    // 1. Client-side Rate Limiting
+  uploadFile: async (
+    file: File | Blob,
+    originalName?: string,
+    options?: UploadOptions
+  ): Promise<string> => {
+    const allowedTypes = options?.allowedTypes ?? ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = options?.maxSize ?? 2 * 1024 * 1024;
+    const pathPrefix = options?.pathPrefix ?? 'uploads';
+
     const now = Date.now();
-    const recentUploads = UPLOAD_TIMESTAMPS.filter(ts => now - ts < RATE_LIMIT_WINDOW);
+    const recentUploads = UPLOAD_TIMESTAMPS.filter((ts) => now - ts < RATE_LIMIT_WINDOW);
     if (recentUploads.length >= RATE_LIMIT_COUNT) {
       throw new Error('SECURITY_REJECTION: Tải lên quá nhanh. Vui lòng đợi 1 phút.');
     }
     UPLOAD_TIMESTAMPS.push(now);
 
-    // 2. Client-side Integrity Validation (Magic Bytes)
-    const isValid = await checkImageIntegrity(file);
-    if (!isValid) {
-      throw new Error('SECURITY_REJECTION: Tệp không hợp lệ hoặc bị hỏng (Magic Byte mismatch).');
-    }
-
-    // 3. MIME Validation
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       throw new Error('SERVER_REJECTION: Định dạng file không hỗ trợ.');
     }
 
-    // 4. Size Validation (2MB max)
-    const MAX_SIZE = 2 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      throw new Error('SERVER_REJECTION: File quá lớn (Tối đa 2MB).');
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    const isValid = isImage
+      ? await checkImageIntegrity(file)
+      : isPdf
+        ? await checkPdfIntegrity(file)
+        : false;
+
+    if (!isValid) {
+      throw new Error('SECURITY_REJECTION: Tệp không hợp lệ hoặc bị hỏng.');
     }
 
-    // 5. Upload to Supabase Storage
-    const fileName = originalName || `upload_${Date.now()}.png`;
-    const filePath = `uploads/${Date.now()}_${fileName}`;
+    if (file.size > maxSize) {
+      throw new Error(`SERVER_REJECTION: File quá lớn (tối đa ${Math.round(maxSize / 1024 / 1024)}MB).`);
+    }
+
+    const fallbackName = isPdf ? `upload_${Date.now()}.pdf` : `upload_${Date.now()}.png`;
+    const safeName = (originalName || fallbackName).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${pathPrefix}/${Date.now()}_${safeName}`;
 
     const { data, error } = await supabase.storage
       .from('smartstay-files')
@@ -50,7 +65,7 @@ export const fileService = {
 
     if (error) {
       console.error('Upload failed:', error);
-      throw new Error('Lỗi hệ thống khi lưu trữ tệp tin');
+      throw new Error(error.message || 'Lỗi hệ thống khi lưu trữ tệp tin.');
     }
 
     const { data: urlData } = supabase.storage
@@ -58,5 +73,5 @@ export const fileService = {
       .getPublicUrl(data.path);
 
     return urlData.publicUrl;
-  }
+  },
 };

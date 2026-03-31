@@ -76,6 +76,22 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
     enabled: !!districtId && isOpen
   });
 
+  // Re-apply districtId once district options arrive (options weren't present when reset() ran)
+  useEffect(() => {
+    if (isEditing && isOpen && building?.districtId && districts.length > 0 && provinceId === building.provinceId) {
+      setValue('districtId', building.districtId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [districts]);
+
+  // Re-apply wardId once ward options arrive
+  useEffect(() => {
+    if (isEditing && isOpen && building?.wardId && wards.length > 0 && districtId === building.districtId) {
+      setValue('wardId', building.wardId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wards]);
+
   const createMutation = useMutation({
     mutationFn: (data: BuildingFormData) => buildingService.createBuilding(data),
     onSuccess: () => {

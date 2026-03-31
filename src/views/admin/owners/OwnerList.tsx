@@ -16,6 +16,8 @@ import { usePermission } from '@/hooks/usePermission';
 import { OwnerModal } from './OwnerModal';
 import { toast } from 'sonner';
 
+const DEFAULT_OWNER_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
 const OwnerList = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -126,7 +128,7 @@ const OwnerList = () => {
                    <tr key={owner.id} className="group hover:bg-primary/[0.02] transition-colors">
                       <td className="px-6 py-6 font-medium">
                          <div className="flex items-center gap-4">
-                            <img src={owner.avatarUrl} className="w-14 h-14 rounded-2xl border-4 border-white shadow-xl" alt="" />
+                            <img src={owner.avatarUrl || DEFAULT_OWNER_AVATAR_URL} className="w-14 h-14 rounded-2xl border-4 border-white shadow-xl object-cover" alt="" />
                             <div>
                                <p 
                                     className="text-body font-black text-primary hover:underline cursor-pointer leading-tight"

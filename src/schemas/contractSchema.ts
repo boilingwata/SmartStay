@@ -22,6 +22,10 @@ export const contractSchema = z.object({
   paymentDueDay: z.number().min(1).max(31),
   autoRenew: z.boolean().default(false),
 
+  // CCCD images (uploaded in Step 1)
+  cccdFrontUrl: z.string().optional(),
+  cccdBackUrl: z.string().optional(),
+
   // Step 3: Services & Owner
   selectedServices: z.array(z.string()),
   ownerRep: z.object({

@@ -1,5 +1,5 @@
 // Auto-generated from smartstay schema introspection.
-// Matches all 27 tables + 1 view in the smartstay schema.
+// Matches all 29 tables + 1 view in the smartstay schema.
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -140,6 +140,61 @@ export interface Database {
           created_by?: string | null
         }
         Relationships: []
+      }
+      room_images: {
+        Row: {
+          id: number
+          room_id: number
+          url: string
+          is_main: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          room_id: number
+          url: string
+          is_main?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          room_id?: number
+          url?: string
+          is_main?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      building_images: {
+        Row: {
+          id: number
+          building_id: number
+          url: string
+          is_main: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          building_id: number
+          url: string
+          is_main?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          building_id?: number
+          url?: string
+          is_main?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'building_images_building_id_fkey'
+            columns: ['building_id']
+            referencedRelation: 'buildings'
+            referencedColumns: ['id']
+          }
+        ]
       }
       buildings: {
         Row: {
@@ -555,6 +610,45 @@ export interface Database {
           stripe_payment_intent_id?: string | null
           stripe_charge_id?: string | null
           notes?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          profile_id: string
+          title: string
+          message: string
+          type: string
+          link: string | null
+          is_read: boolean
+          metadata: Json | null
+          created_by: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          title: string
+          message: string
+          type?: string
+          link?: string | null
+          is_read?: boolean
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          title?: string
+          message?: string
+          type?: string
+          link?: string | null
+          is_read?: boolean
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string | null
         }
         Relationships: []
       }

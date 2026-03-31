@@ -40,6 +40,9 @@ const InvoiceDetail = () => {
     }
   }, [id, invoice]);
 
+  const remainingAmount = invoice ? Math.max(0, invoice.totalAmount - invoice.paidAmount) : 0;
+  const isFullyPaid = invoice ? invoice.status === 'Paid' || remainingAmount <= 0 : false;
+
   if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
   if (!invoice) return <div>Không tìm thấy hóa đơn.</div>;
 
@@ -102,8 +105,18 @@ const InvoiceDetail = () => {
               );
             }}><Send size={18} /> Gửi lại thông báo</button>
             <button 
-              className="btn-primary flex items-center gap-2 shadow-lg shadow-primary/20"
-              onClick={() => setIsPaymentModalOpen(true)}
+              className={cn(
+                "btn-primary flex items-center gap-2 shadow-lg shadow-primary/20",
+                isFullyPaid && "opacity-60 cursor-not-allowed shadow-none"
+              )}
+              onClick={() => {
+                if (isFullyPaid) {
+                  toast.info('Hóa đơn này đã được thanh toán đủ.');
+                  return;
+                }
+                setIsPaymentModalOpen(true);
+              }}
+              disabled={isFullyPaid}
             >
               <CreditCard size={18} /> Ghi nhận thanh toán
             </button>

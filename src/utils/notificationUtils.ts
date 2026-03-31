@@ -20,6 +20,7 @@ export const NOTIFICATION_STYLE_MAP: Record<string, NotificationStyle> = {
   'ticket': { icon: Wrench, color: 'bg-teal-50 text-[#0D8A8A] border-teal-100' },
   'contract_renew': { icon: Calendar, color: 'bg-rose-50 text-rose-600 border-rose-100' },
   'announcement': { icon: Megaphone, color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+  'admin_message': { icon: Bell, color: 'bg-sky-50 text-sky-600 border-sky-100' },
   'default': { icon: Bell, color: 'bg-slate-50 text-slate-500 border-slate-100' }
 };
 
@@ -39,7 +40,8 @@ const TYPE_MAPPING: Record<string, string> = {
   'ticketupdate': 'ticket',
   'contractrenew': 'contract_renew',
   'contractexpiring': 'contract_renew',
-  'announcement': 'announcement'
+  'announcement': 'announcement',
+  'adminmessage': 'admin_message'
 };
 
 /**
@@ -60,6 +62,7 @@ export const normalizeNotificationType = (type?: string): string => {
   if (base.includes('ticket')) return 'ticket';
   if (base.includes('contract')) return 'contract_renew';
   if (base.includes('announcement')) return 'announcement';
+  if (base.includes('message')) return 'admin_message';
   
   return 'default';
 };

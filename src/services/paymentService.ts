@@ -249,14 +249,70 @@ export const paymentService = {
   },
 
   approvePayment: async (id: string): Promise<boolean> => {
+    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
+      const { error } = await supabase.functions.invoke('process-payment', {
+        body: { existingPaymentId: Number(id), confirm: true },
+      });
+      if (error) throw new Error(error.message);
+      return true;
+    }
+    // Legacy path: confirm the payment and sync the invoice totals/status
     const now = new Date().toISOString();
     const { data: user } = await supabase.auth.getUser();
+    const paymentRow = (await unwrap(
+      supabase
+        .from('payments')
+        .select('id, invoice_id, amount, confirmed_at')
+        .eq('id', Number(id))
+        .single()
+    )) as unknown as {
+      id: number;
+      invoice_id: number;
+      amount: number;
+      confirmed_at: string | null;
+    };
+
+    if (paymentRow.confirmed_at) {
+      return true;
+    }
+
     await unwrap(
       supabase
         .from('payments')
         .update({ confirmed_at: now, confirmed_by: user.user?.id ?? null })
         .eq('id', Number(id))
     );
+
+    const invoiceRow = (await unwrap(
+      supabase
+        .from('invoices')
+        .select('id, total_amount, amount_paid, status')
+        .eq('id', paymentRow.invoice_id)
+        .single()
+    )) as unknown as {
+      id: number;
+      total_amount: number | null;
+      amount_paid: number | null;
+      status: string | null;
+    };
+
+    const total = invoiceRow.total_amount ?? 0;
+    const alreadyPaid = invoiceRow.amount_paid ?? 0;
+    const newPaid = alreadyPaid + paymentRow.amount;
+    const newStatus =
+      newPaid >= total ? 'paid' : newPaid > 0 ? 'partially_paid' : invoiceRow.status ?? 'pending_payment';
+
+    await unwrap(
+      supabase
+        .from('invoices')
+        .update({
+          amount_paid: newPaid,
+          status: newStatus as import('@/types/supabase').DbInvoiceStatus,
+          paid_date: newPaid >= total ? now : null,
+        })
+        .eq('id', invoiceRow.id)
+    );
+
     return true;
   },
 
@@ -274,20 +330,78 @@ export const paymentService = {
   recordPayment: async (
     payment: Omit<PaymentTransaction, 'id' | 'createdAt'>
   ): Promise<PaymentTransaction> => {
+    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
+      const { data, error } = await supabase.functions.invoke('process-payment', {
+        body: {
+          invoiceId:       Number(payment.invoiceId),
+          amount:          payment.amount,
+          method:          mapPaymentMethod.toDb(payment.method),
+          paymentDate:     payment.paidAt,
+          notes:           payment.note ?? null,
+          receiptUrl:      payment.evidenceImage ?? null,
+          autoConfirm:     payment.status === 'Confirmed',
+        },
+      });
+      if (error) throw new Error(error.message);
+      // Refetch the created payment row so we return the full PaymentTransaction shape
+      const rows = (await unwrap(
+        supabase.from('payments').select(PAYMENT_SELECT).eq('id', data.paymentId).single()
+      )) as unknown as DbPaymentRow;
+      return mapDbRowToPayment(rows);
+    }
+    const shouldConfirm = payment.status === 'Confirmed';
+    const { data: user } = await supabase.auth.getUser();
+    const confirmedAt = shouldConfirm ? payment.paidAt : null;
+    const confirmedBy = shouldConfirm ? user.user?.id ?? null : null;
+
     const row = await unwrap(
       supabase
         .from('payments')
         .insert({
-          invoice_id: Number(payment.invoiceId),
-          amount: payment.amount,
-          method: mapPaymentMethod.toDb(payment.method) as import('@/types/supabase').DbPaymentMethod,
+          invoice_id:  Number(payment.invoiceId),
+          amount:      payment.amount,
+          method:      mapPaymentMethod.toDb(payment.method) as import('@/types/supabase').DbPaymentMethod,
           payment_date: payment.paidAt,
           receipt_url: payment.evidenceImage ?? null,
-          notes: payment.note ?? null,
+          confirmed_at: confirmedAt,
+          confirmed_by: confirmedBy,
+          notes:       payment.note ?? null,
         })
         .select(PAYMENT_SELECT)
         .single()
     ) as unknown as DbPaymentRow;
+
+    if (shouldConfirm) {
+      const invoiceRow = (await unwrap(
+        supabase
+          .from('invoices')
+          .select('id, total_amount, amount_paid, status')
+          .eq('id', Number(payment.invoiceId))
+          .single()
+      )) as unknown as {
+        id: number;
+        total_amount: number | null;
+        amount_paid: number | null;
+        status: string | null;
+      };
+
+      const total = invoiceRow.total_amount ?? 0;
+      const alreadyPaid = invoiceRow.amount_paid ?? 0;
+      const newPaid = alreadyPaid + payment.amount;
+      const newStatus =
+        newPaid >= total ? 'paid' : newPaid > 0 ? 'partially_paid' : invoiceRow.status ?? 'pending_payment';
+
+      await unwrap(
+        supabase
+          .from('invoices')
+          .update({
+            amount_paid: newPaid,
+            status: newStatus as import('@/types/supabase').DbInvoiceStatus,
+            paid_date: newPaid >= total ? payment.paidAt : null,
+          })
+          .eq('id', invoiceRow.id)
+      );
+    }
 
     return mapDbRowToPayment(row);
   },
@@ -366,7 +480,33 @@ export const paymentService = {
     type: TransactionType,
     note: string
   ): Promise<TenantBalanceTransaction> => {
-    // Fetch current balance first
+    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
+      const dbType = mapTransactionTypeToDb(type);
+      const { data, error } = await supabase.functions.invoke('adjust-balance', {
+        body: {
+          tenantId:        Number(tenantId),
+          amount,
+          transactionType: dbType,
+          notes:           note,
+        },
+      });
+      if (error) throw new Error(error.message);
+      const balance = await paymentService.getTenantBalance(tenantId);
+      return {
+        id:             String(data.historyId),
+        tenantId,
+        amount,
+        type,
+        description:    note,
+        balanceBefore:  data.balanceBefore,
+        balanceAfter:   data.balanceAfter,
+        createdAt:      data.lastUpdated,
+        lastUpdated:    data.lastUpdated,
+        currentBalance: balance.currentBalance,
+      } as unknown as TenantBalanceTransaction;
+    }
+
+    // Legacy path: non-atomic two-step write
     const balance = await paymentService.getTenantBalance(tenantId);
     const balanceBefore = balance.currentBalance;
     const balanceAfter = balanceBefore + amount;

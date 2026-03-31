@@ -25,6 +25,12 @@ interface DbTenantRow {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   documents: unknown | null;
+  profile_id?: string | null;
+}
+
+interface DuplicateTenantRow {
+  id: number;
+  full_name: string;
 }
 
 interface DbContractTenantJoined {
@@ -79,11 +85,60 @@ function computeOnboardingPercent(row: DbTenantRow, hasContract: boolean): numbe
   return Math.round((done / steps.length) * 100);
 }
 
+function extractAvatarUrl(documents: unknown): string | undefined {
+  if (!documents || typeof documents !== 'object') return undefined;
+  const avatarUrl = (documents as Record<string, unknown>).avatar_url;
+  return typeof avatarUrl === 'string' && avatarUrl.length > 0 ? avatarUrl : undefined;
+}
+
+function extractStringDocumentField(documents: unknown, key: string): string | undefined {
+  if (!documents || typeof documents !== 'object') return undefined;
+  const value = (documents as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function extractVehiclePlates(documents: unknown): string[] {
+  if (!documents || typeof documents !== 'object') return [];
+  const value = (documents as Record<string, unknown>).vehicle_plates;
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+function normalizeIdNumber(value: string): string {
+  return value.trim();
+}
+
+function isDuplicateIdNumberError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes('tenants_id_number_key')
+    || (lower.includes('duplicate key value') && lower.includes('id_number'));
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
 export const tenantService = {
+  findTenantByIdNumber: async (idNumber: string): Promise<{ id: string; fullName: string } | null> => {
+    const normalizedIdNumber = normalizeIdNumber(idNumber);
+    if (!normalizedIdNumber) return null;
+
+    const row = await unwrap(
+      supabase
+        .from('tenants')
+        .select('id, full_name')
+        .eq('id_number', normalizedIdNumber)
+        .eq('is_deleted', false)
+        .maybeSingle()
+    ) as unknown as DuplicateTenantRow | null;
+
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      fullName: row.full_name,
+    };
+  },
+
   /**
    * Return a flat list of TenantSummary rows.
    * Joins contract_tenants → contracts → rooms to determine active status
@@ -100,7 +155,7 @@ export const tenantService = {
     const tenants = await unwrap(
       supabase
         .from('tenants')
-        .select('id, uuid, full_name, id_number, date_of_birth, gender, phone, email, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
+        .select('id, uuid, profile_id, full_name, id_number, date_of_birth, gender, phone, email, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
         .eq('is_deleted', false)
     );
 
@@ -144,7 +199,7 @@ export const tenantService = {
           ? String(activeLink.contracts.room_id)
           : undefined,
         currentRoomCode: activeLink?.contracts?.rooms?.room_code ?? undefined,
-        avatarUrl: undefined,
+        avatarUrl: extractAvatarUrl(t.documents),
         onboardingPercent,
         hasActiveContract,
         isRepresentative: activeLink?.is_primary ?? false,
@@ -186,7 +241,7 @@ export const tenantService = {
     const row = await unwrap(
       supabase
         .from('tenants')
-        .select('id, uuid, full_name, id_number, date_of_birth, gender, phone, email, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
+        .select('id, uuid, profile_id, full_name, id_number, date_of_birth, gender, phone, email, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
         .eq('id', numericId)
         .eq('is_deleted', false)
         .single()
@@ -208,14 +263,15 @@ export const tenantService = {
     const status = deriveTenantStatus(hasActiveContract);
     const onboardingPercent = computeOnboardingPercent(row as unknown as DbTenantRow, hasActiveContract);
 
-    // Parse vehiclePlates from documents jsonb if present
     const docs = row.documents as Record<string, unknown> | null;
-    const vehiclePlates: string[] = Array.isArray(docs?.vehicle_plates)
-      ? (docs!.vehicle_plates as string[])
-      : [];
+    const vehiclePlates = extractVehiclePlates(docs);
+    const nationality = extractStringDocumentField(docs, 'nationality') ?? 'Việt Nam';
+    const occupation = extractStringDocumentField(docs, 'occupation') ?? '';
 
     const profile: TenantProfile = {
       id: String(row.id),
+      profileId: row.profile_id ?? undefined,
+      hasPortalAccount: !!row.profile_id,
       fullName: row.full_name,
       phone: row.phone ?? '',
       email: row.email ?? undefined,
@@ -225,7 +281,7 @@ export const tenantService = {
         ? String(activeLink.contracts.room_id)
         : undefined,
       currentRoomCode: activeLink?.contracts?.rooms?.room_code ?? undefined,
-      avatarUrl: undefined,
+      avatarUrl: extractAvatarUrl(row.documents),
       onboardingPercent,
       // TenantProfile-specific fields
       gender: mapGender.fromDb(row.gender ?? 'other') as 'Male' | 'Female' | 'Other',
@@ -234,8 +290,8 @@ export const tenantService = {
       // Fields not stored in DB — sensible defaults
       cccdIssuedDate: '',
       cccdIssuedPlace: '',
-      nationality: 'Việt Nam',
-      occupation: '',
+      nationality,
+      occupation,
       vehiclePlates,
       notes: (docs?.notes as string | undefined) ?? '',
     };
@@ -426,42 +482,68 @@ export const tenantService = {
     occupation?: string;
     permanentAddress?: string;
     vehiclePlates?: string[];
+    avatarUrl?: string;
   }): Promise<TenantSummary> => {
-    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
-    const row = await unwrap(
-      supabase
-        .from('tenants')
-        .insert({
-          full_name: data.fullName,
-          phone: data.phone || null,
-          email: data.email || null,
-          id_number: data.cccd,
-          date_of_birth: data.dateOfBirth || null,
-          gender: genderMap[data.gender ?? 'Other'] ?? 'other',
-          permanent_address: data.permanentAddress || null,
-          documents: data.vehiclePlates && data.vehiclePlates.length > 0
-            ? { vehicle_plates: data.vehiclePlates }
-            : null,
-          is_deleted: false,
-        })
-        .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
-        .single()
-    ) as unknown as DbTenantRow;
+    const normalizedIdNumber = normalizeIdNumber(data.cccd);
+    const existingTenant = await tenantService.findTenantByIdNumber(normalizedIdNumber);
+    if (existingTenant) {
+      throw new Error(`CCCD ${normalizedIdNumber} đã tồn tại trong hồ sơ cư dân ${existingTenant.fullName}.`);
+    }
 
-    return {
-      id: String(row.id),
-      fullName: row.full_name,
-      phone: row.phone ?? '',
-      email: row.email ?? undefined,
-      cccd: row.id_number,
-      status: 'CheckedOut',
-      currentRoomId: undefined,
-      currentRoomCode: undefined,
-      avatarUrl: undefined,
-      onboardingPercent: computeOnboardingPercent(row, false),
-      hasActiveContract: false,
-      isRepresentative: false,
-    };
+    const genderMap: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
+    const documentsPayload: Record<string, unknown> = {};
+    if (data.vehiclePlates && data.vehiclePlates.length > 0) {
+      documentsPayload.vehicle_plates = data.vehiclePlates;
+    }
+    if (data.avatarUrl) {
+      documentsPayload.avatar_url = data.avatarUrl;
+    }
+    if (data.nationality) {
+      documentsPayload.nationality = data.nationality.trim();
+    }
+    if (data.occupation) {
+      documentsPayload.occupation = data.occupation.trim();
+    }
+    try {
+      const row = await unwrap(
+        supabase
+          .from('tenants')
+          .insert({
+            full_name: data.fullName,
+            phone: data.phone || null,
+            email: data.email || null,
+            id_number: normalizedIdNumber,
+            date_of_birth: data.dateOfBirth || null,
+            gender: genderMap[data.gender ?? 'Other'] ?? 'other',
+            permanent_address: data.permanentAddress || null,
+            documents: Object.keys(documentsPayload).length > 0 ? documentsPayload : null,
+            is_deleted: false,
+          })
+          .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
+          .single()
+      ) as unknown as DbTenantRow;
+
+      return {
+        id: String(row.id),
+        fullName: row.full_name,
+        phone: row.phone ?? '',
+        email: row.email ?? undefined,
+        cccd: row.id_number,
+        status: 'CheckedOut',
+        currentRoomId: undefined,
+        currentRoomCode: undefined,
+        avatarUrl: extractAvatarUrl(row.documents),
+        onboardingPercent: computeOnboardingPercent(row, false),
+        hasActiveContract: false,
+        isRepresentative: false,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể tạo cư dân.';
+      if (isDuplicateIdNumberError(message)) {
+        throw new Error(`CCCD ${normalizedIdNumber} đã tồn tại trong hệ thống.`);
+      }
+      throw error;
+    }
   },
 
   /**
@@ -473,10 +555,14 @@ export const tenantService = {
       fullName?: string;
       phone?: string;
       email?: string;
+      cccd?: string;
       dateOfBirth?: string;
       gender?: string;
+      nationality?: string;
+      occupation?: string;
       permanentAddress?: string;
       vehiclePlates?: string[];
+      avatarUrl?: string;
     }
   ): Promise<void> => {
     const numericId = Number(id);
@@ -488,11 +574,47 @@ export const tenantService = {
     if (data.fullName !== undefined) updatePayload.full_name = data.fullName;
     if (data.phone !== undefined) updatePayload.phone = data.phone || null;
     if (data.email !== undefined) updatePayload.email = data.email || null;
+    if (data.cccd !== undefined) {
+      const normalizedIdNumber = normalizeIdNumber(data.cccd);
+      const existingTenant = await tenantService.findTenantByIdNumber(normalizedIdNumber);
+      if (existingTenant && existingTenant.id !== id) {
+        throw new Error(`CCCD ${normalizedIdNumber} đã tồn tại trong hệ thống.`);
+      }
+      updatePayload.id_number = normalizedIdNumber;
+    }
     if (data.dateOfBirth !== undefined) updatePayload.date_of_birth = data.dateOfBirth || null;
     if (data.gender !== undefined) updatePayload.gender = genderMap[data.gender] ?? 'other';
     if (data.permanentAddress !== undefined) updatePayload.permanent_address = data.permanentAddress || null;
-    if (data.vehiclePlates !== undefined) {
-      updatePayload.documents = { vehicle_plates: data.vehiclePlates };
+    if (
+      data.vehiclePlates !== undefined
+      || data.avatarUrl !== undefined
+      || data.nationality !== undefined
+      || data.occupation !== undefined
+    ) {
+      const existingRow = await unwrap(
+        supabase
+          .from('tenants')
+          .select('documents')
+          .eq('id', numericId)
+          .single()
+      ) as unknown as { documents: Record<string, unknown> | null };
+      const nextDocuments = { ...(existingRow.documents ?? {}) } as Record<string, unknown>;
+      if (data.vehiclePlates !== undefined) {
+        nextDocuments.vehicle_plates = data.vehiclePlates;
+      }
+      if (data.avatarUrl !== undefined) {
+        if (data.avatarUrl) nextDocuments.avatar_url = data.avatarUrl;
+        else delete nextDocuments.avatar_url;
+      }
+      if (data.nationality !== undefined) {
+        if (data.nationality.trim()) nextDocuments.nationality = data.nationality.trim();
+        else delete nextDocuments.nationality;
+      }
+      if (data.occupation !== undefined) {
+        if (data.occupation.trim()) nextDocuments.occupation = data.occupation.trim();
+        else delete nextDocuments.occupation;
+      }
+      updatePayload.documents = Object.keys(nextDocuments).length > 0 ? nextDocuments : null;
     }
     await unwrap(
       supabase.from('tenants').update(updatePayload).eq('id', numericId)

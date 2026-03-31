@@ -16,6 +16,8 @@ export interface Tenant {
 }
 
 export interface TenantProfile extends Tenant {
+  profileId?: string;
+  hasPortalAccount: boolean;
   gender: 'Male' | 'Female' | 'Other';
   dateOfBirth: string; // ISO format
   cccdIssuedDate: string;

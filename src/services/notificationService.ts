@@ -1,21 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Notification } from '@/types/notification';
 
-/**
- * Notification Service
- *
- * NOTE: The `notifications` table does NOT exist in the `smartstay` schema.
- * All methods gracefully return empty/zero results to prevent UI crashes.
- *
- * The realtime subscription is disabled to avoid creating dead channels.
- *
- * TO ENABLE THIS FEATURE:
- *   1. Run the migration in supabase/migrations/add_notifications_table.sql
- *   2. Re-generate src/types/supabase.ts
- *   3. Remove the FEATURE_DISABLED guard below
- */
-const NOTIFICATIONS_TABLE_EXISTS = false;
-
 interface NotificationRow {
   id: string;
   profile_id: string;
@@ -25,32 +10,35 @@ interface NotificationRow {
   is_read: boolean;
   link: string | null;
   created_at: string;
+  created_by: string | null;
 }
 
 function mapRow(row: NotificationRow): Notification {
   return {
-    id:        row.id,
-    title:     row.title,
-    message:   row.message,
-    type:      row.type as Notification['type'],
-    isRead:    row.is_read,
-    link:      row.link || undefined,
+    id: row.id,
+    title: row.title,
+    message: row.message,
+    type: row.type,
+    isRead: row.is_read,
+    link: row.link || undefined,
     createdAt: row.created_at,
+    createdBy: row.created_by || undefined,
   };
 }
 
-export const notificationService = {
-  /**
-   * Fetch recent notifications for the current user.
-   * Returns [] when the table doesn't exist yet.
-   */
-  async getNotifications(profileId: string, limit = 20): Promise<Notification[]> {
-    if (!NOTIFICATIONS_TABLE_EXISTS) return [];
+async function getCurrentProfileId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    // C-05: Remove .schema('smartstay') — client already configured for this schema
-    const { data, error } = await (supabase as any)
+  return user?.id ?? null;
+}
+
+export const notificationService = {
+  async getNotifications(profileId: string, limit = 20): Promise<Notification[]> {
+    const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, profile_id, title, message, type, is_read, link, created_at, created_by')
       .eq('profile_id', profileId)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -63,13 +51,8 @@ export const notificationService = {
     return (data as NotificationRow[]).map(mapRow);
   },
 
-  /**
-   * Get unread count for the current user.
-   */
   async getUnreadCount(profileId: string): Promise<number> {
-    if (!NOTIFICATIONS_TABLE_EXISTS) return 0;
-
-    const { count, error } = await (supabase as any)
+    const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('profile_id', profileId)
@@ -83,13 +66,8 @@ export const notificationService = {
     return count || 0;
   },
 
-  /**
-   * Mark a single notification as read.
-   */
   async markAsRead(id: string): Promise<void> {
-    if (!NOTIFICATIONS_TABLE_EXISTS) return;
-
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id);
@@ -99,13 +77,8 @@ export const notificationService = {
     }
   },
 
-  /**
-   * Mark all notifications as read for the current user.
-   */
   async markAllAsRead(profileId: string): Promise<void> {
-    if (!NOTIFICATIONS_TABLE_EXISTS) return;
-
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('profile_id', profileId)
@@ -116,16 +89,35 @@ export const notificationService = {
     }
   },
 
-  /**
-   * Subscribe to realtime inserts for this user's notifications.
-   * Returns a no-op unsubscribe function when the table doesn't exist.
-   */
-  subscribeToNew(profileId: string, onNew: (notification: Notification) => void) {
-    if (!NOTIFICATIONS_TABLE_EXISTS) {
-      // Feature not available — return a no-op cleanup function
-      return () => undefined;
+  async sendToProfile(input: {
+    profileId: string;
+    title: string;
+    message: string;
+    type?: string;
+    link?: string | null;
+  }): Promise<Notification> {
+    const createdBy = await getCurrentProfileId();
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({
+        profile_id: input.profileId,
+        title: input.title.trim(),
+        message: input.message.trim(),
+        type: input.type ?? 'admin_message',
+        link: input.link ?? null,
+        created_by: createdBy,
+      })
+      .select('id, profile_id, title, message, type, is_read, link, created_at, created_by')
+      .single();
+
+    if (error) {
+      throw new Error(error.message || 'Không thể gửi thông báo tới cư dân.');
     }
 
+    return mapRow(data as NotificationRow);
+  },
+
+  subscribeToNew(profileId: string, onNew: (notification: Notification) => void) {
     const channel = supabase
       .channel(`notifications:${profileId}`)
       .on(
@@ -138,7 +130,7 @@ export const notificationService = {
         },
         (payload) => {
           onNew(mapRow(payload.new as NotificationRow));
-        }
+        },
       )
       .subscribe();
 

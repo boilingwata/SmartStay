@@ -1,17 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  ArrowLeft, Home, Building2, MapPin, 
-  Info, Image as ImageIcon, Users, 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft, Home, Building2, MapPin,
+  Info, Image as ImageIcon, Users,
   TrendingUp, TrendingDown, Phone, Mail,
   Calendar, Layers, Maximize, Key, Plus,
   Edit, Trash2, ExternalLink, ShieldCheck,
   CheckCircle2, XCircle, MoreVertical,
   Star, Share2, Printer, Download, Clock,
-  ArrowRight
+  ArrowRight, Loader2, X, ChevronLeft, ChevronRight, ZoomIn
 } from 'lucide-react';
 import { buildingService } from '@/services/buildingService';
+import { fileService } from '@/services/fileService';
 import { roomService } from '@/services/roomService';
 import { BuildingDetail as BuildingDetailType } from '@/models/Building';
 import { Room } from '@/models/Room';
@@ -130,6 +135,51 @@ const BuildingDetail = () => {
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const setBuilding = useUIStore((s) => s.setBuilding);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const imageCountRef = React.useRef(0);
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      setUploadingCount(files.length);
+      const isFirst = (building?.images?.length ?? 0) === 0;
+      const results = await Promise.allSettled(
+        files.map(async (file, i) => {
+          const url = await fileService.uploadFile(file, file.name);
+          return buildingService.addBuildingImage(id!, url, isFirst && i === 0);
+        })
+      );
+      setUploadingCount(0);
+      const failed = results.filter(r => r.status === 'rejected').length;
+      if (failed > 0) throw new Error(`${failed} ảnh tải lên thất bại`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['building', id] });
+      toast.success('Đã tải ảnh lên thành công!');
+    },
+    onError: (err: Error) => {
+      setUploadingCount(0);
+      toast.error(err.message);
+    },
+  });
+
+  const deleteImageMutation = useMutation({
+    mutationFn: (imageId: string) => buildingService.deleteBuildingImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['building', id] });
+      toast.success('Đã xóa ảnh.');
+    },
+    onError: () => toast.error('Xóa ảnh thất bại.'),
+  });
+
+  const setMainImageMutation = useMutation({
+    mutationFn: (imageId: string) => buildingService.setMainBuildingImage(id!, imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['building', id] });
+      toast.success('Đã đặt ảnh đại diện.');
+    },
+    onError: () => toast.error('Cập nhật ảnh đại diện thất bại.'),
+  });
 
   // Set the active building context so RoomModal defaults to this building
   useEffect(() => {
@@ -146,11 +196,59 @@ const BuildingDetail = () => {
     queryFn: () => buildingService.getBuildingDetail(id!)
   });
 
+  const { data: revenueChart = [] } = useQuery({
+    queryKey: ['building', id, 'revenue-chart'],
+    queryFn: () => buildingService.getBuildingRevenueChart(id!),
+    enabled: !!id,
+  });
+
+  const { data: reportRooms = [] } = useQuery({
+    queryKey: ['rooms', 'building', id],
+    queryFn: () => roomService.getRooms({ buildingId: id! }),
+    enabled: !!id,
+  });
+
+  // Keep ref in sync so keyboard handler always has latest image count
+  imageCountRef.current = building?.images?.length ?? 0;
+
+  // Keyboard navigation for image lightbox
+  useEffect(() => {
+    if (previewIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      const len = imageCountRef.current;
+      if (e.key === 'Escape') setPreviewIndex(null);
+      if (e.key === 'ArrowRight') setPreviewIndex(i => i !== null ? (i + 1) % len : null);
+      if (e.key === 'ArrowLeft') setPreviewIndex(i => i !== null ? (i - 1 + len) % len : null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [previewIndex]);
+
+  // Occupancy-by-segment: group rooms by type (must be before early returns)
+  const occupancySegments = useMemo(() => {
+    const map = new Map<string, { occupied: number; vacant: number; maintenance: number; reserved: number }>();
+    for (const room of reportRooms) {
+      const cur = map.get(room.roomType) ?? { occupied: 0, vacant: 0, maintenance: 0, reserved: 0 };
+      if (room.status === 'Occupied')         cur.occupied++;
+      else if (room.status === 'Vacant')      cur.vacant++;
+      else if (room.status === 'Maintenance') cur.maintenance++;
+      else if (room.status === 'Reserved')    cur.reserved++;
+      map.set(room.roomType, cur);
+    }
+    return Array.from(map.entries()).map(([type, counts]) => ({ type, ...counts }));
+  }, [reportRooms]);
+
   if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
   if (!building) return <div>Toà nhà không tồn tại.</div>;
 
   // Checklist #2: Ownership sum check
   const totalOwnership = building.ownership.reduce((sum, o) => sum + o.ownershipPercent, 0);
+
+  // Format month label: "2026-03" → "T3/26"
+  const fmtMonth = (m: string) => {
+    const [y, mo] = m.split('-');
+    return `T${Number(mo)}/${y.slice(2)}`;
+  };
 
   const onOwnershipSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['building', id] });
@@ -486,67 +584,101 @@ const BuildingDetail = () => {
           {activeTab === 'Images' && (
             <div className="space-y-8">
                <div className="flex justify-between items-center">
-                  <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Bộ sưu tập hình ảnh</h3>
+                  <div>
+                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Bộ sưu tập hình ảnh</h3>
+                    <p className="text-[11px] text-muted font-medium mt-0.5">{building.images.length} ảnh · JPG, PNG, WebP · Tối đa 2MB/ảnh</p>
+                  </div>
                   <div className="flex gap-2">
-                   {/* B10 FIX: Download images list as JSON/CSV */}
-                   <button 
-                      onClick={() => {
-                        const csv = ['Url,IsMain', ...building.images.map(img => `${img.url},${img.isMain}`)].join('\n');
-                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `images_${building.buildingCode}.csv`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        toast.success('Danh sách ảnh đã được tải về!');
-                      }}
-                      className="btn-outline-sm flex items-center gap-2"
-                   ><Download size={14} /> Tải toàn bộ</button>
-                   {/* B11 FIX: Hidden file input for photo upload trigger */}
                    <input
                      ref={photoInputRef}
                      type="file"
-                     accept="image/*"
+                     accept="image/jpeg,image/png,image/webp"
                      multiple
                      className="hidden"
                      onChange={(e) => {
                        const files = Array.from(e.target.files ?? []);
                        if (files.length > 0) {
-                         toast.promise(
-                           new Promise(res => setTimeout(res, 1200)),
-                           {
-                             loading: `Đang tải lên ${files.length} ảnh...`,
-                             success: `Đã chọn ${files.length} ảnh — tính năng lưu trữ đang được phát triển.`,
-                             error: 'Tải ảnh thất bại.',
-                           }
-                         );
+                         uploadImageMutation.mutate(files);
                        }
                        e.target.value = '';
                      }}
                    />
-                   <button 
+                   <button
                       onClick={() => photoInputRef.current?.click()}
-                      className="btn-primary-sm flex items-center gap-2"
-                   ><Plus size={14} /> Thêm ảnh</button>
+                      disabled={uploadImageMutation.isPending}
+                      className="btn-primary-sm flex items-center gap-2 disabled:opacity-60"
+                   >
+                     {uploadImageMutation.isPending ? (
+                       <><Loader2 size={14} className="animate-spin" /> Đang tải {uploadingCount} ảnh...</>
+                     ) : (
+                       <><Plus size={14} /> Thêm ảnh</>
+                     )}
+                   </button>
                   </div>
                </div>
-               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {building.images.map((img) => (
-                    <div key={img.id} className="group relative aspect-[4/3] rounded-[32px] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1 cursor-zoom-in">
-                       <img src={img.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                          <p className="text-[10px] text-white font-black uppercase tracking-widest">{img.isMain ? 'Ảnh đại diện' : 'Ảnh phối cảnh'}</p>
-                       </div>
-                       <div className="absolute top-4 right-4 flex gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
-                          <button className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-primary shadow-lg hover:bg-white"><Edit size={14} /></button>
-                          <button className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-danger shadow-lg hover:bg-white"><Trash2 size={14} /></button>
-                       </div>
-                    </div>
-                  ))}
-               </div>
+
+               {building.images.length === 0 && !uploadImageMutation.isPending ? (
+                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                   <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center">
+                     <ImageIcon size={36} className="text-primary/30" />
+                   </div>
+                   <div>
+                     <p className="text-body font-black text-muted">Chưa có ảnh nào</p>
+                     <p className="text-small text-muted/70 mt-1">Nhấn "Thêm ảnh" để tải ảnh tòa nhà lên.</p>
+                   </div>
+                   <button onClick={() => photoInputRef.current?.click()} className="btn-primary flex items-center gap-2 mt-2">
+                     <Plus size={16} /> Thêm ảnh đầu tiên
+                   </button>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                   {building.images.map((img, idx) => (
+                     <div key={img.id} className="group relative aspect-[4/3] rounded-[32px] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1">
+                        <img
+                          src={img.url}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 cursor-zoom-in"
+                          alt=""
+                          onClick={() => setPreviewIndex(idx)}
+                        />
+                        {img.isMain && (
+                          <div className="absolute top-3 left-3">
+                            <span className="flex items-center gap-1 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow">
+                              <Star size={10} fill="currentColor" /> Đại diện
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute top-3 right-3 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                           <button
+                             onClick={() => setPreviewIndex(idx)}
+                             title="Xem ảnh"
+                             className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-primary shadow-lg hover:bg-white"
+                           >
+                             <ZoomIn size={14} />
+                           </button>
+                           {!img.isMain && (
+                             <button
+                               onClick={() => setMainImageMutation.mutate(img.id)}
+                               disabled={setMainImageMutation.isPending}
+                               title="Đặt làm ảnh đại diện"
+                               className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-yellow-500 shadow-lg hover:bg-white disabled:opacity-50"
+                             >
+                               <Star size={14} />
+                             </button>
+                           )}
+                           <button
+                             onClick={() => deleteImageMutation.mutate(img.id)}
+                             disabled={deleteImageMutation.isPending}
+                             title="Xóa ảnh"
+                             className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-danger shadow-lg hover:bg-white disabled:opacity-50"
+                           >
+                             <Trash2 size={14} />
+                           </button>
+                        </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
             </div>
           )}
 
@@ -555,15 +687,69 @@ const BuildingDetail = () => {
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className="card-container p-8 bg-white/60">
                      <h3 className="text-label text-muted font-black uppercase tracking-widest mb-6">Biến động doanh thu (6 tháng)</h3>
-                     <div className="h-64 flex items-center justify-center text-muted font-mono italic bg-bg/20 rounded-3xl border border-dashed">
-                        [ MiniRevenueChart Placeholder ]
-                     </div>
+                     {revenueChart.every(p => p.revenue === 0) ? (
+                       <div className="h-64 flex flex-col items-center justify-center text-center gap-3">
+                         <TrendingUp size={32} className="text-primary/20" />
+                         <p className="text-small text-muted font-bold">Chưa có dữ liệu doanh thu</p>
+                       </div>
+                     ) : (
+                       <div className="h-64">
+                         <ResponsiveContainer width="100%" height="100%">
+                           <AreaChart data={revenueChart.map(p => ({ ...p, month: fmtMonth(p.month) }))} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                             <defs>
+                               <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                                 <stop offset="5%" stopColor="#1B3A6B" stopOpacity={0.15} />
+                                 <stop offset="95%" stopColor="#1B3A6B" stopOpacity={0} />
+                               </linearGradient>
+                               <linearGradient id="gradCollected" x1="0" y1="0" x2="0" y2="1">
+                                 <stop offset="5%" stopColor="#22c55e" stopOpacity={0.15} />
+                                 <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                               </linearGradient>
+                             </defs>
+                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 700 }} dy={8} />
+                             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} tickFormatter={v => `${(v / 1_000_000).toFixed(0)}tr`} width={40} />
+                             <Tooltip
+                               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontSize: 12 }}
+                               formatter={(v: number, name: string) => [`${(v / 1_000_000).toFixed(1)}tr ₫`, name === 'revenue' ? 'Doanh thu' : 'Đã thu']}
+                             />
+                             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 700, paddingTop: 8 }}
+                               formatter={v => v === 'revenue' ? 'Doanh thu' : 'Đã thu'} />
+                             <Area type="monotone" dataKey="revenue" stroke="#1B3A6B" strokeWidth={2} fill="url(#gradRevenue)" dot={{ r: 3, fill: '#1B3A6B', strokeWidth: 0 }} />
+                             <Area type="monotone" dataKey="collected" stroke="#22c55e" strokeWidth={2} fill="url(#gradCollected)" dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} />
+                           </AreaChart>
+                         </ResponsiveContainer>
+                       </div>
+                     )}
                   </div>
                   <div className="card-container p-8 bg-white/60">
                      <h3 className="text-label text-muted font-black uppercase tracking-widest mb-6">Tỷ lệ lấp đầy theo phân khúc</h3>
-                     <div className="h-64 flex items-center justify-center text-muted font-mono italic bg-bg/20 rounded-3xl border border-dashed">
-                        [ MiniOccupancyChart Placeholder ]
-                     </div>
+                     {occupancySegments.length === 0 ? (
+                       <div className="h-64 flex flex-col items-center justify-center text-center gap-3">
+                         <Layers size={32} className="text-primary/20" />
+                         <p className="text-small text-muted font-bold">Chưa có dữ liệu phòng</p>
+                       </div>
+                     ) : (
+                       <div className="h-64">
+                         <ResponsiveContainer width="100%" height="100%">
+                           <BarChart data={occupancySegments} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barSize={18}>
+                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                             <XAxis dataKey="type" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 700 }} dy={8} />
+                             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} allowDecimals={false} width={28} />
+                             <Tooltip
+                               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontSize: 12 }}
+                               formatter={(v: number, name: string) => [v, name === 'occupied' ? 'Đang thuê' : name === 'vacant' ? 'Trống' : name === 'maintenance' ? 'Bảo trì' : 'Đặt trước']}
+                             />
+                             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 700, paddingTop: 8 }}
+                               formatter={v => v === 'occupied' ? 'Đang thuê' : v === 'vacant' ? 'Trống' : v === 'maintenance' ? 'Bảo trì' : 'Đặt trước'} />
+                             <Bar dataKey="occupied" stackId="a" fill="#1B3A6B" radius={[0, 0, 0, 0]} />
+                             <Bar dataKey="vacant" stackId="a" fill="#E2E8F0" radius={[0, 0, 0, 0]} />
+                             <Bar dataKey="maintenance" stackId="a" fill="#F59E0B" radius={[0, 0, 0, 0]} />
+                             <Bar dataKey="reserved" stackId="a" fill="#F26419" radius={[4, 4, 0, 0]} />
+                           </BarChart>
+                         </ResponsiveContainer>
+                       </div>
+                     )}
                   </div>
                </div>
                
@@ -614,6 +800,72 @@ const BuildingDetail = () => {
         buildingId={id!}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['rooms', 'building', id] })}
       />
+
+      {/* Image Lightbox */}
+      {previewIndex !== null && building.images[previewIndex] && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center"
+          onClick={() => setPreviewIndex(null)}
+        >
+          {/* Close */}
+          <button
+            onClick={() => setPreviewIndex(null)}
+            className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all"
+          >
+            <X size={20} />
+          </button>
+
+          {/* Counter */}
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-white/10 text-white text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-full backdrop-blur-md">
+            {previewIndex + 1} / {building.images.length}
+          </div>
+
+          {/* Prev */}
+          {building.images.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex - 1 + building.images.length) % building.images.length); }}
+              className="absolute left-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all"
+            >
+              <ChevronLeft size={24} />
+            </button>
+          )}
+
+          {/* Image */}
+          <img
+            src={building.images[previewIndex].url}
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Next */}
+          {building.images.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex + 1) % building.images.length); }}
+              className="absolute right-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all"
+            >
+              <ChevronRight size={24} />
+            </button>
+          )}
+
+          {/* Main image toggle */}
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2" onClick={(e) => e.stopPropagation()}>
+            {building.images[previewIndex].isMain ? (
+              <span className="flex items-center gap-1.5 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow">
+                <Star size={11} fill="currentColor" /> Ảnh đại diện
+              </span>
+            ) : (
+              <button
+                onClick={() => setMainImageMutation.mutate(building.images[previewIndex!].id)}
+                disabled={setMainImageMutation.isPending}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-yellow-400 hover:text-yellow-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow backdrop-blur-md transition-all disabled:opacity-50"
+              >
+                <Star size={11} /> Đặt làm ảnh đại diện
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

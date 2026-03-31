@@ -6,7 +6,7 @@ import {
   History, CheckCircle2, XCircle, Clock, Eye as EyeIcon, Layers,
   Copy, Check
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { invoiceService } from '@/services/invoiceService';
 import { buildingService } from '@/services/buildingService';
@@ -25,6 +25,7 @@ import { RecordPaymentModal } from '@/components/shared/modals/RecordPaymentModa
 const InvoiceList = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<InvoiceStatus | 'All'>('All');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -356,8 +357,22 @@ const InvoiceList = () => {
         </div>
       </div>
 
-      <CreateInvoiceModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
-      <BulkInvoiceModal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} />
+      <CreateInvoiceModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['invoices'] });
+          queryClient.invalidateQueries({ queryKey: ['invoiceCounts'] });
+        }}
+      />
+      <BulkInvoiceModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['invoices'] });
+          queryClient.invalidateQueries({ queryKey: ['invoiceCounts'] });
+        }}
+      />
       <RecordPaymentModal 
         isOpen={isPaymentModalOpen} 
         onClose={() => {

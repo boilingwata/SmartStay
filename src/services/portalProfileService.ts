@@ -3,6 +3,7 @@ import { unwrap } from '@/lib/supabaseHelpers';
 import { TenantProfile } from '@/models/Tenant';
 import { mapGender } from '@/lib/enumMaps';
 import { handleServiceError } from '@/utils/errorUtils';
+import { assertNoLikelyMojibake } from '@/utils';
 
 export interface PortalProfile extends TenantProfile {
   buildingName: string;
@@ -92,7 +93,7 @@ async function getFallbackProfile(profileId: string): Promise<PortalProfile> {
     permanentAddress: '',
     cccdIssuedDate: '',
     cccdIssuedPlace: '',
-    nationality: 'Viá»‡t Nam',
+    nationality: 'Việt Nam',
     occupation: '',
     vehiclePlates: [],
     notes: '',
@@ -204,6 +205,19 @@ export const portalProfileService = {
 
   updateProfile: async (data: Partial<PortalProfile>): Promise<void> => {
     try {
+      assertNoLikelyMojibake(
+        {
+          fullName: data.fullName,
+          email: data.email,
+          permanentAddress: data.permanentAddress,
+        },
+        {
+          fullName: 'họ tên',
+          email: 'email',
+          permanentAddress: 'địa chỉ thường trú',
+        },
+      );
+
       const context = await getCurrentTenantRow();
       if (!context) {
         const { data: { user }, error: authError } = await supabase.auth.getUser();

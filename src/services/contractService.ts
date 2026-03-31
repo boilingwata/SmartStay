@@ -252,33 +252,100 @@ export const contractService = {
       throw new Error(`[contractService] Invalid room id: "${data.roomId}"`);
     }
 
-    // Insert core contract record
-    const row = await unwrap(
-      supabase
-        .from('contracts')
-        .insert({
-          room_id: numRoomId,
-          start_date: data.startDate,
-          end_date: data.endDate,
-          monthly_rent: data.rentPrice,
-          deposit_amount: data.depositAmount,
-          payment_cycle_months: data.paymentCycle,
-          status: 'active' as DbContractStatus,
-          is_deleted: false,
-        })
-        .select(`
-          id, uuid, contract_code, room_id, start_date, end_date,
-          payment_cycle_months, monthly_rent, deposit_status, status,
-          rooms!inner(id, room_code, building_id, buildings(name)),
-          contract_tenants(id, contract_id, tenant_id, is_primary,
-            tenants(id, full_name, profile_id,
-              profiles(avatar_url)
-            )
-          )
-        `)
-        .single()
-    ) as unknown as ContractRow;
+    // Pre-insert guard: check for overlapping active/pending contracts on this room
+    const { data: conflicting } = await supabase
+      .from('contracts')
+      .select('id, contract_code')
+      .eq('room_id', numRoomId)
+      .in('status', ['active', 'pending_signature'])
+      .eq('is_deleted', false)
+      .lte('start_date', data.endDate)
+      .gte('end_date', data.startDate)
+      .limit(1);
 
-    return toContract(row);
+    if (conflicting && conflicting.length > 0) {
+      const code = (conflicting[0] as { contract_code: string }).contract_code;
+      throw new Error(
+        `Phòng này đã có hợp đồng đang hoạt động (${code}) trong khoảng thời gian được chọn. ` +
+        `Vui lòng kết thúc hợp đồng hiện tại hoặc chọn khoảng thời gian khác.`
+      );
+    }
+
+    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
+      const tenants = data.tenants.map((t) => ({
+        id: Number(t.id),
+        isPrimary: t.id === data.representativeId,
+      }));
+
+      const { data: result, error } = await supabase.functions.invoke('create-contract', {
+        body: {
+          roomId:               numRoomId,
+          startDate:            data.startDate,
+          endDate:              data.endDate,
+          rentPrice:            data.rentPrice,
+          depositAmount:        data.depositAmount,
+          paymentCycle:         data.paymentCycle,
+          tenants,
+          selectedServices:     data.selectedServices.map((id) => ({ serviceId: Number(id) })),
+          markDepositReceived:  data.depositAmount > 0,
+        },
+      });
+      if (error) throw new Error(error.message);
+
+      // Fetch the full contract row for the return value
+      const contractRow = await unwrap(
+        supabase
+          .from('contracts')
+          .select(`
+            id, uuid, contract_code, room_id, start_date, end_date,
+            payment_cycle_months, monthly_rent, deposit_status, status,
+            rooms!inner(id, room_code, building_id, buildings(name)),
+            contract_tenants(id, contract_id, tenant_id, is_primary,
+              tenants(id, full_name, profile_id, profiles(avatar_url))
+            )
+          `)
+          .eq('id', result.contractId)
+          .single()
+      ) as unknown as ContractRow;
+
+      return toContract(contractRow);
+    }
+
+    // Legacy path: inserts contracts row only (missing tenants + services)
+    const { data: insertData, error: insertError } = await supabase
+      .from('contracts')
+      .insert({
+        room_id: numRoomId,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        monthly_rent: data.rentPrice,
+        deposit_amount: data.depositAmount,
+        payment_cycle_months: data.paymentCycle,
+        status: 'active' as DbContractStatus,
+        is_deleted: false,
+      })
+      .select(`
+        id, uuid, contract_code, room_id, start_date, end_date,
+        payment_cycle_months, monthly_rent, deposit_status, status,
+        rooms!inner(id, room_code, building_id, buildings(name)),
+        contract_tenants(id, contract_id, tenant_id, is_primary,
+          tenants(id, full_name, profile_id,
+            profiles(avatar_url)
+          )
+        )
+      `)
+      .single();
+
+    if (insertError) {
+      if (insertError.message.includes('excl_room_contract')) {
+        throw new Error(
+          'Phòng này đã có hợp đồng đang hoạt động trong khoảng thời gian được chọn. ' +
+          'Vui lòng kết thúc hợp đồng hiện tại hoặc chọn khoảng thời gian khác.'
+        );
+      }
+      throw new Error(insertError.message);
+    }
+
+    return toContract(insertData as unknown as ContractRow);
   },
 };

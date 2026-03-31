@@ -84,3 +84,5 @@ export const formatPercentage = (val: number): string => {
     maximumFractionDigits: 1,
   }).format(val / 100);
 };
+
+export * from './textEncoding';

@@ -16,6 +16,8 @@ import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 
+const DEFAULT_OWNER_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
 /**
  * 2.3.1 Owner detail view showing owned buildings & profile
  * Design focus: Premium, professional, and clear assets visualization
@@ -49,7 +51,7 @@ const OwnerDetail = () => {
           <div className="flex items-center gap-5">
              <div className="w-20 h-20 rounded-[28px] bg-primary/10 flex items-center justify-center border-4 border-white shadow-xl overflow-hidden">
                 {owner.avatarUrl ? (
-                  <img src={owner.avatarUrl} alt={owner.fullName} className="w-full h-full object-cover" />
+                  <img src={owner.avatarUrl || DEFAULT_OWNER_AVATAR_URL} alt={owner.fullName} className="w-full h-full object-cover" />
                 ) : (
                   <User size={32} className="text-primary" />
                 )}

@@ -95,6 +95,23 @@ export const checkImageIntegrity = async (file: Blob): Promise<boolean> => {
   });
 };
 
+export const checkPdfIntegrity = async (file: Blob): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = (e) => {
+      if (!e.target?.result) return resolve(false);
+      const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 5);
+      let header = '';
+      for (let i = 0; i < arr.length; i++) {
+        header += String.fromCharCode(arr[i]);
+      }
+
+      resolve(header === '%PDF-');
+    };
+    reader.readAsArrayBuffer(file.slice(0, 5));
+  });
+};
+
 /**
  * Strictly validates and normalizes a URL string. 
  * Only allows http: and https: protocols AND requires the host

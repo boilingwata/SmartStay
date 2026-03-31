@@ -1,46 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  User, Phone, Mail, MapPin, 
-  ShieldCheck, CreditCard, FileText, 
-  MessageSquare, LayoutList, ChevronRight,
-  Plus, ExternalLink, MoreVertical, 
-  Smartphone, Briefcase, Globe, 
-  Calendar, AlertCircle, CheckCircle2,
-  Trash2, Edit, TrendingUp, Star,
-  DollarSign, Wallet, History,
-  ArrowRight, Heart, Eye, EyeOff
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Edit, History, Mail, MapPin, MessageSquare, Phone } from 'lucide-react';
 import ReactConfetti from 'react-confetti';
+import { toast } from 'sonner';
+
 import { tenantService } from '@/services/tenantService';
-import { 
-  TenantProfile, EmergencyContact, 
-  OnboardingProgress, TenantFeedback, 
-  NPSSurvey, TenantBalanceTransaction 
-} from '@/models/Tenant';
-import { cn, maskCCCD, maskPhone, calculateAge, formatDate, formatVND } from '@/utils';
+import notificationService from '@/services/notificationService';
+import { TenantFormModal } from '@/components/forms/TenantFormModal';
 import { Spinner } from '@/components/ui/Feedback';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { usePermission } from '@/hooks/usePermission';
-import { toast } from 'sonner';
+import { calculateAge, cn } from '@/utils';
+import {
+  EmergencyContact,
+  OnboardingProgress,
+  TenantBalanceTransaction,
+  TenantFeedback,
+  TenantProfile,
+  NPSSurvey,
+} from '@/models/Tenant';
 
-import { 
-  ProfileTab,
+import {
   ContactTab,
   ContractTab,
-  InvoiceTab,
-  WalletTab,
   FeedbackTab,
-  OnboardingTab
-} from './components/index';
+  InvoiceTab,
+  OnboardingTab,
+  ProfileTab,
+  WalletTab,
+} from './components';
+import MessageTenantModal from './components/MessageTenantModal';
 
 export type TabType = 'Ho so' | 'Lien he' | 'Hop dong' | 'Hoa don' | 'Vi' | 'Phan hoi' | 'Onboarding';
 
-/**
- * Helper to determine if a tab is in a loading state.
- * Using a function declaration for hoisting safety.
- */
+const DEFAULT_TENANT_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
 function isLoadingTab(tab: TabType, loadingOnboarding?: boolean, loadingTransactions?: boolean) {
   if (tab === 'Onboarding' && loadingOnboarding) return true;
   if (tab === 'Vi' && loadingTransactions) return true;
@@ -50,13 +45,19 @@ function isLoadingTab(tab: TabType, loadingOnboarding?: boolean, loadingTransact
 const TenantDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { hasPermission } = usePermission();
   const canViewPII = hasPermission('tenant.view_pii');
-  
+
   const [activeTab, setActiveTab] = useState<TabType>('Ho so');
   const [showSensitive, setShowSensitive] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingVehicles, setIsSavingVehicles] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -64,195 +65,310 @@ const TenantDetail = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Queries
-  const { data: profile, isLoading: loadingProfile } = useQuery<TenantProfile>({
+  const {
+    data: profile,
+    isLoading: loadingProfile,
+    refetch: refetchProfile,
+  } = useQuery<TenantProfile>({
     queryKey: ['tenant-profile', id],
     queryFn: () => tenantService.getTenantDetail(id!),
-    enabled: !!id
+    enabled: !!id,
   });
 
   const { data: contacts } = useQuery<EmergencyContact[]>({
     queryKey: ['tenant-contacts', id],
     queryFn: () => tenantService.getEmergencyContacts(id!),
-    enabled: activeTab === 'Lien he'
+    enabled: activeTab === 'Lien he' && !!id,
   });
 
   const { data: onboarding, isLoading: loadingOnboarding } = useQuery<OnboardingProgress>({
     queryKey: ['tenant-onboarding', id],
     queryFn: () => tenantService.getOnboardingProgress(id!),
-    enabled: activeTab === 'Onboarding'
+    enabled: activeTab === 'Onboarding' && !!id,
   });
 
   const { data: feedback } = useQuery<TenantFeedback[]>({
     queryKey: ['tenant-feedback', id],
     queryFn: () => tenantService.getFeedback(id!),
-    enabled: activeTab === 'Phan hoi'
+    enabled: activeTab === 'Phan hoi' && !!id,
   });
 
   const { data: nps } = useQuery<NPSSurvey[]>({
     queryKey: ['tenant-nps', id],
     queryFn: () => tenantService.getNPSSurveys(id!),
-    enabled: activeTab === 'Phan hoi'
+    enabled: activeTab === 'Phan hoi' && !!id,
   });
 
   const { data: transactions, isLoading: loadingTransactions } = useQuery<TenantBalanceTransaction[]>({
     queryKey: ['tenant-transactions', id],
     queryFn: () => tenantService.getTenantBalanceTransactions(id!),
-    enabled: activeTab === 'Vi'
+    enabled: activeTab === 'Vi' && !!id,
   });
 
-  // Checklist #4: Onboarding Confetti
+  const refreshTenantViews = async () => {
+    await Promise.all([
+      refetchProfile(),
+      queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+    ]);
+  };
+
   const handleOnboardingAction = (key: string) => {
     toast.success(`Đã cập nhật bước: ${key}`);
-    // Simulated confetti if reached 100%
     if (onboarding && (onboarding.completionPercent >= 80 || key === 'isRoomHandovered')) {
       setShowConfetti(true);
-      toast.success('CHÚC MỪNG! Quy trình Onboarding đã hoàn tất 100%.', {
-        description: 'Dữ liệu cư dân đã được đồng bộ vào Ledger bảo mật.',
+      toast.success('Chúc mừng! Quy trình onboarding đã hoàn tất 100%.', {
+        description: 'Dữ liệu cư dân đã được đồng bộ đầy đủ.',
         icon: <CheckCircle2 className="text-success" />,
-        duration: 8000
+        duration: 8000,
       });
       setTimeout(() => setShowConfetti(false), 8000);
     }
   };
 
+  const handleEditSubmit = async (data: {
+    fullName: string;
+    phone: string;
+    email?: string;
+    cccd: string;
+    dateOfBirth?: string;
+    gender?: 'Male' | 'Female' | 'Other';
+    nationality?: string;
+    occupation?: string;
+    permanentAddress?: string;
+    avatarUrl?: string;
+    vehiclePlates: string[];
+  }) => {
+    if (!id) return;
+
+    setIsSavingProfile(true);
+    try {
+      await tenantService.updateTenant(id, {
+        fullName: data.fullName,
+        phone: data.phone,
+        email: data.email,
+        cccd: data.cccd,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        nationality: data.nationality,
+        occupation: data.occupation,
+        permanentAddress: data.permanentAddress,
+        avatarUrl: data.avatarUrl,
+        vehiclePlates: data.vehiclePlates,
+      });
+      await refreshTenantViews();
+      toast.success(`Đã cập nhật hồ sơ cư dân ${data.fullName}.`);
+      setIsEditModalOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật thông tin cư dân.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleVehicleSave = async (vehiclePlates: string[]) => {
+    if (!id) return;
+
+    setIsSavingVehicles(true);
+    try {
+      await tenantService.updateTenant(id, { vehiclePlates });
+      await refreshTenantViews();
+      toast.success('Đã cập nhật danh sách phương tiện.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật phương tiện.');
+      throw error;
+    } finally {
+      setIsSavingVehicles(false);
+    }
+  };
+
+  const handleSendMessage = async ({ title, message }: { title: string; message: string }) => {
+    if (!profile?.profileId) {
+      toast.error('Cư dân này chưa có tài khoản portal để nhận tin nhắn.');
+      return;
+    }
+
+    setIsSendingMessage(true);
+    try {
+      await notificationService.sendToProfile({
+        profileId: profile.profileId,
+        title,
+        message,
+        type: 'admin_message',
+        link: '/portal/notifications',
+      });
+      toast.success(`Đã gửi tin nhắn tới ${profile.fullName}.`);
+      setIsMessageModalOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể gửi tin nhắn cho cư dân.');
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   if (loadingProfile || !profile) {
     return (
-      <div className="h-[80vh] flex flex-col items-center justify-center gap-4">
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
         <Spinner />
-        <p className="text-label text-muted font-bold animate-pulse uppercase tracking-[3px]">Carregando Perfil...</p>
+        <p className="text-label font-bold uppercase tracking-[3px] text-muted animate-pulse">Đang tải hồ sơ cư dân...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 relative">
-      {showConfetti && (
-        <ReactConfetti
-          width={windowSize.width}
-          height={windowSize.height}
-          recycle={false}
-          numberOfPieces={500}
-        />
-      )}
+    <div className="relative space-y-8 animate-in fade-in duration-700">
+      {showConfetti ? (
+        <ReactConfetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={500} />
+      ) : null}
 
-      {/* 3.2 Page Header (Mobile-first feel) */}
-      <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-end">
-        <div className="relative group">
-           <img 
-            src={profile.avatarUrl} 
-            className="w-32 h-32 rounded-[40px] object-cover shadow-2xl border-4 border-white group-hover:scale-105 transition-transform duration-500" 
-            alt={profile.fullName} 
-           />
-           <div className="absolute inset-0 bg-black/40 rounded-[40px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-              <span className="text-white text-[10px] font-black uppercase tracking-widest">Đổi ảnh</span>
-           </div>
+      <TenantFormModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          if (!isSavingProfile) setIsEditModalOpen(false);
+        }}
+        initialData={{
+          id: profile.id,
+          fullName: profile.fullName,
+          phone: profile.phone,
+          email: profile.email,
+          cccd: profile.cccd,
+          dateOfBirth: profile.dateOfBirth,
+          gender: profile.gender,
+          nationality: profile.nationality,
+          occupation: profile.occupation,
+          permanentAddress: profile.permanentAddress,
+          avatarUrl: profile.avatarUrl,
+          vehiclePlates: profile.vehiclePlates,
+        }}
+        onSubmit={handleEditSubmit}
+      />
+
+      <MessageTenantModal
+        isOpen={isMessageModalOpen}
+        tenantName={profile.fullName}
+        isSending={isSendingMessage}
+        onClose={() => {
+          if (!isSendingMessage) setIsMessageModalOpen(false);
+        }}
+        onSubmit={handleSendMessage}
+      />
+
+      <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-end">
+        <div className="group relative">
+          <img
+            src={profile.avatarUrl || DEFAULT_TENANT_AVATAR_URL}
+            className="h-32 w-32 rounded-[40px] border-4 border-white object-cover shadow-2xl transition-transform duration-500 group-hover:scale-105"
+            alt={profile.fullName}
+          />
+          <div className="absolute inset-0 flex items-center justify-center rounded-[40px] bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Ảnh hồ sơ</span>
+          </div>
         </div>
 
         <div className="flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-display text-primary tracking-tighter">{profile.fullName}</h1>
+            <h1 className="text-display tracking-tighter text-primary">{profile.fullName}</h1>
             <StatusBadge status={profile.status} size="sm" className="shadow-lg" />
-            <span className="text-body font-bold text-muted bg-bg px-3 py-1 rounded-full">{calculateAge(profile.dateOfBirth)}</span>
+            <span className="rounded-full bg-bg px-3 py-1 text-body font-bold text-muted">{calculateAge(profile.dateOfBirth)}</span>
+            {profile.hasPortalAccount ? (
+              <span className="rounded-full border border-success/15 bg-success/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-success">
+                Có tài khoản portal
+              </span>
+            ) : (
+              <span className="rounded-full border border-muted/20 bg-muted/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted">
+                Chưa có portal
+              </span>
+            )}
           </div>
-          
+
           <div className="flex flex-wrap gap-6 text-small font-medium text-muted">
-            <span className="flex items-center gap-2"><Phone size={14} className="text-primary" /> {profile.phone}</span>
-            <span className="flex items-center gap-2"><Mail size={14} className="text-primary" /> {profile.email || 'N/A'}</span>
-            <span className="flex items-center gap-2"><MapPin size={14} className="text-primary" /> {profile.currentRoomCode || 'Chưa nhận phòng'}</span>
+            <span className="flex items-center gap-2">
+              <Phone size={14} className="text-primary" />
+              {profile.phone}
+            </span>
+            <span className="flex items-center gap-2">
+              <Mail size={14} className="text-primary" />
+              {profile.email || 'N/A'}
+            </span>
+            <span className="flex items-center gap-2">
+              <MapPin size={14} className="text-primary" />
+              {profile.currentRoomCode || 'Chưa nhận phòng'}
+            </span>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button className="btn-outline-sm flex items-center gap-2" onClick={() => navigate(-1)}>
-             Quay lại
+            Quay lại
           </button>
-          {/* B21 FIX: Message button with simulated send */}
           <button
-            className="btn-outline flex items-center gap-2 px-6"
-            onClick={() => {
-              toast.promise(
-                new Promise((res) => setTimeout(res, 900)),
-                {
-                  loading: `Đang gửi tin nhắn tới ${profile.fullName}...`,
-                  success: 'Tin nhắn đã được gửi!',
-                  error: 'Gửi thất bại. Vui lòng thử lại.',
-                }
-              );
-            }}
+            className={cn(
+              'btn-outline flex items-center gap-2 px-6',
+              !profile.hasPortalAccount && 'cursor-not-allowed opacity-60 hover:translate-y-0 hover:shadow-none',
+            )}
+            onClick={() => setIsMessageModalOpen(true)}
+            disabled={!profile.hasPortalAccount}
+            title={profile.hasPortalAccount ? 'Gửi tin nhắn nội bộ' : 'Cư dân chưa có tài khoản portal'}
           >
-            <MessageSquare size={16} /> Gửi tin nhắn
+            <MessageSquare size={16} />
+            Gửi tin nhắn
           </button>
-          <button className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20" onClick={() => toast.info('Tính năng chỉnh sửa thông tin cư dân đang được phát triển.')}>
-             <Edit size={16} /> Chỉnh sửa
+          <button
+            className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20"
+            onClick={() => setIsEditModalOpen(true)}
+          >
+            <Edit size={16} />
+            Chỉnh sửa
           </button>
         </div>
       </div>
 
-      {/* 3.2.1 Tab Navigation */}
-      <div className="border-b border-border/20 flex flex-nowrap overflow-x-auto no-scrollbar gap-8">
-        {(['Ho so', 'Lien he', 'Hop dong', 'Hoa don', 'Vi', 'Phan hoi', 'Onboarding'] as TabType[]).map(tab => (
+      <div className="flex flex-nowrap gap-8 overflow-x-auto border-b border-border/20 no-scrollbar">
+        {(['Ho so', 'Lien he', 'Hop dong', 'Hoa don', 'Vi', 'Phan hoi', 'Onboarding'] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "pb-4 text-[11px] font-black uppercase tracking-[2px] transition-all whitespace-nowrap relative",
-              activeTab === tab ? "text-primary opacity-100" : "text-muted opacity-50 hover:opacity-80"
+              'relative whitespace-nowrap pb-4 text-[11px] font-black uppercase tracking-[2px] transition-all',
+              activeTab === tab ? 'text-primary opacity-100' : 'text-muted opacity-50 hover:opacity-80',
             )}
           >
             {tab}
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full animate-in slide-in-from-bottom-1" />
-            )}
+            {activeTab === tab ? <div className="absolute bottom-0 left-0 right-0 h-1 rounded-full bg-primary animate-in slide-in-from-bottom-1" /> : null}
           </button>
         ))}
       </div>
 
-      {/* Tab Contents */}
       <div className="min-h-[500px]">
-        {activeTab === 'Ho so' && (
-          <ProfileTab 
-            profile={profile} 
-            canViewPII={canViewPII} 
-            showSensitive={showSensitive} 
-            setShowSensitive={setShowSensitive} 
+        {activeTab === 'Ho so' ? (
+          <ProfileTab
+            profile={profile}
+            canViewPII={canViewPII}
+            showSensitive={showSensitive}
+            setShowSensitive={setShowSensitive}
+            onSaveVehiclePlates={handleVehicleSave}
+            isSavingVehicles={isSavingVehicles}
           />
-        )}
-        {activeTab === 'Lien he' && (
-          <ContactTab profile={profile} contacts={contacts} />
-        )}
-        {activeTab === 'Hop dong' && (
-          <ContractTab />
-        )}
-        {activeTab === 'Hoa don' && (
-          <InvoiceTab />
-        )}
-        {activeTab === 'Vi' && (
-          <WalletTab transactions={transactions} isLoading={loadingTransactions} />
-        )}
-        {activeTab === 'Phan hoi' && (
-          <FeedbackTab feedback={feedback} nps={nps} />
-        )}
-        {activeTab === 'Onboarding' && (
-          <OnboardingTab 
-            onboarding={onboarding!} 
-            onAction={handleOnboardingAction} 
-            onTabChange={setActiveTab} 
-          />
-        )}
+        ) : null}
+        {activeTab === 'Lien he' ? <ContactTab profile={profile} contacts={contacts} /> : null}
+        {activeTab === 'Hop dong' ? <ContractTab /> : null}
+        {activeTab === 'Hoa don' ? <InvoiceTab /> : null}
+        {activeTab === 'Vi' ? <WalletTab transactions={transactions} isLoading={loadingTransactions} /> : null}
+        {activeTab === 'Phan hoi' ? <FeedbackTab feedback={feedback} nps={nps} /> : null}
+        {activeTab === 'Onboarding' ? (
+          <OnboardingTab onboarding={onboarding!} onAction={handleOnboardingAction} onTabChange={setActiveTab} />
+        ) : null}
 
-        {/* Tab Placeholders fallback */}
-        {isLoadingTab(activeTab, loadingOnboarding, loadingTransactions) && (
-          <div className="py-20 flex flex-col items-center justify-center gap-6 text-center animate-in zoom-in-95 duration-500">
-             <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center text-primary border border-primary/10">
-                <History size={40} className="animate-spin-slow" />
-             </div>
-             <div className="max-w-md space-y-2">
-                <h3 className="text-h3 font-black text-primary uppercase tracking-[4px]">Dữ liệu {activeTab}</h3>
-                <p className="text-small text-muted italic font-medium">Toàn bộ lịch sử giao dịch và hồ sơ đang được đồng bộ từ Ledger Engine...</p>
-             </div>
+        {isLoadingTab(activeTab, loadingOnboarding, loadingTransactions) ? (
+          <div className="flex flex-col items-center justify-center gap-6 py-20 text-center animate-in zoom-in-95 duration-500">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full border border-primary/10 bg-primary/5 text-primary">
+              <History size={40} className="animate-spin-slow" />
+            </div>
+            <div className="max-w-md space-y-2">
+              <h3 className="text-h3 font-black uppercase tracking-[4px] text-primary">Dữ liệu {activeTab}</h3>
+              <p className="text-small font-medium italic text-muted">Thông tin đang được đồng bộ từ SmartStay.</p>
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

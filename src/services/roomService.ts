@@ -194,8 +194,8 @@ export const roomService = {
       throw new Error(`[roomService] Invalid room id: "${id}"`);
     }
 
-    // Fetch room, assets, history, and meters in parallel
-    const [row, assetRows, historyRows, meterRows] = await Promise.all([
+    // Fetch room, assets, history, meters, and images in parallel
+    const [row, assetRows, historyRows, meterRows, imageRows] = await Promise.all([
       unwrap(
         supabase
           .from('rooms')
@@ -228,10 +228,51 @@ export const roomService = {
           .order('reading_date', { ascending: false })
           .limit(12)
       ) as unknown as Promise<MeterReadingRow[]>,
+
+      supabase
+        .from('room_images')
+        .select('id, url, is_main, sort_order')
+        .eq('room_id', numId)
+        .order('sort_order', { ascending: true })
+        .then(({ data }) => (data ?? []) as { id: number; url: string; is_main: boolean; sort_order: number }[]),
     ]);
 
     const meters = toMeters(meterRows, numId);
-    return toRoomDetail(row, assetRows, historyRows, meters);
+    const detail = toRoomDetail(row, assetRows, historyRows, meters);
+    detail.images = imageRows.map(r => ({
+      id: String(r.id),
+      url: r.url,
+      isMain: r.is_main,
+      sortOrder: r.sort_order,
+    }));
+    return detail;
+  },
+
+  addRoomImage: async (roomId: string, url: string, isMain: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from('room_images')
+      .insert({ room_id: Number(roomId), url, is_main: isMain, sort_order: 0 });
+    if (error) throw new Error(error.message);
+  },
+
+  deleteRoomImage: async (imageId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('room_images')
+      .delete()
+      .eq('id', Number(imageId));
+    if (error) throw new Error(error.message);
+  },
+
+  setMainRoomImage: async (roomId: string, imageId: string): Promise<void> => {
+    await supabase
+      .from('room_images')
+      .update({ is_main: false })
+      .eq('room_id', Number(roomId));
+    const { error } = await supabase
+      .from('room_images')
+      .update({ is_main: true })
+      .eq('id', Number(imageId));
+    if (error) throw new Error(error.message);
   },
 
   getRoomHandoverChecklist: async (_roomId: string): Promise<HandoverChecklist[]> => {
