@@ -16,16 +16,11 @@ interface ProfileRow {
   full_name: string;
   phone: string | null;
   avatar_url: string | null;
-  role: string | null;
-  role_id: string | null;
+  role: string;
   tenant_stage: DbTenantStage;
   preferences: ProfilePreferences | null;
   is_active: boolean | null;
   created_at: string | null;
-  roles?: {
-    id: string;
-    name: string;
-  } | null;
 }
 
 interface ProfileUpdate {
@@ -33,7 +28,6 @@ interface ProfileUpdate {
   phone?: string | null;
   avatar_url?: string | null;
   role?: DbUserRole;
-  role_id?: string;
   tenant_stage?: DbTenantStage;
   preferences?: ProfilePreferences | null;
   is_active?: boolean;
@@ -42,6 +36,8 @@ interface ProfileUpdate {
 interface CreateUserResult {
   user: User;
 }
+
+const PROFILE_SELECT = 'id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at';
 
 function normalizeUsername(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
@@ -64,11 +60,13 @@ function toSupportedDbRole(role: User['role']): DbUserRole {
   if (role === 'Viewer') {
     throw new Error('Vai trò Viewer chưa được hỗ trợ trong cơ sở dữ liệu hiện tại.');
   }
+
   return mapRole.toDb(role) as DbUserRole;
 }
 
 function rowToUser(row: ProfileRow): User {
   const preferences = getPreferences(row);
+
   return {
     id: row.id,
     username: preferences.username?.trim() || row.full_name,
@@ -76,8 +74,7 @@ function rowToUser(row: ProfileRow): User {
     email: preferences.email?.trim() || '',
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
-    role: (row.roles?.name || mapRole.fromDb(row.role ?? '') || 'Staff') as User['role'],
-    roleId: row.role_id ?? undefined,
+    role: mapRole.fromDb(row.role) as User['role'],
     buildingsAccess: normalizeBuildingsAccess(preferences.buildings_access),
     isActive: row.is_active ?? true,
     isTwoFactorEnabled: false,
@@ -95,22 +92,18 @@ function parseIsActiveFilter(value: boolean | string | undefined): boolean | und
   return undefined;
 }
 
-const PROFILE_SELECT = 'id, full_name, phone, avatar_url, role, role_id, tenant_stage, preferences, is_active, created_at, roles(id, name)';
-
 export const userService = {
   getUsers: async (filters?: {
     search?: string;
     role?: string;
-    roleId?: string;
     isActive?: boolean | string;
   }): Promise<User[]> => {
-    let query = (supabase.from('profiles') as any)
+    let query = supabase
+      .from('profiles')
       .select(PROFILE_SELECT)
       .order('created_at', { ascending: false });
 
-    if (filters?.roleId && filters.roleId !== 'All') {
-      query = query.eq('role_id', filters.roleId);
-    } else if (filters?.role && filters.role !== 'All') {
+    if (filters?.role && filters.role !== 'All') {
       const dbRole = mapRole.toDb(filters.role) as DbUserRole;
       query = query.eq('role', dbRole);
     }
@@ -124,12 +117,12 @@ export const userService = {
     let users = rows.map(rowToUser);
 
     if (filters?.search) {
-      const s = filters.search.toLowerCase();
+      const search = filters.search.toLowerCase();
       users = users.filter(
         (user) =>
-          user.username.toLowerCase().includes(s) ||
-          user.fullName.toLowerCase().includes(s) ||
-          user.email.toLowerCase().includes(s)
+          user.username.toLowerCase().includes(search) ||
+          user.fullName.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search)
       );
     }
 
@@ -138,7 +131,8 @@ export const userService = {
 
   getUserById: async (id: number | string): Promise<User | undefined> => {
     const row = await unwrap(
-      (supabase.from('profiles') as any)
+      supabase
+        .from('profiles')
         .select(PROFILE_SELECT)
         .eq('id', String(id))
         .maybeSingle()
@@ -166,7 +160,6 @@ export const userService = {
         phone: user.phone?.trim() || null,
         avatarUrl: user.avatar ?? null,
         role: toSupportedDbRole(user.role),
-        roleId: user.roleId,
         isActive: user.isActive ?? true,
         buildingsAccess: normalizeBuildingsAccess(user.buildingsAccess),
         forceChangePassword: user.forceChangePassword ?? true,
@@ -182,8 +175,9 @@ export const userService = {
     return (result as CreateUserResult).user;
   },
 
-  updateUser: async (id: number | string, user: Partial<User & { roleId?: string }>): Promise<User> => {
-    const { data: currentRow, error: currentError } = await (supabase.from('profiles') as any)
+  updateUser: async (id: number | string, user: Partial<User>): Promise<User> => {
+    const { data: currentRow, error: currentError } = await supabase
+      .from('profiles')
       .select('role, preferences')
       .eq('id', String(id))
       .maybeSingle();
@@ -201,7 +195,6 @@ export const userService = {
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
     if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as DbTenantStage;
-    if (user.roleId !== undefined) updatePayload.role_id = user.roleId;
 
     const nextPreferences: ProfilePreferences = { ...currentPreferences };
     let shouldUpdatePreferences = false;
@@ -241,7 +234,8 @@ export const userService = {
     }
 
     const row = await unwrap(
-      (supabase.from('profiles') as any)
+      supabase
+        .from('profiles')
         .update(updatePayload)
         .eq('id', String(id))
         .select(PROFILE_SELECT)
@@ -253,14 +247,16 @@ export const userService = {
 
   deleteUser: async (id: number | string): Promise<void> => {
     await unwrap(
-      (supabase.from('profiles') as any)
-        .update({ is_active: false })
+      supabase
+        .from('profiles')
+        .update({ is_active: false } as ProfileUpdate)
         .eq('id', String(id))
     );
   },
 
   toggleUserStatus: async (id: number | string): Promise<void> => {
-    const { data: row } = await (supabase.from('profiles') as any)
+    const { data: row } = await supabase
+      .from('profiles')
       .select('is_active')
       .eq('id', String(id))
       .maybeSingle();
@@ -268,8 +264,9 @@ export const userService = {
     const current = (row as { is_active: boolean | null } | null)?.is_active ?? true;
 
     await unwrap(
-      (supabase.from('profiles') as any)
-        .update({ is_active: !current })
+      supabase
+        .from('profiles')
+        .update({ is_active: !current } as ProfileUpdate)
         .eq('id', String(id))
     );
   },
@@ -281,7 +278,9 @@ export const userService = {
 
   sendResetPasswordEmail: async (userId: string): Promise<void> => {
     const user = await userService.getUserById(userId);
-    if (!user) throw new Error('User not found');
+    if (!user?.email) {
+      throw new Error('Người dùng chưa có email để gửi liên kết đặt lại mật khẩu.');
+    }
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
       redirectTo: `${window.location.origin}/reset-password`,

@@ -1,34 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  Shield, 
-  Mail, 
-  MoreVertical, 
+import {
+  Users,
+  UserPlus,
+  Shield,
+  Mail,
   Lock,
   UserX,
   History,
-  X,
-  Filter,
   Layers,
   ChevronRight,
   Phone,
-  Calendar,
-  CheckCircle2,
-  MoreHorizontal,
   Fingerprint,
   Activity,
-  UserCheck
+  UserCheck,
 } from 'lucide-react';
 import { DataTable, RowAction } from '@/components/shared/DataTable';
 import { FilterPanel, FilterConfig } from '@/components/shared/FilterPanel';
-import { User, Role } from '@/types';
+import { User } from '@/types';
 import { userService } from '@/services/userService';
-import { roleService } from '@/services/roleService';
 import { auditService } from '@/services/auditService';
-import { formatRelativeTime, cn } from '@/utils';
+import { cn } from '@/utils';
 import UserModal from './UserModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import { Button } from '@/components/ui/Button';
@@ -36,12 +28,10 @@ import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
 
 const UserListPage: React.FC = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -53,14 +43,10 @@ const UserListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [userData, roleData] = await Promise.all([
-        userService.getUsers(filterValues),
-        roleService.getRoles()
-      ]);
+      const userData = await userService.getUsers(filterValues);
       setUsers(userData);
-      setRoles(roleData);
     } catch (error) {
-      toast.error('Không thể tải dữ liệu');
+      toast.error(error instanceof Error ? error.message : 'Không thể tải dữ liệu');
     } finally {
       setLoading(false);
     }
@@ -223,14 +209,16 @@ const UserListPage: React.FC = () => {
       type: 'text', 
       placeholder: 'Tên, email, ID...' 
     },
-    { 
-      key: 'roleId', 
-      label: 'Vai trò', 
-      type: 'select', 
+    {
+      key: 'role',
+      label: 'Vai trò',
+      type: 'select',
       options: [
         { label: 'Tất cả', value: 'All' },
-        ...roles.map(r => ({ label: r.name, value: r.id }))
-      ] 
+        { label: 'Admin', value: 'Admin' },
+        { label: 'Staff', value: 'Staff' },
+        { label: 'Tenant', value: 'Tenant' },
+      ]
     },
     { 
       key: 'isActive', 
