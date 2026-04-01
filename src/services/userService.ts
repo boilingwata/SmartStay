@@ -2,7 +2,14 @@ import { User } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapRole } from '@/lib/enumMaps';
-import type { DbUserRole } from '@/types/supabase';
+import type { DbTenantStage, DbUserRole } from '@/types/supabase';
+
+interface ProfilePreferences {
+  username?: string;
+  email?: string;
+  buildings_access?: (number | string)[];
+  force_change_password?: boolean;
+}
 
 interface ProfileRow {
   id: string;
@@ -10,6 +17,8 @@ interface ProfileRow {
   phone: string | null;
   avatar_url: string | null;
   role: string;
+  tenant_stage: DbTenantStage;
+  preferences: ProfilePreferences | null;
   is_active: boolean | null;
   created_at: string | null;
 }
@@ -19,29 +28,66 @@ interface ProfileUpdate {
   phone?: string | null;
   avatar_url?: string | null;
   role?: DbUserRole;
+  tenant_stage?: DbTenantStage;
+  preferences?: ProfilePreferences | null;
   is_active?: boolean;
 }
 
+interface CreateUserResult {
+  user: User;
+}
+
+function normalizeUsername(value: string | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+}
+
+function normalizeEmail(value: string | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function normalizeBuildingsAccess(value: User['buildingsAccess']): (number | string)[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is number | string => item !== null && item !== undefined && item !== '');
+}
+
+function getPreferences(row: ProfileRow): ProfilePreferences {
+  return (row.preferences ?? {}) as ProfilePreferences;
+}
+
+function toSupportedDbRole(role: User['role']): DbUserRole {
+  if (role === 'Viewer') {
+    throw new Error('Vai trò Viewer chưa được hỗ trợ trong cơ sở dữ liệu hiện tại.');
+  }
+
+  return mapRole.toDb(role) as DbUserRole;
+}
+
 function rowToUser(row: ProfileRow): User {
+  const preferences = getPreferences(row);
+
   return {
     id: row.id,
-    // profiles table has no separate username column; use full_name as fallback
-    username: row.full_name,
+    username: preferences.username?.trim() || row.full_name,
     fullName: row.full_name,
-    // USR-02: email is intentionally empty here.
-    // The `profiles` table does NOT store email — it lives only in `auth.users`,
-    // which is not directly accessible from the client JS SDK.
-    // Email is patched in ONLY by authStore.syncSessionUser() which has access
-    // to `session.user.email` from the active Supabase session.
-    // Callers that need email must go through authStore, not userService.getUsers().
-    email: '',
+    email: preferences.email?.trim() || '',
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
     role: mapRole.fromDb(row.role) as User['role'],
+    buildingsAccess: normalizeBuildingsAccess(preferences.buildings_access),
     isActive: row.is_active ?? true,
     isTwoFactorEnabled: false,
+    forceChangePassword: preferences.force_change_password ?? false,
+    tenantStage: row.tenant_stage,
     createdAt: row.created_at ?? undefined,
   };
+}
+
+function parseIsActiveFilter(value: boolean | string | undefined): boolean | undefined {
+  if (value === undefined || value === 'All' || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  if (value === 'Active' || value === 'true') return true;
+  if (value === 'Inactive' || value === 'false') return false;
+  return undefined;
 }
 
 export const userService = {
@@ -53,16 +99,16 @@ export const userService = {
   }): Promise<User[]> => {
     let query = supabase
       .from('profiles')
-      .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+      .select('id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at')
       .order('created_at', { ascending: false });
 
     if (filters?.role && filters.role !== 'All') {
-      const dbRole = mapRole.toDb(filters.role) as import('@/types/supabase').DbUserRole;
+      const dbRole = mapRole.toDb(filters.role) as DbUserRole;
       query = query.eq('role', dbRole);
     }
 
-    if (filters?.isActive !== undefined && filters.isActive !== 'All') {
-      const active = filters.isActive === true || filters.isActive === 'Active';
+    const active = parseIsActiveFilter(filters?.isActive);
+    if (active !== undefined) {
       query = query.eq('is_active', active);
     }
 
@@ -70,12 +116,12 @@ export const userService = {
     let users = rows.map(rowToUser);
 
     if (filters?.search) {
-      const s = filters.search.toLowerCase();
+      const search = filters.search.toLowerCase();
       users = users.filter(
-        u =>
-          u.username.toLowerCase().includes(s) ||
-          u.fullName.toLowerCase().includes(s) ||
-          u.email.toLowerCase().includes(s)
+        (user) =>
+          user.username.toLowerCase().includes(search) ||
+          user.fullName.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search)
       );
     }
 
@@ -86,7 +132,7 @@ export const userService = {
     const row = await unwrap(
       supabase
         .from('profiles')
-        .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+        .select('id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at')
         .eq('id', String(id))
         .maybeSingle()
     ) as ProfileRow | null;
@@ -94,47 +140,96 @@ export const userService = {
     return row ? rowToUser(row) : undefined;
   },
 
-  createUser: async (_user: Omit<User, 'id'>): Promise<User> => {
-    // Creating auth users requires service-role key (not available client-side).
-    // Stub: throw a descriptive error so the UI can surface it gracefully.
-    throw new Error(
-      'User creation requires server-side invocation (service-role key). ' +
-      'Use a Supabase Edge Function or the admin dashboard instead.'
-    );
+  createUser: async (user: Omit<User, 'id'>): Promise<User> => {
+    const username = normalizeUsername(user.username);
+    if (username.length < 3) {
+      throw new Error('Username phải có ít nhất 3 ký tự hợp lệ.');
+    }
+
+    const email = normalizeEmail(user.email);
+    if (!email || !email.includes('@')) {
+      throw new Error('Vui lòng nhập email hợp lệ.');
+    }
+
+    const { data: result, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        fullName: user.fullName.trim(),
+        username,
+        email,
+        phone: user.phone?.trim() || null,
+        avatarUrl: user.avatar ?? null,
+        role: toSupportedDbRole(user.role),
+        isActive: user.isActive ?? true,
+        buildingsAccess: normalizeBuildingsAccess(user.buildingsAccess),
+        forceChangePassword: user.forceChangePassword ?? true,
+        tenantStage: user.role === 'Tenant' ? (user.tenantStage ?? 'prospect') : undefined,
+      },
+    });
+
+    if (error) throw new Error(error.message);
+    if (!(result as CreateUserResult | null)?.user) {
+      throw new Error('Tạo người dùng thất bại: phản hồi không hợp lệ từ server.');
+    }
+
+    return (result as CreateUserResult).user;
   },
 
   updateUser: async (id: number | string, user: Partial<User>): Promise<User> => {
+    const { data: currentRow, error: currentError } = await supabase
+      .from('profiles')
+      .select('role, preferences')
+      .eq('id', String(id))
+      .maybeSingle();
+
+    if (currentError) {
+      throw new Error(currentError.message);
+    }
+
+    const currentDbRole = (currentRow as { role?: string } | null)?.role ?? '';
+    const currentPreferences = ((currentRow as { preferences?: ProfilePreferences | null } | null)?.preferences ?? {}) as ProfilePreferences;
+
     const updatePayload: ProfileUpdate = {};
     if (user.fullName !== undefined) updatePayload.full_name = user.fullName;
     if (user.phone !== undefined) updatePayload.phone = user.phone ?? null;
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
+    if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as DbTenantStage;
 
-    // E-02 FIX: Prevent silent role corruption for manager/landlord users.
-    // mapRole.fromDb maps 'manager' and 'landlord' → 'Admin', and mapRole.toDb('Admin') → 'admin'.
-    // If we naively persist the mapped role, managers/landlords become admins silently.
-    // Guard: only update role if explicitly provided AND the current DB role is not one of the
-    // privileged variants (manager, landlord) that round-trip incorrectly.
+    const nextPreferences: ProfilePreferences = { ...currentPreferences };
+    let shouldUpdatePreferences = false;
+
+    if (user.username !== undefined) {
+      nextPreferences.username = normalizeUsername(user.username);
+      shouldUpdatePreferences = true;
+    }
+    if (user.email !== undefined) {
+      nextPreferences.email = normalizeEmail(user.email);
+      shouldUpdatePreferences = true;
+    }
+    if (user.buildingsAccess !== undefined) {
+      nextPreferences.buildings_access = normalizeBuildingsAccess(user.buildingsAccess);
+      shouldUpdatePreferences = true;
+    }
+    if (user.forceChangePassword !== undefined) {
+      nextPreferences.force_change_password = user.forceChangePassword;
+      shouldUpdatePreferences = true;
+    }
+
+    if (shouldUpdatePreferences) {
+      updatePayload.preferences = nextPreferences;
+    }
+
     if (user.role !== undefined) {
-      const { data: currentRow } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', String(id))
-        .maybeSingle();
-      const currentDbRole = (currentRow as { role: string } | null)?.role ?? '';
-      // Only write role if the DB currently stores 'admin' (safe to overwrite)
-      // or if the target is 'staff'/'tenant' (no round-trip ambiguity for those).
       const isSafeToUpdateRole =
         currentDbRole === 'admin' ||
         currentDbRole === 'staff' ||
         currentDbRole === 'tenant' ||
         user.role === 'Staff' ||
         user.role === 'Tenant';
+
       if (isSafeToUpdateRole) {
-        updatePayload.role = mapRole.toDb(user.role) as DbUserRole;
+        updatePayload.role = toSupportedDbRole(user.role);
       }
-      // If currentDbRole is 'manager' or 'landlord' and user.role === 'Admin',
-      // skip the update to avoid data corruption (E-02).
     }
 
     const row = await unwrap(
@@ -142,7 +237,7 @@ export const userService = {
         .from('profiles')
         .update(updatePayload)
         .eq('id', String(id))
-        .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+        .select('id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at')
         .single()
     ) as ProfileRow;
 
@@ -150,7 +245,6 @@ export const userService = {
   },
 
   deleteUser: async (id: number | string): Promise<void> => {
-    // Soft-delete: mark inactive rather than physically removing auth user
     await unwrap(
       supabase
         .from('profiles')
@@ -162,11 +256,9 @@ export const userService = {
   resetPassword: async (_id: number | string, _newPassword?: string): Promise<void> => {
     // Password reset requires auth admin API (service-role).
     // The correct flow is to send a reset email via supabase.auth.resetPasswordForEmail.
-    // This is a no-op stub; the caller should use sendResetPasswordEmail instead.
   },
 
   toggleUserStatus: async (id: number | string): Promise<void> => {
-    // Fetch current status first, then flip it
     const { data: row } = await supabase
       .from('profiles')
       .select('is_active')
@@ -184,8 +276,8 @@ export const userService = {
   },
 
   sendResetPasswordEmail: async (_id: number | string): Promise<void> => {
-    // Requires knowing the user's email, which lives in auth.users (server-side only).
-    // Stub — implement via Edge Function in a full setup.
+    // Requires knowing the user's auth email and a server-side admin client.
+    // Implement via Edge Function when the reset-email flow is wired end to end.
   },
 };
 

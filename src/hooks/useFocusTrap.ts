@@ -19,6 +19,11 @@ const FOCUSABLE_SELECTOR = [
 export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,9 +42,9 @@ export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) {
+      if (e.key === 'Escape' && onCloseRef.current) {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -71,7 +76,7 @@ export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
       // Restore focus to previously focused element
       previousFocusRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   return containerRef;
 }
