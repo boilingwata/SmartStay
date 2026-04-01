@@ -79,4 +79,30 @@ export const auditService = {
 
     return logs;
   },
+
+  logAction: async (log: {
+    action: string;
+    entityType: string;
+    entityId?: string | number;
+    details?: string;
+    oldValues?: any;
+    newValues?: any;
+  }): Promise<void> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: user?.id,
+          action: log.action,
+          entity_type: log.entityType,
+          entity_id: log.entityId ? String(log.entityId) : null,
+          old_values: log.oldValues || null,
+          new_values: log.newValues || null,
+        });
+    } catch (error) {
+      console.error('Failed to log audit action:', error);
+    }
+  }
 };

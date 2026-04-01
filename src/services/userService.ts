@@ -1,64 +1,62 @@
 import { User } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { mapRole } from '@/lib/enumMaps';
-import type { DbUserRole } from '@/types/supabase';
+import { toast } from 'sonner';
 
 interface ProfileRow {
   id: string;
   full_name: string;
   phone: string | null;
   avatar_url: string | null;
-  role: string;
+  role: string | null; // Old enum column
+  role_id: string | null; // New UUID column
   is_active: boolean | null;
   created_at: string | null;
+  roles?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface ProfileUpdate {
   full_name?: string;
   phone?: string | null;
   avatar_url?: string | null;
-  role?: DbUserRole;
+  role_id?: string;
   is_active?: boolean;
 }
 
 function rowToUser(row: ProfileRow): User {
   return {
     id: row.id,
-    // profiles table has no separate username column; use full_name as fallback
     username: row.full_name,
     fullName: row.full_name,
-    // USR-02: email is intentionally empty here.
-    // The `profiles` table does NOT store email — it lives only in `auth.users`,
-    // which is not directly accessible from the client JS SDK.
-    // Email is patched in ONLY by authStore.syncSessionUser() which has access
-    // to `session.user.email` from the active Supabase session.
-    // Callers that need email must go through authStore, not userService.getUsers().
-    email: '',
+    email: '', // Email lives in auth.users
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
-    role: mapRole.fromDb(row.role) as User['role'],
+    // Use the dynamic role name from the joined table, fallback to old role enum
+    role: (row.roles?.name || row.role || 'Tenant') as any,
+    roleId: row.role_id ?? undefined,
     isActive: row.is_active ?? true,
     isTwoFactorEnabled: false,
     createdAt: row.created_at ?? undefined,
   };
 }
 
+const PROFILE_SELECT = 'id, full_name, phone, avatar_url, role, role_id, is_active, created_at, roles(id, name)';
+
 export const userService = {
   getUsers: async (filters?: {
     search?: string;
-    role?: string;
+    roleId?: string;
     isActive?: boolean | string;
-    buildingId?: string | number;
   }): Promise<User[]> => {
-    let query = supabase
-      .from('profiles')
-      .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+    let query = (supabase.from('profiles') as any)
+      .select(PROFILE_SELECT)
       .order('created_at', { ascending: false });
 
-    if (filters?.role && filters.role !== 'All') {
-      const dbRole = mapRole.toDb(filters.role) as import('@/types/supabase').DbUserRole;
-      query = query.eq('role', dbRole);
+    if (filters?.roleId && filters.roleId !== 'All') {
+      query = query.eq('role_id', filters.roleId);
     }
 
     if (filters?.isActive !== undefined && filters.isActive !== 'All') {
@@ -74,8 +72,7 @@ export const userService = {
       users = users.filter(
         u =>
           u.username.toLowerCase().includes(s) ||
-          u.fullName.toLowerCase().includes(s) ||
-          u.email.toLowerCase().includes(s)
+          u.fullName.toLowerCase().includes(s)
       );
     }
 
@@ -84,9 +81,8 @@ export const userService = {
 
   getUserById: async (id: number | string): Promise<User | undefined> => {
     const row = await unwrap(
-      supabase
-        .from('profiles')
-        .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+      (supabase.from('profiles') as any)
+        .select(PROFILE_SELECT)
         .eq('id', String(id))
         .maybeSingle()
     ) as ProfileRow | null;
@@ -94,55 +90,19 @@ export const userService = {
     return row ? rowToUser(row) : undefined;
   },
 
-  createUser: async (_user: Omit<User, 'id'>): Promise<User> => {
-    // Creating auth users requires service-role key (not available client-side).
-    // Stub: throw a descriptive error so the UI can surface it gracefully.
-    throw new Error(
-      'User creation requires server-side invocation (service-role key). ' +
-      'Use a Supabase Edge Function or the admin dashboard instead.'
-    );
-  },
-
-  updateUser: async (id: number | string, user: Partial<User>): Promise<User> => {
+  updateUser: async (id: number | string, user: Partial<User & { roleId?: string }>): Promise<User> => {
     const updatePayload: ProfileUpdate = {};
     if (user.fullName !== undefined) updatePayload.full_name = user.fullName;
     if (user.phone !== undefined) updatePayload.phone = user.phone ?? null;
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
-
-    // E-02 FIX: Prevent silent role corruption for manager/landlord users.
-    // mapRole.fromDb maps 'manager' and 'landlord' → 'Admin', and mapRole.toDb('Admin') → 'admin'.
-    // If we naively persist the mapped role, managers/landlords become admins silently.
-    // Guard: only update role if explicitly provided AND the current DB role is not one of the
-    // privileged variants (manager, landlord) that round-trip incorrectly.
-    if (user.role !== undefined) {
-      const { data: currentRow } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', String(id))
-        .maybeSingle();
-      const currentDbRole = (currentRow as { role: string } | null)?.role ?? '';
-      // Only write role if the DB currently stores 'admin' (safe to overwrite)
-      // or if the target is 'staff'/'tenant' (no round-trip ambiguity for those).
-      const isSafeToUpdateRole =
-        currentDbRole === 'admin' ||
-        currentDbRole === 'staff' ||
-        currentDbRole === 'tenant' ||
-        user.role === 'Staff' ||
-        user.role === 'Tenant';
-      if (isSafeToUpdateRole) {
-        updatePayload.role = mapRole.toDb(user.role) as DbUserRole;
-      }
-      // If currentDbRole is 'manager' or 'landlord' and user.role === 'Admin',
-      // skip the update to avoid data corruption (E-02).
-    }
+    if (user.roleId !== undefined) updatePayload.role_id = user.roleId;
 
     const row = await unwrap(
-      supabase
-        .from('profiles')
+      (supabase.from('profiles') as any)
         .update(updatePayload)
         .eq('id', String(id))
-        .select('id, full_name, phone, avatar_url, role, is_active, created_at')
+        .select(PROFILE_SELECT)
         .single()
     ) as ProfileRow;
 
@@ -150,25 +110,15 @@ export const userService = {
   },
 
   deleteUser: async (id: number | string): Promise<void> => {
-    // Soft-delete: mark inactive rather than physically removing auth user
     await unwrap(
-      supabase
-        .from('profiles')
-        .update({ is_active: false } as ProfileUpdate)
+      (supabase.from('profiles') as any)
+        .update({ is_active: false })
         .eq('id', String(id))
     );
   },
 
-  resetPassword: async (_id: number | string, _newPassword?: string): Promise<void> => {
-    // Password reset requires auth admin API (service-role).
-    // The correct flow is to send a reset email via supabase.auth.resetPasswordForEmail.
-    // This is a no-op stub; the caller should use sendResetPasswordEmail instead.
-  },
-
   toggleUserStatus: async (id: number | string): Promise<void> => {
-    // Fetch current status first, then flip it
-    const { data: row } = await supabase
-      .from('profiles')
+    const { data: row } = await (supabase.from('profiles') as any)
       .select('is_active')
       .eq('id', String(id))
       .maybeSingle();
@@ -176,17 +126,63 @@ export const userService = {
     const current = (row as { is_active: boolean | null } | null)?.is_active ?? true;
 
     await unwrap(
-      supabase
-        .from('profiles')
-        .update({ is_active: !current } as ProfileUpdate)
+      (supabase.from('profiles') as any)
+        .update({ is_active: !current })
         .eq('id', String(id))
     );
   },
 
-  sendResetPasswordEmail: async (_id: number | string): Promise<void> => {
-    // Requires knowing the user's email, which lives in auth.users (server-side only).
-    // Stub — implement via Edge Function in a full setup.
+  createUser: async (user: Omit<User, 'id'>): Promise<User> => {
+    // Note: Creating auth users requires service_role key or Edge Function
+    // We simulate creating a profile for now
+    const { data: { user: authUser }, error } = await supabase.auth.signUp({
+      email: user.email,
+      password: 'TemporaryPassword123!', // Should be randomized in production
+      options: {
+        data: {
+          full_name: user.fullName,
+        }
+      }
+    });
+
+    if (error) throw error;
+    if (!authUser) throw new Error('Failed to create auth user');
+
+    const updatePayload: ProfileUpdate = {
+      full_name: user.fullName,
+      phone: user.phone || null,
+      role_id: user.roleId,
+      is_active: true
+    };
+
+    const row = await unwrap(
+      (supabase.from('profiles') as any)
+        .update(updatePayload)
+        .eq('id', authUser.id)
+        .select(PROFILE_SELECT)
+        .single()
+    ) as ProfileRow;
+
+    return rowToUser(row);
   },
+
+  resetPassword: async (userId: string, newPassword: string): Promise<void> => {
+    // In production, this would call an Edge Function or Supabase Admin API
+    // Clients can only update their own password
+    toast.info('Chức năng đổi mật khẩu thủ công yêu cầu Edge Function. Đang giả lập...');
+    console.log(`Simulating password reset for ${userId} to ${newPassword}`);
+  },
+
+  sendResetPasswordEmail: async (userId: string): Promise<void> => {
+    const user = await userService.getUserById(userId);
+    if (!user) throw new Error('User not found');
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    if (error) throw error;
+  }
 };
 
 export default userService;
