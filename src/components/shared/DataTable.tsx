@@ -132,8 +132,8 @@ export function DataTable<T>({
       <div className={cn("overflow-auto flex-1", stickyHeader && "relative")}>
         <table className="w-full text-sm text-left border-collapse">
           <thead className={cn(
-            "bg-gray-50 text-gray-700 font-semibold text-xs uppercase tracking-wider",
-            stickyHeader && "sticky top-0 z-10 shadow-sm"
+            "bg-slate-50/50 text-slate-500 font-bold text-[10px] uppercase tracking-wider whitespace-nowrap border-b border-slate-100",
+            stickyHeader && "sticky top-0 z-10 backdrop-blur-md shadow-sm"
           )}>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -152,31 +152,31 @@ export function DataTable<T>({
                     />
                   </th>
                 )}
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-3">
-                    <div 
-                      className={cn(
-                        "flex items-center gap-2",
-                        header.column.getCanSort() && "cursor-pointer hover:text-gray-900"
-                      )}
-                      onClick={() => {
-                        if (sorting && header.column.getCanSort()) {
-                          const isCurrent = sorting.sortBy === header.id;
-                          const nextDir = isCurrent && sorting.sortDir === 'asc' ? 'desc' : 'asc';
-                          sorting.onChange(header.id, nextDir);
-                        }
-                      }}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {sorting && header.id === sorting.sortBy ? (
-                        sorting.sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                      ) : (
-                        header.column.getCanSort() && <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                      )}
-                    </div>
-                  </th>
-                ))}
-                {rowActions && <th className="px-4 py-3 w-10 text-right">Thao tác</th>}
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="px-6 py-4">
+                      <div 
+                        className={cn(
+                          "flex items-center gap-1.5",
+                          header.column.getCanSort() && "cursor-pointer hover:text-slate-900 transition-colors group/header"
+                        )}
+                        onClick={() => {
+                          if (sorting && header.column.getCanSort()) {
+                            const isCurrent = sorting.sortBy === header.id;
+                            const nextDir = isCurrent && sorting.sortDir === 'asc' ? 'desc' : 'asc';
+                            sorting.onChange(header.id, nextDir);
+                          }
+                        }}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorting && header.id === sorting.sortBy ? (
+                          sorting.sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />
+                        ) : (
+                          header.column.getCanSort() && <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover/header:opacity-100 transition-opacity" />
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                  {rowActions && <th className="px-6 py-4 min-w-[120px] text-right">Thao tác</th>}
               </tr>
             ))}
           </thead>
@@ -232,7 +232,7 @@ export function DataTable<T>({
                     </td>
                   )}
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-gray-600">
+                    <td key={cell.id} className="px-6 py-4 text-slate-600">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

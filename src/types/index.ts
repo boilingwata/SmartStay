@@ -35,7 +35,17 @@ export interface User {
   email: string;
   phone?: string;
   avatar?: string;
+  identityNumber?: string; // CCCD/CMND
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  address?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
   role: UserRoleType;
+  roleId?: string;
   buildingsAccess?: (number | string)[];
   isActive: boolean;
   lastLoginAt?: string;

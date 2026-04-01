@@ -62,6 +62,7 @@ interface FilterPanelProps {
   onReset?: () => void;
   collapsed?: boolean;
   activeCount?: number;
+  className?: string;
 }
 
 const AsyncSelect = ({ 
@@ -130,6 +131,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
   onReset,
   collapsed: initialCollapsed = false,
   activeCount = 0,
+  className,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -154,7 +156,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
   };
 
   return (
-    <div className="bg-white border rounded-xl shadow-sm overflow-hidden mb-4 transition-all duration-300">
+    <div className={cn("bg-white border rounded-xl shadow-sm overflow-hidden mb-4 transition-all duration-300", className)}>
       <div 
         className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
