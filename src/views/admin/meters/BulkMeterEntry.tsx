@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, Zap, Droplets, Calendar, 
   ArrowRight, CheckCircle, ChevronLeft, 
@@ -73,33 +73,37 @@ const BulkMeterEntry = () => {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Step 2 Initial Data Sync (RULE-01: Must fetch LatestIndex from View)
+  // Step 2 Initial Data Sync (RULE-01: Performance-Optimized Bulk Fetch)
   const [isFetchingPrev, setIsFetchingPrev] = useState(false);
   
   useEffect(() => {
      if (step === 2 && meters?.data?.length) {
         const fetchAllLatest = async () => {
            setIsFetchingPrev(true);
-           const initial: typeof readings = {};
-           
            try {
-              // RULE-01: Fetch from view for each meter to be 100% compliant
-              await Promise.all(meters.data.map(async (m: Meter) => {
-                 try {
-                    const latest = await meterService.getLatestReading(m.id);
-                    initial[m.id] = { current: '', note: '', prev: latest.currentIndex || 0 };
-                 } catch (e) {
-                    initial[m.id] = { current: '', note: '', prev: 0 };
-                 }
-              }));
-              setReadings(initial);
+              const meterIds = meters.data.map(m => m.id);
+              // RULE-01: Optimized bulk fetch replaces N+1 queries
+              const latestData = await meterService.getLatestReadingsBulk(meterIds);
+              
+              const initial: typeof readings = {};
+              meters.data.forEach(m => {
+                 const latest = latestData[m.id];
+                 initial[m.id] = { 
+                    current: '', 
+                    note: '', 
+                    prev: latest?.currentIndex || 0 
+                 };
+              });
+              setReadings(prev => ({ ...initial, ...prev }));
+           } catch (e) {
+              toast.error('Không thể tải chỉ số cũ hàng loạt.');
            } finally {
               setIsFetchingPrev(false);
            }
         };
         fetchAllLatest();
      }
-  }, [step, meters]);
+  }, [step, meters?.data]);
 
   const handleNext = () => setStep(prev => prev + 1);
   const handleBack = () => setStep(prev => prev - 1);

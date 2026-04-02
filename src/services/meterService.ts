@@ -9,10 +9,6 @@ import {
 import { handleServiceError } from '@/utils/errorUtils';
 import { BaseRequestParams } from '@/types/api';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export interface MeterFilter extends BaseRequestParams {
   buildingId?: string;
   roomId?: string;
@@ -21,10 +17,6 @@ export interface MeterFilter extends BaseRequestParams {
   missingOnly?: boolean;
   search?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Internal DB row shapes
-// ---------------------------------------------------------------------------
 
 interface DbMeterReadingRow {
   id: number;
@@ -44,6 +36,15 @@ interface DbMeterReadingRow {
     building_id: number;
     buildings: { name: string };
   } | null;
+}
+
+interface DbLatestViewRow {
+  MeterId: string;
+  CurrentIndex: number;
+  Usage: number;
+  BillingPeriod: string;
+  ReadingDate: string;
+  ReadingId: number;
 }
 
 interface DbRoomRow {
@@ -163,80 +164,76 @@ export const meterService = {
       }
 
       const rooms = (await unwrap(roomQuery)) as unknown as DbRoomRow[];
-
-      if (rooms.length === 0) {
-        return { data: [], total: 0 };
-      }
+      if (rooms.length === 0) return { data: [], total: 0 };
 
       const roomIds = rooms.map((r) => r.id);
 
-      // 2. Fetch the latest reading per room (most recent billing_period)
-      const latestRows = (await unwrap(
-        supabase
-          .from('meter_readings')
-          .select(
-            'id, room_id, billing_period, electricity_current, water_current, reading_date, read_by, electricity_previous, electricity_usage, water_previous, water_usage, created_at'
-          )
-          .in('room_id', roomIds)
-          .order('billing_period', { ascending: false })
-      )) as unknown as DbMeterReadingRow[];
+      // 2. RULE-01: Fetch from vw_LatestMeterReading instead of raw table
+      const { data: latestRows } = await (supabase.from as any)('vw_LatestMeterReading')
+        .select('*')
+        .in('MeterId', [
+          ...roomIds.map(id => `${id}-elec`),
+          ...roomIds.map(id => `${id}-water`)
+        ]);
 
-      // Keep only the latest row per room
-      const latestByRoom = new Map<number, DbMeterReadingRow>();
-      for (const row of latestRows) {
-        if (!latestByRoom.has(row.room_id)) {
-          latestByRoom.set(row.room_id, row);
-        }
-      }
+      const latestMap = new Map<string, DbLatestViewRow>();
+      (latestRows || []).forEach((row: any) => {
+        latestMap.set(row.MeterId, row as DbLatestViewRow);
+      });
 
       const currentMonth = new Date().toISOString().substring(0, 7);
 
-      // 3. Build virtual meters — one elec + one water per room
+      // 3. Build virtual meters
       const meters: (Meter & { hasReadingThisMonth: boolean })[] = [];
 
       for (const room of rooms) {
-        const latest = latestByRoom.get(room.id) ?? null;
-        const hasReading = latest
-          ? (latest.billing_period?.slice(0, 7) ?? '') === currentMonth
-          : false;
-
         const types: ('elec' | 'water')[] = ['elec', 'water'];
+        
         for (const t of types) {
           if (params.type) {
             const expectedType: MeterType = t === 'elec' ? 'Electricity' : 'Water';
             if (expectedType !== params.type) continue;
           }
+
+          const vId = makeVirtualId(room.id, t);
+          const latest = latestMap.get(vId);
+          const hasReading = latest?.BillingPeriod?.slice(0, 7) === currentMonth;
+
           meters.push({
-            ...mapReadingRowToMeter(room, t, latest),
+            id: vId,
+            meterCode: `${room.room_code}-${t.toUpperCase()}`,
+            meterType: t === 'elec' ? 'Electricity' : 'Water',
+            meterStatus: 'Active',
+            buildingId: String(room.building_id),
+            buildingName: room.buildings?.name ?? undefined,
+            roomId: String(room.id),
+            roomCode: room.room_code,
+            latestReadingIndex: latest?.CurrentIndex,
+            usage: latest?.Usage,
+            latestMonthYear: latest?.BillingPeriod?.slice(0, 7),
+            readingDate: latest?.ReadingDate,
             hasReadingThisMonth: hasReading,
           });
         }
       }
 
-      // 4. missingOnly filter
+      // 4. Filters & Pagination
       let result = meters;
-      if (params.missingOnly) {
-        result = meters.filter((m) => !m.hasReadingThisMonth);
-      }
-
-      // 5. search filter (in-memory, by room code)
+      if (params.missingOnly) result = meters.filter((m) => !m.hasReadingThisMonth);
       if (params.search) {
         const s = params.search.toLowerCase();
-        result = result.filter(
-          (m) =>
-            (m.roomCode ?? '').toLowerCase().includes(s) ||
-            (m.meterCode ?? '').toLowerCase().includes(s)
+        result = result.filter(m => 
+          (m.roomCode ?? '').toLowerCase().includes(s) || 
+          (m.meterCode ?? '').toLowerCase().includes(s)
         );
       }
 
-      // 6. B36 FIX: in-memory pagination
       const total = result.length;
       const page = params.page ?? 1;
       const limit = params.limit ?? total;
       const start = (page - 1) * limit;
-      const paged = result.slice(start, start + limit);
-
-      return { data: paged, total };
+      
+      return { data: result.slice(start, start + limit), total };
     } catch (error) {
       return handleServiceError(error, 'Không thể tải danh sách đồng hồ');
     }
@@ -244,40 +241,53 @@ export const meterService = {
 
   getLatestReading: async (meterId: string): Promise<LatestMeterReading> => {
     try {
-      const { roomId, type } = parseVirtualId(meterId);
-
+      // RULE-01: Direct query from view
       const row = (await unwrap(
-        supabase
-          .from('meter_readings')
-          .select(
-            'id, room_id, billing_period, electricity_current, electricity_previous, electricity_usage, water_current, water_previous, water_usage, reading_date, created_at'
-          )
-          .eq('room_id', roomId)
-          .order('billing_period', { ascending: false })
-          .limit(1)
+        (supabase.from as any)('vw_LatestMeterReading')
+          .select('*')
+          .eq('MeterId', meterId)
           .maybeSingle()
-      )) as unknown as DbMeterReadingRow | null;
+      )) as unknown as DbLatestViewRow | null;
 
       if (!row) {
         return { meterId, currentIndex: 0, monthYear: '', readingDate: '', consumption: 0 };
       }
 
-      const isElec = type === 'Electricity';
-      const current = isElec ? row.electricity_current : row.water_current;
-      const previous = isElec ? row.electricity_previous : row.water_previous;
-      const usage = isElec
-        ? (row.electricity_usage ?? current - previous)
-        : (row.water_usage ?? current - previous);
-
       return {
         meterId,
-        currentIndex: current,
-        monthYear: row.billing_period?.slice(0, 7) ?? '',
-        readingDate: row.reading_date,
-        consumption: usage,
+        currentIndex: row.CurrentIndex,
+        monthYear: row.BillingPeriod?.slice(0, 7) ?? '',
+        readingDate: row.ReadingDate,
+        consumption: row.Usage,
       };
     } catch (error) {
-      return handleServiceError(error, 'Không thể tải chỉ số mới nhất');
+      return handleServiceError(error, 'Không thể tải chỉ số mới nhất (Rule-01)');
+    }
+  },
+
+  getLatestReadingsBulk: async (meterIds: string[]): Promise<Record<string, LatestMeterReading>> => {
+    try {
+      if (meterIds.length === 0) return {};
+      
+      const { data } = await (supabase.from as any)('vw_LatestMeterReading')
+        .select('*')
+        .in('MeterId', meterIds);
+
+      const result: Record<string, LatestMeterReading> = {};
+      (data || []).forEach((row: any) => {
+        result[row.MeterId] = {
+          meterId: row.MeterId,
+          currentIndex: row.CurrentIndex,
+          monthYear: row.BillingPeriod?.slice(0, 7) ?? '',
+          readingDate: row.ReadingDate,
+          consumption: row.Usage,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Bulk fetch failed', error);
+      return {};
     }
   },
 
@@ -415,37 +425,34 @@ export const meterService = {
 
   getMeterStatistics: async (params: { buildingId?: string } = {}) => {
     try {
-      let roomQuery = supabase
-        .from('rooms')
-        .select('id');
-
+      // 1. Efficiently get total rooms for given building
+      let roomQuery = supabase.from('rooms').select('id', { count: 'exact', head: true });
       if (params.buildingId) {
         roomQuery = roomQuery.eq('building_id', Number(params.buildingId));
       }
+      const { count: totalRooms } = await roomQuery;
+      const total = (totalRooms || 0) * 2; // Elec + Water per room
 
-      const rooms = (await unwrap(roomQuery)) as unknown as { id: number }[];
-      const roomIds = rooms.map(r => r.id);
-      const totalRooms = rooms.length;
-
+      // 2. RULE-01: Use view to check current month completeness
       const currentMonth = new Date().toISOString().substring(0, 7);
+      
+      const { data: latestRows } = await (supabase.from as any)('vw_LatestMeterReading')
+        .select('MeterId, BillingPeriod');
 
-      const latestReadings = (await unwrap(
-        supabase
-          .from('meter_readings')
-          .select('room_id, billing_period')
-          .in('room_id', roomIds)
-          .like('billing_period', `${currentMonth}%`)
-      )) as unknown as { room_id: number; billing_period: string }[];
+      const activeRows = latestRows || [];
+      const roomsWithReading = new Set(
+        activeRows
+          .filter((r: any) => r.BillingPeriod?.startsWith(currentMonth))
+          .map((r: any) => r.MeterId.split('-')[0])
+      );
 
-      const roomsWithReading = new Set(latestReadings.map(r => r.room_id));
-      const missingCount = totalRooms - roomsWithReading.size;
+      const missingCount = (totalRooms || 0) - roomsWithReading.size;
 
-      // Each room has 1 Elec and 1 Water meter in our virtual model
       return {
-        total: totalRooms * 2,
-        electricity: totalRooms,
-        water: totalRooms,
-        missing: missingCount * 2, // If a room reading is missing, both elec and water are missing
+        total,
+        electricity: totalRooms || 0,
+        water: totalRooms || 0,
+        missing: Math.max(0, missingCount * 2),
       };
     } catch (error) {
       return { total: 0, electricity: 0, water: 0, missing: 0 };

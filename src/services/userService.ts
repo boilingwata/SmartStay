@@ -9,6 +9,7 @@ interface ProfilePreferences {
   email?: string;
   buildings_access?: (number | string)[];
   force_change_password?: boolean;
+  [key: string]: any;
 }
 
 interface ProfileRow {
@@ -16,11 +17,19 @@ interface ProfileRow {
   full_name: string;
   phone: string | null;
   avatar_url: string | null;
-  role: string;
+  role: string | null;
+  role_id: string | null;
   tenant_stage: DbTenantStage;
   preferences: ProfilePreferences | null;
   is_active: boolean | null;
+  identity_number: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  address: string | null;
   created_at: string | null;
+  roles?: {
+    name: string;
+  } | null;
 }
 
 interface ProfileUpdate {
@@ -28,16 +37,21 @@ interface ProfileUpdate {
   phone?: string | null;
   avatar_url?: string | null;
   role?: DbUserRole;
+  role_id?: string | null;
   tenant_stage?: DbTenantStage;
   preferences?: ProfilePreferences | null;
   is_active?: boolean;
+  identity_number?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  address?: string | null;
 }
 
 interface CreateUserResult {
   user: User;
 }
 
-const PROFILE_SELECT = 'id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at';
+const PROFILE_SELECT = 'id, full_name, phone, avatar_url, role, role_id, tenant_stage, preferences, is_active, identity_number, date_of_birth, gender, address, created_at, roles(name)';
 
 function normalizeUsername(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
@@ -74,12 +88,17 @@ function rowToUser(row: ProfileRow): User {
     email: preferences.email?.trim() || '',
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
-    role: mapRole.fromDb(row.role) as User['role'],
+    role: (row.roles?.name || mapRole.fromDb(row.role ?? '') || 'Staff') as User['role'],
+    roleId: row.role_id ?? undefined,
     buildingsAccess: normalizeBuildingsAccess(preferences.buildings_access),
     isActive: row.is_active ?? true,
     isTwoFactorEnabled: false,
     forceChangePassword: preferences.force_change_password ?? false,
     tenantStage: row.tenant_stage,
+    identityNumber: row.identity_number ?? undefined,
+    dateOfBirth: row.date_of_birth ?? undefined,
+    gender: row.gender ? (row.gender.charAt(0).toUpperCase() + row.gender.slice(1)) as User['gender'] : undefined,
+    address: row.address ?? undefined,
     createdAt: row.created_at ?? undefined,
   };
 }
@@ -96,14 +115,16 @@ export const userService = {
   getUsers: async (filters?: {
     search?: string;
     role?: string;
+    roleId?: string;
     isActive?: boolean | string;
   }): Promise<User[]> => {
-    let query = supabase
-      .from('profiles')
+    let query = (supabase.from('profiles') as any)
       .select(PROFILE_SELECT)
       .order('created_at', { ascending: false });
 
-    if (filters?.role && filters.role !== 'All') {
+    if (filters?.roleId && filters.roleId !== 'All') {
+      query = query.eq('role_id', filters.roleId);
+    } else if (filters?.role && filters.role !== 'All') {
       const dbRole = mapRole.toDb(filters.role) as DbUserRole;
       query = query.eq('role', dbRole);
     }
@@ -131,8 +152,7 @@ export const userService = {
 
   getUserById: async (id: number | string): Promise<User | undefined> => {
     const row = await unwrap(
-      supabase
-        .from('profiles')
+      (supabase.from('profiles') as any)
         .select(PROFILE_SELECT)
         .eq('id', String(id))
         .maybeSingle()
@@ -160,10 +180,15 @@ export const userService = {
         phone: user.phone?.trim() || null,
         avatarUrl: user.avatar ?? null,
         role: toSupportedDbRole(user.role),
+        roleId: user.roleId,
         isActive: user.isActive ?? true,
         buildingsAccess: normalizeBuildingsAccess(user.buildingsAccess),
         forceChangePassword: user.forceChangePassword ?? true,
         tenantStage: user.role === 'Tenant' ? (user.tenantStage ?? 'prospect') : undefined,
+        identityNumber: user.identityNumber,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender?.toLowerCase(),
+        address: user.address,
       },
     });
 
@@ -176,8 +201,7 @@ export const userService = {
   },
 
   updateUser: async (id: number | string, user: Partial<User>): Promise<User> => {
-    const { data: currentRow, error: currentError } = await supabase
-      .from('profiles')
+    const { data: currentRow, error: currentError } = await (supabase.from('profiles') as any)
       .select('role, preferences')
       .eq('id', String(id))
       .maybeSingle();
@@ -195,6 +219,11 @@ export const userService = {
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
     if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as DbTenantStage;
+    if (user.roleId !== undefined) updatePayload.role_id = user.roleId ?? null;
+    if (user.identityNumber !== undefined) updatePayload.identity_number = user.identityNumber ?? null;
+    if (user.dateOfBirth !== undefined) updatePayload.date_of_birth = user.dateOfBirth ?? null;
+    if (user.gender !== undefined) updatePayload.gender = user.gender?.toLowerCase() ?? null;
+    if (user.address !== undefined) updatePayload.address = user.address ?? null;
 
     const nextPreferences: ProfilePreferences = { ...currentPreferences };
     let shouldUpdatePreferences = false;
@@ -234,8 +263,7 @@ export const userService = {
     }
 
     const row = await unwrap(
-      supabase
-        .from('profiles')
+      (supabase.from('profiles') as any)
         .update(updatePayload)
         .eq('id', String(id))
         .select(PROFILE_SELECT)
@@ -247,16 +275,14 @@ export const userService = {
 
   deleteUser: async (id: number | string): Promise<void> => {
     await unwrap(
-      supabase
-        .from('profiles')
+      (supabase.from('profiles') as any)
         .update({ is_active: false } as ProfileUpdate)
         .eq('id', String(id))
     );
   },
 
   toggleUserStatus: async (id: number | string): Promise<void> => {
-    const { data: row } = await supabase
-      .from('profiles')
+    const { data: row } = await (supabase.from('profiles') as any)
       .select('is_active')
       .eq('id', String(id))
       .maybeSingle();
@@ -264,8 +290,7 @@ export const userService = {
     const current = (row as { is_active: boolean | null } | null)?.is_active ?? true;
 
     await unwrap(
-      supabase
-        .from('profiles')
+      (supabase.from('profiles') as any)
         .update({ is_active: !current } as ProfileUpdate)
         .eq('id', String(id))
     );

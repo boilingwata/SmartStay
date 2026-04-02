@@ -13,8 +13,7 @@ export const roleService = {
    */
   getRoles: async (): Promise<Role[]> => {
     const rows = await unwrap(
-      supabase
-        .from('roles' as any)
+      (supabase.from('roles' as any) as any)
         .select('id, name, description, is_system')
         .order('name')
     );
@@ -32,16 +31,15 @@ export const roleService = {
    */
   getAllPermissions: async (): Promise<Permission[]> => {
     const rows = await unwrap(
-      supabase
-        .from('permissions' as any)
-        .select('code, name, group')
-        .order('group', { ascending: true })
+      (supabase.from('permissions' as any) as any)
+        .select('code, name, group_name')
+        .order('group_name', { ascending: true })
     );
 
     return (rows as any[]).map(row => ({
       key: row.code,
       name: row.name,
-      group: row.group,
+      group: row.group_name,
     }));
   },
 
@@ -49,26 +47,26 @@ export const roleService = {
    * Fetches the mapping of permissions assigned to each role.
    */
   getRolePermissions: async (): Promise<RolePermission[]> => {
-    const { data: roles } = await supabase.from('roles' as any).select('id');
+    const { data: roles } = await (supabase.from('roles' as any) as any).select('id');
     if (!roles) return [];
 
-    const results: RolePermission[] = [];
-    
-    // Fetch junction data
+    // Fetch junctions with joined permission codes
     const rows = await unwrap(
-      supabase
-        .from('role_permissions' as any)
-        .select('role_id, permissions(code)')
+      (supabase.from('role_permissions' as any) as any)
+        .select(`
+          role_id, 
+          permissions!inner(code)
+        `)
     );
 
     // Group permissions by role_id
-    const grouped = (rows as any[]).reduce((acc, current) => {
+    const grouped = (rows as any[]).reduce((acc: Record<string, string[]>, current: any) => {
       const roleId = current.role_id;
       const permCode = current.permissions?.code;
       if (!acc[roleId]) acc[roleId] = [];
       if (permCode) acc[roleId].push(permCode);
       return acc;
-    }, {} as Record<string, string[]>);
+    }, {});
 
     return (roles as any[]).map(r => ({
       roleId: r.id,
@@ -81,19 +79,19 @@ export const roleService = {
    */
   getRoleById: async (id: string): Promise<Role | undefined> => {
     const row = await unwrap(
-      supabase
-        .from('roles' as any)
+      (supabase.from('roles' as any) as any)
         .select('id, name, description, is_system')
         .eq('id', id)
         .maybeSingle()
     );
 
     if (!row) return undefined;
+    const r = row as any;
     return {
-      id: (row as any).id,
-      name: (row as any).name,
-      description: (row as any).description || '',
-      isSystem: (row as any).is_system || false,
+      id: r.id,
+      name: r.name,
+      description: r.description || '',
+      isSystem: r.is_system || false,
     };
   },
 
@@ -103,8 +101,7 @@ export const roleService = {
    */
   updateRolePermissions: async (roleId: string, permissions: string[]): Promise<void> => {
     // 1. Get permission IDs for the provided codes
-    const { data: permRows } = await supabase
-      .from('permissions' as any)
+    const { data: permRows } = await (supabase.from('permissions' as any) as any)
       .select('id, code')
       .in('code', permissions);
     
@@ -112,22 +109,20 @@ export const roleService = {
 
     // 2. Delete existing mappings for this role
     await unwrap(
-      supabase
-        .from('role_permissions' as any)
+      (supabase.from('role_permissions' as any) as any)
         .delete()
         .eq('role_id', roleId)
     );
 
     // 3. Insert new mappings
     if ((permRows as any[]).length > 0) {
-      const newMappings = (permRows as any[]).map(p => ({
+      const newMappings = (permRows as any[]).map((p: any) => ({
         role_id: roleId,
         permission_id: p.id
       }));
 
       await unwrap(
-        supabase
-          .from('role_permissions' as any)
+        (supabase.from('role_permissions' as any) as any)
           .insert(newMappings)
       );
     }
@@ -145,15 +140,16 @@ export const roleService = {
 
     const row = await unwrap(
       role.id 
-        ? supabase.from('roles' as any).update(payload).eq('id', role.id).select().single()
-        : supabase.from('roles' as any).insert(payload).select().single()
+        ? (supabase.from('roles' as any) as any).update(payload).eq('id', role.id).select().single()
+        : (supabase.from('roles' as any) as any).insert(payload).select().single()
     );
 
+    const r = row as any;
     return {
-      id: (row as any).id,
-      name: (row as any).name,
-      description: (row as any).description || '',
-      isSystem: (row as any).is_system || false,
+      id: r.id,
+      name: r.name,
+      description: r.description || '',
+      isSystem: r.is_system || false,
     };
   }
 };

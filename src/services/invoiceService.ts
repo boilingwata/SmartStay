@@ -174,6 +174,7 @@ interface ContractOptionRow {
   contract_code: string;
   room_id: number;
   monthly_rent: number | null;
+  rent_price_snapshot: number | null; // Rule DB-03
   rooms: {
     room_code: string;
     building_id: number;
@@ -192,6 +193,7 @@ interface ContractDraftRow extends ContractOptionRow {
     service_id: number;
     quantity: number | null;
     fixed_price: number | null;
+    unit_price_snapshot: number | null; // Rule DB-04
     services: {
       name: string;
       calc_type: string | null;
@@ -301,7 +303,8 @@ function mapContractRowToOption(row: ContractOptionRow): InvoiceCreateContractOp
     buildingId: row.rooms?.building_id != null ? String(row.rooms.building_id) : '',
     buildingName: row.rooms?.buildings?.name ?? '',
     tenantName: primaryTenant?.tenants?.full_name ?? '',
-    monthlyRent: row.monthly_rent ?? 0,
+    // RULE DB-03: Prefer snapshot over current monthly_rent
+    monthlyRent: row.rent_price_snapshot ?? row.monthly_rent ?? 0,
   };
 }
 
@@ -346,6 +349,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
         contract_code,
         room_id,
         monthly_rent,
+        rent_price_snapshot,
         rooms (
           room_code,
           building_id,
@@ -359,6 +363,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
           service_id,
           quantity,
           fixed_price,
+          unit_price_snapshot,
           services ( name, calc_type )
         )
       `)
@@ -419,7 +424,14 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
     const serviceName = service.services?.name ?? `Dịch vụ #${service.service_id}`;
     const calcType = service.services?.calc_type ?? 'flat_rate';
     const quantity = Math.max(1, Number(service.quantity ?? 1));
-    const unitPrice = Number(service.fixed_price ?? priceMap.get(service.service_id) ?? 0);
+    
+    // RULE DB-04: Priority: fixed_price (override) > unit_price_snapshot (at signing) > current price (fallback)
+    const unitPrice = Number(
+      service.fixed_price ?? 
+      service.unit_price_snapshot ?? 
+      priceMap.get(service.service_id) ?? 
+      0
+    );
 
     if (calcType === 'per_unit') {
       const utilityKind = inferUtilityKind(serviceName);
@@ -536,6 +548,7 @@ export const invoiceService = {
           contract_code,
           room_id,
           monthly_rent,
+          rent_price_snapshot,
           rooms (
             room_code,
             building_id,

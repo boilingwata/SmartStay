@@ -26,8 +26,7 @@ async function getCurrentTenantId(): Promise<number | null> {
 
 export const portalMeterService = {
   /**
-   * RULE-01: Meter Readings. Since we cannot create views in read-only mode,
-   * we fetch from smartstay.meter_readings directly and pick the latest.
+   * RULE-01: Must use View for the latest reading.
    */
   getLatestReading: async (type: 'Electricity' | 'Water'): Promise<MeterReading | null> => {
     const tenantId = await getCurrentTenantId();
@@ -44,27 +43,27 @@ export const portalMeterService = {
     const roomId = contracts?.[0]?.room_id;
     if (!roomId) return null;
 
-    // 2. Get latest reading from meter_readings table
-    const { data: readings } = await supabase
-      .from('meter_readings')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('reading_date', { ascending: false })
-      .limit(1);
+    const meterTypeSuffix = type === 'Electricity' ? 'elec' : 'water';
+    const virtualId = `${roomId}-${meterTypeSuffix}`;
 
-    const row = readings?.[0];
+    // 2. RULE-01: Get latest reading from vw_LatestMeterReading
+    const { data: row } = await (supabase.from as any)('vw_LatestMeterReading')
+      .select('*')
+      .eq('MeterId', virtualId)
+      .maybeSingle();
+
     if (!row) return null;
 
     return {
-      id: String(row.id),
+      id: String(row.ReadingId),
       meterId: type,
-      monthYear: row.billing_period,
-      readingDate: row.reading_date,
-      currentIndex: type === 'Electricity' ? row.electricity_current : row.water_current,
-      previousIndex: type === 'Electricity' ? row.electricity_previous : row.water_previous,
-      consumption: (type === 'Electricity' ? row.electricity_usage : row.water_usage) ?? 0,
-      recordedById: row.read_by ?? '',
-      createdAt: row.created_at ?? new Date().toISOString(),
+      monthYear: row.BillingPeriod,
+      readingDate: row.ReadingDate,
+      currentIndex: row.CurrentIndex,
+      previousIndex: 0, // View doesn't have previous, usually fetched from history UI
+      consumption: row.Usage ?? 0,
+      recordedById: '',
+      createdAt: row.ReadingDate,
     };
   },
 

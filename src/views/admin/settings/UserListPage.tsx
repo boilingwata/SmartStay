@@ -17,10 +17,11 @@ import {
 } from 'lucide-react';
 import { DataTable, RowAction } from '@/components/shared/DataTable';
 import { FilterPanel, FilterConfig } from '@/components/shared/FilterPanel';
-import { User } from '@/types';
+import { User, Role } from '@/types';
 import { userService } from '@/services/userService';
+import { roleService } from '@/services/roleService';
 import { auditService } from '@/services/auditService';
-import { cn } from '@/utils';
+import { formatRelativeTime, cn } from '@/utils';
 import UserModal from './UserModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +33,7 @@ import { Card } from '@/components/ui/Card';
 const UserListPage: React.FC = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -43,8 +45,12 @@ const UserListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const userData = await userService.getUsers(filterValues);
+      const [userData, roleData] = await Promise.all([
+        userService.getUsers(filterValues),
+        roleService.getRoles()
+      ]);
       setUsers(userData);
+      setRoles(roleData);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể tải dữ liệu');
     } finally {
@@ -210,14 +216,12 @@ const UserListPage: React.FC = () => {
       placeholder: 'Tên, email, ID...' 
     },
     {
-      key: 'role',
+      key: 'roleId',
       label: 'Vai trò',
       type: 'select',
       options: [
         { label: 'Tất cả', value: 'All' },
-        { label: 'Admin', value: 'Admin' },
-        { label: 'Staff', value: 'Staff' },
-        { label: 'Tenant', value: 'Tenant' },
+        ...roles.map(r => ({ label: r.name, value: r.id }))
       ]
     },
     { 

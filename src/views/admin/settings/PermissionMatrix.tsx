@@ -55,7 +55,7 @@ const PermissionMatrix: React.FC = () => {
 
   const togglePermission = (roleId: string, permKey: string) => {
     const role = roles.find(r => r.id === roleId);
-    if (role?.name.toLowerCase() === 'admin') return; // Admin is immutable
+    if (role?.isSystem) return; // System roles are immutable
     
     setRolePerms(prev => {
       const index = prev.findIndex(rp => rp.roleId === roleId);
@@ -72,6 +72,44 @@ const PermissionMatrix: React.FC = () => {
         newRP.push({ roleId, permissions: [permKey] });
       }
       
+      setHasChanges(true);
+      return newRP;
+    });
+  };
+
+  const toggleGroup = (roleId: string, groupKey: string) => {
+    const role = roles.find(r => r.id === roleId);
+    if (role?.isSystem) return;
+
+    const groupPermKeys = groupedPermissions[groupKey].map(p => p.key);
+    
+    setRolePerms(prev => {
+      const index = prev.findIndex(rp => rp.roleId === roleId);
+      const newRP = [...prev];
+      
+      let currentRolePerms: string[] = [];
+      if (index !== -1) {
+        currentRolePerms = [...newRP[index].permissions];
+      }
+
+      const allInGroupSelected = groupPermKeys.every(k => currentRolePerms.includes(k));
+      
+      let nextRolePerms: string[];
+      if (allInGroupSelected) {
+        // Deselect all in group
+        nextRolePerms = currentRolePerms.filter(k => !groupPermKeys.includes(k));
+      } else {
+        // Select all in group
+        const otherPerms = currentRolePerms.filter(k => !groupPermKeys.includes(k));
+        nextRolePerms = [...otherPerms, ...groupPermKeys];
+      }
+
+      if (index !== -1) {
+        newRP[index] = { ...newRP[index], permissions: nextRolePerms };
+      } else {
+        newRP.push({ roleId, permissions: nextRolePerms });
+      }
+
       setHasChanges(true);
       return newRP;
     });
@@ -200,12 +238,14 @@ const PermissionMatrix: React.FC = () => {
                         </div>
                         <div className="space-y-1">
                            <span className="text-sm font-black text-slate-900 block tracking-tight uppercase">{role.name}</span>
-                           {role.name.toLowerCase() === 'admin' ? (
+                           {role.isSystem ? (
                              <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
-                               <Lock size={8} className="mr-1 inline" /> Immutable
+                               <Lock size={8} className="mr-1 inline" /> System Role
                              </Badge>
                            ) : (
-                             <span className="text-[10px] font-bold text-slate-400">Customizable</span>
+                             <Badge variant="outline" className="text-[9px] font-black uppercase border-slate-200 text-slate-400 px-2 py-0.5 rounded-full">
+                               Customizable
+                             </Badge>
                            )}
                         </div>
                       </div>
@@ -218,12 +258,25 @@ const PermissionMatrix: React.FC = () => {
                   <React.Fragment key={group}>
                     <tr className="bg-indigo-50/20">
                       <td 
-                        colSpan={roles.length + 1} 
-                        className="px-8 py-4 text-[11px] font-black uppercase tracking-[4px] text-indigo-500 border-y border-indigo-100/30 flex items-center gap-2"
+                        className="px-8 py-4 text-[11px] font-black uppercase tracking-[4px] text-indigo-500 border-y border-indigo-100/30 sticky left-0 bg-indigo-50/80 backdrop-blur-md z-10"
                       >
-                        <Settings size={14} />
-                        {group}
+                        <div className="flex items-center gap-2">
+                           <Settings size={14} />
+                           {group}
+                        </div>
                       </td>
+                      {roles.map(role => (
+                        <td key={`group-actions-${role.id}-${group}`} className="px-8 py-4 text-center border-y border-indigo-100/30">
+                           {!role.isSystem && (
+                             <button
+                               onClick={() => toggleGroup(role.id, group)}
+                               className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-600 transition-colors"
+                             >
+                               Toggle Group
+                             </button>
+                           )}
+                        </td>
+                      ))}
                     </tr>
                     {groupPerms.map(perm => (
                       <tr key={perm.key} className="group hover:bg-slate-50/80 transition-all duration-300">
@@ -235,20 +288,20 @@ const PermissionMatrix: React.FC = () => {
                         </td>
                         {roles.map(role => {
                           const isChecked = rolePerms.find(rp => rp.roleId === role.id)?.permissions.includes(perm.key);
-                          const isAdmin = role.name.toLowerCase() === 'admin';
+                          const isImmutable = role.isSystem;
                           
                           return (
                             <td key={`${role.id}-${perm.key}`} className="p-8 text-center border-l border-slate-50">
                               <label className={cn(
                                 "relative inline-flex items-center justify-center cursor-pointer p-4 rounded-3xl transition-all duration-500",
-                                isAdmin ? "cursor-not-allowed opacity-40" : "hover:bg-white hover:shadow-xl hover:shadow-indigo-600/5 group/check"
+                                isImmutable ? "cursor-not-allowed opacity-40" : "hover:bg-white hover:shadow-xl hover:shadow-indigo-600/5 group/check"
                                 )}
                               >
                                 <input 
                                   type="checkbox" 
                                   className="sr-only"
                                   checked={isChecked}
-                                  disabled={isAdmin}
+                                  disabled={isImmutable}
                                   onChange={() => togglePermission(role.id, perm.key)}
                                 />
                                 <div className={cn(
