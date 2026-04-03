@@ -20,7 +20,9 @@ export interface Contract {
 }
 
 export interface ContractDetail extends Contract {
+  signingDate?: string;
   depositAmount: number;
+  depositStatusRaw?: string;
   depositStatus: 'Available' | 'Deducted' | 'Refunded';
   paymentDueDay: number;
   noticePeriodDays?: number;
@@ -29,6 +31,9 @@ export interface ContractDetail extends Contract {
   note?: string;
   tenants: ContractTenant[];
   services: ContractService[];
+  renewals?: ContractRenewal[];
+  invoices?: ContractInvoice[];
+  addendumSourceAvailable?: boolean;
   addendums?: ContractAddendum[];
 
 }
@@ -38,9 +43,33 @@ export interface ContractTenant {
   fullName: string;
   avatarUrl?: string;
   cccd: string;
+  phone?: string;
+  email?: string;
   isRepresentative: boolean;
   joinedAt: string;
   leftAt?: string;
+}
+
+export interface ContractRenewal {
+  id: string;
+  previousEndDate: string;
+  newEndDate: string;
+  newMonthlyRent: number;
+  reason?: string;
+  createdAt?: string;
+}
+
+export interface ContractInvoice {
+  id: string;
+  invoiceCode: string;
+  billingPeriod: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  dueDate: string;
+  paidDate?: string;
+  status: string;
+  createdAt?: string;
 }
 
 export interface ContractService {

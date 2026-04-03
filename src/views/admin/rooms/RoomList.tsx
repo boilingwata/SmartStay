@@ -53,7 +53,6 @@ const RoomList = () => {
   const [maxFloor, setMaxFloor] = useState<number | undefined>();
   const [minArea, setMinArea] = useState<number | undefined>();
   const [maxArea, setMaxArea] = useState<number | undefined>();
-  const [hasMeter, setHasMeter] = useState<boolean | undefined>();
   const [facing, setFacing] = useState<DirectionFacing | ''>('');
 
   const toggleView = (mode: 'List' | 'Grid') => {
@@ -62,7 +61,7 @@ const RoomList = () => {
   };
 
   const { data: rooms, isLoading, isError, refetch } = useQuery<Room[]>({
-    queryKey: ['rooms', activeBuildingId, search, statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, hasMeter, sortBy, sortOrder],
+    queryKey: ['rooms', activeBuildingId, search, statusFilter, typeFilter, facing, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, sortBy, sortOrder],
     queryFn: () => {
       const numericId = Number(activeBuildingId);
       const safeId = (activeBuildingId != null && activeBuildingId !== '' && Number.isFinite(numericId) && numericId > 0)
@@ -74,13 +73,13 @@ const RoomList = () => {
         search,
         status: statusFilter.length > 0 ? statusFilter as RoomStatus[] : undefined,
         roomType: typeFilter || undefined,
+        facing: facing || undefined,
         minPrice,
         maxPrice,
         minFloor,
         maxFloor,
         minArea,
         maxArea,
-        hasMeter,
         sortBy,
         sortOrder
       });
@@ -97,7 +96,6 @@ const RoomList = () => {
     setMaxFloor(undefined);
     setMinArea(undefined);
     setMaxArea(undefined);
-    setHasMeter(undefined);
     setFacing('');
     toast.success("Đã xoá bộ lọc");
   };
@@ -109,10 +107,9 @@ const RoomList = () => {
     if (minPrice || maxPrice) count++;
     if (minFloor || maxFloor) count++;
     if (minArea || maxArea) count++;
-    if (hasMeter !== undefined) count++;
     if (facing) count++;
     return count;
-  }, [statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, hasMeter, facing]);
+  }, [statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, facing]);
 
   const handleCreateRoom = () => {
     setSelectedRoom(null);
@@ -120,6 +117,7 @@ const RoomList = () => {
   };
 
   const handleEditRoom = (room: Room, e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     setSelectedRoom(room);
     setIsModalOpen(true);
@@ -129,16 +127,16 @@ const RoomList = () => {
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {/* Premium Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/20">
               Quản lý vận hành
             </span>
             <div className="h-px w-8 bg-primary/20"></div>
           </div>
-          <h1 className="text-display text-slate-900 leading-tight flex items-center gap-4">
-            {t('pages.rooms.title')}
-            <div className="h-10 w-10 rounded-2xl bg-primary/5 flex items-center justify-center text-primary">
+          <h1 className="text-display text-slate-900 leading-tight flex flex-wrap items-center gap-4">
+            <span className="min-w-0 break-words">{t('pages.rooms.title')}</span>
+            <div className="h-10 w-10 shrink-0 rounded-2xl bg-primary/5 flex items-center justify-center text-primary">
                <Home size={24} />
             </div>
           </h1>
@@ -181,9 +179,9 @@ const RoomList = () => {
       {/* Master Search Hub */}
       <div className="relative z-10">
          <div className="card-premium p-6 lg:p-8 bg-white border border-slate-100 shadow-2xl shadow-slate-200/40 rounded-[44px]">
-            <div className="flex flex-col lg:flex-row items-end gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-6">
                {/* Search Input */}
-               <div className="flex-1 space-y-2.5 group">
+               <div className="flex-1 min-w-0 space-y-2.5 group">
                   <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1 flex items-center gap-2 group-focus-within:text-primary transition-colors">
                      <Search size={14} /> {t('common.search') || 'Tìm kiếm phòng'}
                   </label>
@@ -224,14 +222,14 @@ const RoomList = () => {
                </div>
 
                {/* Sort & Filter Toggle */}
-               <div className="flex items-end gap-3">
-                  <div className="space-y-2.5">
+               <div className="flex w-full lg:w-auto flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-stretch sm:items-end gap-3">
+                  <div className="space-y-2.5 min-w-0 sm:flex-1 lg:flex-none">
                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1 flex items-center gap-2">
                         <ArrowUpAz size={14} /> Sắp xếp
                      </label>
-                     <div className="h-16 flex items-center bg-slate-50/50 border border-slate-100 rounded-[28px] px-4 hover:border-slate-200 transition-all">
+                     <div className="h-16 flex items-center bg-slate-50/50 border border-slate-100 rounded-[28px] px-4 hover:border-slate-200 transition-all min-w-0">
                         <select
-                          className="bg-transparent border-none font-black text-[11px] uppercase tracking-widest text-slate-600 focus:ring-0 cursor-pointer pr-10"
+                          className="min-w-0 flex-1 bg-transparent border-none font-black text-[11px] uppercase tracking-widest text-slate-600 focus:ring-0 cursor-pointer pr-6"
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value as any)}
                         >
@@ -250,12 +248,12 @@ const RoomList = () => {
                      </div>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-2.5 sm:flex-1 lg:flex-none">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1 opacity-0">Lọc</label>
                     <button
                       onClick={() => setIsFilterPanelOpen(true)}
                       className={cn(
-                        "h-16 px-8 rounded-[28px] flex items-center gap-3 font-black text-[11px] uppercase tracking-widest transition-all relative border-2 shadow-lg",
+                        "h-16 w-full px-6 rounded-[28px] flex items-center justify-center text-center gap-3 font-black text-[11px] uppercase tracking-widest transition-all relative border-2 shadow-lg",
                         activeFilterCount > 0 
                           ? "bg-primary/5 border-primary/20 text-primary shadow-primary/10" 
                           : "bg-slate-900 border-slate-900 text-white hover:bg-primary shadow-slate-200 hover:-translate-y-1"
@@ -311,7 +309,7 @@ const RoomList = () => {
                  </>
                )}
 
-               <div className="ml-auto text-[11px] font-bold text-slate-400">
+               <div className="w-full sm:w-auto sm:ml-auto text-[11px] font-bold text-slate-400 text-left sm:text-right">
                   Hiển thị <span className="text-slate-900">{rooms?.length || 0}</span> phòng
                </div>
             </div>
@@ -348,12 +346,13 @@ const RoomList = () => {
             <Link 
               key={room.id}
               to={`/admin/rooms/${room.id}`}
+              aria-label={`Xem chi tiết phòng ${room.roomCode}`}
               className="group card-premium p-0 overflow-hidden hover:shadow-[0_40px_80px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-3 transition-all duration-700 cursor-pointer border-none shadow-xl shadow-slate-200/50 bg-white flex flex-col w-full max-w-full"
             >
               <div className="relative h-64 overflow-hidden bg-slate-100">
                 <img 
                   src={room.thumbnailUrl || 'https://images.unsplash.com/photo-1513584684374-8bdb7489fe92?w=500'} 
-                  alt={room.roomCode}
+                  alt=""
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                 />
                 
@@ -381,20 +380,20 @@ const RoomList = () => {
               </div>
 
               <div className="p-8 space-y-6 flex-1 flex flex-col">
-                <div className="grid grid-cols-3 gap-2 pb-6 border-b border-dashed border-slate-100 items-start">
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5 truncate"><MapPin size={10} className="shrink-0" /> Tầng</span>
-                        <span className="text-h4 font-black text-slate-900 truncate">{room.floorNumber}</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-4 pb-6 border-b border-dashed border-slate-100 items-start">
+                    <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5 whitespace-nowrap"><MapPin size={10} className="shrink-0" /> Tầng</span>
+                        <span className="text-[26px] leading-none font-black text-slate-900">{room.floorNumber}</span>
                     </div>
                     
-                    <div className="flex flex-col border-l border-slate-100 pl-3 min-w-0">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5 truncate"><Maximize size={10} className="shrink-0" /> Diện tích</span>
-                        <span className="text-h4 font-black text-slate-900 truncate">{room.areaSqm} <span className="text-[12px] text-slate-400">m²</span></span>
+                    <div className="flex flex-col border-l border-slate-100 pl-4 min-w-0">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5 whitespace-nowrap"><Maximize size={10} className="shrink-0" /> Diện tích</span>
+                        <span className="text-[26px] leading-none font-black text-slate-900 whitespace-nowrap">{room.areaSqm} <span className="text-[12px] text-slate-400">m²</span></span>
                     </div>
 
-                    <div className="flex flex-col border-l border-slate-100 pl-3 items-end min-w-0">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate text-right">Giá thuê từ</span>
-                        <span className="text-[14px] font-black text-primary tracking-tight truncate text-right">{formatVND(room.baseRentPrice)}</span>
+                    <div className="col-span-2 flex flex-col border-t border-slate-100 pt-4 min-w-0">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá thuê từ</span>
+                        <span className="text-[22px] leading-tight font-black text-primary tracking-tight break-words">{formatVND(room.baseRentPrice)}</span>
                     </div>
                 </div>
                 
@@ -654,9 +653,9 @@ const RoomList = () => {
                  <Navigation size={14} className="text-violet-500" /> Tiện ích & Trang bị
               </label>
               <div className="space-y-3">
-                 <label className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer group hover:bg-slate-100 transition-colors">
+                 <label className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-not-allowed opacity-70">
                     <div className="flex items-center gap-4">
-                       <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-colors", hasMeter ? "bg-primary text-white" : "bg-white text-slate-300 shadow-sm")}>
+                       <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white text-slate-300 shadow-sm">
                           <Zap size={18} />
                        </div>
                        <span className="text-[12px] font-black uppercase text-slate-600 tracking-widest">{t('pages.rooms.hasMeters')}</span>
@@ -664,8 +663,9 @@ const RoomList = () => {
                     <input
                       type="checkbox"
                       className="w-6 h-6 rounded-lg border-2 border-slate-200 text-primary focus:ring-primary/20"
-                      checked={hasMeter === true}
-                      onChange={(e) => setHasMeter(e.target.checked ? true : undefined)}
+                      checked={false}
+                      disabled
+                      readOnly
                     />
                  </label>
 

@@ -63,6 +63,7 @@ test-results/
 blob-report/
 .playwright-cli/
 .playwright-mcp/
+playwright/.auth/
 audit-screenshots/
 output/
 *-REPORT.md
@@ -73,7 +74,11 @@ coverage/
 .nyc_output/
 test-results*.json
 junit.xml
+tmp-*/
+tmp-*.png
+tmp-*.json
 
 # Vite
 vite.config.d.ts
 vite.config.js
+vite.config.js.timestamp-*.mjs

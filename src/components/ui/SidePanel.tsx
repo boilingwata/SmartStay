@@ -46,7 +46,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
       <aside 
         onTransitionEnd={handleAnimationEnd}
         className={cn(
-          "absolute right-0 top-0 h-full w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-500 ease-out pointer-events-auto",
+          "absolute right-0 top-0 h-full w-full max-w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-500 ease-out pointer-events-auto",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >

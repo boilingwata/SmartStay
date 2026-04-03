@@ -94,7 +94,7 @@ export interface BulkInvoiceInput {
 export interface BulkInvoicePreviewRow {
   contract: InvoiceCreateContractOption;
   preview?: InvoiceDraftPreview;
-  status: 'ready' | 'warning' | 'duplicate' | 'error';
+  status: 'ready' | 'blocked' | 'duplicate' | 'error';
   canCreate: boolean;
   issue?: string;
   existingInvoiceCode?: string;
@@ -326,6 +326,13 @@ function isExistingInvoiceError(message: string): boolean {
   const normalized = normalizeForMatch(message);
   return normalized.includes('hoa don') && normalized.includes('ton tai')
     || normalized.includes('already exists');
+}
+
+function getMissingMeterReadingsMessage(draft: InvoiceDraftPreview): string {
+  const missingItems = draft.missingUtilityItems.join(', ');
+  return missingItems
+    ? `Cannot create invoice: missing meter readings for this billing period (${missingItems}).`
+    : 'Cannot create invoice: missing meter readings for this billing period';
 }
 
 async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraftPreview> {
@@ -625,10 +632,10 @@ export const invoiceService = {
           return {
             contract,
             preview,
-            status: preview.missingUtilityItems.length > 0 ? 'warning' as const : 'ready' as const,
-            canCreate: true,
+            status: preview.missingUtilityItems.length > 0 ? 'blocked' as const : 'ready' as const,
+            canCreate: preview.missingUtilityItems.length === 0,
             issue: preview.missingUtilityItems.length > 0
-              ? `Thiếu chỉ số cho: ${preview.missingUtilityItems.join(', ')}. Hóa đơn vẫn sẽ được tạo với các khoản hiện có.`
+              ? getMissingMeterReadingsMessage(preview)
               : undefined,
           };
         } catch (error) {
@@ -932,6 +939,10 @@ export const invoiceService = {
     const billingPeriod = input.monthYear;
     const draft = await buildInvoiceDraft(input);
 
+    if (draft.missingUtilityItems.length > 0) {
+      throw new Error(getMissingMeterReadingsMessage(draft));
+    }
+
     const existingInvoice = (await unwrap(
       supabase
         .from('invoices')
@@ -999,3 +1010,4 @@ export const invoiceService = {
 };
 
 export default invoiceService;
+

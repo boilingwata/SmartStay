@@ -37,6 +37,7 @@ type OwnerFormData = {
 };
 
 const DEFAULT_OWNER_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmitting }: OwnerModalProps) => {
   const defaultValues = React.useMemo<OwnerFormData>(() => ({
@@ -49,8 +50,9 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
     avatarUrl: initialData?.avatarUrl ?? '',
   }), [initialData]);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<OwnerFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isValid } } = useForm<OwnerFormData>({
     defaultValues,
+    mode: 'onChange',
   });
 
   const [avatarPreview, setAvatarPreview] = React.useState<string>(defaultValues.avatarUrl || DEFAULT_OWNER_AVATAR_URL);
@@ -70,6 +72,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
     try {
       await Promise.resolve(onSubmit({
         ...data,
+        email: data.email.trim(),
         avatarUrl: data.avatarUrl || initialData?.avatarUrl || undefined,
       }));
     } finally {
@@ -114,7 +117,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
         </div>
 
         <div className="flex-1 p-8 md:p-14 overflow-y-auto custom-scrollbar bg-slate-50/30">
-          <form onSubmit={handleSubmit(submitOwner)} className="space-y-12">
+          <form onSubmit={handleSubmit(submitOwner)} className="space-y-12" noValidate>
             <input type="hidden" {...register('avatarUrl')} />
 
             <section className="space-y-8">
@@ -132,6 +135,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                       {...register('fullName', { required: 'Vui lòng nhập họ tên' })}
                       className={cn('input-base pl-14 h-16 rounded-2xl bg-white shadow-sm border-slate-200', errors.fullName && 'border-danger bg-danger/5')}
                       placeholder="VD: Nguyễn Văn A"
+                      aria-invalid={Boolean(errors.fullName)}
                     />
                   </div>
                   {errors.fullName && <p className="text-[10px] text-danger font-bold uppercase ml-1">{errors.fullName.message}</p>}
@@ -145,6 +149,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                       {...register('cccd', { required: 'Vui lòng nhập số định danh' })}
                       className={cn('input-base pl-14 h-16 rounded-2xl font-mono text-[16px] bg-white shadow-sm border-slate-200', errors.cccd && 'border-danger bg-danger/5')}
                       placeholder="VD: 00120100xxxx"
+                      aria-invalid={Boolean(errors.cccd)}
                     />
                   </div>
                   {errors.cccd && <p className="text-[10px] text-danger font-bold uppercase ml-1">{errors.cccd.message}</p>}
@@ -158,21 +163,27 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                       {...register('phone', { required: 'Vui lòng nhập số điện thoại' })}
                       className={cn('input-base pl-14 h-16 rounded-2xl font-mono text-[16px] bg-white shadow-sm border-slate-200', errors.phone && 'border-danger bg-danger/5')}
                       placeholder="VD: 090xxxxxxx"
+                      aria-invalid={Boolean(errors.phone)}
                     />
                   </div>
                   {errors.phone && <p className="text-[10px] text-danger font-bold uppercase ml-1">{errors.phone.message}</p>}
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Địa chỉ Email</label>
+                  <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">Địa chỉ Email <span className="text-danger">*</span></label>
                   <div className="relative group">
                     <Mail size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors" />
                     <input
-                      {...register('email')}
-                      className="input-base pl-14 h-16 rounded-2xl font-mono text-[16px] bg-white shadow-sm border-slate-200"
+                      {...register('email', {
+                        required: 'Vui lòng nhập email',
+                        validate: (value) => EMAIL_PATTERN.test(value.trim()) || 'Email không đúng định dạng',
+                      })}
+                      className={cn('input-base pl-14 h-16 rounded-2xl font-mono text-[16px] bg-white shadow-sm border-slate-200', errors.email && 'border-danger bg-danger/5')}
                       placeholder="example@gmail.com"
+                      aria-invalid={Boolean(errors.email)}
                     />
                   </div>
+                  {errors.email && <p className="text-[10px] text-danger font-bold uppercase ml-1">{errors.email.message}</p>}
                 </div>
               </div>
             </section>
@@ -260,7 +271,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                 <button
                   type="submit"
                   className="group px-14 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-[3px] text-[11px] shadow-2xl shadow-primary/30 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-3"
-                  disabled={isBusy}
+                  disabled={isBusy || !isValid}
                 >
                   {isBusy ? (
                     <>

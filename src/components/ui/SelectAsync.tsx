@@ -94,7 +94,7 @@ export const SelectAsync = ({
           onClick={() => !disabled && setOpen(!open)}
           disabled={disabled}
           className={cn(
-            "h-14 pl-6 pr-12 bg-slate-50/50 border border-slate-200 rounded-2xl flex items-center transition-all w-full font-bold text-slate-900 text-left",
+            "h-14 pl-6 pr-20 bg-slate-50/50 border border-slate-200 rounded-2xl flex items-center transition-all w-full font-bold text-slate-900 text-left",
             "hover:bg-white hover:border-primary/30 active:scale-[0.99]",
             open && "bg-white border-primary shadow-xl shadow-primary/10 ring-4 ring-primary/5",
             disabled && "opacity-60 cursor-not-allowed bg-slate-100 border-slate-200 shadow-none"
@@ -111,22 +111,22 @@ export const SelectAsync = ({
           </div>
           
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            {value && onClear && !disabled && (
-               <button
-                 type="button"
-                 onClick={(e) => {
-                   e.stopPropagation();
-                   onClear();
-                   setOpen(false);
-                 }}
-                 className="p-1 rounded-full text-slate-300 hover:bg-danger/10 hover:text-danger transition-colors opacity-0 group-hover/select:opacity-100"
-               >
-                 <X size={16} />
-               </button>
-            )}
             <ChevronDown size={18} className={cn("text-slate-400 transition-transform duration-500 shrink-0", open && "rotate-180 text-primary")} />
           </div>
         </button>
+        {value && onClear && !disabled && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+              setOpen(false);
+            }}
+            className="absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-300 hover:bg-danger/10 hover:text-danger transition-colors opacity-0 group-hover/select:opacity-100"
+          >
+            <X size={16} />
+          </button>
+        )}
 
         {open && !disabled && (
           <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-[100] bg-white rounded-[16px] border border-slate-100 shadow-[0_20px_40px_rgba(30,58,138,0.12)] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">

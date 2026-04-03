@@ -36,14 +36,14 @@ const defaultForm = (): BulkInvoiceInput => ({
 
 const statusBadgeClasses: Record<BulkInvoicePreviewRow['status'], string> = {
   ready: 'bg-success/10 text-success',
-  warning: 'bg-warning/10 text-warning',
+  blocked: 'bg-danger/10 text-danger',
   duplicate: 'bg-slate-200 text-slate-700',
   error: 'bg-danger/10 text-danger',
 };
 
 const statusLabels: Record<BulkInvoicePreviewRow['status'], string> = {
   ready: 'Sẵn sàng',
-  warning: 'Thiếu chỉ số',
+  blocked: 'Bị chặn',
   duplicate: 'Đã tồn tại',
   error: 'Lỗi dữ liệu',
 };
@@ -84,7 +84,7 @@ export const BulkInvoiceModal = ({ isOpen, onClose, onCreated }: BulkInvoiceModa
 
   const eligibleRows = previewRows.filter((row) => row.canCreate);
   const readyCount = previewRows.filter((row) => row.status === 'ready').length;
-  const warningCount = previewRows.filter((row) => row.status === 'warning').length;
+  const blockedCount = previewRows.filter((row) => row.status === 'blocked').length;
   const duplicateCount = previewRows.filter((row) => row.status === 'duplicate').length;
   const errorCount = previewRows.filter((row) => row.status === 'error').length;
   const selectedRows = eligibleRows.filter((row) => selectedContractIds.includes(row.contract.id));
@@ -293,7 +293,7 @@ export const BulkInvoiceModal = ({ isOpen, onClose, onCreated }: BulkInvoiceModa
                 </div>
                 <div className="flex gap-3 text-[10px] font-bold uppercase">
                   <span className="text-success">Sẵn sàng ({readyCount})</span>
-                  <span className="text-warning">Thiếu chỉ số ({warningCount})</span>
+                  <span className="text-danger">Bị chặn ({blockedCount})</span>
                   <span className="text-slate-500">Đã tồn tại ({duplicateCount})</span>
                   <span className="text-danger">Lỗi ({errorCount})</span>
                 </div>
@@ -499,3 +499,4 @@ export const BulkInvoiceModal = ({ isOpen, onClose, onCreated }: BulkInvoiceModa
     </div>
   );
 };
+

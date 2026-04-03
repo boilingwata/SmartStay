@@ -86,3 +86,4 @@ export const formatPercentage = (val: number): string => {
 };
 
 export * from './textEncoding';
+export * from './meterReadingValidation';

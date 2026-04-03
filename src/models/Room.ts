@@ -120,6 +120,7 @@ export interface RoomFilters {
   search?: string;
   status?: RoomStatus[];
   roomType?: RoomType | '';
+  facing?: DirectionFacing | '';
   minFloor?: number;
   maxFloor?: number;
   minArea?: number;

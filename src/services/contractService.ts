@@ -1,4 +1,4 @@
-import { Contract, ContractDetail, ContractTenant, ContractService } from '@/models/Contract';
+import { Contract, ContractDetail, ContractTenant, ContractService, ContractInvoice, ContractRenewal } from '@/models/Contract';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapContractStatus, mapDepositStatus } from '@/lib/enumMaps';
@@ -55,6 +55,9 @@ interface ContractTenantRow {
   tenants?: {
     id: number;
     full_name: string;
+    id_number: string | null;
+    phone: string | null;
+    email: string | null;
     profile_id: string | null;
     profiles?: { avatar_url: string | null } | null;
   } | null;
@@ -71,6 +74,29 @@ interface ContractServiceRow {
     name: string;
     calc_type: string | null;
   } | null;
+}
+
+interface ContractRenewalRow {
+  id: number;
+  contract_id: number;
+  previous_end_date: string;
+  new_end_date: string;
+  new_monthly_rent: number | null;
+  reason: string | null;
+  created_at: string | null;
+}
+
+interface ContractInvoiceRow {
+  id: number;
+  invoice_code: string;
+  billing_period: string | null;
+  total_amount: number | null;
+  amount_paid: number | null;
+  balance_due: number | null;
+  due_date: string | null;
+  paid_date: string | null;
+  status: string | null;
+  created_at: string | null;
 }
 
 // --- Transformers ---
@@ -110,7 +136,9 @@ function toContractTenant(row: ContractTenantRow): ContractTenant {
     id: String(row.id),
     fullName: tenant?.full_name ?? '',
     avatarUrl: tenant?.profiles?.avatar_url ?? undefined,
-    cccd: '',
+    cccd: tenant?.id_number ?? '',
+    phone: tenant?.phone ?? undefined,
+    email: tenant?.email ?? undefined,
     isRepresentative: row.is_primary ?? false,
     joinedAt: '',
     leftAt: undefined,
@@ -132,16 +160,47 @@ function toContractService(row: ContractServiceRow): ContractService {
   };
 }
 
+function toContractRenewal(row: ContractRenewalRow): ContractRenewal {
+  return {
+    id: String(row.id),
+    previousEndDate: row.previous_end_date,
+    newEndDate: row.new_end_date,
+    newMonthlyRent: row.new_monthly_rent ?? 0,
+    reason: row.reason ?? undefined,
+    createdAt: row.created_at ?? undefined,
+  };
+}
+
+function toContractInvoice(row: ContractInvoiceRow): ContractInvoice {
+  return {
+    id: String(row.id),
+    invoiceCode: row.invoice_code,
+    billingPeriod: row.billing_period ?? '',
+    totalAmount: row.total_amount ?? 0,
+    amountPaid: row.amount_paid ?? 0,
+    balanceDue: row.balance_due ?? 0,
+    dueDate: row.due_date ?? '',
+    paidDate: row.paid_date ?? undefined,
+    status: row.status ?? '',
+    createdAt: row.created_at ?? undefined,
+  };
+}
+
 function toContractDetail(
   row: ContractRow,
-  serviceRows: ContractServiceRow[]
+  serviceRows: ContractServiceRow[],
+  renewalRows: ContractRenewalRow[],
+  invoiceRows: ContractInvoiceRow[],
+  addendumSourceAvailable: boolean
 ): ContractDetail {
   const base = toContract(row);
   const tenantRows = (row.contract_tenants ?? []) as ContractTenantRow[];
 
   return {
     ...base,
+    signingDate: row.signing_date ?? undefined,
     depositAmount: row.deposit_amount ?? 0,
+    depositStatusRaw: row.deposit_status ?? undefined,
     depositStatus: mapDepositStatus.fromDb(
       row.deposit_status ?? 'pending'
     ) as ContractDetail['depositStatus'],
@@ -152,6 +211,9 @@ function toContractDetail(
     terminationReason: row.termination_reason ?? undefined,
     tenants: tenantRows.map(toContractTenant),
     services: serviceRows.map(toContractService),
+    renewals: renewalRows.map(toContractRenewal),
+    invoices: invoiceRows.map(toContractInvoice),
+    addendumSourceAvailable,
     addendums: [],
   };
 }
@@ -242,7 +304,7 @@ export const contractService = {
       throw new Error(`[contractService] Invalid contract id: "${id}"`);
     }
 
-    const [contractRow, serviceRows] = await Promise.all([
+    const [contractRow, serviceRows, renewalRows, invoiceRows, addendumSourceAvailable] = await Promise.all([
       unwrap(
         supabase
           .from('contracts')
@@ -252,7 +314,7 @@ export const contractService = {
              deposit_amount, deposit_status, status, termination_reason, terms,
              rooms(id, room_code, building_id, buildings(name)),
              contract_tenants(id, contract_id, tenant_id, is_primary,
-               tenants(id, full_name, profile_id,
+               tenants(id, full_name, id_number, phone, email, profile_id,
                  profiles(avatar_url)
                )
              )`
@@ -270,9 +332,35 @@ export const contractService = {
           )
           .eq('contract_id', numId)
       ) as unknown as Promise<ContractServiceRow[]>,
+
+      unwrap(
+        supabase
+          .from('contract_renewals')
+          .select('id, contract_id, previous_end_date, new_end_date, new_monthly_rent, reason, created_at')
+          .eq('contract_id', numId)
+          .order('created_at', { ascending: false })
+      ) as unknown as Promise<ContractRenewalRow[]>,
+
+      unwrap(
+        supabase
+          .from('invoices')
+          .select('id, invoice_code, billing_period, total_amount, amount_paid, balance_due, due_date, paid_date, status, created_at')
+          .eq('contract_id', numId)
+          .order('created_at', { ascending: false })
+      ) as unknown as Promise<ContractInvoiceRow[]>,
+
+      (async (): Promise<boolean> => {
+        const client = supabase as any;
+        const { error } = await client
+          .from('contract_addendums')
+          .select('id', { head: true, count: 'exact' })
+          .eq('contract_id', numId);
+
+        return !error;
+      })(),
     ]);
 
-    return toContractDetail(contractRow, serviceRows);
+    return toContractDetail(contractRow, serviceRows, renewalRows, invoiceRows, addendumSourceAvailable);
   },
 
   exportContracts: async (_filters: ContractFilter): Promise<Blob> => {

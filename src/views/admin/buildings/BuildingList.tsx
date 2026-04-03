@@ -324,13 +324,14 @@ const BuildingList = () => {
             <Link
               key={building.id}
               to={`/admin/buildings/${building.id}`}
+              aria-label={`Xem chi tiết tòa nhà ${building.buildingName}`}
               className="group card-premium p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md flex flex-col scale-[0.99] hover:scale-100 w-full"
             >
               {/* Hero Image */}
               <div className="relative h-72 overflow-hidden bg-slate-100">
                 <img
                   src={building.heroImageUrl || `https://source.unsplash.com/800x600/?architecture,building&sig=${building.id}`}
-                  alt={building.buildingName}
+                  alt=""
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                 />
                 <div className="absolute top-6 left-6">

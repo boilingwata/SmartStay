@@ -1,7 +1,7 @@
 import {
   Room, RoomDetail, RoomStatus, RoomType,
   HandoverChecklist, RoomStatusHistory, RoomMeter, RoomAsset,
-  RoomFilters, CreateRoomData, UpdateRoomData, AssetFilters
+  RoomFilters, CreateRoomData, UpdateRoomData, AssetFilters, DirectionFacing
 } from '@/models/Room';
 
 import { Asset } from '@/models/Asset';
@@ -223,6 +223,9 @@ export const roomService = {
 
     if (filters?.roomType) {
       query = query.eq('room_type', filters.roomType);
+    }
+    if (filters?.facing) {
+      query = query.eq('facing', filters.facing as DirectionFacing);
     }
 
     if (filters?.minFloor !== undefined) query = query.gte('floor_number', filters.minFloor);
