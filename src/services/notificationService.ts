@@ -29,6 +29,19 @@ function mapRow(row: NotificationRow): Notification {
 let notificationsTableAvailable: boolean | null = null;
 let notificationsTableCheckPromise: Promise<boolean> | null = null;
 
+function isMissingNotificationsTableError(error: { message?: string; code?: string } | null | undefined) {
+  if (!error) return false;
+
+  const message = (error.message || '').toLowerCase();
+  return (
+    error.code === 'PGRST205' ||
+    message.includes("could not find the table") ||
+    message.includes('schema cache') ||
+    message.includes("relation 'smartstay.notifications' does not exist") ||
+    message.includes('relation "smartstay.notifications" does not exist')
+  );
+}
+
 async function ensureNotificationsTable(): Promise<boolean> {
   if (notificationsTableAvailable !== null) return notificationsTableAvailable;
   if (notificationsTableCheckPromise) return notificationsTableCheckPromise;
@@ -42,6 +55,9 @@ async function ensureNotificationsTable(): Promise<boolean> {
 
     notificationsTableAvailable = !error;
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       console.warn('[notificationService] notifications table unavailable:', error.message);
     }
 
@@ -73,6 +89,9 @@ export const notificationService = {
       .limit(limit);
 
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       console.warn('[notificationService] getNotifications:', error.message);
       return [];
     }
@@ -91,6 +110,9 @@ export const notificationService = {
       .eq('is_read', false);
 
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       console.warn('[notificationService] getUnreadCount:', error.message);
       return 0;
     }
@@ -108,6 +130,9 @@ export const notificationService = {
       .eq('id', id);
 
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       console.warn('[notificationService] markAsRead:', error.message);
     }
   },
@@ -123,6 +148,9 @@ export const notificationService = {
       .eq('is_read', false);
 
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       console.warn('[notificationService] markAllAsRead:', error.message);
     }
   },
@@ -154,6 +182,9 @@ export const notificationService = {
       .single();
 
     if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
       throw new Error(error.message || 'Không thể gửi thông báo tới cư dân.');
     }
 
@@ -161,28 +192,34 @@ export const notificationService = {
   },
 
   subscribeToNew(profileId: string, onNew: (notification: Notification) => void) {
-    if (notificationsTableAvailable === false) {
-      return () => undefined;
-    }
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
-    const channel = supabase
-      .channel(`notifications:${profileId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'smartstay',
-          table: 'notifications',
-          filter: `profile_id=eq.${profileId}`,
-        },
-        (payload) => {
-          onNew(mapRow(payload.new as NotificationRow));
-        },
-      )
-      .subscribe();
+    void ensureNotificationsTable().then((isAvailable) => {
+      if (!isAvailable || cancelled) return;
+
+      channel = supabase
+        .channel(`notifications:${profileId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'smartstay',
+            table: 'notifications',
+            filter: `profile_id=eq.${profileId}`,
+          },
+          (payload) => {
+            onNew(mapRow(payload.new as NotificationRow));
+          },
+        )
+        .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   },
 };

@@ -343,6 +343,15 @@ export const paymentService = {
         },
       });
       if (error) throw new Error(error.message);
+      if (!data?.paymentId) {
+        return {
+          ...payment,
+          id: `attempt-${data?.attemptId ?? Date.now()}`,
+          transactionCode: payment.transactionCode,
+          createdAt: new Date().toISOString(),
+          status: 'Pending',
+        };
+      }
       // Refetch the created payment row so we return the full PaymentTransaction shape
       const rows = (await unwrap(
         supabase.from('payments').select(PAYMENT_SELECT).eq('id', data.paymentId).single()

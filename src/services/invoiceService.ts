@@ -1012,4 +1012,4 @@ export const invoiceService = {
 };
 
 export default invoiceService;
-
+export * from './portalInvoiceService';

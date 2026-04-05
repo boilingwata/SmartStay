@@ -1,10 +1,10 @@
 /// <reference path="../_shared/deno-globals.d.ts" />
 
 /**
- * webhook-payment
+ * sepay-webhook
  *
- * Backward-compatible payment webhook entrypoint.
- * Prefer using /functions/v1/sepay-webhook directly for SePay.
+ * Receives incoming transfer webhooks from SePay and confirms invoice payments
+ * after validating the webhook authorization header.
  */
 
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
@@ -17,11 +17,8 @@ function json(body: Record<string, unknown>, status = 200): Response {
 }
 
 Deno.serve(async (req: Request) => {
-  const url = new URL(req.url);
-  const provider = url.searchParams.get('provider');
-
-  if (provider !== 'sepay') {
-    return json({ success: false, error: 'unsupported_provider' }, 400);
+  if (req.method !== 'POST') {
+    return json({ success: false, error: 'method_not_allowed' }, 405);
   }
 
   const allowDemo = Deno.env.get('SEPAY_ALLOW_DEMO') === 'true';
@@ -38,6 +35,7 @@ Deno.serve(async (req: Request) => {
   if (expectedApiKey && !isDemoRequest) {
     const authHeader = req.headers.get('authorization') ?? '';
     if (authHeader !== `Apikey ${expectedApiKey}`) {
+      console.error('[sepay-webhook] Invalid Authorization header');
       return json({ success: false, error: 'invalid_api_key' }, 401);
     }
   }
@@ -45,7 +43,8 @@ Deno.serve(async (req: Request) => {
   let payload: Record<string, unknown>;
   try {
     payload = await req.json();
-  } catch {
+  } catch (error) {
+    console.error('[sepay-webhook] Invalid JSON payload:', error);
     return json({ success: false, error: 'parse_error' }, 400);
   }
 
@@ -57,7 +56,7 @@ Deno.serve(async (req: Request) => {
   });
 
   if (error) {
-    console.error('[webhook-payment] handle_sepay_webhook RPC error:', error);
+    console.error('[sepay-webhook] RPC error:', error);
     return json({ success: false, error: 'processing_failed', detail: error.message }, 500);
   }
 

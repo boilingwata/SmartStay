@@ -110,13 +110,24 @@ export const RecordPaymentModal = ({
 
   const paymentMethods: { id: PaymentMethod; label: string; icon: React.ElementType; color: string }[] = useMemo(
     () => [
+      { id: 'BankTransfer', label: 'VietQR / Bank', icon: Landmark, color: 'text-blue-500' },
       { id: 'Cash', label: 'Tiền mặt', icon: Wallet, color: 'text-orange-500' },
-      { id: 'BankTransfer', label: 'Chuyển khoản', icon: Landmark, color: 'text-blue-500' },
-      { id: 'VNPay', label: 'VNPay', icon: Smartphone, color: 'text-blue-600' },
       { id: 'Momo', label: 'Momo', icon: Zap, color: 'text-pink-500' },
+      { id: 'VNPay', label: 'VNPay', icon: Smartphone, color: 'text-blue-600' },
     ],
     []
   );
+
+  const qrUrl = useMemo(() => {
+    if (method !== 'BankTransfer' || !activeInvoice) return '';
+    const bankAcc = import.meta.env.VITE_BANK_ACCOUNT_NUMBER?.trim();
+    const bankCode = import.meta.env.VITE_BANK_CODE?.trim();
+    if (!bankAcc || !bankCode || amount <= 0) return '';
+
+    // SS<InvoiceID> is the standard format for our SePay webhook
+    const description = `SS${activeInvoice.id}`;
+    return `https://qr.sepay.vn/api/generate?acc=${bankAcc}&bank=${bankCode}&amount=${amount}&des=${description}&template=compact2`;
+  }, [method, activeInvoice, amount]);
 
   const handleProofUpload = async (file: File) => {
     setIsUploadingProof(true);
@@ -401,6 +412,40 @@ export const RecordPaymentModal = ({
                   onChange={(e) => setNote(e.target.value)}
                 />
               </div>
+
+              {method === 'BankTransfer' && qrUrl && (
+                <div className="p-6 bg-blue-50/50 border-2 border-dashed border-blue-200 rounded-[32px] flex flex-col items-center gap-4 animate-in zoom-in-95 duration-500">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center">
+                      <Zap size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Thanh toán tự động</p>
+                      <p className="text-[11px] text-slate-500 font-medium leading-none">Quét mã QR để gạch nợ ngay lập tức</p>
+                    </div>
+                  </div>
+                  
+                  <div className="relative group">
+                    <div className="absolute -inset-4 bg-blue-500/10 rounded-[40px] blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
+                    <img 
+                      src={qrUrl} 
+                      alt="VietQR Payment" 
+                      className="relative w-48 h-48 object-contain bg-white p-2 rounded-2xl shadow-xl shadow-blue-500/10 border-4 border-white" 
+                    />
+                  </div>
+
+                  <div className="w-full space-y-2">
+                    <div className="flex justify-between items-center p-3 bg-white/80 rounded-xl border border-blue-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung chuyển khoản</span>
+                      <span className="text-xs font-black text-blue-600 font-mono">SS{activeInvoice?.id}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] text-center text-slate-400 font-medium italic">
+                    * Lưu ý: Hệ thống sẽ tự động xác nhận trong 1-2 phút sau khi nhận được tiền.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

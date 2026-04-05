@@ -16,6 +16,7 @@ import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { RecordPaymentModal } from '@/components/shared/modals/RecordPaymentModal';
+import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 
 const InvoiceDetail = () => {
   const { id } = useParams();
@@ -23,6 +24,8 @@ const InvoiceDetail = () => {
   const [showElectricityDetails, setShowElectricityDetails] = useState(false);
   const [showWaterDetails, setShowWaterDetails] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+  useAdminFinanceRealtime(id);
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetailType>({
     queryKey: ['invoice', id],

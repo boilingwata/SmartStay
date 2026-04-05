@@ -15,12 +15,15 @@ import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 
 const PaymentList = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeFilters, setActiveFilters] = useState({});
+
+  useAdminFinanceRealtime();
 
   // Queries
   const { data: payments, isLoading } = useQuery<PaymentTransaction[]>({

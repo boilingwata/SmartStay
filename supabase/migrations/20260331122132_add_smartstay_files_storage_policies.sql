@@ -1,0 +1,3 @@
+-- Historical migration placeholder.
+-- This version already exists on the linked remote project.
+-- The original SQL was not present in the current repository snapshot.

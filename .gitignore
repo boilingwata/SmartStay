@@ -13,11 +13,17 @@ build/
 .env
 .env.*
 !.env.example
+!.env*.example
+.envrc
+*.local
 
 # Editor / IDE
+**/.vscode/
+!.vscode/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
+supabase/functions/.vscode/
 .idea/
 *.suo
 *.ntvs*
@@ -56,6 +62,16 @@ skills-lock.json
 .next
 .supabase/
 supabase/.temp/
+
+# Secrets / credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+*.secrets.*
 
 # Testing & Reports
 playwright-report/

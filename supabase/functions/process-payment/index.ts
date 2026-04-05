@@ -1,5 +1,7 @@
+/// <reference path="../_shared/deno-globals.d.ts" />
+
 import { handleOptions } from '../_shared/cors.ts';
-import { requireAdminRole } from '../_shared/auth.ts';
+import { requireAdminRole, requireAuth } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
@@ -14,27 +16,45 @@ interface NewPaymentRequest {
   referenceNumber?: string;
   bankName?: string;
   autoConfirm?: boolean;
+  idempotencyKey?: string;
+  attemptStatus?: string;
 }
 
 // Branch B: approve an existing pending payment
 interface ApprovePaymentRequest {
-  existingPaymentId: number;
+  existingPaymentId?: number;
+  paymentAttemptId?: number;
   confirm: true;
 }
 
 type ProcessPaymentRequest = NewPaymentRequest | ApprovePaymentRequest;
 
-function isApprove(body: ProcessPaymentRequest): body is ApprovePaymentRequest {
-  return 'existingPaymentId' in body && (body as ApprovePaymentRequest).confirm === true;
+async function hmacSha256(key: string, data: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(data));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-const VALID_METHODS = ['cash', 'bank_transfer', 'momo', 'zalopay', 'vnpay', 'stripe', 'other'];
+function isApprove(body: ProcessPaymentRequest): body is ApprovePaymentRequest {
+  return (
+    ('existingPaymentId' in body || 'paymentAttemptId' in body)
+    && (body as ApprovePaymentRequest).confirm === true
+  );
+}
+
+const VALID_METHODS = ['cash', 'bank_transfer', 'momo', 'tien_mat', 'chuyen_khoan', 'momo_online'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return handleOptions();
-
-  const { caller, denied } = await requireAdminRole(req);
-  if (denied) return denied;
 
   let body: ProcessPaymentRequest;
   try {
@@ -47,15 +67,22 @@ Deno.serve(async (req: Request) => {
 
   // --- Branch B: Approve existing payment ---
   if (isApprove(body)) {
-    const { existingPaymentId } = body;
+    const { caller, denied } = await requireAdminRole(req);
+    if (denied) return denied;
 
-    if (!existingPaymentId || typeof existingPaymentId !== 'number') {
-      return errorResponse('existingPaymentId must be a number');
+    const { existingPaymentId, paymentAttemptId } = body;
+
+    if (
+      (existingPaymentId == null || typeof existingPaymentId !== 'number')
+      && (paymentAttemptId == null || typeof paymentAttemptId !== 'number')
+    ) {
+      return errorResponse('existingPaymentId or paymentAttemptId must be a number');
     }
 
     const { data, error } = await db.rpc('approve_payment', {
-      p_payment_id:   existingPaymentId,
+      p_payment_id:   existingPaymentId ?? 0,
       p_confirmed_by: caller!.userId,
+      p_attempt_id:   paymentAttemptId ?? null,
     });
 
     if (error) {
@@ -81,6 +108,13 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Branch A: New payment ---
+  let caller;
+  try {
+    caller = await requireAuth(req);
+  } catch (error) {
+    return errorResponse(error instanceof Error ? error.message : 'Authentication failed', 401);
+  }
+
   const {
     invoiceId,
     amount,
@@ -91,7 +125,91 @@ Deno.serve(async (req: Request) => {
     referenceNumber,
     bankName,
     autoConfirm = true,
+    idempotencyKey,
+    attemptStatus,
   } = body as NewPaymentRequest;
+
+  if (method === 'momo' && !autoConfirm) {
+    const partnerCode = Deno.env.get('MOMO_PARTNER_CODE') ?? '';
+    const accessKey = Deno.env.get('MOMO_ACCESS_KEY') ?? '';
+    const secretKey = Deno.env.get('MOMO_SECRET_KEY') ?? '';
+    const partnerName = Deno.env.get('MOMO_PARTNER_NAME') ?? 'SmartStay';
+    const storeId = Deno.env.get('MOMO_STORE_ID') ?? 'SmartStay';
+    const redirectUrl = Deno.env.get('MOMO_REDIRECT_URL') ?? `${Deno.env.get('SITE_URL') ?? ''}/portal/invoices`;
+    const ipnUrl = Deno.env.get('MOMO_IPN_URL') ?? `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-payment?provider=momo`;
+    const endpoint = Deno.env.get('MOMO_API_ENDPOINT') ?? 'https://test-payment.momo.vn/v2/gateway/api/create';
+
+    if (!partnerCode || !accessKey || !secretKey || !redirectUrl || !ipnUrl) {
+      return errorResponse('MoMo chưa được cấu hình đầy đủ trên server.', 500);
+    }
+
+    const orderId = `INV${invoiceId}-${Date.now()}`;
+    const requestId = crypto.randomUUID();
+    const extraData = '';
+    const rawSignature =
+      `accessKey=${accessKey}&amount=${Math.round(amount)}&extraData=${extraData}` +
+      `&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=Thanh toán hóa đơn ${invoiceId}` +
+      `&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}` +
+      `&requestId=${requestId}&requestType=captureWallet`;
+
+    const signature = await hmacSha256(secretKey, rawSignature);
+
+    const { data, error } = await db.rpc('process_payment', {
+      p_invoice_id: invoiceId,
+      p_amount: amount,
+      p_method: 'momo_online',
+      p_payment_date: paymentDate,
+      p_notes: notes ?? null,
+      p_receipt_url: receiptUrl ?? null,
+      p_reference: orderId,
+      p_bank_name: null,
+      p_confirmed_by: caller.userId,
+      p_auto_confirm: false,
+      p_idempotency_key: idempotencyKey ?? `momo:${orderId}`,
+      p_attempt_status: 'cho_xu_ly',
+    });
+
+    if (error) {
+      console.error('[process-payment] momo process_payment RPC error:', error);
+      return errorResponse(error.message, 500);
+    }
+
+    const momoResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partnerCode,
+        partnerName,
+        storeId,
+        requestType: 'captureWallet',
+        ipnUrl,
+        redirectUrl,
+        orderId,
+        amount: String(Math.round(amount)),
+        orderInfo: `Thanh toán hóa đơn ${invoiceId}`,
+        requestId,
+        extraData,
+        lang: 'vi',
+        autoCapture: true,
+        signature,
+      }),
+    });
+
+    const momoPayload = await momoResponse.json().catch(() => null);
+    if (!momoResponse.ok || !momoPayload || momoPayload.resultCode !== 0) {
+      console.error('[process-payment] momo create error:', momoPayload);
+      return errorResponse(momoPayload?.message ?? 'Không tạo được đơn MoMo.', 500);
+    }
+
+    return successResponse({
+      ...(data as Record<string, unknown>),
+      orderId,
+      requestId,
+      payUrl: momoPayload.payUrl ?? null,
+      deeplink: momoPayload.deeplink ?? null,
+      qrCodeUrl: momoPayload.qrCodeUrl ?? null,
+    });
+  }
 
   if (!invoiceId || typeof invoiceId !== 'number') {
     return errorResponse('invoiceId must be a number');
@@ -115,8 +233,10 @@ Deno.serve(async (req: Request) => {
     p_receipt_url:  receiptUrl ?? null,
     p_reference:    referenceNumber ?? null,
     p_bank_name:    bankName ?? null,
-    p_confirmed_by: caller!.userId,
+    p_confirmed_by: caller.userId,
     p_auto_confirm: autoConfirm,
+    p_idempotency_key: idempotencyKey ?? null,
+    p_attempt_status: attemptStatus ?? null,
   });
 
   if (error) {
@@ -125,16 +245,20 @@ Deno.serve(async (req: Request) => {
   }
 
   const result = data as {
-    paymentId: number;
-    paymentCode: string;
+    attemptId?: number;
+    paymentId?: number | null;
+    paymentCode?: string | null;
+    attemptStatus?: string;
     invoiceStatus: string;
     amountPaid: number;
     balanceDue: number;
   };
 
   return successResponse({
-    paymentId:     result.paymentId,
-    paymentCode:   result.paymentCode,
+    attemptId:     result.attemptId ?? null,
+    paymentId:     result.paymentId ?? null,
+    paymentCode:   result.paymentCode ?? null,
+    attemptStatus: result.attemptStatus ?? null,
     invoiceStatus: result.invoiceStatus,
     amountPaid:    result.amountPaid,
     balanceDue:    result.balanceDue,

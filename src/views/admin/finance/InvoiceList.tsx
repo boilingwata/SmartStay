@@ -17,6 +17,7 @@ import { InvoiceAdvancedFilter } from '@/components/invoices/InvoiceAdvancedFilt
 import { BulkInvoiceModal } from '@/components/invoices/modals/BulkInvoiceModal';
 import { CreateInvoiceModal } from '@/components/invoices/modals/CreateInvoiceModal';
 import { RecordPaymentModal } from '@/components/shared/modals/RecordPaymentModal';
+import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 
 const getInvoicePeriodLabel = (period: string) => {
   const [year, month] = period.split('-');
@@ -63,6 +64,8 @@ const InvoiceList = () => {
   });
   const [page, setPage] = useState(1);
   const limit = 10;
+
+  useAdminFinanceRealtime();
 
   const isAdvancedActive = !!(
     advancedFilters.minAmount ||
