@@ -27,22 +27,29 @@ function mapRow(row: NotificationRow): Notification {
 }
 
 let notificationsTableAvailable: boolean | null = null;
+let notificationsTableCheckPromise: Promise<boolean> | null = null;
 
 async function ensureNotificationsTable(): Promise<boolean> {
   if (notificationsTableAvailable !== null) return notificationsTableAvailable;
+  if (notificationsTableCheckPromise) return notificationsTableCheckPromise;
 
-  const client = supabase as any;
-  const { error } = await client
-    .from('notifications')
-    .select('id', { head: true, count: 'exact' })
-    .limit(1);
+  notificationsTableCheckPromise = (async () => {
+    const client = supabase as any;
+    const { error } = await client
+      .from('notifications')
+      .select('id', { head: true, count: 'exact' })
+      .limit(1);
 
-  notificationsTableAvailable = !error;
-  if (error) {
-    console.warn('[notificationService] notifications table unavailable:', error.message);
-  }
+    notificationsTableAvailable = !error;
+    if (error) {
+      console.warn('[notificationService] notifications table unavailable:', error.message);
+    }
 
-  return notificationsTableAvailable;
+    notificationsTableCheckPromise = null;
+    return notificationsTableAvailable;
+  })();
+
+  return notificationsTableCheckPromise;
 }
 
 async function getCurrentProfileId(): Promise<string | null> {

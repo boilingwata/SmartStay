@@ -6,6 +6,7 @@ import { ticketService } from '@/services/ticketService';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
 
 const TicketList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'resolved' | 'all'>('active');
@@ -14,14 +15,14 @@ const TicketList: React.FC = () => {
   const { data: tenantId } = useQuery({
     queryKey: ['current-tenant-id'],
     queryFn: async () => {
-      const { data: { user } } = await import('@/lib/supabase').then((m) => m.supabase.auth.getUser());
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data: tenants } = await import('@/lib/supabase').then((m) => m.supabase
+      const { data: tenants } = await supabase
         .from('tenants')
         .select('id')
         .eq('profile_id', user.id)
         .eq('is_deleted', false)
-        .limit(1));
+        .limit(1);
       return tenants?.[0]?.id;
     },
   });
