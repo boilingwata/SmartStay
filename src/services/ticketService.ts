@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import type { DbTicketStatus, DbPriorityType } from '@/types/supabase';
 import { mapTicketStatus, mapPriority, mapRole } from '@/lib/enumMaps';
+import { z } from 'zod';
 import {
   Ticket,
   TicketComment,
@@ -54,6 +55,50 @@ interface DbTicketCommentRow {
   created_at: string | null;
   profiles: { full_name: string; avatar_url: string | null; role: string } | null;
 }
+
+const optionalNumericId = z.union([z.string(), z.number(), z.null(), z.undefined()]).transform((value, ctx) => {
+  if (value == null || value === '') return null;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Expected a positive integer id',
+    });
+    return z.NEVER;
+  }
+
+  return parsed;
+});
+
+const optionalUuid = z.union([z.string(), z.null(), z.undefined()]).transform((value, ctx) => {
+  if (!value) return null;
+
+  if (!z.string().uuid().safeParse(value).success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Expected a valid UUID',
+    });
+    return z.NEVER;
+  }
+
+  return value;
+});
+
+const createTicketInputSchema = z.object({
+  tenantId: optionalNumericId,
+  roomId: optionalNumericId,
+  title: z.string().trim().min(3, 'Title is required'),
+  description: z.string().trim().max(5000).optional().default(''),
+  type: z.string().trim().min(1, 'Category is required'),
+  priority: z.enum(['Critical', 'High', 'Medium', 'Low']).default('Medium'),
+  status: z.enum(['Open', 'InProgress', 'Resolved', 'Closed', 'Cancelled']).optional().default('Open'),
+  assignedToId: optionalUuid.optional().default(null),
+});
+
+export type CreateTicketInput = z.infer<typeof createTicketInputSchema>;
+
+const DB_TICKET_STATUSES = ['new', 'in_progress', 'pending_confirmation', 'resolved', 'closed'] as const;
 
 // ---------------------------------------------------------------------------
 // Select strings
@@ -194,6 +239,7 @@ export const ticketService = {
     priority?: string | string[];
     assignedTo?: string;
     search?: string;
+    tenantId?: string | number | null;
     buildingId?: string | number | null;
     roomId?: string | number | null;
     type?: string | string[];
@@ -208,10 +254,17 @@ export const ticketService = {
     // Server-side status filter
     if (filters?.status && filters.status !== 'All') {
       if (Array.isArray(filters.status) && filters.status.length > 0) {
-        const dbStatuses = filters.status.map(s => mapTicketStatus.toDb(s) as DbTicketStatus);
+        const dbStatuses = filters.status.map((status) => {
+          return DB_TICKET_STATUSES.includes(status as (typeof DB_TICKET_STATUSES)[number])
+            ? (status as DbTicketStatus)
+            : (mapTicketStatus.toDb(status) as DbTicketStatus);
+        });
         query = query.in('status', dbStatuses);
       } else if (!Array.isArray(filters.status)) {
-        query = query.eq('status', mapTicketStatus.toDb(filters.status) as DbTicketStatus);
+        const dbStatus = DB_TICKET_STATUSES.includes(filters.status as (typeof DB_TICKET_STATUSES)[number])
+          ? (filters.status as DbTicketStatus)
+          : (mapTicketStatus.toDb(filters.status) as DbTicketStatus);
+        query = query.eq('status', dbStatus);
       }
     }
 
@@ -237,6 +290,10 @@ export const ticketService = {
     // Server-side assignedTo filter
     if (filters?.assignedTo && filters.assignedTo !== 'All') {
       query = query.eq('assigned_to', filters.assignedTo);
+    }
+
+    if (filters?.tenantId != null && filters.tenantId !== '') {
+      query = query.eq('tenant_id', Number(filters.tenantId));
     }
 
     // Server-side roomId filter
@@ -285,19 +342,33 @@ export const ticketService = {
     return tickets;
   },
 
-  getTicketDetail: async (id: string): Promise<Ticket> => {
-    const row = (await unwrap(
-      supabase
-        .from('tickets')
-        .select(TICKET_SELECT)
-        .eq('id', Number(id))
-        .single()
-    )) as unknown as DbTicketRow;
+  getTicketDetail: async (id: string, tenantId?: string | number | null): Promise<Ticket> => {
+    let query = supabase
+      .from('tickets')
+      .select(TICKET_SELECT)
+      .eq('id', Number(id));
+
+    if (tenantId != null && tenantId !== '') {
+      query = query.eq('tenant_id', Number(tenantId));
+    }
+
+    const row = (await unwrap(query.single())) as unknown as DbTicketRow;
 
     return mapDbRowToTicket(row);
   },
 
-  getTicketComments: async (ticketId: string): Promise<TicketComment[]> => {
+  getTicketComments: async (ticketId: string, tenantId?: string | number | null): Promise<TicketComment[]> => {
+    if (tenantId != null && tenantId !== '') {
+      await unwrap(
+        supabase
+          .from('tickets')
+          .select('id')
+          .eq('id', Number(ticketId))
+          .eq('tenant_id', Number(tenantId))
+          .single()
+      );
+    }
+
     const rows = (await unwrap(
       supabase
         .from('ticket_comments')
@@ -376,29 +447,37 @@ export const ticketService = {
     };
   },
 
-  createTicket: async (
-    ticket: Omit<Ticket, 'id' | 'ticketCode' | 'createdAt' | 'updatedAt' | 'buildingId' | 'buildingName'>
-  ): Promise<Ticket> => {
-    // 1. Insert first
+  createTicket: async (ticket: CreateTicketInput): Promise<Ticket> => {
+    const parsedTicket = createTicketInputSchema.parse(ticket);
+    const { data: auth } = await supabase.auth.getUser();
+
+    if (!auth.user) {
+      throw new Error('Bạn cần đăng nhập lại trước khi gửi yêu cầu.');
+    }
+
     const { data: newRow, error: insertError } = await supabase
       .from('tickets')
       .insert({
-        tenant_id: ticket.tenantId ? Number(ticket.tenantId) : null,
-        room_id: ticket.roomId ? Number(ticket.roomId) : null,
-        subject: ticket.title,
-        description: ticket.description,
-        category: ticket.type,
-        priority: mapPriority.toDb(ticket.priority) as DbPriorityType,
-        status: mapTicketStatus.toDb(ticket.status || 'Open') as DbTicketStatus,
-        assigned_to: ticket.assignedToId || null,
-        // Calculate SLA if provided or let it use default in DB/Mapper if we had a trigger
+        tenant_id: parsedTicket.tenantId,
+        room_id: parsedTicket.roomId,
+        subject: parsedTicket.title,
+        description: parsedTicket.description || null,
+        category: parsedTicket.type,
+        priority: mapPriority.toDb(parsedTicket.priority) as DbPriorityType,
+        status: mapTicketStatus.toDb(parsedTicket.status || 'Open') as DbTicketStatus,
+        assigned_to: parsedTicket.assignedToId,
       })
       .select('id')
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      if (insertError.message.toLowerCase().includes('row-level security')) {
+        throw new Error('Tài khoản hiện tại không có quyền tạo ticket cho hồ sơ cư dân này.');
+      }
 
-    // 2. Fetch full detail to ensure joins work and ticketCode is generated
+      throw new Error(insertError.message);
+    }
+
     return ticketService.getTicketDetail(String(newRow.id));
   },
 

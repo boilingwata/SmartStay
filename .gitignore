@@ -66,10 +66,14 @@ blob-report/
 playwright/.auth/
 audit-screenshots/
 output/
+tmp/
 *-REPORT.md
 AUDIT.md
 CLAUDE.md
 IMPROVEMENTS.md
+findings.md
+progress.md
+task_plan.md
 coverage/
 .nyc_output/
 test-results*.json
@@ -77,6 +81,7 @@ junit.xml
 tmp-*/
 tmp-*.png
 tmp-*.json
+lint_output*.txt
 
 # Vite
 vite.config.d.ts

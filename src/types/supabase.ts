@@ -1,5 +1,5 @@
-// Auto-generated from smartstay schema introspection.
-// Matches all 29 tables + 1 view in the smartstay schema.
+// Generated for the smartstay schema and adjusted to match the currently connected project.
+// Keep this file aligned with the real Supabase schema; do not add speculative tables/views here.
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -664,6 +664,11 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          identity_number: string | null
+          date_of_birth: string | null
+          gender: DbGenderType | null
+          address: string | null
+          role_id: string | null
         }
         Insert: {
           id: string
@@ -674,6 +679,11 @@ export interface Database {
           tenant_stage?: DbTenantStage
           preferences?: Json | null
           is_active?: boolean | null
+          identity_number?: string | null
+          date_of_birth?: string | null
+          gender?: DbGenderType | null
+          address?: string | null
+          role_id?: string | null
         }
         Update: {
           id?: string
@@ -684,6 +694,11 @@ export interface Database {
           tenant_stage?: DbTenantStage
           preferences?: Json | null
           is_active?: boolean | null
+          identity_number?: string | null
+          date_of_birth?: string | null
+          gender?: DbGenderType | null
+          address?: string | null
+          role_id?: string | null
         }
         Relationships: []
       }

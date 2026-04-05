@@ -112,7 +112,7 @@ const AdminDashboard = () => {
   const dismissAlertMutation = useMutation({
     mutationFn: (id: string) => dashboardService.dismissAlert(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard_alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'alerts'] });
       toast.success(t('pages.dashboard.alertDismissed'));
     }
   });

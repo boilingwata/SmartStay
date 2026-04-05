@@ -83,7 +83,7 @@ const StaffMyTickets = () => {
     queryFn: () => ticketService.getTickets({ 
       assignedTo: user?.id,
       search,
-      status: ['Open', 'InProgress'] // Default Filter: Active only
+      status: ['new', 'in_progress', 'pending_confirmation'] // Default Filter: Active only
     })
   });
 

@@ -4,6 +4,7 @@ import { TenantProfile } from '@/models/Tenant';
 import { mapGender } from '@/lib/enumMaps';
 import { handleServiceError } from '@/utils/errorUtils';
 import { assertNoLikelyMojibake } from '@/utils';
+import { fileService } from './fileService';
 
 export interface PortalProfile extends TenantProfile {
   buildingName: string;
@@ -15,10 +16,6 @@ export interface PortalProfile extends TenantProfile {
     push: boolean;
   };
 }
-
-// ---------------------------------------------------------------------------
-// Internal DB row shapes
-// ---------------------------------------------------------------------------
 
 interface DbTenantProfileRow {
   id: number;
@@ -46,10 +43,6 @@ interface DbContractTenantRow {
     } | null;
   } | null;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 async function getCurrentTenantRow(): Promise<{ tenantId: number; profileId: string } | null> {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -109,10 +102,6 @@ async function getFallbackProfile(profileId: string): Promise<PortalProfile> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
 export const portalProfileService = {
   getProfile: async (): Promise<PortalProfile> => {
     try {
@@ -138,7 +127,6 @@ export const portalProfileService = {
           .single()
       ) as unknown as DbTenantProfileRow;
 
-      // Determine active contract room + building
       const contractLinks = await unwrap(
         supabase
           .from('contract_tenants')
@@ -153,12 +141,12 @@ export const portalProfileService = {
       ) as unknown as DbContractTenantRow[];
 
       const activeLink = (contractLinks ?? []).find(
-        l => l.contracts?.status === 'active' && !l.contracts?.is_deleted
+        (l) => l.contracts?.status === 'active' && !l.contracts?.is_deleted
       );
 
       const docs = row.documents as Record<string, unknown> | null;
       const vehiclePlates: string[] = Array.isArray(docs?.vehicle_plates)
-        ? (docs!.vehicle_plates as string[])
+        ? (docs.vehicle_plates as string[])
         : [];
 
       const avatarUrl = row.profiles?.avatar_url ?? '';
@@ -186,14 +174,9 @@ export const portalProfileService = {
         occupation: '',
         vehiclePlates,
         notes: (docs?.notes as string | undefined) ?? '',
-        // PortalProfile-specific fields
         avatar: avatarUrl,
         roomCode: activeLink?.contracts?.rooms?.room_code ?? '',
         buildingName: activeLink?.contracts?.rooms?.buildings?.name ?? 'SmartStay',
-        // PP-01: notificationPrefs are hardcoded to all-enabled defaults.
-        // The `profiles` and `tenants` tables have no notification preferences column.
-        // TO PERSIST USER PREFS: add a `notification_prefs` JSONB column to `profiles`
-        // or create a separate `notification_preferences` table, then query it here.
         notificationPrefs: {
           sms: true,
           email: true,
@@ -268,20 +251,9 @@ export const portalProfileService = {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Not authenticated');
 
-      const ext = file.name.split('.').pop() ?? 'jpg';
-      const path = `avatars/${user.id}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('public-assets')
-        .upload(path, file, { upsert: true });
-
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: urlData } = supabase.storage
-        .from('public-assets')
-        .getPublicUrl(path);
-
-      const avatarUrl = urlData.publicUrl;
+      const avatarUrl = await fileService.uploadFile(file, `${user.id}-${file.name}`, {
+        pathPrefix: 'avatars',
+      });
 
       await supabase
         .from('profiles')
@@ -312,7 +284,6 @@ export const portalProfileService = {
 
       const { tenantId } = context;
 
-      // tenant_feedback table does not exist — redirect to tickets table with category 'feedback'
       await unwrap(
         supabase
           .from('tickets')

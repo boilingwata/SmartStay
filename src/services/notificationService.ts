@@ -26,6 +26,25 @@ function mapRow(row: NotificationRow): Notification {
   };
 }
 
+let notificationsTableAvailable: boolean | null = null;
+
+async function ensureNotificationsTable(): Promise<boolean> {
+  if (notificationsTableAvailable !== null) return notificationsTableAvailable;
+
+  const client = supabase as any;
+  const { error } = await client
+    .from('notifications')
+    .select('id', { head: true, count: 'exact' })
+    .limit(1);
+
+  notificationsTableAvailable = !error;
+  if (error) {
+    console.warn('[notificationService] notifications table unavailable:', error.message);
+  }
+
+  return notificationsTableAvailable;
+}
+
 async function getCurrentProfileId(): Promise<string | null> {
   const {
     data: { user },
@@ -36,7 +55,10 @@ async function getCurrentProfileId(): Promise<string | null> {
 
 export const notificationService = {
   async getNotifications(profileId: string, limit = 20): Promise<Notification[]> {
-    const { data, error } = await supabase
+    if (!(await ensureNotificationsTable())) return [];
+
+    const client = supabase as any;
+    const { data, error } = await client
       .from('notifications')
       .select('id, profile_id, title, message, type, is_read, link, created_at, created_by')
       .eq('profile_id', profileId)
@@ -52,7 +74,10 @@ export const notificationService = {
   },
 
   async getUnreadCount(profileId: string): Promise<number> {
-    const { count, error } = await supabase
+    if (!(await ensureNotificationsTable())) return 0;
+
+    const client = supabase as any;
+    const { count, error } = await client
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('profile_id', profileId)
@@ -67,7 +92,10 @@ export const notificationService = {
   },
 
   async markAsRead(id: string): Promise<void> {
-    const { error } = await supabase
+    if (!(await ensureNotificationsTable())) return;
+
+    const client = supabase as any;
+    const { error } = await client
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id);
@@ -78,7 +106,10 @@ export const notificationService = {
   },
 
   async markAllAsRead(profileId: string): Promise<void> {
-    const { error } = await supabase
+    if (!(await ensureNotificationsTable())) return;
+
+    const client = supabase as any;
+    const { error } = await client
       .from('notifications')
       .update({ is_read: true })
       .eq('profile_id', profileId)
@@ -96,8 +127,13 @@ export const notificationService = {
     type?: string;
     link?: string | null;
   }): Promise<Notification> {
+    if (!(await ensureNotificationsTable())) {
+      throw new Error('Schema Supabase hiện tại chưa có bảng notifications.');
+    }
+
     const createdBy = await getCurrentProfileId();
-    const { data, error } = await supabase
+    const client = supabase as any;
+    const { data, error } = await client
       .from('notifications')
       .insert({
         profile_id: input.profileId,
@@ -118,6 +154,10 @@ export const notificationService = {
   },
 
   subscribeToNew(profileId: string, onNew: (notification: Notification) => void) {
+    if (notificationsTableAvailable === false) {
+      return () => undefined;
+    }
+
     const channel = supabase
       .channel(`notifications:${profileId}`)
       .on(

@@ -39,14 +39,16 @@ const PaymentList = () => {
     mutationFn: (id: string) => paymentService.approvePayment(id),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ['payments'] });
-      const previousPayments = queryClient.getQueryData(['payments']);
-      queryClient.setQueryData(['payments'], (old: PaymentTransaction[] | undefined) => 
+      const previousPayments = queryClient.getQueriesData<PaymentTransaction[]>({ queryKey: ['payments'] });
+      queryClient.setQueriesData({ queryKey: ['payments'] }, (old: PaymentTransaction[] | undefined) => 
         old?.map(p => p.id === id ? { ...p, status: 'Confirmed' as PaymentStatus } : p)
       );
       return { previousPayments };
     },
     onError: (err, id, context) => {
-      queryClient.setQueryData(['payments'], context?.previousPayments);
+      context?.previousPayments?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast.error('Duyệt thất bại, vui lòng thử lại');
     },
     onSuccess: () => {

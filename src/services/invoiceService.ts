@@ -715,11 +715,12 @@ export const invoiceService = {
 
     if (status) {
       if (status === 'Unpaid') {
-        query = query.in('status', ['draft', 'pending_payment', 'partially_payment'] as DbInvoiceStatus[]);
+        query = query.in('status', ['draft', 'pending_payment', 'partially_paid'] as DbInvoiceStatus[]);
       } else {
         query = query.eq('status', mapInvoiceStatus.toDb(status) as DbInvoiceStatus);
       }
     }
+    if (period) query = query.eq('billing_period', period);
     if (dueDateFrom) query = query.gte('due_date', dueDateFrom);
     if (dueDateTo) query = query.lte('due_date', dueDateTo);
 
@@ -755,16 +756,17 @@ export const invoiceService = {
         const matchesAmountRange =
           (minAmount === undefined || item.totalAmount >= minAmount) &&
           (maxAmount === undefined || item.totalAmount <= maxAmount);
-        const matchesRoom = !roomCode || item.roomCode.toLowerCase().includes(roomCode.toLowerCase());
+        const matchesRoom = !roomCode || normalizeForMatch(item.roomCode).includes(normalizeForMatch(roomCode));
 
         let matchesSearch = true;
         if (search) {
-          const s = search.toLowerCase();
+          const s = normalizeForMatch(search);
           matchesSearch =
-            item.invoiceCode.toLowerCase().includes(s) ||
-            item.tenantName.toLowerCase().includes(s) ||
-            item.roomCode.toLowerCase().includes(s) ||
-            item.contractCode.toLowerCase().includes(s);
+            normalizeForMatch(item.invoiceCode).includes(s) ||
+            normalizeForMatch(item.tenantName).includes(s) ||
+            normalizeForMatch(item.roomCode).includes(s) ||
+            normalizeForMatch(item.contractCode).includes(s) ||
+            normalizeForMatch(item.buildingName).includes(s);
         }
 
         return matchesBuilding && matchesTenant && matchesSearch && matchesAmountRange && matchesRoom;

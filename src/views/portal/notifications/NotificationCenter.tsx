@@ -140,14 +140,14 @@ const NotificationCenter = () => {
   const markAsReadMutation = useMutation({
     mutationFn: (id: string) => notificationService.markAsRead(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portal-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-notifications', profileId] });
     }
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: () => notificationService.markAllAsRead(profileId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portal-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-notifications', profileId] });
       toast.success('Đã đánh dấu tất cả đã đọc');
     }
   });

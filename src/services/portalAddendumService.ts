@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
+import { fileService } from './fileService';
 
 export interface PortalAddendum {
   id?: string;
@@ -15,29 +16,19 @@ export interface PortalAddendum {
 
 export const portalAddendumService = {
   /**
-   * Uploads a file to Supabase Storage and returns the public URL.
-   * Note: Requires 'contracts' bucket to exist.
+   * Uploads a file to the existing `smartstay-files` bucket and returns the public URL.
    */
-  uploadAddendumFile: async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-    const filePath = `addendums/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('contracts')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error(`Không thể tải tệp lên: ${uploadError.message}`);
-    }
-
-    const { data } = supabase.storage
-      .from('contracts')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
-  },
+  uploadAddendumFile: async (file: File): Promise<string> => (
+    fileService.uploadFile(file, file.name, {
+      allowedTypes: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
+      maxSize: 10 * 1024 * 1024,
+      pathPrefix: 'contracts/addendums',
+    })
+  ),
 
   /**
    * Creates a new addendum in the database.
@@ -45,11 +36,9 @@ export const portalAddendumService = {
    */
   createAddendum: async (addendum: PortalAddendum): Promise<void> => {
     if (addendum.status === 'Signed' && !addendum.fileUrl) {
-      throw new Error('RULE-06: FileUrl là bắt buộc khi trạng thái là Signed');
+      throw new Error('RULE-06: FileUrl is required when status is Signed');
     }
 
-    // FIX: Using (supabase as any) for the missing contract_addendums table.
-    // This is intentionally left as a "real" call to demonstrate the production pattern.
     await unwrap(
       (supabase as any)
         .from('contract_addendums')
@@ -61,10 +50,10 @@ export const portalAddendumService = {
           content: addendum.content,
           effective_date: addendum.effectiveDate,
           status: addendum.status,
-          file_url: addendum.fileUrl
+          file_url: addendum.fileUrl,
         })
     );
-  }
+  },
 };
 
 export default portalAddendumService;
