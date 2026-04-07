@@ -107,7 +107,7 @@ const LandingPage = () => {
               <div className="absolute -inset-4 bg-accent/20 blur-3xl rounded-full"></div>
               <img 
                 src={screenshots.admin} 
-                alt="SmartStay Dashboard" 
+                alt="Bảng điều khiển SmartStay" 
                 className="rounded-2xl shadow-2xl border-4 border-white/10 relative"
               />
             </div>

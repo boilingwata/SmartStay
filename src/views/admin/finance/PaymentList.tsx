@@ -146,7 +146,7 @@ const PaymentList = () => {
                <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">Trạng thái</label>
                <select className="input-base w-full h-11 bg-white/50">
                   <option>Tất cả trạng thái</option>
-                  <option>Đang chờ (Pending)</option>
+                  <option>Đang chờ</option>
                   <option>Đã xác nhận</option>
                   <option>Đã từ chối</option>
                   <option>Đã hoàn tiền</option>

@@ -1,4 +1,5 @@
 import tailwindAnimate from "tailwindcss-animate";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -64,7 +65,7 @@ export default {
         full: "var(--radius-full)",
       },
       fontFamily: {
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: ["Inter", ...defaultTheme.fontFamily.sans],
         display: ["Syne", "sans-serif"],
         serif: ["Times New Roman", "Georgia", "Cambria", "Times", "serif"],
         mono: ["IBM Plex Mono", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],

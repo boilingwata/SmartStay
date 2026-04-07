@@ -274,7 +274,7 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
                   <div className="w-20 h-20 rounded-3xl overflow-hidden border-2 border-primary/10 shadow-lg shrink-0 bg-white">
                     <img
                       src={avatarPreview}
-                      alt="Tenant avatar preview"
+                      alt="Xem trước ảnh đại diện cư dân"
                       className={cn('w-full h-full object-cover', avatarPreview === DEFAULT_TENANT_AVATAR_URL && 'grayscale opacity-50')}
                     />
                   </div>
@@ -282,7 +282,7 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
                     <ImageUploadCard
                       value={savedAvatarUrl || undefined}
                       label="Ảnh đại diện"
-                      alt="Tenant avatar preview"
+                      alt="Xem trước ảnh đại diện cư dân"
                       successMessage="Đã tải ảnh đại diện thành công"
                       onUploadStateChange={setIsUploadingAvatar}
                       onUploaded={(url) => {

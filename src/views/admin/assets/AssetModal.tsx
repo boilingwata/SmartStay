@@ -86,7 +86,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
            <div className="relative z-10 p-6 bg-white/5 rounded-[32px] border border-white/10 backdrop-blur-md">
               <div className="flex items-center gap-3 mb-3">
                  <div className="w-1 h-5 bg-primary rounded-full"></div>
-                 <p className="text-[9px] font-black uppercase tracking-[3px] text-white/40">Audit Logic</p>
+                 <p className="text-[9px] font-black uppercase tracking-[3px] text-white/40">Nhật ký kiểm soát</p>
               </div>
               <p className="text-[11px] italic text-white/60 leading-relaxed font-medium">
                 Dữ liệu kỹ thuật sẽ được đồng bộ trực tiếp với cơ sở dữ liệu Supabase thông qua mã định danh QR Code.

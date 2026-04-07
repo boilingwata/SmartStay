@@ -122,7 +122,7 @@ const OwnerList = () => {
         </div>
         <div className="flex items-center gap-3">
           <button className="btn-outline flex items-center gap-2 h-11 font-tnr" onClick={handleExport} disabled={!owners?.length}>
-            <Download size={18} /> Export
+            <Download size={18} /> Xuất dữ liệu
           </button>
           <button onClick={handleOpenCreate} className="btn-primary flex items-center gap-2 px-8 h-11 shadow-xl shadow-primary/20 font-tnr">
             <Plus size={18} /> Thêm chủ sở hữu

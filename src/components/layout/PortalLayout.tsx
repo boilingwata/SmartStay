@@ -21,7 +21,7 @@ const sidebarNavItems = [
   { icon: Home,     label: 'Trang chủ', route: '/portal/dashboard' },
   { icon: Receipt,  label: 'Hóa đơn',   route: '/portal/invoices'  },
   { icon: Wrench,   label: 'Yêu cầu',   route: '/portal/tickets'   },
-  { icon: Building2,label: 'Tiện ích',   route: '/portal/amenities' },
+  { icon: Building2, label: 'Tiện ích',  route: '/portal/amenities' },
   { icon: User,     label: 'Hồ sơ',     route: '/portal/profile'   },
 ];
 
@@ -40,23 +40,23 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
 
   const getTitleFromRoute = () => {
     const path = location.pathname;
-    if (path === '/portal' || path === '/portal/dashboard') return 'Dashboard';
-    if (path === '/portal/invoices') return 'Hoá đơn';
-    if (path.startsWith('/portal/invoices/')) return 'Chi tiết hoá đơn';
-    if (path === '/portal/tickets') return 'Hỗ trợ & Ticket';
+    if (path === '/portal' || path === '/portal/dashboard') return 'Tổng quan';
+    if (path === '/portal/invoices') return 'Hóa đơn';
+    if (path.startsWith('/portal/invoices/')) return 'Chi tiết hóa đơn';
+    if (path === '/portal/tickets') return 'Hỗ trợ và yêu cầu';
     if (path === '/portal/tickets/create') return 'Gửi yêu cầu mới';
-    if (path.startsWith('/portal/tickets/')) return 'Chi tiết Ticket';
+    if (path.startsWith('/portal/tickets/')) return 'Chi tiết yêu cầu';
     if (path === '/portal/amenities') return 'Tiện ích tòa nhà';
     if (path === '/portal/amenities/my-bookings') return 'Lịch đặt của tôi';
     if (path === '/portal/profile') return 'Thông tin cá nhân';
     if (path === '/portal/notifications') return 'Trung tâm thông báo';
     if (path === '/portal/visitors') return 'Đăng ký khách';
     if (path === '/portal/payments/history') return 'Lịch sử thanh toán';
-    if (path === '/portal/balance') return 'Số dư & Ví';
+    if (path === '/portal/balance') return 'Số dư và ví';
     if (path === '/portal/contract') return 'Hợp đồng thuê';
     if (path === '/portal/faq') return 'Câu hỏi thường gặp';
     if (path === '/portal/service-requests') return 'Yêu cầu dịch vụ';
-    if (path === '/portal/documents') return 'Giấy tờ hồ sơ';
+    if (path === '/portal/documents') return 'Hồ sơ giấy tờ';
     return title || 'SmartStay';
   };
 
@@ -79,7 +79,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
                 SmartStay
               </span>
               <span className="block text-[10px] font-bold uppercase tracking-[1.5px] text-white/70">
-                Portal
+                Cổng cư dân
               </span>
             </div>
           </Link>

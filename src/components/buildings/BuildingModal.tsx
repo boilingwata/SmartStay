@@ -136,7 +136,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><Building2 size={24} /></div>
               <div>
                  <h2 className="text-xl font-black uppercase tracking-widest">{isEditing ? 'Sửa thông tin toà nhà' : 'Thêm toà nhà mới'}</h2>
-                 <p className="text-[10px] text-white/60 font-medium uppercase tracking-tighter">BMS SmartStay Building Management</p>
+                  <p className="text-[10px] text-white/60 font-medium uppercase tracking-tighter">Nền tảng quản lý tòa nhà SmartStay</p>
               </div>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={24} /></button>

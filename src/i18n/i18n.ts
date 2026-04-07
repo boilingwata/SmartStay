@@ -12,7 +12,7 @@ i18n
       en: { common: enCommon },
     },
     lng: 'vi',
-    fallbackLng: 'en',
+    fallbackLng: 'vi',
     interpolation: {
       escapeValue: false,
     },

@@ -332,7 +332,7 @@ const AdminDashboard = () => {
               isExporting && "opacity-60 cursor-not-allowed"
             )}
           >
-            <Download size={18} /> <span className="hidden sm:inline">{isExporting ? 'Dang xuat...' : t('pages.dashboard.export')}</span>
+            <Download size={18} /> <span className="hidden sm:inline">{isExporting ? 'Đang xuất...' : t('pages.dashboard.export')}</span>
           </button>
         </div>
       </div>

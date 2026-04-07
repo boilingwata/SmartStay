@@ -95,7 +95,7 @@ const WebhookLogs = () => {
               <p className="text-small text-muted">Lịch sử tín hiệu từ các cổng thanh toán trực tuyến.</p>
            </div>
            <button className="btn-primary flex items-center gap-2" onClick={() => queryClient.invalidateQueries({ queryKey: ['webhookLogs'] })}>
-              <RefreshCw size={18} /> Refresh
+              <RefreshCw size={18} /> Làm mới
            </button>
         </div>
 

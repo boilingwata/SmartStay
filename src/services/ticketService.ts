@@ -1,10 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import type { DbTicketStatus, DbPriorityType } from '@/types/supabase';
+import type { DbTicketStatus, DbPriorityType, Json } from '@/types/supabase';
 import { mapTicketStatus, mapPriority, mapRole } from '@/lib/enumMaps';
 import { z } from 'zod';
+import { fileService } from '@/services/fileService';
 import {
   Ticket,
+  TicketAttachment,
   TicketComment,
   TicketStatistics,
   TicketStatus,
@@ -88,7 +90,7 @@ const optionalUuid = z.union([z.string(), z.null(), z.undefined()]).transform((v
 const createTicketInputSchema = z.object({
   tenantId: optionalNumericId,
   roomId: optionalNumericId,
-  title: z.string().trim().min(3, 'Title is required'),
+  title: z.string().trim().min(3, 'Vui lòng nhập tiêu đề'),
   description: z.string().trim().max(5000).optional().default(''),
   type: z.string().trim().min(1, 'Category is required'),
   priority: z.enum(['Critical', 'High', 'Medium', 'Low']).default('Medium'),
@@ -96,7 +98,9 @@ const createTicketInputSchema = z.object({
   assignedToId: optionalUuid.optional().default(null),
 });
 
-export type CreateTicketInput = z.infer<typeof createTicketInputSchema>;
+export type CreateTicketInput = z.infer<typeof createTicketInputSchema> & {
+  attachments?: File[];
+};
 
 const DB_TICKET_STATUSES = ['new', 'in_progress', 'pending_confirmation', 'resolved', 'closed'] as const;
 
@@ -222,11 +226,35 @@ function mapDbCommentToTicketComment(row: DbTicketCommentRow): TicketComment {
     authorId: row.author_id ?? '',
     authorName: profile?.full_name ?? 'Unknown',
     authorAvatar: profile?.avatar_url ?? undefined,
-    authorRole: profile?.role ?? 'Staff',
+    authorRole: profile?.role ?? 'Nhân viên',
     isInternal: row.is_internal ?? false,
     attachments,
     createdAt: row.created_at ?? new Date().toISOString(),
   };
+}
+
+async function uploadTicketAttachments(files: File[], uploadedBy: string): Promise<TicketAttachment[]> {
+  const uploads = await Promise.all(
+    files.map(async (file) => {
+      const fileUrl = await fileService.uploadFile(file, file.name, {
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        maxSize: 5 * 1024 * 1024,
+        pathPrefix: `tickets/${uploadedBy}`,
+      });
+
+      return {
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        fileUrl,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedBy,
+        createdAt: new Date().toISOString(),
+      } satisfies TicketAttachment;
+    })
+  );
+
+  return uploads;
 }
 
 // ---------------------------------------------------------------------------
@@ -449,6 +477,7 @@ export const ticketService = {
 
   createTicket: async (ticket: CreateTicketInput): Promise<Ticket> => {
     const parsedTicket = createTicketInputSchema.parse(ticket);
+    const attachments = Array.isArray(ticket.attachments) ? ticket.attachments : [];
     const { data: auth } = await supabase.auth.getUser();
 
     if (!auth.user) {
@@ -476,6 +505,24 @@ export const ticketService = {
       }
 
       throw new Error(insertError.message);
+    }
+
+    if (attachments.length > 0 || parsedTicket.description.trim()) {
+      const uploadedAttachments = attachments.length > 0
+        ? await uploadTicketAttachments(attachments, auth.user.id)
+        : [];
+
+      await unwrap(
+        supabase
+          .from('ticket_comments')
+          .insert({
+            ticket_id: newRow.id,
+            author_id: auth.user.id,
+            content: parsedTicket.description.trim() || 'Đính kèm hình ảnh mô tả ban đầu.',
+            is_internal: false,
+            attachments: uploadedAttachments as unknown as Json,
+          })
+      );
     }
 
     return ticketService.getTicketDetail(String(newRow.id));
@@ -537,7 +584,8 @@ export const ticketService = {
   addComment: async (
     ticketId: string,
     content: string,
-    isInternal: boolean = false
+    isInternal: boolean = false,
+    attachments: TicketAttachment[] = []
   ): Promise<TicketComment> => {
     const { data: user } = await supabase.auth.getUser();
 
@@ -549,6 +597,7 @@ export const ticketService = {
           author_id: user.user?.id ?? null,
           content,
           is_internal: isInternal,
+          attachments: attachments as unknown as Json,
         })
         .select(COMMENT_SELECT)
         .single()

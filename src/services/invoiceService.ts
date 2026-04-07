@@ -711,7 +711,8 @@ export const invoiceService = {
     // 1. Base query (apply basic filters that work directly on `invoices` table)
     let query = supabase
       .from('invoices')
-      .select(INVOICE_SELECT, { count: 'exact' });
+      .select(INVOICE_SELECT, { count: 'exact' })
+      .order('due_date', { ascending: false });
 
     if (status) {
       if (status === 'Unpaid') {
@@ -775,8 +776,14 @@ export const invoiceService = {
 
     const filteredTotal = isInMemoryNeeded ? items.length : (count ?? 0);
 
-    // Apply client-side pagination on the filtered results
+    // Apply client-side sort + pagination on the filtered results
     if (isInMemoryNeeded) {
+      // Sort newest due_date first (mirrors the DB order)
+      items.sort((a, b) => {
+        const aTime = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const bTime = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return bTime - aTime;
+      });
       const start = (typedPage - 1) * typedLimit;
       items = items.slice(start, start + typedLimit);
     }

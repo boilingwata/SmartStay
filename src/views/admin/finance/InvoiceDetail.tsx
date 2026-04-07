@@ -55,11 +55,11 @@ const InvoiceDetail = () => {
       (async () => {
         // In production: const response = await fetch(`/api/invoices/${id}/pdf`);
         // const blob = await response.blob();
-        const blob = new Blob(['Invoice PDF Content'], { type: 'application/pdf' });
+        const blob = new Blob(['Nội dung PDF hóa đơn'], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `Invoice-${invoice.invoiceCode}.pdf`);
+        link.setAttribute('download', `Hoa-don-${invoice.invoiceCode}.pdf`);
         document.body.appendChild(link);
         link.click();
         link.remove();

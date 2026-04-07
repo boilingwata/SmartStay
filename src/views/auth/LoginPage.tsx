@@ -285,7 +285,7 @@ const LoginPage = () => {
                     onClick={() => setQuickLogin('admin@smartstay.vn', 'Admin@123456')}
                     className="flex flex-col items-center p-4 px-10 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group w-full"
                   >
-                     <span className="text-xs font-black text-primary uppercase tracking-tighter">System Admin</span>
+                     <span className="text-xs font-black text-primary uppercase tracking-tighter">Quản trị hệ thống</span>
                      <span className="text-[9px] text-muted font-bold uppercase tracking-widest mt-1">Quản trị viên</span>
                   </button>
                </div>

@@ -7,6 +7,7 @@ import { ticketService } from '@/services/ticketService';
 import { cn } from '@/utils';
 import { Spinner } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { TicketAttachmentGallery } from '@/components/tickets/TicketAttachmentGallery';
 
 const TicketDetail: React.FC = () => {
   const { id } = useParams();
@@ -62,6 +63,7 @@ const TicketDetail: React.FC = () => {
   };
 
   const isLoading = ticketLoading || commentsLoading;
+  const initialAttachments = comments.find((comment) => comment.attachments.length > 0)?.attachments ?? [];
 
   if (isLoading) {
     return (
@@ -177,6 +179,11 @@ const TicketDetail: React.FC = () => {
                     <p className="text-[15px] text-slate-700 leading-relaxed font-medium tracking-tight italic">"{ticket.description}"</p>
                   </div>
                 </div>
+                {initialAttachments.length > 0 && (
+                  <div className="relative z-10">
+                    <TicketAttachmentGallery attachments={initialAttachments} />
+                  </div>
+                )}
               </div>
 
               <button
@@ -214,8 +221,11 @@ const TicketDetail: React.FC = () => {
                             : 'bg-teal-600 text-white rounded-br-none shadow-teal-600/20'
                         )}>
                           {isStaff && <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest mb-2 opacity-70">Ban quản lý</p>}
-                          <p className="text-[15px] font-black leading-relaxed tracking-tight">{msg.content}</p>
-                        </div>
+	                          <p className="text-[15px] font-black leading-relaxed tracking-tight">{msg.content}</p>
+	                          {msg.attachments.length > 0 && (
+	                            <TicketAttachmentGallery attachments={msg.attachments} compact className="mt-4" />
+	                          )}
+	                        </div>
                         <p className={cn('text-[9px] text-slate-300 font-black uppercase tracking-widest px-2', isStaff ? 'text-left' : 'text-right')}>
                           {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(msg.createdAt).toLocaleDateString('vi-VN')}
                         </p>

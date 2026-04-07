@@ -13,7 +13,7 @@ import { ticketService } from '@/services/ticketService';
 import { useQuery } from '@tanstack/react-query';
 
 // Safe Font Stack for Vietnamese
-const SAFE_FONT = { fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
+const SAFE_FONT = { fontFamily: '"Inter", system-ui, sans-serif', fontVariantNumeric: 'tabular-nums' as const };
 
 interface FilterState {
   buildingId: string;

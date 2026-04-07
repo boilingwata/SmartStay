@@ -214,7 +214,7 @@ export const AnnouncementModal = ({ isOpen, onClose, initialData, onSubmit, isSu
                              >
                                 <option value="Published">Phát ngay (Published)</option>
                                 <option value="Scheduled">Hẹn giờ (Scheduled)</option>
-                                <option value="Draft">Bản nháp (Draft)</option>
+                                <option value="Draft">Bản nháp</option>
                              </select>
                           </div>
                           

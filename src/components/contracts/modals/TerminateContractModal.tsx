@@ -46,7 +46,7 @@ export const TerminateContractModal = ({ isOpen, onClose, contract }: TerminateC
               
               <div className="bg-danger/5 p-4 rounded-xl border border-danger/10 flex items-start gap-3 text-left">
                 <Info size={18} className="text-danger shrink-0 mt-0.5" />
-                <p className="text-[11px] text-danger font-bold uppercase">Lưu ý: Hệ thống sẽ tự động cập nhật nhật ký hoạt động (Audit Log) cho hành động này.</p>
+                <p className="text-[11px] text-danger font-bold uppercase">Lưu ý: Hệ thống sẽ tự động cập nhật nhật ký hoạt động cho hành động này.</p>
               </div>
             </div>
           ) : (

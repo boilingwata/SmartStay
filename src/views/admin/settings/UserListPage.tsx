@@ -66,7 +66,7 @@ const UserListPage: React.FC = () => {
     try {
       await userService.toggleUserStatus(user.id);
       await auditService.logAction({
-        action: 'Toggle Status',
+        action: 'Chuyển trạng thái',
         entityType: 'Profiles',
         entityId: user.id,
         newValues: { isActive: !user.isActive }
@@ -365,7 +365,7 @@ const UserListPage: React.FC = () => {
                <div>
                   <h4 className="text-sm font-bold text-slate-800 tracking-tight">Tính bảo mật và minh bạch</h4>
                   <p className="text-xs text-slate-400 font-medium max-w-xl">
-                    Mọi thao tác thay đổi vai trò hoặc trạng thái tài khoản đều được lưu lại trong hệ thống Audit Logs. Hãy đảm bảo bạn tuân thủ các chính sách bảo mật của SmartStay.
+                    Mọi thao tác thay đổi vai trò hoặc trạng thái tài khoản đều được lưu lại trong nhật ký hoạt động. Hãy đảm bảo bạn tuân thủ các chính sách bảo mật của SmartStay.
                   </p>
                </div>
             </div>

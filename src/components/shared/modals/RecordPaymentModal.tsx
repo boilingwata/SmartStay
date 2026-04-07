@@ -363,7 +363,7 @@ export const RecordPaymentModal = ({
                   {isUploadingProof ? (
                     <Loader2 size={24} className="text-primary animate-spin" />
                   ) : proofPreviewUrl ? (
-                    <img src={proofPreviewUrl} alt="Payment proof preview" className="h-24 w-full object-cover rounded-2xl" />
+                    <img src={proofPreviewUrl} alt="Xem trước minh chứng thanh toán" className="h-24 w-full object-cover rounded-2xl" />
                   ) : isProofPdf ? (
                     <FileText size={24} className="text-primary" />
                   ) : (
@@ -429,7 +429,7 @@ export const RecordPaymentModal = ({
                     <div className="absolute -inset-4 bg-blue-500/10 rounded-[40px] blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
                     <img 
                       src={qrUrl} 
-                      alt="VietQR Payment" 
+                      alt="Mã VietQR thanh toán" 
                       className="relative w-48 h-48 object-contain bg-white p-2 rounded-2xl shadow-xl shadow-blue-500/10 border-4 border-white" 
                     />
                   </div>

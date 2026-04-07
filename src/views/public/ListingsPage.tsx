@@ -101,7 +101,7 @@ const ListingsPage: React.FC = () => {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 backdrop-blur-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Available now</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Có thể vào ở ngay</p>
                 <p className="mt-2 text-3xl font-black">{listings.length}</p>
               </div>
               <div className="rounded-[28px] border border-white/10 bg-slate-950/20 p-5 backdrop-blur-sm">

@@ -141,7 +141,7 @@ const ContractDetail = () => {
       <section className="rounded-[28px] border border-slate-100 bg-white p-5 shadow-xl shadow-slate-200/40 sm:p-6 lg:p-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 overflow-hidden text-[10px] font-black uppercase tracking-[2px] text-slate-400">
           <Link to="/admin/dashboard" className="flex items-center gap-1 transition-colors hover:text-primary">
-            <Home size={12} /> Dashboard
+            <Home size={12} /> Tổng quan
           </Link>
           <ChevronRight size={14} className="text-slate-300" />
           <Link to="/admin/contracts" className="transition-colors hover:text-primary">

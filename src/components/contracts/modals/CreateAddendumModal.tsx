@@ -123,7 +123,7 @@ export const CreateAddendumModal = ({ isOpen, onClose, contract }: CreateAddendu
                 value={formData.status} 
                 onChange={(e) => setFormData({...formData, status: e.target.value})}
               >
-                <option value="Draft">Bản nháp (Draft)</option>
+                <option value="Draft">Bản nháp</option>
                 <option value="Signed">Đã ký (Signed)</option>
                 <option value="Cancelled">Đã hủy (Cancelled)</option>
               </select>

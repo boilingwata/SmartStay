@@ -1,151 +1,266 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { mapTicketStatus, mapPriority } from '@/lib/enumMaps';
+import { mapPriority, mapTicketStatus } from '@/lib/enumMaps';
 import type { DbInvoiceStatus } from '@/types/supabase';
-import { RecentTicket } from '../models/Dashboard';
-import { TenantBalance } from '../models/TenantBalance';
-import { Announcement } from '../types/announcement';
-import { ContractDetail } from '../models/Contract';
+import type { Notification } from '@/types/notification';
+import type { RecentTicket } from '@/models/Dashboard';
+import type { TenantBalance } from '@/models/TenantBalance';
+import type { ContractDetail } from '@/models/Contract';
+import notificationService from '@/services/notificationService';
+import portalService from '@/services/portalService';
+import portalOnboardingService, { type PortalOnboardingStatus } from '@/services/portalOnboardingService';
 
-export interface OnboardingStatus {
-  completionPercent: number;
-  steps: {
-    isPersonalInfoConfirmed: boolean;
-    isCCCDUploaded: boolean;
-    isEmergencyContactAdded: boolean;
-    isRoomHandovered: boolean;
-    isDepositPaid: boolean;
-    isContractSigned: boolean;
-  };
+type TenantContext = {
+  profileId: string;
+  tenantId: number;
+  contractIds: number[];
+};
+
+type TenantBalanceRow = {
+  tenant_id: number;
+  balance: number | null;
+  last_updated: string | null;
+};
+
+type InvoiceRow = {
+  id: number;
+  invoice_code: string;
+  total_amount: number | null;
+  due_date: string | null;
+  status: DbInvoiceStatus | null;
+};
+
+type TicketRow = {
+  id: number;
+  ticket_code: string;
+  subject: string;
+  priority: string;
+  status: string;
+  created_at: string;
+  updated_at: string | null;
+  rooms: {
+    room_code: string;
+  } | null;
+};
+
+export interface DashboardInvoice {
+  id: string;
+  invoiceCode: string;
+  title: string;
+  amount: number;
+  dueDate: string | null;
+  status: DbInvoiceStatus | null;
 }
 
 export interface DashboardSummary {
+  context: {
+    profileId: string | null;
+    tenantId: number | null;
+    contractIds: number[];
+  };
   balance: TenantBalance;
   pendingInvoicesCount: number;
   totalPendingAmount: number;
-  upcomingInvoices: any[];
+  upcomingInvoices: DashboardInvoice[];
   recentTickets: RecentTicket[];
-  hotAnnouncements: Announcement[];
+  hotAnnouncements: Notification[];
   activeContract: ContractDetail | null;
-  onboarding: OnboardingStatus;
+  onboarding: PortalOnboardingStatus;
 }
 
-async function resolveTenantId(): Promise<string | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+async function getTenantContext(): Promise<TenantContext | null> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  const rows = await unwrap(
-    supabase.from('tenants').select('id').eq('profile_id', user.id).limit(1)
-  ) as unknown as { id: number }[];
+  if (authError) {
+    throw new Error(authError.message);
+  }
 
-  return rows[0]?.id?.toString() ?? null;
+  if (!user) {
+    return null;
+  }
+
+  const tenantRows = (await unwrap(
+    supabase
+      .from('tenants')
+      .select('id')
+      .eq('profile_id', user.id)
+      .eq('is_deleted', false)
+      .limit(1)
+  )) as unknown as Array<{ id: number }>;
+
+  const tenantId = tenantRows[0]?.id;
+  if (!tenantId) {
+    return null;
+  }
+
+  const contractRows = (await unwrap(
+    supabase
+      .from('contract_tenants')
+      .select('contract_id')
+      .eq('tenant_id', tenantId)
+  )) as unknown as Array<{ contract_id: number }>;
+
+  return {
+    profileId: user.id,
+    tenantId,
+    contractIds: contractRows.map((row) => row.contract_id),
+  };
+}
+
+function buildEmptySummary(tenantId?: number): DashboardSummary {
+  const now = new Date().toISOString();
+
+  return {
+    context: {
+      profileId: null,
+      tenantId: tenantId ?? null,
+      contractIds: [],
+    },
+    balance: {
+      tenantId: tenantId ? String(tenantId) : '',
+      currentBalance: 0,
+      lastUpdated: now,
+      lastUpdatedAt: now,
+    },
+    pendingInvoicesCount: 0,
+    totalPendingAmount: 0,
+    upcomingInvoices: [],
+    recentTickets: [],
+    hotAnnouncements: [],
+    activeContract: null,
+    onboarding: {
+      completionPercent: 0,
+      steps: {
+        isPersonalInfoConfirmed: false,
+        isCCCDUploaded: false,
+        isEmergencyContactAdded: false,
+        isRoomHandovered: false,
+        isDepositPaid: false,
+        isContractSigned: false,
+      },
+    },
+  };
+}
+
+function toDashboardInvoice(row: InvoiceRow): DashboardInvoice {
+  return {
+    id: String(row.id),
+    invoiceCode: row.invoice_code,
+    title: row.invoice_code,
+    amount: Number(row.total_amount ?? 0),
+    dueDate: row.due_date,
+    status: row.status,
+  };
+}
+
+function toRecentTicket(row: TicketRow): RecentTicket {
+  return {
+    id: String(row.id),
+    ticketCode: row.ticket_code,
+    title: row.subject,
+    roomName: row.rooms?.room_code ?? '',
+    priority: mapPriority.fromDb(row.priority) as RecentTicket['priority'],
+    status: mapTicketStatus.fromDb(row.status) as RecentTicket['status'],
+    createdAt: row.created_at,
+    slaDeadline: row.updated_at ?? row.created_at,
+  };
+}
+
+async function fetchBalance(tenantId: number): Promise<TenantBalance> {
+  const row = (await unwrap(
+    supabase
+      .from('tenant_balances')
+      .select('tenant_id, balance, last_updated')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+  )) as unknown as TenantBalanceRow | null;
+
+  const lastUpdated = row?.last_updated ?? new Date().toISOString();
+
+  return {
+    tenantId: String(tenantId),
+    currentBalance: Number(row?.balance ?? 0),
+    lastUpdated,
+    lastUpdatedAt: lastUpdated,
+  };
+}
+
+async function fetchUpcomingInvoices(contractIds: number[]): Promise<DashboardInvoice[]> {
+  if (contractIds.length === 0) {
+    return [];
+  }
+
+  const rows = (await unwrap(
+    supabase
+      .from('invoices')
+      .select('id, invoice_code, total_amount, due_date, status')
+      .in('contract_id', contractIds)
+      .in('status', ['draft', 'pending_payment', 'partially_paid', 'overdue'] satisfies DbInvoiceStatus[])
+      .order('due_date', { ascending: true })
+      .limit(5)
+  )) as unknown as InvoiceRow[];
+
+  return rows.map(toDashboardInvoice);
+}
+
+async function fetchRecentTickets(tenantId: number): Promise<RecentTicket[]> {
+  const rows = (await unwrap(
+    supabase
+      .from('tickets')
+      .select('id, ticket_code, subject, priority, status, created_at, updated_at, rooms(room_code)')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+  )) as unknown as TicketRow[];
+
+  return rows.map(toRecentTicket);
 }
 
 export const tenantDashboardService = {
-  getSummary: async (): Promise<DashboardSummary> => {
-    const tenantId = await resolveTenantId();
+  async getSummary(): Promise<DashboardSummary> {
+    try {
+      const context = await getTenantContext();
+      if (!context) {
+        return buildEmptySummary();
+      }
 
-    const emptyResult: DashboardSummary = {
-      balance: { tenantId: tenantId ?? '', currentBalance: 0, lastUpdated: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() },
-      pendingInvoicesCount: 0,
-      totalPendingAmount: 0,
-      upcomingInvoices: [],
-      recentTickets: [],
-      hotAnnouncements: [],
-      activeContract: null,
-      onboarding: {
-        completionPercent: 0,
-        steps: {
-          isPersonalInfoConfirmed: false,
-          isCCCDUploaded: false,
-          isEmergencyContactAdded: false,
-          isRoomHandovered: false,
-          isDepositPaid: false,
-          isContractSigned: false,
+      const emptySummary = buildEmptySummary(context.tenantId);
+
+      const [balance, upcomingInvoices, recentTickets, hotAnnouncements, activeContract, onboarding] = await Promise.all([
+        fetchBalance(context.tenantId),
+        fetchUpcomingInvoices(context.contractIds),
+        fetchRecentTickets(context.tenantId),
+        notificationService.getNotifications(context.profileId, 3),
+        portalService.getActiveContract(),
+        portalOnboardingService.getStatusForProfile(context.profileId),
+      ]);
+
+      const totalPendingAmount = upcomingInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+
+      return {
+        ...emptySummary,
+        context: {
+          profileId: context.profileId,
+          tenantId: context.tenantId,
+          contractIds: context.contractIds,
         },
-      },
-    };
-
-    if (!tenantId) return emptyResult;
-
-    // Fetch data in parallel
-    interface BalanceRow { balance_after: number }
-    interface InvoiceRow { id: number; total_amount: number; due_date: string; status: string; contracts?: { contract_tenants?: { tenant_id: number }[] } | null }
-    interface TicketRow { id: number; ticket_code: string; subject: string; priority: string; status: string; created_at: string; rooms: { room_code: string } | null }
-
-    const [balanceRows, invoiceRows, ticketRows] = await Promise.all([
-      // Balance
-      unwrap(
-        supabase.from('balance_history')
-          .select('balance_after')
-          .eq('tenant_id', Number(tenantId))
-          .order('created_at', { ascending: false })
-          .limit(1)
-      ).catch(() => []) as Promise<unknown>,
-
-      // Pending invoices via contract_tenants
-      unwrap(
-        supabase.from('invoices')
-          .select('id, total_amount, due_date, status, contracts!inner(contract_tenants!inner(tenant_id))')
-          .in('status', ['draft', 'pending_payment', 'partially_paid'] as DbInvoiceStatus[])
-          .order('due_date', { ascending: true })
-          .limit(5)
-      ).catch(() => []) as Promise<unknown>,
-
-      // Recent tickets
-      unwrap(
-        supabase.from('tickets')
-          .select('id, ticket_code, subject, priority, status, created_at, rooms(room_code)')
-          .eq('tenant_id', Number(tenantId))
-          .order('created_at', { ascending: false })
-          .limit(5)
-      ).catch(() => []) as Promise<unknown>,
-    ]);
-
-    const typedBalance = balanceRows as BalanceRow[];
-    const typedInvoices = invoiceRows as InvoiceRow[];
-    const typedTickets = ticketRows as TicketRow[];
-
-    const currentBalance = typedBalance[0]?.balance_after ?? 0;
-
-    // C-07: Filter invoices to only the current tenant's invoices (in-memory, based on joined contract_tenants)
-    const tenantInvoices = typedInvoices.filter(inv => {
-      const cts = inv.contracts?.contract_tenants;
-      return Array.isArray(cts) && cts.some(ct => ct.tenant_id === Number(tenantId));
-    });
-
-    const totalPendingAmount = tenantInvoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
-
-    const recentTickets: RecentTicket[] = typedTickets.map((t) => ({
-      id: String(t.id),
-      ticketCode: t.ticket_code,
-      title: t.subject,          // C-01: DB column is `subject`, not `title`
-      roomName: t.rooms?.room_code ?? '',
-      priority: mapPriority.fromDb(t.priority) as RecentTicket['priority'],
-      status: mapTicketStatus.fromDb(t.status) as RecentTicket['status'],
-      createdAt: t.created_at,
-      slaDeadline: t.created_at, // C-01: sla_deadline không tồn tại trong DB, dùng created_at
-    }));
-
-    return {
-      ...emptyResult,
-      balance: {
-        tenantId: tenantId,
-        currentBalance,
-        lastUpdated: new Date().toISOString(),
-        lastUpdatedAt: new Date().toISOString(),
-      },
-      pendingInvoicesCount: tenantInvoices.length,
-      totalPendingAmount,
-      upcomingInvoices: tenantInvoices.map((inv) => ({
-        id: String(inv.id),
-        title: `Hóa đơn #${inv.id}`,
-        amount: inv.total_amount,
-        dueDate: inv.due_date,
-      })),
-      recentTickets,
-    };
-  }
+        balance,
+        pendingInvoicesCount: upcomingInvoices.length,
+        totalPendingAmount,
+        upcomingInvoices,
+        recentTickets,
+        hotAnnouncements,
+        activeContract,
+        onboarding,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Khong the tai du lieu dashboard.';
+      throw new Error(message);
+    }
+  },
 };
 
 export default tenantDashboardService;

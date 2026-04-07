@@ -1,9 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&subset=latin,latin-ext&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    font-family: "Inter", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+
     /* Semantic Colors */
     --primary: #1B3A6B;
     --primary-foreground: #FFFFFF;
@@ -79,12 +84,31 @@
     color: var(--foreground);
   }
 
+  *,
+  *::before,
+  *::after {
+    font-family: inherit;
+  }
+
   body {
     @apply bg-slate-100 text-foreground;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     word-break: break-word;
     overflow-wrap: anywhere;
+  }
+
+  td,
+  th,
+  .price,
+  .stat,
+  .badge,
+  .counter,
+  .number {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 
   /* Premium Backgrounds */

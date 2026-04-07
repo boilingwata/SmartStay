@@ -53,8 +53,36 @@ lerna-debug.log*
 # AI & Tooling
 .agent/
 .agents/
+.adal/
+.augment/
+.bob/
 .claude/
+.codebuddy/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.factory/
+.goose/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
 .qodo/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/
 .mcp.json
 skills-lock.json
 *.tmp
@@ -62,6 +90,7 @@ skills-lock.json
 .next
 .supabase/
 supabase/.temp/
+skills/
 
 # Secrets / credentials
 *.pem
@@ -83,6 +112,9 @@ playwright/.auth/
 audit-screenshots/
 output/
 tmp/
+tmp-*/
+tmp-*.png
+tmp-*.json
 *-REPORT.md
 AUDIT.md
 CLAUDE.md
@@ -94,9 +126,6 @@ coverage/
 .nyc_output/
 test-results*.json
 junit.xml
-tmp-*/
-tmp-*.png
-tmp-*.json
 lint_output*.txt
 
 # Vite

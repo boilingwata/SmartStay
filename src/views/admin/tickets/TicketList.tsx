@@ -23,7 +23,7 @@ import StaffMyTickets from '@/views/admin/StaffMyTickets';
 import { QuickFilterChips, QuickFilterOption } from '@/components/ui/QuickFilterChips';
 
 // Safe Font Stack for Vietnamese
-const SAFE_FONT = { fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' };
+const SAFE_FONT = { fontFamily: '"Inter", system-ui, sans-serif', fontVariantNumeric: 'tabular-nums' as const };
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
   Critical: 'bg-[#DC2626]',

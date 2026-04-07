@@ -14,6 +14,7 @@ import { cn } from '@/utils';
 import { format, parseISO, differenceInMinutes, formatDistanceToNow, isAfter, subDays } from 'date-fns';
 import { vi } from 'date-fns/locale/vi';
 import { toast } from 'sonner';
+import { TicketAttachmentGallery } from '@/components/tickets/TicketAttachmentGallery';
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
   Critical: 'text-[#DC2626] bg-[#DC2626]/10 border-[#DC2626]/20',
@@ -104,6 +105,7 @@ const TicketDetail = () => {
   const canEditComment = (createdAt: string) => {
     return differenceInMinutes(new Date(), parseISO(createdAt)) <= 5;
   };
+  const initialAttachments = comments?.find((comment) => comment.attachments.length > 0)?.attachments ?? [];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -161,10 +163,13 @@ const TicketDetail = () => {
                        <MessageSquare size={16} />
                        <span>Mô tả chi tiết</span>
                     </div>
-                    <div className="text-body text-primary leading-relaxed whitespace-pre-wrap font-medium opacity-90">
-                       {ticket.description}
-                    </div>
-                 </div>
+	                    <div className="text-body text-primary leading-relaxed whitespace-pre-wrap font-medium opacity-90">
+	                       {ticket.description}
+	                    </div>
+	                    {initialAttachments.length > 0 && (
+	                      <TicketAttachmentGallery attachments={initialAttachments} />
+	                    )}
+	                 </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="card-container p-6 bg-white shadow-sm border-border/10 hover:shadow-md transition-all">
@@ -285,10 +290,13 @@ const TicketDetail = () => {
                                 </div>
                              )}
                           </div>
-                          <div className="card-container p-6 bg-white shadow-sm border-border/5 text-body font-medium text-primary">
-                             {comment.content}
-                          </div>
-                       </div>
+	                          <div className="card-container p-6 bg-white shadow-sm border-border/5 text-body font-medium text-primary">
+	                             {comment.content}
+	                             {comment.attachments.length > 0 && (
+	                               <TicketAttachmentGallery attachments={comment.attachments} compact className="mt-5" />
+	                             )}
+	                          </div>
+	                       </div>
                     </div>
                  ))}
               </div>

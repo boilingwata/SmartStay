@@ -104,7 +104,7 @@ function toPublicListing(row: PublicListingRow): PublicListing {
     hasPrivateBathroom: row.has_private_bathroom ?? false,
     facing: row.facing ?? undefined,
     conditionScore: row.condition_score,
-    availabilityLabel: row.availability_status === 'available_now' ? 'Available now' : 'Open for booking',
+    availabilityLabel: row.availability_status === 'available_now' ? 'Có thể vào ở ngay' : 'Đang nhận đặt chỗ',
     buildingId: String(row.building_id),
     buildingName: row.building_name,
     buildingAddress: row.building_address,
@@ -235,7 +235,7 @@ export const publicListingsService = {
   submitApplication: async (roomId: string, form: RentalApplicationFormData): Promise<RentalApplicationSummary> => {
     const profile = await getCurrentProfile();
     if (!profile) {
-      throw new Error('Please sign in before submitting an application.');
+      throw new Error('Vui lòng đăng nhập trước khi gửi đơn đăng ký.');
     }
 
     if (profile.role !== 'tenant') {

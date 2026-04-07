@@ -391,7 +391,7 @@ function pickPrimaryTenant(row: InvoiceRow): { fullName: string; phone: string |
   const tenants = row.contracts?.contract_tenants ?? [];
   const primary = tenants.find((tenant) => tenant.is_primary) ?? tenants[0];
   return {
-    fullName: primary?.tenants?.full_name ?? 'Unknown guest',
+    fullName: primary?.tenants?.full_name ?? 'Khách thuê chưa xác định',
     phone: primary?.tenants?.phone ?? null,
   };
 }
@@ -484,11 +484,11 @@ function applyInvoiceFilters(items: PortalInvoice[], filters?: InvoiceFilters): 
 
 function ensureValidPaymentAmount(invoice: PortalInvoice, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('Payment amount must be greater than 0.');
+    throw new Error('Số tiền thanh toán phải lớn hơn 0.');
   }
 
   if (amount > invoice.balance) {
-    throw new Error('Payment amount cannot exceed the remaining balance.');
+    throw new Error('Số tiền thanh toán không được vượt quá số dư còn lại.');
   }
 }
 
@@ -515,8 +515,8 @@ async function fetchBankTransferDetails(): Promise<PortalBankDetails | null> {
   }
 
   const row = (await unwrap(
-    supabase
-      .from('system_settings')
+    (supabase as any)
+      .from('portal_payment_settings')
       .select('value')
       .eq('key', 'payment.bank_transfer_details')
       .maybeSingle()
@@ -569,7 +569,7 @@ async function recordInvoicePayment(
 
   const rpcResult = data as PaymentRpcResult | null;
   if (!rpcResult?.attemptId && !rpcResult?.paymentId) {
-    throw new Error('Payment request was not recorded correctly.');
+    throw new Error('Yêu cầu thanh toán chưa được ghi nhận chính xác.');
   }
 
   return fetchInvoiceById(invoiceId);

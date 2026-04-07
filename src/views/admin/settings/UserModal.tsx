@@ -104,7 +104,7 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
       if (isEdit) {
         await userService.updateUser(user!.id, formData);
         await auditService.logAction({
-          action: 'Update User',
+          action: 'Cập nhật người dùng',
           entityType: 'Profiles',
           entityId: user!.id,
           newValues: formData
@@ -404,7 +404,7 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
             <ImageUploadCard
               value={formData.avatar}
               label="Ảnh đại diện"
-              alt="User avatar preview"
+              alt="Xem trước ảnh đại diện người dùng"
               successMessage="Đã tải ảnh đại diện thành công"
               onUploaded={(url) => setFormData(prev => ({ ...prev, avatar: url }))}
             />

@@ -9,14 +9,14 @@ interface TitleMap {
 const titleMap: TitleMap = {
   '/dashboard': 'nav.dashboard',
   '/contracts': 'nav.contracts',
-  '/contracts/create': 'HD - Tạo mới',
-  '/invoices': 'nav.management',
-  '/rooms': 'Quản lý Phòng',
+  '/contracts/create': 'Hợp đồng - Tạo mới',
+  '/invoices': 'Hóa đơn',
+  '/rooms': 'Quản lý phòng',
   '/buildings': 'Tòa nhà',
   '/tenants': 'Cư dân',
   '/public/login': 'Đăng nhập',
   '/public/register': 'Đăng ký',
-  '/portal': 'Tenant Portal',
+  '/portal': 'Cổng cư dân',
 };
 
 export const PageTitle = () => {

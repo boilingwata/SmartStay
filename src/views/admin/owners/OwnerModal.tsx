@@ -232,7 +232,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                   <img
                     src={avatarPreview}
                     className={cn('w-full h-full object-cover', avatarPreview === DEFAULT_OWNER_AVATAR_URL && 'grayscale opacity-50')}
-                    alt="Owner avatar preview"
+                    alt="Xem trước ảnh đại diện chủ sở hữu"
                   />
                 </div>
 
@@ -240,7 +240,7 @@ export const OwnerModal = ({ isOpen, onClose, initialData, onSubmit, isSubmittin
                   <ImageUploadCard
                     value={savedAvatarUrl || undefined}
                     label="Ảnh đại diện"
-                    alt="Owner avatar preview"
+                    alt="Xem trước ảnh đại diện chủ sở hữu"
                     successMessage="Đã tải ảnh đại diện thành công"
                     onUploadStateChange={setIsUploadingAvatar}
                     onUploaded={(url) => {

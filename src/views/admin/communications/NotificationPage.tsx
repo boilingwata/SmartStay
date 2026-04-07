@@ -115,11 +115,11 @@ const NotificationPage = () => {
                   <div className="space-y-4 pt-2">
                      <div className="flex items-center justify-between">
                         <span className="text-small font-medium text-white/80 flex items-center gap-2 italic underline underline-offset-4 decoration-success decoration-2">SMS Gateway</span>
-                        <span className="text-[10px] font-black text-success">Active</span>
+                    <span className="text-[10px] font-black text-success">Đang hoạt động</span>
                      </div>
                      <div className="flex items-center justify-between">
                         <span className="text-small font-medium text-white/80 flex items-center gap-2 italic underline underline-offset-4 decoration-success decoration-2">Firebase Cloud</span>
-                        <span className="text-[10px] font-black text-success">Active</span>
+                    <span className="text-[10px] font-black text-success">Đang hoạt động</span>
                      </div>
                      <div className="flex items-center justify-between">
                         <span className="text-small font-medium text-white/80 flex items-center gap-2 italic underline underline-offset-4 decoration-danger decoration-2">Zalo Official</span>

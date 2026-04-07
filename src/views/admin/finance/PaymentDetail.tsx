@@ -31,7 +31,7 @@ const PaymentDetail = () => {
     queryFn: async () => {
       const payments = await paymentService.getPayments();
       const found = payments.find(p => p.id === id);
-      if (!found) throw new Error('Payment not found');
+      if (!found) throw new Error('Không tìm thấy giao dịch thanh toán.');
       return found;
     }
   });
@@ -69,7 +69,7 @@ const PaymentDetail = () => {
             </div>
             <div className="flex items-center gap-4 text-small text-muted font-medium">
                <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(payment.paidAt)}</span>
-               <span className="flex items-center gap-1"><User size={14} /> Người thực hiện: {payment.recordedBy || 'System'}</span>
+               <span className="flex items-center gap-1"><User size={14} /> Người thực hiện: {payment.recordedBy || 'Hệ thống'}</span>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@ const PaymentDetail = () => {
                        <div className="absolute -left-[5px] top-0 w-[9px] h-[9px] rounded-full bg-primary" />
                        <p className="text-small font-bold text-text leading-none">Khởi tạo giao dịch</p>
                        <p className="text-[10px] text-muted mt-1">{formatDate(payment.createdAt)}</p>
-                       <p className="text-[10px] text-muted italic">Bởi: {payment.recordedBy || 'System'}</p>
+                       <p className="text-[10px] text-muted italic">Bởi: {payment.recordedBy || 'Hệ thống'}</p>
                     </div>
                     {payment.status === 'Confirmed' && (
                       <div className="relative pl-6 border-l border-border pb-2">

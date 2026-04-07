@@ -240,7 +240,7 @@ const PermissionMatrix: React.FC = () => {
                            <span className="text-sm font-black text-slate-900 block tracking-tight uppercase">{role.name}</span>
                            {role.isSystem ? (
                              <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
-                               <Lock size={8} className="mr-1 inline" /> System Role
+                               <Lock size={8} className="mr-1 inline" /> Vai trò hệ thống
                              </Badge>
                            ) : (
                              <Badge variant="outline" className="text-[9px] font-black uppercase border-slate-200 text-slate-400 px-2 py-0.5 rounded-full">

@@ -153,10 +153,10 @@ const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string, options?: LoginOptions) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        if (!data.user) throw new Error('Login failed')
+        if (!data.user) throw new Error('Đăng nhập thất bại')
 
         const profile = await fetchProfile(data.user.id)
-        if (!profile) throw new Error('Profile not found')
+        if (!profile) throw new Error('Không tìm thấy hồ sơ người dùng')
 
         if (options?.allowedRoles && !options.allowedRoles.includes(profile.role)) {
           await supabase.auth.signOut()
