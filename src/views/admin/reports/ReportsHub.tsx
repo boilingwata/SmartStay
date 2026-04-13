@@ -4,7 +4,6 @@ import {
   Building2, 
   TrendingUp, 
   AlertCircle, 
-  Zap, 
   RefreshCw, 
   Star, 
   Users, 
@@ -37,14 +36,6 @@ const reportCards = [
     route: "/admin/reports/debt",
     color: "text-rose-600",
     bg: "bg-rose-50"
-  },
-  { 
-    icon: Zap, 
-    title: "Tiêu thụ Điện/Nước", 
-    desc: "Tiêu thụ theo tòa nhà, phòng, so sánh kỳ", 
-    route: "/admin/reports/consumption",
-    color: "text-amber-600",
-    bg: "bg-amber-50"
   },
   { 
     icon: RefreshCw, 
@@ -130,3 +121,4 @@ const ReportsHub: React.FC = () => {
 };
 
 export default ReportsHub;
+

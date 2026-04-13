@@ -21,7 +21,6 @@ export const BILLING_METHOD_LABELS: Record<BillingMethod, string> = {
   Fixed: "Cố định",
   PerPerson: "Theo người",
   PerM2: "Theo m²",
-  Metered: "Theo chỉ số",
   Usage: "Theo lần dùng",
 };
 

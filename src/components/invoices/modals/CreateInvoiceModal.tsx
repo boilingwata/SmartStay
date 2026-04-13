@@ -34,7 +34,8 @@ const defaultForm = (): CreateInvoiceInput => ({
   note: '',
 });
 
-const MISSING_READING_BLOCK_MESSAGE = 'Cannot create invoice: missing meter readings for this billing period';
+const UTILITY_BLOCK_MESSAGE =
+  'Cannot create invoice: utility policy data is incomplete for this billing period';
 
 export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoiceModalProps) => {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
 
   const selectedContract = useMemo(
     () => contracts.find((contract) => contract.id === formData.contractId) ?? null,
-    [contracts, formData.contractId]
+    [contracts, formData.contractId],
   );
 
   const previewMutation = useMutation({
@@ -99,33 +100,11 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
   };
 
   const handleCreate = async () => {
-    if (isInvoiceBlocked) {
-      toast.error(MISSING_READING_BLOCK_MESSAGE);
-      return;
-    }
-
     try {
       await createMutation.mutateAsync(formData);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể tạo hóa đơn.');
     }
-  };
-
-  const handleOpenMeterEntry = () => {
-    if (!selectedContract) {
-      toast.error('Hãy chọn hợp đồng trước khi nhập chỉ số.');
-      return;
-    }
-
-    onClose();
-    navigate('/admin/meters/bulk', {
-      state: {
-        buildingId: selectedContract.buildingId,
-        roomId: selectedContract.roomId,
-        monthYear: formData.monthYear,
-        from: '/admin/invoices',
-      },
-    });
   };
 
   return (
@@ -136,18 +115,38 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
         <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-8 py-6">
           <div>
             <h2 className="text-h2 text-primary">Tạo hóa đơn lẻ</h2>
-            <p className="text-small text-muted">Chỉ cho phép tạo khi kỳ thanh toán đã có đủ chỉ số công tơ.</p>
+            <p className="text-small text-muted">
+              Tiền điện nước sẽ được tính tự động theo utility policy, có prorate và snapshot cho kỳ này.
+            </p>
           </div>
-          <button onClick={onClose} disabled={isBusy} className="rounded-full p-2 transition-all hover:bg-bg disabled:opacity-50">
+          <button
+            onClick={onClose}
+            disabled={isBusy}
+            className="rounded-full p-2 transition-all hover:bg-bg disabled:opacity-50"
+          >
             <X size={20} />
           </button>
         </div>
 
         <div className="max-h-[70vh] space-y-6 overflow-y-auto p-8">
           <div className="mb-4 flex items-center gap-4">
-            <div className={cn('flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold', step >= 1 ? 'bg-primary text-white' : 'bg-bg text-muted')}>1</div>
+            <div
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
+                step >= 1 ? 'bg-primary text-white' : 'bg-bg text-muted',
+              )}
+            >
+              1
+            </div>
             <div className="h-px flex-1 bg-border" />
-            <div className={cn('flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold', step >= 2 ? 'bg-primary text-white' : 'bg-bg text-muted')}>2</div>
+            <div
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
+                step >= 2 ? 'bg-primary text-white' : 'bg-bg text-muted',
+              )}
+            >
+              2
+            </div>
           </div>
 
           {step === 1 && (
@@ -155,8 +154,17 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-label text-muted">Hợp đồng</label>
-                  <select className="input-base w-full" value={formData.contractId} onChange={(event) => setFormData((current) => ({ ...current, contractId: event.target.value }))} disabled={contractsLoading}>
-                    <option value="">{contractsLoading ? 'Đang tải hợp đồng...' : 'Chọn hợp đồng...'}</option>
+                  <select
+                    className="input-base w-full"
+                    value={formData.contractId}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, contractId: event.target.value }))
+                    }
+                    disabled={contractsLoading}
+                  >
+                    <option value="">
+                      {contractsLoading ? 'Đang tải hợp đồng...' : 'Chọn hợp đồng...'}
+                    </option>
                     {contracts.map((contract: InvoiceCreateContractOption) => (
                       <option key={contract.id} value={contract.id}>
                         {contract.contractCode} - {contract.roomCode} - {contract.tenantName}
@@ -167,49 +175,97 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
 
                 <div className="space-y-2">
                   <label className="text-label text-muted">Kỳ thanh toán</label>
-                  <input type="month" className="input-base w-full" value={formData.monthYear} onChange={(event) => setFormData((current) => ({ ...current, monthYear: event.target.value }))} />
+                  <input
+                    type="month"
+                    className="input-base w-full"
+                    value={formData.monthYear}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, monthYear: event.target.value }))
+                    }
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-label text-muted">Hạn thanh toán</label>
-                  <input type="date" className="input-base w-full" value={formData.dueDate} onChange={(event) => setFormData((current) => ({ ...current, dueDate: event.target.value }))} />
+                  <input
+                    type="date"
+                    className="input-base w-full"
+                    value={formData.dueDate}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, dueDate: event.target.value }))
+                    }
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-label text-muted">Giảm trừ (VND)</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-                    <input type="number" min={0} className="input-base w-full pl-10" value={formData.discountAmount ?? 0} onChange={(event) => setFormData((current) => ({ ...current, discountAmount: Number(event.target.value) }))} />
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-base w-full pl-10"
+                      value={formData.discountAmount ?? 0}
+                      onChange={(event) =>
+                        setFormData((current) => ({
+                          ...current,
+                          discountAmount: Number(event.target.value),
+                        }))
+                      }
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-label text-muted">Lý do giảm trừ</label>
-                  <input type="text" className="input-base w-full" value={formData.discountReason ?? ''} onChange={(event) => setFormData((current) => ({ ...current, discountReason: event.target.value }))} />
+                  <input
+                    type="text"
+                    className="input-base w-full"
+                    value={formData.discountReason ?? ''}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, discountReason: event.target.value }))
+                    }
+                  />
                 </div>
               </div>
 
               {selectedContract && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Hợp đồng</p><p className="mt-2 font-bold text-primary">{selectedContract.contractCode}</p></div>
-                  <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Phòng</p><p className="mt-2 font-bold text-primary">{selectedContract.roomCode}</p></div>
-                  <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Tiền thuê</p><p className="mt-2 font-bold text-primary">{formatVND(selectedContract.monthlyRent)}</p></div>
+                  <div className="rounded-2xl border bg-bg/20 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Hợp đồng</p>
+                    <p className="mt-2 font-bold text-primary">{selectedContract.contractCode}</p>
+                  </div>
+                  <div className="rounded-2xl border bg-bg/20 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Phòng</p>
+                    <p className="mt-2 font-bold text-primary">{selectedContract.roomCode}</p>
+                  </div>
+                  <div className="rounded-2xl border bg-bg/20 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Tiền thuê</p>
+                    <p className="mt-2 font-bold text-primary">{formatVND(selectedContract.monthlyRent)}</p>
+                  </div>
                 </div>
               )}
 
               <div className="space-y-2">
                 <label className="text-label text-muted">Ghi chú hóa đơn</label>
-                <textarea className="input-base min-h-[88px] w-full" value={formData.note ?? ''} onChange={(event) => setFormData((current) => ({ ...current, note: event.target.value }))} />
+                <textarea
+                  className="input-base min-h-[88px] w-full"
+                  value={formData.note ?? ''}
+                  onChange={(event) =>
+                    setFormData((current) => ({ ...current, note: event.target.value }))
+                  }
+                />
               </div>
 
               <div className="flex gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-4">
                 <AlertTriangle className="shrink-0 text-danger" size={20} />
                 <div className="text-small font-medium text-danger">
-                  Không cho tạo hóa đơn nếu thiếu chỉ số công tơ cho kỳ này.
-                  <div>Tiền điện nước chỉ được thêm khi dữ liệu meter reading đã đầy đủ.</div>
-                  <button type="button" onClick={handleOpenMeterEntry} className="mt-1 underline">
-                    Nhập chỉ số ngay
-                  </button>
+                  Hóa đơn utility sẽ dùng utility policy đã resolve theo thứ tự: invoice override, contract,
+                  room, building, system.
+                  <div>
+                    Hệ thống tự tính điện nước, áp mùa, khu vực, phụ thu thiết bị và prorate theo số ngày ở
+                    thực tế.
+                  </div>
                 </div>
               </div>
             </div>
@@ -218,21 +274,30 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
           {step === 2 && preview && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Cư dân</p><p className="mt-2 font-bold text-primary">{preview.tenantName}</p></div>
-                <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Phòng</p><p className="mt-2 font-bold text-primary">{preview.roomCode}</p></div>
-                <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Kỳ</p><p className="mt-2 font-bold text-primary">{preview.billingPeriod}</p></div>
-                <div className="rounded-2xl border bg-bg/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Hạn thanh toán</p><p className="mt-2 font-bold text-primary">{preview.dueDate}</p></div>
+                <div className="rounded-2xl border bg-bg/20 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Cư dân</p>
+                  <p className="mt-2 font-bold text-primary">{preview.tenantName}</p>
+                </div>
+                <div className="rounded-2xl border bg-bg/20 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Phòng</p>
+                  <p className="mt-2 font-bold text-primary">{preview.roomCode}</p>
+                </div>
+                <div className="rounded-2xl border bg-bg/20 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Kỳ</p>
+                  <p className="mt-2 font-bold text-primary">{preview.billingPeriod}</p>
+                </div>
+                <div className="rounded-2xl border bg-bg/20 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Hạn thanh toán</p>
+                  <p className="mt-2 font-bold text-primary">{preview.dueDate}</p>
+                </div>
               </div>
 
               {isInvoiceBlocked && (
                 <div className="flex gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-4">
                   <AlertTriangle className="shrink-0 text-danger" size={20} />
                   <div className="text-small font-medium text-danger">
-                    {MISSING_READING_BLOCK_MESSAGE}.
+                    {UTILITY_BLOCK_MESSAGE}.
                     <div>Thiếu dữ liệu cho: {missingUtilityItems.join(', ')}.</div>
-                    <button type="button" onClick={handleOpenMeterEntry} className="mt-1 underline">
-                      Nhập chỉ số ngay
-                    </button>
                   </div>
                 </div>
               )}
@@ -246,7 +311,10 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
                 </div>
                 <div className="divide-y">
                   {preview.items.map((item, index) => (
-                    <div key={`${item.description}-${index}`} className="grid grid-cols-[1.5fr_120px_140px_140px] gap-4 items-center px-6 py-4">
+                    <div
+                      key={`${item.description}-${index}`}
+                      className="grid grid-cols-[1.5fr_120px_140px_140px] items-center gap-4 px-6 py-4"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                           <FileText size={18} />
@@ -277,23 +345,37 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
 
         <div className="flex items-center justify-between border-t bg-bg/20 px-8 py-6">
           {step === 2 ? (
-            <button onClick={() => setStep(1)} className="btn-outline flex items-center gap-2" disabled={isBusy}>
+            <button
+              onClick={() => setStep(1)}
+              className="btn-outline flex items-center gap-2"
+              disabled={isBusy}
+            >
               <ChevronLeft size={18} /> Quay lại
             </button>
           ) : (
-            <button onClick={onClose} className="btn-outline" disabled={isBusy}>Hủy</button>
+            <button onClick={onClose} className="btn-outline" disabled={isBusy}>
+              Hủy
+            </button>
           )}
 
           <div className="ml-auto flex items-center gap-3">
             {step === 1 ? (
-              <button onClick={handlePreview} className="btn-primary flex items-center gap-2" disabled={isBusy || contractsLoading}>
+              <button
+                onClick={handlePreview}
+                className="btn-primary flex items-center gap-2"
+                disabled={isBusy || contractsLoading}
+              >
                 {previewMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : null}
                 Xem trước <ChevronRight size={18} />
               </button>
             ) : (
-              <button onClick={handleCreate} className="btn-primary flex items-center gap-2" disabled={isBusy || isInvoiceBlocked}>
+              <button
+                onClick={handleCreate}
+                className="btn-primary flex items-center gap-2"
+                disabled={isBusy || isInvoiceBlocked}
+              >
                 {createMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : null}
-                {isInvoiceBlocked ? 'Thiếu chỉ số công tơ' : 'Tạo hóa đơn'}
+                {isInvoiceBlocked ? 'Thiếu utility data' : 'Tạo hóa đơn'}
               </button>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { createUserClient } from './supabaseAdmin.ts';
+import { createAdminClient } from './supabaseAdmin.ts';
 import { errorResponse } from './errors.ts';
 
 export type AdminRole = 'admin' | 'manager' | 'staff';
@@ -34,7 +34,7 @@ export function extractJwt(req: Request): string {
  */
 export async function requireAuth(req: Request): Promise<Caller> {
   const jwt = extractJwt(req);
-  const client = createUserClient(jwt);
+  const client = createAdminClient();
 
   // Pass jwt explicitly — auth.getUser() without an argument looks for a
   // persisted session which doesn't exist in the edge runtime (persistSession: false).
@@ -42,11 +42,13 @@ export async function requireAuth(req: Request): Promise<Caller> {
   const { data: { user }, error } = await client.auth.getUser(jwt);
   if (error || !user) throw new AuthError('Invalid or expired token');
 
-  const { data: profile } = await client
+  const { data: profile, error: profileError } = await client
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .maybeSingle();
+
+  if (profileError) throw new AuthError('Failed to resolve caller profile', 500);
 
   return { userId: user.id, role: (profile?.role as AnyRole) ?? 'tenant' };
 }

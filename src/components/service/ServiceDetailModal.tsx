@@ -57,11 +57,10 @@ const BILLING_METHOD_DESCRIPTIONS: Record<BillingMethod, string> = {
   Fixed: "Tính phí cố định hàng tháng, không phụ thuộc sử dụng",
   PerPerson: "Tính theo số người ghi trong hợp đồng",
   PerM2: "Tính theo diện tích phòng (m²)",
-  Metered: "Tính theo chỉ số đồng hồ (điện, nước)",
   Usage: "Tính theo số lần sử dụng thực tế",
 };
 
-const UNIT_SUGGESTIONS = ["người/tháng", "m2/tháng", "KW", "lần", "tháng"];
+const UNIT_SUGGESTIONS = ["người/tháng", "m2/tháng", "lần", "tháng"];
 
 const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   open,

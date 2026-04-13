@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+export type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Service-role client targeting the smartstay schema.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected by the Supabase Edge runtime.

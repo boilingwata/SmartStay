@@ -653,22 +653,6 @@ const RoomList = () => {
                  <Navigation size={14} className="text-violet-500" /> Tiện ích & Trang bị
               </label>
               <div className="space-y-3">
-                 <label className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-not-allowed opacity-70">
-                    <div className="flex items-center gap-4">
-                       <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white text-slate-300 shadow-sm">
-                          <Zap size={18} />
-                       </div>
-                       <span className="text-[12px] font-black uppercase text-slate-600 tracking-widest">{t('pages.rooms.hasMeters')}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      className="w-6 h-6 rounded-lg border-2 border-slate-200 text-primary focus:ring-primary/20"
-                      checked={false}
-                      disabled
-                      readOnly
-                    />
-                 </label>
-
                  <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100/50 flex gap-4">
                     <AlertCircle className="text-amber-500 shrink-0" size={20} />
                     <p className="text-[11px] text-amber-700 font-medium leading-relaxed italic">

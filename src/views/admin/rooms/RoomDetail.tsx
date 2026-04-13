@@ -8,8 +8,7 @@ import {
   Edit, Key, Wrench, CheckCircle2, MoreVertical,
   Star, Share2, Printer, Download, Trash2,
   Calendar, User, Clock, Check, Copy,
-  ArrowRight, ShieldCheck, Smartphone,
-  Layout, Wind, Refrigerator, Disc,
+  ArrowRight, ShieldCheck,   Layout, Wind, Refrigerator, Disc,
   Loader2, ZoomIn, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { roomService } from '@/services/roomService';
@@ -21,9 +20,6 @@ import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
-import { 
-  LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip 
-} from 'recharts';
 import { 
   DndContext, closestCenter, KeyboardSensor, 
   PointerSensor, useSensor, useSensors 
@@ -283,7 +279,6 @@ const RoomDetail = () => {
         <div className="flex flex-wrap border-b border-border/5 bg-bg/20 px-4">
           <TabItem active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} icon={Info}>Tổng quan</TabItem>
           <TabItem active={activeTab === 'Images'} onClick={() => setActiveTab('Images')} icon={ImageIcon}>Hình ảnh</TabItem>
-          <TabItem active={activeTab === 'Meters'} onClick={() => setActiveTab('Meters')} icon={Zap}>Đồng hồ</TabItem>
           <TabItem active={activeTab === 'Assets'} onClick={() => setActiveTab('Assets')} icon={Package}>Tài sản</TabItem>
           <TabItem active={activeTab === 'Contracts'} onClick={() => setActiveTab('Contracts')} icon={History}>Hợp đồng</TabItem>
           <TabItem active={activeTab === 'History'} onClick={() => setActiveTab('History')} icon={ClipboardList}>Lịch sử TT</TabItem>
@@ -501,96 +496,6 @@ const RoomDetail = () => {
                    ))}
                  </div>
                )}
-            </div>
-          )}
-
-          {activeTab === 'Meters' && (
-            <div className="space-y-12">
-               <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Đồng hồ dịch vụ</h3>
-                    <p className="text-[10px] text-muted font-bold italic">Thống kê chỉ số tiêu thụ 6 tháng gần nhất.</p>
-                  </div>
-                  <button className="btn-outline-sm px-6 h-11 flex items-center gap-2 rounded-xl"><Smartphone size={16} /> Xem tất cả lịch sử</button>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  {room.meters.map((meter) => (
-                    <div key={meter.id} className="card-container p-10 bg-white rounded-[48px] border border-primary/5 hover:shadow-2xl transition-all group relative overflow-hidden">
-                       <div className="flex justify-between items-start mb-10">
-                          <div className="flex items-center gap-6">
-                             <div className={cn(
-                               "w-20 h-20 rounded-[32px] flex items-center justify-center shadow-inner ring-4 ring-bg",
-                               meter.meterType === 'Electricity' ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"
-                             )}>
-                                {meter.meterType === 'Electricity' ? <Zap size={36} /> : <Droplets size={36} />}
-                             </div>
-                             <div>
-                                <p className="text-[10px] text-muted font-black tracking-[3px] uppercase mb-1">{meter.meterType === 'Electricity' ? 'Điện năng' : 'Nước sinh hoạt'}</p>
-                                <p className="text-[24px] font-mono font-black text-primary group-hover:tracking-tighter transition-all">{meter.meterCode}</p>
-                             </div>
-                          </div>
-                          <button className="p-4 bg-bg/50 rounded-2xl text-muted group-hover:text-primary transition-all hover:bg-white hover:shadow-lg">
-                             <ArrowRight size={22} />
-                          </button>
-                       </div>
-                       
-                       <div className="space-y-8 pt-10 border-t border-dashed border-border/20">
-                          <div className="flex items-end justify-between">
-                             <div>
-                                <p className="text-[11px] text-muted font-black uppercase mb-2 tracking-widest">Chỉ số mới nhất</p>
-                                <div className="flex items-baseline gap-3">
-                                   <span className="text-[56px] font-black text-primary font-mono tracking-tighter leading-none">{meter.currentIndex}</span>
-                                   <span className="text-[20px] font-black text-muted uppercase">{meter.meterType === 'Electricity' ? 'kWh' : 'm3'}</span>
-                                </div>
-                                <p className="text-[11px] text-success font-black mt-4 flex items-center gap-2 bg-success/5 px-4 py-2 rounded-full w-fit">
-                                   <Clock size={14} /> Cập nhật: {formatDate(meter.lastReadingDate)}
-                                </p>
-                             </div>
-                             
-                             <div className="w-48 h-24">
-                               <ResponsiveContainer width="100%" height="100%">
-                                 <LineChart data={meter.history}>
-                                    <Line 
-                                      type="monotone" 
-                                      dataKey="value" 
-                                      stroke={meter.meterType === 'Electricity' ? '#f59e0b' : '#3b82f6'} 
-                                      strokeWidth={4} 
-                                      dot={false}
-                                      animateNewValues={true}
-                                    />
-                                    <RechartsTooltip 
-                                      content={({ active, payload }) => {
-                                        if (active && payload && payload.length) {
-                                          return (
-                                            <div className="bg-slate-900 border-none px-3 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-2xl">
-                                              {payload[0].value} {meter.meterType === 'Electricity' ? 'kWh' : 'm3'}
-                                            </div>
-                                          )
-                                        }
-                                        return null;
-                                      }}
-                                    />
-                                 </LineChart>
-                               </ResponsiveContainer>
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-                  ))}
-               </div>
-               
-               <div className="p-10 bg-warning/[0.03] border border-warning/10 rounded-[40px] flex gap-6 items-start shadow-xl shadow-warning/5 animate-pulse">
-                  <div className="p-4 bg-warning/10 rounded-2xl text-warning">
-                    <ShieldCheck size={32} />
-                  </div>
-                  <div>
-                    <h4 className="text-[12px] font-black text-warning uppercase tracking-[3px] mb-2">Tuân thủ RULE-01 (MANDATORY)</h4>
-                    <p className="text-[14px] text-warning/80 font-bold italic leading-relaxed">
-                       Hệ thống đang truy xuất 100% dữ liệu từ <code className="bg-warning/10 px-2 py-0.5 rounded text-[12px] font-mono mx-1">vw_LatestMeterReading</code>. 
-                       Trường <code className="bg-warning/10 px-2 py-0.5 rounded text-[12px] font-mono mx-1">Meters.LastReadingValue</code> đã bị loại bỏ khỏi luồng tính năng để đảm bảo tính integridad của dữ liệu chỉ số.
-                    </p>
-                  </div>
-               </div>
             </div>
           )}
 
@@ -861,3 +766,4 @@ const RoomDetail = () => {
 };
 
 export default RoomDetail;
+

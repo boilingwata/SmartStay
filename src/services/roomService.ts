@@ -1,6 +1,6 @@
 import {
   Room, RoomDetail, RoomStatus, RoomType,
-  HandoverChecklist, RoomStatusHistory, RoomMeter, RoomAsset,
+  HandoverChecklist, RoomStatusHistory, RoomAsset,
   RoomFilters, CreateRoomData, UpdateRoomData, AssetFilters, DirectionFacing
 } from '@/models/Room';
 
@@ -66,17 +66,6 @@ interface StatusHistoryRow {
   reason: string | null
 }
 
-interface MeterReadingRow {
-  id: number
-  room_id: number
-  billing_period: string
-  electricity_previous: number
-  electricity_current: number
-  water_previous: number
-  water_current: number
-  reading_date: string
-}
-
 // --- Transformers ---
 
 function toRoom(row: RoomRow): Room {
@@ -90,7 +79,7 @@ function toRoom(row: RoomRow): Room {
     areaSqm: row.area_sqm ?? 0,
     baseRentPrice: row.base_rent ?? 0,
     status: mapRoomStatus.fromDb(row.status ?? 'available') as RoomStatus,
-    hasMeter: true, // assume all rooms have meters
+    hasMeter: false,
   };
 }
 
@@ -98,7 +87,6 @@ function toRoomDetail(
   row: RoomRow,
   assets: RoomAssetRow[],
   history: StatusHistoryRow[],
-  meters: RoomMeter[],
   contracts: RoomContractRow[]
 ): RoomDetail {
   const room = toRoom(row);
@@ -137,7 +125,7 @@ function toRoomDetail(
     tenantNames: tenantNames.length > 0 ? tenantNames : undefined,
     images: [],
     amenities,
-    meters,
+    meters: [],
     assets: assets.map(toRoomAsset),
     statusHistory: history.map(toStatusHistory),
     contracts: contractSummaries,
@@ -164,38 +152,6 @@ function toStatusHistory(row: StatusHistoryRow): RoomStatusHistory {
     changedBy: row.changed_by ?? '',
     reason: row.reason ?? undefined,
   };
-}
-
-/** Convert meter_readings rows into virtual RoomMeter objects (1 per type per room). */
-function toMeters(readings: MeterReadingRow[], roomId: number): RoomMeter[] {
-  if (readings.length === 0) return [];
-
-  // Use the most recent reading
-  const latest = readings[0];
-  return [
-    {
-      id: `${roomId}-elec`,
-      meterCode: `E-${roomId}`,
-      meterType: 'Electricity',
-      currentIndex: latest.electricity_current,
-      lastReadingDate: latest.reading_date,
-      history: readings.map(r => ({
-        month: r.billing_period,
-        value: r.electricity_current - r.electricity_previous,
-      })),
-    },
-    {
-      id: `${roomId}-water`,
-      meterCode: `W-${roomId}`,
-      meterType: 'Water',
-      currentIndex: latest.water_current,
-      lastReadingDate: latest.reading_date,
-      history: readings.map(r => ({
-        month: r.billing_period,
-        value: r.water_current - r.water_previous,
-      })),
-    },
-  ];
 }
 
 // --- Service ---
@@ -263,8 +219,8 @@ export const roomService = {
       throw new Error(`[roomService] Invalid room id: "${id}"`);
     }
 
-    // Fetch room, assets, history, meters, images, and contracts in parallel
-    const [row, assetRows, historyRows, meterRows, imageRows, contractRows] = await Promise.all([
+    // Fetch room, assets, history, images, and contracts in parallel.
+    const [row, assetRows, historyRows, imageRows, contractRows] = await Promise.all([
       unwrap(
         supabase
           .from('rooms')
@@ -288,15 +244,6 @@ export const roomService = {
           .order('changed_at', { ascending: false })
           .limit(20)
       ) as unknown as Promise<StatusHistoryRow[]>,
-
-      unwrap(
-        supabase
-          .from('meter_readings')
-          .select('*')
-          .eq('room_id', numId)
-          .order('reading_date', { ascending: false })
-          .limit(12)
-      ) as unknown as Promise<MeterReadingRow[]>,
 
       supabase
         .from('room_images')
@@ -325,8 +272,7 @@ export const roomService = {
       })(),
     ]);
 
-    const meters = toMeters(meterRows, numId);
-    const detail = toRoomDetail(row, assetRows, historyRows, meters, contractRows);
+    const detail = toRoomDetail(row, assetRows, historyRows, contractRows);
     detail.images = imageRows.map(r => ({
       id: String(r.id),
       url: r.url,

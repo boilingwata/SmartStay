@@ -9,7 +9,6 @@ export interface InvoiceItem {
   unitPriceSnapshot: number;
   amount: number;
   type: InvoiceItemType;
-  tierBreakdown?: { label: string; qty: number; unitPrice: number; amount: number }[];
   snapshotPrice: number | null;
   snapshotLabel: string;
 }
@@ -60,26 +59,4 @@ export interface InvoiceDetail extends Invoice {
     bankName: string;
     qrContent: string;
   };
-}
-
-export interface ElectricityTier {
-  tierOrder: number;
-  fromKwh: number;
-  toKwh: number | null;
-  kwh: number;
-  price: number;
-  amount: number;
-}
-
-export interface ElectricityCalculation {
-  id: string;
-  invoiceId: string;
-  fromKwh: number;
-  toKwh: number;
-  totalKwh: number;
-  tierBreakdownJson: string;
-  policyName: string;
-  legalReference: string;
-  effectiveFrom: string;
-  previousMonthKwh: number;
 }

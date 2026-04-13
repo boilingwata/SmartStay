@@ -31,12 +31,9 @@ const OwnerDetail = lazy(() => import('@/views/admin/owners/OwnerDetail'));
 const TicketList = lazy(() => import('@/views/admin/tickets/TicketList'));
 const TicketDetail = lazy(() => import('@/views/admin/tickets/TicketDetail'));
 const StaffRatings = lazy(() => import('@/views/admin/tickets/StaffRatings'));
-const MeterList = lazy(() => import('@/views/admin/meters/MeterList'));
-const BulkMeterEntry = lazy(() => import('@/views/admin/meters/BulkMeterEntry'));
-const MeterReadingHistory = lazy(() => import('@/views/admin/meters/MeterReadingHistory'));
-const MeterReadingConfirm = lazy(() => import('@/views/admin/meters/MeterReadingConfirm'));
-const ElectricityPolicyPage = lazy(() => import('@/views/admin/settings/ElectricityPolicyPage'));
-const WaterPolicyPage = lazy(() => import('@/views/admin/settings/WaterPolicyPage'));
+const UtilityPoliciesPage = lazy(() => import('@/views/admin/settings/UtilityPoliciesPage'));
+const UtilityOverridesPage = lazy(() => import('@/views/admin/settings/UtilityOverridesPage'));
+const BillingRunsPage = lazy(() => import('@/views/admin/settings/BillingRunsPage'));
 const UserManagement = lazy(() => import('@/views/admin/settings/UserListPage'));
 const PermissionMatrix = lazy(() => import('@/views/admin/settings/PermissionMatrix'));
 const AuditLogs = lazy(() => import('@/views/admin/settings/AuditLogs'));
@@ -53,7 +50,6 @@ const ReportsHub = lazy(() => import('@/views/admin/reports/ReportsHub'));
 const OccupancyReport = lazy(() => import('@/views/admin/reports/OccupancyReport'));
 const FinancialReport = lazy(() => import('@/views/admin/reports/FinancialReport'));
 const DebtReport = lazy(() => import('@/views/admin/reports/DebtReport'));
-const ConsumptionReport = lazy(() => import('@/views/admin/reports/ConsumptionReport'));
 const RoomLifecycleReport = lazy(() => import('@/views/admin/reports/RoomLifecycleReport'));
 const NPSReport = lazy(() => import('@/views/admin/reports/NPSReport'));
 const StaffReport = lazy(() => import('@/views/admin/reports/StaffReport'));
@@ -90,10 +86,6 @@ export const adminRoutes: RouteObject[] = [
   { path: 'staff/:id/ratings', element: <StaffRatings /> },
   { path: 'announcements', element: <AnnouncementPage /> },
   { path: 'notifications', element: <NotificationPage /> },
-  { path: 'meters', element: <MeterList /> },
-  { path: 'meters/bulk', element: <BulkMeterEntry /> },
-  { path: 'meters/confirm', element: <MeterReadingConfirm /> },
-  { path: 'meters/:id/readings', element: <MeterReadingHistory /> },
   { path: 'services', element: <ServiceCatalog /> },
   {
     element: <ProtectedRoute requiredRole="Admin" />,
@@ -110,7 +102,6 @@ export const adminRoutes: RouteObject[] = [
           { path: 'occupancy', element: <OccupancyReport /> },
           { path: 'financial', element: <FinancialReport /> },
           { path: 'debt', element: <DebtReport /> },
-          { path: 'consumption', element: <ConsumptionReport /> },
           { path: 'room-lifecycle', element: <RoomLifecycleReport /> },
           { path: 'nps', element: <NPSReport /> },
           { path: 'staff', element: <StaffReport /> },
@@ -128,8 +119,11 @@ export const adminRoutes: RouteObject[] = [
           { index: true, element: <Navigate to="users" replace /> },
           { path: 'users', element: <UserManagement /> },
           { path: 'users/permissions', element: <PermissionMatrix /> },
-          { path: 'electricity-policy', element: <ElectricityPolicyPage /> },
-          { path: 'water-policy', element: <WaterPolicyPage /> },
+          { path: 'utility-policies', element: <UtilityPoliciesPage /> },
+          { path: 'utility-overrides', element: <UtilityOverridesPage /> },
+          { path: 'billing-runs', element: <BillingRunsPage /> },
+          { path: 'electricity-policy', element: <Navigate to="../utility-policies" replace /> },
+          { path: 'water-policy', element: <Navigate to="../utility-policies" replace /> },
           { path: 'system', element: <SystemSettings /> },
           { path: 'audit-logs', element: <AuditLogs /> },
         ],

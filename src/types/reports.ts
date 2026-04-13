@@ -3,7 +3,6 @@ export interface ReportFilter {
   from: string
   to: string
   period: "month" | "quarter" | "year" | "custom"
-  consumptionType?: 'electricity' | 'water' | 'both'
 }
 
 export interface ReportMetadata {
@@ -103,34 +102,6 @@ export interface DebtDetailRow {
   lastPaymentDate: string | null
   invoiceId: number
   tenantId: number
-}
-
-export interface ConsumptionKPI {
-  avgElectricityPerRoom: number
-  avgElectricityDelta: number
-  avgWaterPerRoom: number
-  avgWaterDelta: number
-  highestRoom: { roomCode: string; roomId: number; kwh: number }
-  avgElectricityBill: number
-}
-
-export interface ConsumptionChartPoint {
-  month: string
-  buildingName: string
-  electricity: number
-  water: number
-}
-
-export interface ConsumptionDetailRow {
-  roomId: number
-  roomCode: string
-  buildingName: string
-  type: "electricity" | "water"
-  prevIndex: number
-  currentIndex: number
-  consumption: number
-  estimatedAmount: number
-  vsLastMonth: number
 }
 
 export interface RoomLifecycleSegment {

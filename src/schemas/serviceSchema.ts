@@ -13,7 +13,7 @@ export const createServiceSchema = z.object({
     errorMap: () => ({ message: "Vui lòng chọn loại dịch vụ" })
   }),
   unit: z.string().min(1, "Đơn vị không được trống"),
-  billingMethod: z.enum(["Fixed", "PerPerson", "PerM2", "Metered", "Usage"], {
+  billingMethod: z.enum(["Fixed", "PerPerson", "PerM2", "Usage"], {
     errorMap: () => ({ message: "Vui lòng chọn phương thức tính phí" })
   }),
   description: z.string().max(2000).optional(),
@@ -36,7 +36,7 @@ export const updateServiceSchema = z.object({
     .max(200, "Tên tối đa 200 ký tự"),
   serviceType: z.enum(["Utility", "Management", "Amenity", "Optional"]),
   unit: z.string().min(1, "Đơn vị không được trống"),
-  billingMethod: z.enum(["Fixed", "PerPerson", "PerM2", "Metered", "Usage"]),
+  billingMethod: z.enum(["Fixed", "PerPerson", "PerM2", "Usage"]),
   description: z.string().max(2000).optional(),
   isActive: z.boolean(),
 });

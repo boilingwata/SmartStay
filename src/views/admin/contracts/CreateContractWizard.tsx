@@ -693,8 +693,8 @@ const Step3 = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<ContractFormData>();
 
   const services = [
-    { id: 'S1', name: 'Điện', icon: Zap, tier: '3.500đ/kWh' },
-    { id: 'S2', name: 'Nước', icon: Wallet, tier: '25.000đ/m3' },
+    { id: 'S1', name: 'Điện', icon: Zap, tier: 'Theo utility policy c?a phòng' },
+    { id: 'S2', name: 'Nước', icon: Wallet, tier: 'Theo utility policy + số người' },
     { id: 'S3', name: 'Internet', icon: FileText, tier: '120.000đ/tháng' },
     { id: 'S4', name: 'Vệ sinh', icon: Check, tier: '50.000đ/tháng' },
     { id: 'S5', name: 'An ninh', icon: ShieldCheck, tier: 'Miễn phí' }

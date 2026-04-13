@@ -24,12 +24,10 @@ const Documents = lazy(() => import('@/views/portal/profile/Documents'));
 const PortalPaymentHistory = lazy(() => import('@/views/portal/finance/PaymentHistory'));
 const PortalBalanceDetail = lazy(() => import('@/views/portal/finance/BalanceDetail'));
 const PortalContractView = lazy(() => import('@/views/portal/contracts/ContractView'));
-const MeterReadingList = lazy(() => import('@/views/portal/meters/MeterReadingList'));
 
 export const portalRoutes: RouteObject[] = [
   { index: true, element: <TenantDashboard /> },
   { path: 'dashboard', element: <TenantDashboard /> },
-  { path: 'meters/:type', element: <MeterReadingList /> },
   { path: 'invoices', element: <PortalInvoiceList /> },
   { path: 'invoices/:id', element: <PortalInvoiceDetail /> },
   { path: 'payments/history', element: <PortalPaymentHistory /> },

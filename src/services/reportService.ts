@@ -5,9 +5,6 @@ import {
   RoomLifecycleSegment,
   VacancyRateSummary,
   AlertAnalytics,
-  ConsumptionKPI,
-  ConsumptionChartPoint,
-  ConsumptionDetailRow,
   DebtAgingRow,
   DebtDetailRow,
   FinancialKPI,
@@ -60,10 +57,6 @@ const EMPTY_FINANCIAL_KPI: FinancialKPI = {
   totalRevenue: 0, totalRevenueDelta: 0, netRevenue: 0,
   totalDebt: 0, totalDebtDelta: 0, collected: 0, collectionRate: 0, expiringContracts: 0,
 };
-const EMPTY_CONSUMPTION_KPI: ConsumptionKPI = {
-  avgElectricityPerRoom: 0, avgElectricityDelta: 0, avgWaterPerRoom: 0, avgWaterDelta: 0,
-  highestRoom: { roomCode: '', roomId: 0, kwh: 0 }, avgElectricityBill: 0,
-};
 const EMPTY_VACANCY_SUMMARY: VacancyRateSummary = {
   avgVacancyDaysThisMonth: 0, avgVacancyDaysPrevMonth: 0,
   avgVacancyRateThisMonth: 0, avgVacancyRatePrevMonth: 0,
@@ -86,8 +79,6 @@ const AVAILABLE_REPORTS: ReportMetadata[] = [
   { id: 'occupancy',    name: 'Tỷ lệ lấp đầy',       category: 'Occupancy' },
   { id: 'financial',   name: 'Báo cáo tài chính',     category: 'Finance' },
   { id: 'debt',        name: 'Báo cáo công nợ',       category: 'Finance' },
-  { id: 'consumption', name: 'Tiêu thụ điện/nước',    category: 'Utilities' },
-  { id: 'nps',         name: 'Chỉ số NPS',             category: 'Satisfaction' },
   { id: 'staff',       name: 'Hiệu suất nhân viên',   category: 'Operations' },
 ];
 
@@ -112,17 +103,6 @@ type SimpleRoomRow = {
   building_id: number;
   status: string | null;
   created_at: string | null;
-};
-
-type SimpleMeterRow = {
-  room_id: number;
-  billing_period: string;
-  electricity_usage: number | null;
-  water_usage: number | null;
-  electricity_previous: number;
-  electricity_current: number;
-  water_previous: number;
-  water_current: number;
 };
 
 type SimpleContractRow = {
@@ -558,135 +538,6 @@ export const reportService = {
 
   sendDebtReminder: async (_invoiceIds: number[]): Promise<boolean> => true,
 
-  // ── Consumption ──────────────────────────────────────────────────────────
-  getConsumptionKPI: async (filters: ReportFilter): Promise<ConsumptionKPI> => {
-    try {
-      let q = supabase
-        .from('meter_readings')
-        .select('room_id, electricity_usage, water_usage, billing_period')
-        .gte('billing_period', filters.from)
-        .lte('billing_period', filters.to);
-
-      if (filters.buildingIds?.length) {
-        const { data: rms } = await supabase.from('rooms').select('id').in('building_id', filters.buildingIds);
-        const ids = ((rms ?? []) as { id: number }[]).map(r => r.id);
-        if (ids.length === 0) return EMPTY_CONSUMPTION_KPI;
-        q = q.in('room_id', ids);
-      }
-
-      const { data } = await q;
-      const rows = (data ?? []) as SimpleMeterRow[];
-      if (rows.length === 0) return EMPTY_CONSUMPTION_KPI;
-
-      const uniqueRooms = new Set(rows.map(r => r.room_id));
-      const roomCount = uniqueRooms.size;
-      const totalElec = rows.reduce((s, r) => s + (r.electricity_usage ?? 0), 0);
-      const totalWater = rows.reduce((s, r) => s + (r.water_usage ?? 0), 0);
-
-      const byRoom = new Map<number, number>();
-      for (const r of rows) byRoom.set(r.room_id, (byRoom.get(r.room_id) ?? 0) + (r.electricity_usage ?? 0));
-
-      let highestRoom = { roomCode: '', roomId: 0, kwh: 0 };
-      for (const [roomId, kwh] of byRoom) {
-        if (kwh > highestRoom.kwh) highestRoom = { roomCode: `Room ${roomId}`, roomId, kwh };
-      }
-
-      // Enrich room code from rooms table
-      if (highestRoom.roomId) {
-        const { data: rm } = await supabase.from('rooms').select('room_code').eq('id', highestRoom.roomId).single();
-        if (rm) highestRoom.roomCode = (rm as { room_code: string }).room_code;
-      }
-
-      const avgElec = roomCount > 0 ? Math.round(totalElec / roomCount) : 0;
-      return {
-        avgElectricityPerRoom: avgElec,
-        avgElectricityDelta: 0,
-        avgWaterPerRoom: roomCount > 0 ? Math.round(totalWater / roomCount) : 0,
-        avgWaterDelta: 0,
-        highestRoom,
-        avgElectricityBill: Math.round(avgElec * 3500),
-      };
-    } catch { return EMPTY_CONSUMPTION_KPI; }
-  },
-
-  getConsumptionChart: async (filters: ReportFilter): Promise<ConsumptionChartPoint[]> => {
-    try {
-      const { data } = await supabase
-        .from('meter_readings')
-        .select('room_id, electricity_usage, water_usage, billing_period')
-        .gte('billing_period', filters.from)
-        .lte('billing_period', filters.to);
-
-      const rows = (data ?? []) as SimpleMeterRow[];
-      if (rows.length === 0) return [];
-
-      // Fetch room→building mapping
-      const roomIds = [...new Set(rows.map(r => r.room_id))];
-      const { data: rms } = await supabase.from('rooms').select('id, building_id').in('id', roomIds);
-      const { data: blds } = await supabase.from('buildings').select('id, name');
-      const roomBuilding = new Map<number, number>(((rms ?? []) as { id: number; building_id: number }[]).map(r => [r.id, r.building_id]));
-      const bldName = new Map<number, string>(((blds ?? []) as SimpleBuildingRow[]).map(b => [b.id, b.name]));
-
-      const byKey = new Map<string, { electricity: number; water: number }>();
-      for (const r of rows) {
-        const m = r.billing_period.slice(0, 7);
-        const bid = roomBuilding.get(r.room_id) ?? 0;
-        const key = `${m}::${bid}`;
-        const cur = byKey.get(key) ?? { electricity: 0, water: 0 };
-        cur.electricity += r.electricity_usage ?? 0;
-        cur.water += r.water_usage ?? 0;
-        byKey.set(key, cur);
-      }
-
-      return Array.from(byKey.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, v]) => {
-          const [month, bid] = key.split('::');
-          return { month, buildingName: bldName.get(Number(bid)) ?? `Tòa ${bid}`, ...v };
-        });
-    } catch { return []; }
-  },
-
-  getConsumptionDetail: async (filters: ReportFilter): Promise<ConsumptionDetailRow[]> => {
-    try {
-      const { data } = await supabase
-        .from('meter_readings')
-        .select('room_id, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage, billing_period')
-        .gte('billing_period', filters.from)
-        .lte('billing_period', filters.to);
-
-      const rows = (data ?? []) as SimpleMeterRow[];
-      if (rows.length === 0) return [];
-
-      // Fetch room info separately
-      const roomIds = [...new Set(rows.map(r => r.room_id))];
-      const { data: rms } = await supabase.from('rooms').select('id, room_code, building_id').in('id', roomIds);
-      const { data: blds } = await supabase.from('buildings').select('id, name');
-      const rmMap = new Map<number, { code: string; bid: number }>(
-        ((rms ?? []) as { id: number; room_code: string; building_id: number }[]).map(r => [r.id, { code: r.room_code, bid: r.building_id }])
-      );
-      const bldMap = new Map<number, string>(((blds ?? []) as SimpleBuildingRow[]).map(b => [b.id, b.name]));
-
-      const result: ConsumptionDetailRow[] = [];
-      for (const r of rows) {
-        const rm = rmMap.get(r.room_id);
-        const code = rm?.code ?? String(r.room_id);
-        const bname = rm ? bldMap.get(rm.bid) ?? '' : '';
-
-        if ((r.electricity_usage ?? 0) > 0) {
-          result.push({ roomId: r.room_id, roomCode: code, buildingName: bname, type: 'electricity',
-            prevIndex: r.electricity_previous, currentIndex: r.electricity_current,
-            consumption: r.electricity_usage ?? 0, estimatedAmount: Math.round((r.electricity_usage ?? 0) * 3500), vsLastMonth: 0 });
-        }
-        if ((r.water_usage ?? 0) > 0) {
-          result.push({ roomId: r.room_id, roomCode: code, buildingName: bname, type: 'water',
-            prevIndex: r.water_previous, currentIndex: r.water_current,
-            consumption: r.water_usage ?? 0, estimatedAmount: Math.round((r.water_usage ?? 0) * 15000), vsLastMonth: 0 });
-        }
-      }
-      return result;
-    } catch { return []; }
-  },
 
   // ── Alerts (derived from tickets) ────────────────────────────────────────
   getAlertAnalytics: async (filters: ReportFilter): Promise<AlertAnalytics> => {

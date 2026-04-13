@@ -3,6 +3,11 @@ import { unwrap } from '@/lib/supabaseHelpers';
 import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
 import type { DbInvoiceStatus } from '@/types/supabase';
 import {
+  buildPolicyInvoiceDraft,
+  inferUtilityKind,
+  resolveContractUtilityMode,
+} from '@/services/utilityBillingService';
+import {
   Invoice,
   InvoiceDetail,
   InvoiceItem,
@@ -174,7 +179,6 @@ interface ContractOptionRow {
   contract_code: string;
   room_id: number;
   monthly_rent: number | null;
-  rent_price_snapshot: number | null; // Rule DB-03
   rooms: {
     room_code: string;
     building_id: number;
@@ -193,7 +197,6 @@ interface ContractDraftRow extends ContractOptionRow {
     service_id: number;
     quantity: number | null;
     fixed_price: number | null;
-    unit_price_snapshot: number | null; // Rule DB-04
     services: {
       name: string;
       calc_type: string | null;
@@ -275,7 +278,6 @@ function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
     type:              deriveItemType(item.description),
     snapshotPrice:     Number(item.unit_price),
     snapshotLabel:     item.description,
-    tierBreakdown:     undefined,  // no tier_breakdown_json column in DB
   };
 }
 
@@ -303,8 +305,7 @@ function mapContractRowToOption(row: ContractOptionRow): InvoiceCreateContractOp
     buildingId: row.rooms?.building_id != null ? String(row.rooms.building_id) : '',
     buildingName: row.rooms?.buildings?.name ?? '',
     tenantName: primaryTenant?.tenants?.full_name ?? '',
-    // RULE DB-03: Prefer snapshot over current monthly_rent
-    monthlyRent: row.rent_price_snapshot ?? row.monthly_rent ?? 0,
+    monthlyRent: row.monthly_rent ?? 0,
   };
 }
 
@@ -313,13 +314,6 @@ function normalizeForMatch(value: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-}
-
-function inferUtilityKind(serviceName: string): 'electricity' | 'water' | null {
-  const normalized = normalizeForMatch(serviceName);
-  if (normalized.includes('dien') || normalized.includes('electric')) return 'electricity';
-  if (normalized.includes('nuoc') || normalized.includes('water')) return 'water';
-  return null;
 }
 
 function isExistingInvoiceError(message: string): boolean {
@@ -331,24 +325,12 @@ function isExistingInvoiceError(message: string): boolean {
 function getMissingMeterReadingsMessage(draft: InvoiceDraftPreview): string {
   const missingItems = draft.missingUtilityItems.join(', ');
   return missingItems
-    ? `Cannot create invoice: missing meter readings for this billing period (${missingItems}).`
-    : 'Cannot create invoice: missing meter readings for this billing period';
+    ? `Không thể tạo hóa đơn: thiếu chỉ số công tơ cho kỳ này (${missingItems}).`
+    : 'Không thể tạo hóa đơn: thiếu chỉ số công tơ cho kỳ này.';
 }
 
-async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraftPreview> {
-  const contractId = Number(input.contractId);
-  if (!Number.isFinite(contractId)) {
-    throw new Error('Hợp đồng không hợp lệ.');
-  }
-  if (!/^\d{4}-\d{2}$/.test(input.monthYear)) {
-    throw new Error('Kỳ thanh toán không hợp lệ.');
-  }
-  if (!input.dueDate) {
-    throw new Error('Vui lòng chọn hạn thanh toán.');
-  }
-
-  const billingPeriod = input.monthYear;
-  const draftRow = (await unwrap(
+async function fetchContractDraft(contractId: number): Promise<ContractDraftRow> {
+  return (await unwrap(
     supabase
       .from('contracts')
       .select(`
@@ -356,7 +338,6 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
         contract_code,
         room_id,
         monthly_rent,
-        rent_price_snapshot,
         rooms (
           room_code,
           building_id,
@@ -370,7 +351,6 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
           service_id,
           quantity,
           fixed_price,
-          unit_price_snapshot,
           services ( name, calc_type )
         )
       `)
@@ -379,7 +359,12 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
       .eq('is_deleted', false)
       .single()
   )) as unknown as ContractDraftRow;
+}
 
+async function buildLegacyMeteredInvoiceDraft(
+  input: CreateInvoiceInput,
+  draftRow: ContractDraftRow,
+): Promise<InvoiceDraftPreview> {
   const contract = mapContractRowToOption(draftRow);
   const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
   const items: InvoiceDraftPreviewItem[] = [];
@@ -397,7 +382,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
 
   const contractServices = draftRow.contract_services ?? [];
   const serviceIds = contractServices.map((service) => service.service_id);
-  let priceMap = new Map<number, number>();
+  const priceMap = new Map<number, number>();
 
   if (serviceIds.length > 0) {
     const servicePriceRows = (await unwrap(
@@ -411,7 +396,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
 
     for (const row of servicePriceRows) {
       if (!priceMap.has(row.service_id)) {
-        priceMap.set(row.service_id, row.unit_price);
+        priceMap.set(row.service_id, Number(row.unit_price ?? 0));
       }
     }
   }
@@ -422,7 +407,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
           .from('meter_readings')
           .select('id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage')
           .eq('room_id', Number(contract.roomId))
-          .eq('billing_period', billingPeriod)
+          .eq('billing_period', input.monthYear)
           .maybeSingle()
       )) as unknown as MeterReadingDraftRow | null)
     : null;
@@ -431,14 +416,7 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
     const serviceName = service.services?.name ?? `Dịch vụ #${service.service_id}`;
     const calcType = service.services?.calc_type ?? 'flat_rate';
     const quantity = Math.max(1, Number(service.quantity ?? 1));
-    
-    // RULE DB-04: Priority: fixed_price (override) > unit_price_snapshot (at signing) > current price (fallback)
-    const unitPrice = Number(
-      service.fixed_price ?? 
-      service.unit_price_snapshot ?? 
-      priceMap.get(service.service_id) ?? 
-      0
-    );
+    const unitPrice = Number(service.fixed_price ?? priceMap.get(service.service_id) ?? 0);
 
     if (calcType === 'per_unit') {
       const utilityKind = inferUtilityKind(serviceName);
@@ -506,6 +484,45 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
   };
 }
 
+async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraftPreview> {
+  const contractId = Number(input.contractId);
+  if (!Number.isFinite(contractId)) {
+    throw new Error('Hợp đồng không hợp lệ.');
+  }
+
+  const contractDraft = await fetchContractDraft(contractId);
+  const utilityMode = resolveContractUtilityMode(contractDraft.contract_services ?? []);
+
+  if (utilityMode === 'legacy_metered') {
+    return buildLegacyMeteredInvoiceDraft(input, contractDraft);
+  }
+
+  const draft = await buildPolicyInvoiceDraft(input);
+
+  return {
+    contractId: draft.contractId,
+    contractCode: draft.contractCode,
+    roomId: draft.roomId,
+    roomCode: draft.roomCode,
+    buildingId: draft.buildingId,
+    buildingName: draft.buildingName,
+    tenantName: draft.tenantName,
+    billingPeriod: draft.billingPeriod,
+    dueDate: draft.dueDate,
+    items: draft.items.map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      source: item.source,
+    })),
+    subtotal: draft.subtotal,
+    totalAmount: draft.totalAmount,
+    missingUtilityItems: draft.missingUtilityItems,
+    note: draft.note,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Base query builder (shared select string for list + detail)
 // ---------------------------------------------------------------------------
@@ -555,7 +572,6 @@ export const invoiceService = {
           contract_code,
           room_id,
           monthly_rent,
-          rent_price_snapshot,
           rooms (
             room_code,
             building_id,
@@ -945,68 +961,103 @@ export const invoiceService = {
       throw new Error('Hợp đồng không hợp lệ.');
     }
 
-    const billingPeriod = input.monthYear;
-    const draft = await buildInvoiceDraft(input);
+    const contractDraft = await fetchContractDraft(contractId);
+    const utilityMode = resolveContractUtilityMode(contractDraft.contract_services ?? []);
 
-    if (draft.missingUtilityItems.length > 0) {
-      throw new Error(getMissingMeterReadingsMessage(draft));
-    }
+    if (utilityMode === 'legacy_metered') {
+      const billingPeriod = input.monthYear;
+      const draft = await buildLegacyMeteredInvoiceDraft(input, contractDraft);
 
-    const existingInvoice = (await unwrap(
-      supabase
-        .from('invoices')
-        .select('id, invoice_code')
-        .eq('contract_id', contractId)
-        .eq('billing_period', billingPeriod)
-        .neq('status', 'cancelled')
-        .maybeSingle()
-    )) as unknown as { id: number; invoice_code: string } | null;
+      if (draft.missingUtilityItems.length > 0) {
+        throw new Error(getMissingMeterReadingsMessage(draft));
+      }
 
-    if (existingInvoice) {
-      throw new Error(`Hóa đơn ${existingInvoice.invoice_code} đã tồn tại cho kỳ ${input.monthYear}.`);
-    }
-
-    const insertedInvoice = (await unwrap(
-      supabase
-        .from('invoices')
-        .insert({
-          contract_id: contractId,
-          billing_period: billingPeriod,
-          subtotal: draft.subtotal,
-          tax_amount: 0,
-          total_amount: draft.totalAmount,
-          amount_paid: 0,
-          due_date: input.dueDate,
-          status: 'pending_payment',
-          notes: input.note?.trim() || null,
-        })
-        .select('id')
-        .single()
-    )) as unknown as { id: number };
-
-    if (draft.items.length > 0) {
-      await unwrap(
+      const existingInvoice = (await unwrap(
         supabase
-          .from('invoice_items')
-          .insert(
-            draft.items.map((item, index) => ({
-              invoice_id: insertedInvoice.id,
-              description: item.description,
-              quantity: item.quantity,
-              unit_price: item.unitPrice,
-              line_total: item.lineTotal,
-              meter_reading_id: item.meterReadingId ?? null,
-              sort_order: index + 1,
-            }))
-          )
-      );
+          .from('invoices')
+          .select('id, invoice_code')
+          .eq('contract_id', contractId)
+          .eq('billing_period', billingPeriod)
+          .neq('status', 'cancelled')
+          .maybeSingle()
+      )) as unknown as { id: number; invoice_code: string } | null;
+
+      if (existingInvoice) {
+        throw new Error(`Hóa đơn ${existingInvoice.invoice_code} đã tồn tại cho kỳ ${input.monthYear}.`);
+      }
+
+      const insertedInvoice = (await unwrap(
+        supabase
+          .from('invoices')
+          .insert({
+            contract_id: contractId,
+            billing_period: billingPeriod,
+            subtotal: draft.subtotal,
+            tax_amount: 0,
+            total_amount: draft.totalAmount,
+            amount_paid: 0,
+            due_date: input.dueDate,
+            status: 'pending_payment',
+            notes: input.note?.trim() || null,
+          })
+          .select('id')
+          .single()
+      )) as unknown as { id: number };
+
+      if (draft.items.length > 0) {
+        await unwrap(
+          supabase
+            .from('invoice_items')
+            .insert(
+              draft.items.map((item, index) => ({
+                invoice_id: insertedInvoice.id,
+                description: item.description,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                line_total: item.lineTotal,
+                meter_reading_id: item.meterReadingId ?? null,
+                sort_order: index + 1,
+              }))
+            )
+        );
+      }
+
+      const createdInvoice = (await unwrap(
+        supabase
+          .from('invoices')
+          .select(INVOICE_SELECT)
+          .eq('id', insertedInvoice.id)
+          .single()
+      )) as unknown as DbInvoiceRow;
+
+      return mapDbRowToInvoice(createdInvoice);
+    }
+
+    const { data, error } = await supabase.functions.invoke('create-utility-invoice', {
+      body: {
+        contractId,
+        monthYear: input.monthYear,
+        dueDate: input.dueDate,
+        discountAmount: input.discountAmount ?? 0,
+        discountReason: input.discountReason ?? null,
+        note: input.note ?? null,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const invoiceId = Number((data as { invoiceId?: number | string } | null)?.invoiceId);
+    if (!Number.isFinite(invoiceId)) {
+      throw new Error('Không thể tạo hóa đơn utility.');
     }
 
     const createdInvoice = (await unwrap(
       supabase
         .from('invoices')
         .select(INVOICE_SELECT)
-        .eq('id', insertedInvoice.id)
+        .eq('id', invoiceId)
         .single()
     )) as unknown as DbInvoiceRow;
 

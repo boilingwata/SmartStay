@@ -3,7 +3,7 @@ import {
   Building2, Users, Home, PieChart, 
   DollarSign, AlertCircle, FileText, MessageSquare,
   Plus, Calendar, RefreshCcw, ArrowRight,
-  Activity, Check, Copy, Gauge, Star,
+  Activity, Check, Copy, Star,
   Clock, CheckCircle2, LayoutDashboard
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -160,11 +160,11 @@ const StaffDashboard = () => {
               </div>
             </button>
             <button 
-              onClick={() => navigate('/admin/meters/bulk')}
+              onClick={() => navigate('/admin/invoices')}
               className="w-full flex items-center gap-4 p-5 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-all group active:scale-95"
             >
               <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg">
-                <Gauge size={24} />
+                <FileText size={24} />
               </div>
               <div className="text-left">
                 <p className="text-small font-black uppercase tracking-widest">Nhập số điện/nước</p>

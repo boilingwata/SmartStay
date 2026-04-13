@@ -30,7 +30,7 @@ export const ElectricityChart = ({ data, loading }: ElectricityChartProps) => {
   const buildings = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'month') : [];
 
   const handleBarClick = (buildingName: string, month: string) => {
-    navigate(`/reports/consumption?building=${buildingName}&month=${month}`);
+    navigate(`/admin/reports/financial?building=${buildingName}&month=${month}`);
   };
 
   return (
@@ -52,10 +52,12 @@ export const ElectricityChart = ({ data, loading }: ElectricityChartProps) => {
             axisLine={false} 
             tickLine={false} 
             tick={{ fontSize: 11, fill: '#6B7280' }} 
-            label={{ value: 'kWh', angle: -90, position: 'insideLeft', offset: 0, style: { textAnchor: 'middle', fontSize: 11, fill: '#6B7280' } }}
+            tickFormatter={(value) => new Intl.NumberFormat('vi-VN').format(Number(value))}
+            label={{ value: 'VND', angle: -90, position: 'insideLeft', offset: 0, style: { textAnchor: 'middle', fontSize: 11, fill: '#6B7280' } }}
           />
           <Tooltip 
             cursor={{ fill: 'rgba(27, 58, 107, 0.05)' }}
+            formatter={(value: number) => [new Intl.NumberFormat('vi-VN').format(Number(value)) + ' d', 'Chi phi utility']}
             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
           />
           <Legend 

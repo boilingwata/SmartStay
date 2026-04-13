@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { 
   ArrowLeft, FileText, Printer, Share2, 
   CreditCard, Send, Trash2, Building2, 
-  Calendar, Info, ChevronDown, ChevronUp,
+  Calendar, Info,
   Zap, Droplets, ShieldCheck, Receipt,
   Smartphone, Download, AlertCircle, CheckCircle2, QrCode,
   History as HistoryIcon
@@ -21,8 +21,6 @@ import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 const InvoiceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [showElectricityDetails, setShowElectricityDetails] = useState(false);
-  const [showWaterDetails, setShowWaterDetails] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   useAdminFinanceRealtime(id);
@@ -171,47 +169,6 @@ const InvoiceDetail = () => {
                             <td className="px-6 py-4 text-right text-body font-bold text-primary">{formatVND(item.amount)}</td>
                           </tr>
                           
-                          {/* 3.2.4 Electricity Tier Breakdown (Collapsible) */}
-                          {item.type === 'Electricity' && item.tierBreakdown && (
-                            <tr>
-                              <td colSpan={4} className="p-0">
-                                 <button 
-                                   onClick={() => setShowElectricityDetails(!showElectricityDetails)}
-                                   className="w-full flex items-center justify-center gap-2 py-2 bg-warning/5 text-[10px] font-bold text-warning uppercase hover:bg-warning/10 transition-all"
-                                 >
-                                   {showElectricityDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Chi tiết định mức điện
-                                 </button>
-                                 {showElectricityDetails && (
-                                   <div className="p-6 bg-warning/5 border-t border-warning/10 animate-in slide-in-from-top-2 duration-300">
-                                     <table className="w-full text-left text-[11px]">
-                                        <thead>
-                                          <tr className="text-warning/70 border-b border-warning/20">
-                                            <th className="pb-2">Bậc</th>
-                                            <th className="pb-2">Từ (kWh)</th>
-                                            <th className="pb-2">Đến (kWh)</th>
-                                            <th className="pb-2 text-center">Tiêu thụ</th>
-                                            <th className="pb-2 text-right">Đơn giá</th>
-                                            <th className="pb-2 text-right">Thành tiền</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-warning/10">
-                                          {item.tierBreakdown.map((t: any) => (
-                                            <tr key={t.tierOrder}>
-                                              <td className="py-2 font-bold">{t.tierOrder}</td>
-                                              <td className="py-2">{t.fromKwh}</td>
-                                              <td className="py-2">{t.toKwh || 'Không hạn chế'}</td>
-                                              <td className="py-2 text-center font-medium">{t.kwh}</td>
-                                              <td className="py-2 text-right">{formatVND(t.price)}</td>
-                                              <td className="py-2 text-right font-bold">{formatVND(t.amount)}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                     </table>
-                                   </div>
-                                 )}
-                              </td>
-                            </tr>
-                          )}
                         </React.Fragment>
                       ))}
                     </tbody>

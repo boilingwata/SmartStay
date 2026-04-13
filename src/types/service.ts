@@ -1,5 +1,5 @@
 export type ServiceType = "Utility" | "Management" | "Amenity" | "Optional"
-export type BillingMethod = "Fixed" | "PerPerson" | "PerM2" | "Metered" | "Usage"
+export type BillingMethod = "Fixed" | "PerPerson" | "PerM2" | "Usage"
 
 export interface Service {
   serviceId: number

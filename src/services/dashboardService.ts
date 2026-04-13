@@ -310,11 +310,15 @@ export const dashboardService = {
   },
 
   getElectricityChart: async (buildingId?: string | number, months: number = 6): Promise<ElectricityDataPoint[]> => {
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - months);
-    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-01`;
+    const periodLabels: string[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      periodLabels.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
 
-    let targetRoomIds: number[] | null = null;
+    let roomIds: number[] | null = null;
     const numBid = buildingId ? Number(buildingId) : null;
     if (numBid && Number.isFinite(numBid)) {
       const { data: roomData } = await supabase
@@ -322,38 +326,54 @@ export const dashboardService = {
         .select('id')
         .eq('building_id', numBid)
         .eq('is_deleted', false);
-      targetRoomIds = ((roomData ?? []) as { id: number }[]).map(r => r.id);
-      if (targetRoomIds.length === 0) return [];
+      roomIds = ((roomData ?? []) as { id: number }[]).map((room) => room.id);
+      if (roomIds.length === 0) return periodLabels.map((month) => ({ month, total: 0 }));
     }
 
-    let meterQuery = supabase
-      .from('meter_readings')
-      .select('electricity_usage, billing_period')
-      .gte('billing_period', cutoffStr);
+    let snapshotQuery = supabase
+      .from('invoice_utility_snapshots')
+      .select('room_id, billing_period, electric_final_amount, water_final_amount')
+      .in('billing_period', periodLabels);
 
-    if (targetRoomIds !== null) {
-      meterQuery = meterQuery.in('room_id', targetRoomIds);
+    if (roomIds !== null) {
+      snapshotQuery = snapshotQuery.in('room_id', roomIds);
     }
 
-    const { data } = await meterQuery;
-    const rows = (data ?? []) as any[];
+    const { data: snapshots } = await snapshotQuery;
+    const rows = (snapshots ?? []) as {
+      room_id: number;
+      billing_period: string;
+      electric_final_amount: number;
+      water_final_amount: number;
+    }[];
 
-    const byMonth = new Map<string, number>();
-    for (const r of rows) {
-      const m = r.billing_period.slice(0, 7);
-      byMonth.set(m, (byMonth.get(m) ?? 0) + (r.electricity_usage ?? 0));
+    const distinctRoomIds = [...new Set(rows.map((row) => row.room_id))];
+    const { data: roomData } = distinctRoomIds.length === 0
+      ? { data: [] as { id: number; building_id: number }[] }
+      : await supabase.from('rooms').select('id, building_id').in('id', distinctRoomIds);
+
+    const buildingIds = [...new Set(((roomData ?? []) as { id: number; building_id: number }[]).map((room) => room.building_id))];
+    const { data: buildings } = buildingIds.length === 0
+      ? { data: [] as { id: number; name: string }[] }
+      : await supabase.from('buildings').select('id, name').in('id', buildingIds);
+
+    const roomBuildingMap = new Map<number, number>(((roomData ?? []) as { id: number; building_id: number }[]).map((room) => [room.id, room.building_id]));
+    const buildingNameMap = new Map<number, string>(((buildings ?? []) as { id: number; name: string }[]).map((building) => [building.id, building.name]));
+
+    const byMonth = new Map<string, Record<string, number>>();
+    for (const row of rows) {
+      const month = row.billing_period.slice(0, 7);
+      const buildingIdForRoom = roomBuildingMap.get(row.room_id);
+      const buildingName = buildingIdForRoom ? (buildingNameMap.get(buildingIdForRoom) ?? `Toa ${buildingIdForRoom}`) : 'Khac';
+      const current = byMonth.get(month) ?? {};
+      current[buildingName] = (current[buildingName] ?? 0) + (row.electric_final_amount ?? 0) + (row.water_final_amount ?? 0);
+      byMonth.set(month, current);
     }
 
-    const result: ElectricityDataPoint[] = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
-      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      result.push({ month: label, kwh: byMonth.get(label) ?? 0 });
-    }
-
-    return result;
+    return periodLabels.map((month) => ({
+      month,
+      ...(byMonth.get(month) ?? { total: 0 }),
+    }));
   },
 
   getAnalyticsAlerts: async (): Promise<AnalyticsAlert[]> => {

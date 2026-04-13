@@ -23,7 +23,6 @@ const ListingApplyPage = lazy(() => import('@/views/public/ListingApplyPage'));
 // Admin & Staff Views
 const PaymentDetail = lazy(() => import('@/views/admin/finance/PaymentDetail'));
 const OwnerDetail = lazy(() => import('@/views/admin/owners/OwnerDetail'));
-const MeterReadingConfirm = lazy(() => import('@/views/admin/meters/MeterReadingConfirm'));
 const AddendumList = lazy(() => import('@/views/admin/contracts/AddendumListPage'));
 const StaffDashboard = lazy(() => import('@/views/admin/staff/StaffDashboard'));
 const AnnouncementPage = lazy(() => import('@/views/admin/communications/AnnouncementPage/index'));
@@ -131,7 +130,6 @@ const App = () => {
                     {/* Explicit routes for architectural visibility [H1] */}
                     <Route path="payments/:id" element={<PaymentDetail />} />
                     <Route path="owners/:id" element={<OwnerDetail />} />
-                    <Route path="meters/confirm" element={<MeterReadingConfirm />} />
                     <Route path="contracts/addendums" element={<AddendumList />} />
                     <Route path="staff/dashboard" element={<StaffDashboard />} />
                     <Route path="announcements" element={<AnnouncementPage />} />
@@ -145,7 +143,6 @@ const App = () => {
                    <Route path="/tenants/*" element={<LegacyRedirect to="/admin/tenants" />} />
                    <Route path="/invoices/*" element={<LegacyRedirect to="/admin/invoices" />} />
                    <Route path="/payments/*" element={<LegacyRedirect to="/admin/payments" />} />
-                   <Route path="/meters/*" element={<LegacyRedirect to="/admin/meters" />} />
                    <Route path="/tickets/*" element={<LegacyRedirect to="/admin/tickets" />} />
                    <Route path="/buildings/*" element={<LegacyRedirect to="/admin/buildings" />} />
                  </Route>

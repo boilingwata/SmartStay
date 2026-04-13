@@ -2,11 +2,10 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, FileText, Receipt, CreditCard, Users, 
-  DoorOpen, Building, Gauge, Package, AlertCircle, 
-  BarChart2, Megaphone, Briefcase, Wrench, Zap, 
-  Droplets, UserCog, Settings, ScrollText, ChevronLeft,
+  DoorOpen, Building, Package, AlertCircle, 
+  BarChart2, Megaphone, Briefcase, Wrench, Settings, ScrollText, ChevronLeft,
   ChevronRight, LogOut, Building2, UserPlus, Waves,
-  ShieldCheck, FilePlus2
+  ShieldCheck, FilePlus2, Zap, UserCog
 } from 'lucide-react';
 import { cn } from '@/utils';
 import useUIStore from '@/stores/uiStore';
@@ -57,8 +56,6 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
     groupKey: "sidebar.operations",
     items: [
       { labelKey: "sidebar.allTickets", route: "/admin/tickets", icon: AlertCircle, permission: "ticket.view.all" },
-      { labelKey: "sidebar.meters", route: "/admin/meters", icon: Gauge, permission: "meter.view" },
-      { labelKey: "sidebar.meterEntry", route: "/admin/meters/bulk", icon: Gauge, permission: "meter.entry" },
       { labelKey: "sidebar.visitorCheckin", route: "/admin/staff/visitor-checkin", icon: UserPlus, permission: "visitor.checkin" },
       { labelKey: "sidebar.amenityCheckin", route: "/admin/staff/amenity-checkin", icon: Waves, permission: "amenity.checkin" },
       { labelKey: "sidebar.assets", route: "/admin/assets", icon: Package, permission: "asset.view" },
@@ -76,8 +73,9 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: "sidebar.users", route: "/admin/settings/users", icon: UserCog, adminOnly: true },
       { labelKey: "sidebar.permissions", route: "/admin/settings/users/permissions", icon: ShieldCheck, adminOnly: true },
-      { labelKey: "sidebar.electricityPolicy", route: "/admin/settings/electricity-policy", icon: Zap, adminOnly: true },
-      { labelKey: "sidebar.waterPolicy", route: "/admin/settings/water-policy", icon: Droplets, adminOnly: true },
+      { labelKey: "Utility Policies", route: "/admin/settings/utility-policies", icon: Zap, adminOnly: true },
+      { labelKey: "Utility Overrides", route: "/admin/settings/utility-overrides", icon: FileText, adminOnly: true },
+      { labelKey: "Billing Runs", route: "/admin/settings/billing-runs", icon: Receipt, adminOnly: true },
       { labelKey: "sidebar.systemConfig", route: "/admin/settings/system", icon: Settings, adminOnly: true },
       { labelKey: "sidebar.auditLogs", route: "/admin/settings/audit-logs", icon: ScrollText, adminOnly: true },
     ]

@@ -40,14 +40,13 @@ interface DbServicePriceRow {
 
 const CALC_TYPE_TO_BILLING: Record<DbServiceCalcType, Service['billingMethod']> = {
   per_person: 'PerPerson',
-  per_unit:   'Metered',
+  per_unit:   'Fixed',
   flat_rate:  'Fixed',
   per_room:   'Fixed',
 };
 
 const BILLING_TO_CALC_TYPE: Record<string, DbServiceCalcType> = {
   PerPerson: 'per_person',
-  Metered:   'per_unit',
   Fixed:     'flat_rate',
   Usage:     'per_unit',
   PerM2:     'per_unit',
@@ -68,12 +67,14 @@ const CALC_TYPE_TO_SERVICE_TYPE: Record<DbServiceCalcType, Service['serviceType'
 
 function toService(row: DbServiceRow, latestPrice?: DbServicePriceRow): Service {
   const billingMethod = CALC_TYPE_TO_BILLING[row.calc_type] ?? 'Fixed';
+  const unit = row.calc_type === 'per_person' ? 'nguoi/thang' : 'thang';
+
   return {
     serviceId:                 row.id,
     serviceName:               row.name,
     serviceCode:               `SVC-${String(row.id).padStart(4, '0')}`,  // generated client-side
     serviceType:               CALC_TYPE_TO_SERVICE_TYPE[row.calc_type] ?? 'Management',
-    unit:                      row.calc_type === 'per_unit' ? 'kWh' : '月',
+    unit,
     billingMethod,
     description:               undefined,  // no description column in DB
     isActive:                  row.is_active ?? true,

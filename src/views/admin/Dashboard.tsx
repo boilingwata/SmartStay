@@ -205,12 +205,17 @@ const AdminDashboard = () => {
           formatDate(ticket.slaDeadline, 'dd/MM/yyyy HH:mm'),
         ]),
         [],
-        ['Dien nang theo thang'],
-        ['Thang', 'kWh'],
-        ...freshElectricity.map(point => [
-          point.month,
-          point.kwh ?? 0,
-        ]),
+        ['Chi phi utility theo thang'],
+        ['Thang', 'Tong utility'],
+        ...freshElectricity.map(point => {
+          const total = Object.entries(point)
+            .filter(([key]) => key !== 'month')
+            .reduce((sum, [, value]) => sum + Number(value || 0), 0);
+          return [
+            point.month,
+            formatVND(total),
+          ];
+        }),
       ];
 
       const filename = `dashboard_${toFileSlug(buildingLabel)}_${generatedAt.toISOString().split('T')[0]}.csv`;
@@ -550,8 +555,8 @@ const AdminDashboard = () => {
         <div className="lg:col-span-2 card-container p-8 bg-white/40 backdrop-blur-md">
           <div className="flex justify-between items-center mb-8">
              <div>
-                <h3 className="text-h2 text-primary font-black uppercase tracking-tighter">{t('pages.dashboard.electricConsumption')}</h3>
-                <p className="text-small text-muted italic">{t('pages.dashboard.electricDesc')}</p>
+                <h3 className="text-h2 text-primary font-black uppercase tracking-tighter">Chi phí utility</h3>
+                <p className="text-small text-muted italic">Theo dõi tổng điện và nước đã chốt từ invoice utility snapshots.</p>
              </div>
              <div className="w-12 h-12 bg-warning/10 text-warning rounded-2xl flex items-center justify-center">
                 <CloudLightning size={24} />
