@@ -13,6 +13,7 @@ interface AuthState {
   role: UserRoleType | null;
   isLoading: boolean;
   sessionExpired: boolean;
+  authMode: 'supabase' | null;
   initialize: () => Promise<void>;
   refreshUser: () => Promise<void>;
   login: (email: string, password: string, options?: LoginOptions) => Promise<void>;
@@ -39,6 +40,13 @@ interface ProfileRow {
   created_at: string | null
 }
 
+type SessionUserLike = {
+  id: string
+  email?: string | null
+  app_metadata?: Record<string, unknown>
+  user_metadata?: Record<string, unknown>
+}
+
 async function fetchProfile(userId: string): Promise<User | null> {
   const { data, error } = await supabase
     .from('profiles')
@@ -53,16 +61,11 @@ async function fetchProfile(userId: string): Promise<User | null> {
     ? await portalOnboardingService.getStatusForProfile(userId)
     : null
 
-  // AUTH-01: email is intentionally set to '' here and patched by the caller.
-  // `profiles` table does not store email — only `auth.users` does.
-  // The two places that call fetchProfile both patch `profile.email = session.user.email`
-  // immediately after. This is a deliberate two-step because fetchProfile can be reused
-  // in contexts where the session may differ from the profileId being fetched.
   return {
     id: data.id,
     username: data.full_name,
     fullName: data.full_name,
-    email: '',  // patched by caller via session.user.email — see syncSessionUser & login
+    email: '',
     phone: data.phone ?? undefined,
     avatar: data.avatar_url ?? undefined,
     role,
@@ -74,15 +77,58 @@ async function fetchProfile(userId: string): Promise<User | null> {
   }
 }
 
+function resolveWorkspaceRole(sessionUser: SessionUserLike): UserRoleType | null {
+  const appRole = typeof sessionUser.app_metadata?.workspace_role === 'string'
+    ? sessionUser.app_metadata.workspace_role
+    : null
+  const userRole = typeof sessionUser.user_metadata?.workspace_role === 'string'
+    ? sessionUser.user_metadata.workspace_role
+    : null
+  const normalizedRole = (appRole ?? userRole)?.toLowerCase()
+
+  if (normalizedRole === 'super_admin') return 'SuperAdmin'
+  if (normalizedRole === 'owner') return 'Owner'
+  if (normalizedRole === 'staff') return 'Staff'
+  if (normalizedRole === 'tenant') return 'Tenant'
+  return null
+}
+
+function buildSuperAdminUser(sessionUser: SessionUserLike): User {
+  const fullName =
+    (typeof sessionUser.user_metadata?.full_name === 'string' && sessionUser.user_metadata.full_name.trim()) ||
+    (typeof sessionUser.user_metadata?.username === 'string' && sessionUser.user_metadata.username.trim()) ||
+    'Platform Super Admin'
+
+  return {
+    id: sessionUser.id,
+    username: fullName.toLowerCase().replace(/\s+/g, '.'),
+    fullName,
+    email: sessionUser.email ?? '',
+    role: 'SuperAdmin',
+    isActive: true,
+    isTwoFactorEnabled: false,
+  }
+}
+
+async function resolveAuthenticatedUser(sessionUser: SessionUserLike): Promise<User | null> {
+  const workspaceRole = resolveWorkspaceRole(sessionUser)
+
+  if (workspaceRole === 'SuperAdmin') {
+    return buildSuperAdminUser(sessionUser)
+  }
+
+  const profile = await fetchProfile(sessionUser.id)
+  if (!profile) return null
+
+  profile.email = sessionUser.email ?? ''
+  return profile
+}
+
 async function syncSessionUser() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.user) return null
 
-  const profile = await fetchProfile(session.user.id)
-  if (!profile) return null
-
-  profile.email = session.user.email ?? ''
-  return profile
+  return resolveAuthenticatedUser(session.user)
 }
 
 const useAuthStore = create<AuthState>()(
@@ -93,6 +139,7 @@ const useAuthStore = create<AuthState>()(
       role: null,
       isLoading: true,
       sessionExpired: false,
+      authMode: null,
 
       initialize: async () => {
         try {
@@ -105,26 +152,33 @@ const useAuthStore = create<AuthState>()(
               role: profile.role,
               isLoading: false,
               sessionExpired: false,
+              authMode: 'supabase',
             })
             setSentryUser({ id: profile.id, email: profile.email, role: profile.role })
           } else {
-            set({ isLoading: false, isAuthenticated: false, user: null, role: null })
+            set({ isLoading: false, isAuthenticated: false, user: null, role: null, authMode: null })
           }
 
-          const { unsubscribeAuth } = get();
-          if (unsubscribeAuth) unsubscribeAuth();
+          const { unsubscribeAuth } = get()
+          if (unsubscribeAuth) unsubscribeAuth()
 
           const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
-              set({ user: null, isAuthenticated: false, role: null, sessionExpired: false })
-            } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-              const current = get().user
-              if (!current || current.id !== session.user.id) {
-                const refreshedProfile = await fetchProfile(session.user.id)
-                if (refreshedProfile) {
-                  refreshedProfile.email = session.user.email ?? ''
-                  set({ user: refreshedProfile, isAuthenticated: true, role: refreshedProfile.role })
-                }
+              set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
+              return
+            }
+
+            if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+              const refreshedProfile = await resolveAuthenticatedUser(session.user)
+              if (refreshedProfile) {
+                set({
+                  user: refreshedProfile,
+                  isAuthenticated: true,
+                  role: refreshedProfile.role,
+                  sessionExpired: false,
+                  authMode: 'supabase',
+                })
+                setSentryUser({ id: refreshedProfile.id, email: refreshedProfile.email, role: refreshedProfile.role })
               }
             }
           })
@@ -138,7 +192,7 @@ const useAuthStore = create<AuthState>()(
       refreshUser: async () => {
         const profile = await syncSessionUser()
         if (!profile) {
-          set({ user: null, isAuthenticated: false, role: null, sessionExpired: false })
+          set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
           return
         }
 
@@ -147,6 +201,7 @@ const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           role: profile.role,
           sessionExpired: false,
+          authMode: 'supabase',
         })
       },
 
@@ -155,7 +210,7 @@ const useAuthStore = create<AuthState>()(
         if (error) throw error
         if (!data.user) throw new Error('Đăng nhập thất bại')
 
-        const profile = await fetchProfile(data.user.id)
+        const profile = await resolveAuthenticatedUser(data.user)
         if (!profile) throw new Error('Không tìm thấy hồ sơ người dùng')
 
         if (options?.allowedRoles && !options.allowedRoles.includes(profile.role)) {
@@ -163,26 +218,28 @@ const useAuthStore = create<AuthState>()(
           throw new Error(options.invalidRoleMessage ?? 'You are not allowed to sign in here')
         }
 
-        profile.email = data.user.email ?? ''
         set({
           user: profile,
           isAuthenticated: true,
           role: profile.role,
           sessionExpired: false,
+          authMode: 'supabase',
         })
         setSentryUser({ id: profile.id, email: profile.email, role: profile.role })
       },
 
       logout: async () => {
-        await supabase.auth.signOut()
-        set({ user: null, isAuthenticated: false, role: null, sessionExpired: false })
+        if (get().authMode === 'supabase') {
+          await supabase.auth.signOut()
+        }
+        set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
         setSentryUser(null)
         localStorage.removeItem('smartstay-auth-storage')
       },
 
       setUser: (user) => set({ user, role: user.role }),
 
-      clearAuth: () => set({ user: null, isAuthenticated: false, role: null, sessionExpired: false }),
+      clearAuth: () => set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null }),
       setSessionExpired: (expired) => set({ sessionExpired: expired }),
     }),
     {
@@ -192,6 +249,7 @@ const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         role: state.role,
+        authMode: state.authMode,
       }),
     }
   )

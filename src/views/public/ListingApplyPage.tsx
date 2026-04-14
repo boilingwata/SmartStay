@@ -114,7 +114,7 @@ const ListingApplyPage: React.FC = () => {
                   <ArrowRight size={16} />
                 </Link>
                 <Link
-                  to={`/portal/login?redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
+                  to={`/login?redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
                   className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-[12px] font-black uppercase tracking-[0.18em] text-slate-700 transition-all hover:border-[#0D8A8A] hover:text-[#0D8A8A]"
                 >
                   I already have an account

@@ -87,7 +87,7 @@ const ForgotPassword: React.FC = () => {
     setLoading(false);
     setStep(4);
     // Navigation should be user-triggered or a very short auto-redirect
-    setTimeout(() => navigate('/portal/login'), 2000);
+    setTimeout(() => navigate('/login'), 2000);
   };
 
   const renderStep = () => {

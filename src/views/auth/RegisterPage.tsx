@@ -74,7 +74,7 @@ const RegisterPage = () => {
       // redirect to login so the user can sign in after verifying.
       if (error?.message?.toLowerCase().includes('email not confirmed')) {
         toast.info('Vui lòng kiểm tra email để xác thực tài khoản, sau đó đăng nhập.');
-        navigate(requestedRedirect ? `/portal/login?redirect=${encodeURIComponent(requestedRedirect)}` : '/portal/login');
+        navigate(requestedRedirect ? `/login?redirect=${encodeURIComponent(requestedRedirect)}` : '/login');
       } else {
         toast.error(error?.message || 'Có lỗi xảy ra, vui lòng thử lại sau.');
       }
@@ -260,7 +260,7 @@ const RegisterPage = () => {
           <div className="pt-6 text-center">
             <p className="text-body text-muted font-bold">
               Đã có tài khoản?{' '}
-              <Link to="/portal/login" className="text-primary underline underline-offset-4 decoration-2 decoration-primary/30 hover:decoration-primary transition-all">
+              <Link to="/login" className="text-primary underline underline-offset-4 decoration-2 decoration-primary/30 hover:decoration-primary transition-all">
                 Đăng nhập tại đây
               </Link>
             </p>

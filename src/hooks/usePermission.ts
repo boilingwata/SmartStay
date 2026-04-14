@@ -18,7 +18,7 @@ export const usePermission = () => {
 
   const can = useCallback(
     (permissionKey: string): boolean => {
-      if (role === 'Admin') return true;
+      if (role === 'SuperAdmin' || role === 'Owner') return true;
       return permissions.includes(permissionKey);
     },
     [role, permissions]

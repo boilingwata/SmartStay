@@ -15,6 +15,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/run-utility-billing/index.ts"
 
+[functions.create-user]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/create-user/index.ts"
+
 [db.seed]
 enabled = true
 sql_paths = ["./seed.sql"]

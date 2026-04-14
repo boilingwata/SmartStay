@@ -9,14 +9,15 @@ interface TitleMap {
 const titleMap: TitleMap = {
   '/dashboard': 'nav.dashboard',
   '/contracts': 'nav.contracts',
-  '/contracts/create': 'Hợp đồng - Tạo mới',
-  '/invoices': 'Hóa đơn',
-  '/rooms': 'Quản lý phòng',
-  '/buildings': 'Tòa nhà',
-  '/tenants': 'Cư dân',
-  '/public/login': 'Đăng nhập',
-  '/public/register': 'Đăng ký',
-  '/portal': 'Cổng cư dân',
+  '/contracts/create': 'Hop dong - Tao moi',
+  '/invoices': 'Hoa don',
+  '/rooms': 'Quan ly phong',
+  '/buildings': 'Toa nha',
+  '/tenants': 'Cu dan',
+  '/login': 'Dang nhap',
+  '/public/login': 'Dang nhap',
+  '/public/register': 'Dang ky',
+  '/portal': 'Cong cu dan',
 };
 
 export const PageTitle = () => {
@@ -25,10 +26,9 @@ export const PageTitle = () => {
 
   useEffect(() => {
     const path = location.pathname;
-    // Find exact match or most specific prefix
     const pathKey = Object.keys(titleMap)
       .sort((a, b) => b.length - a.length)
-      .find(key => path.startsWith(key));
+      .find((key) => path.startsWith(key));
 
     const pageName = pathKey ? (titleMap[pathKey].includes('.') ? t(titleMap[pathKey]) : titleMap[pathKey]) : 'SmartStay';
     document.title = `${pageName} | SmartStay BMS`;

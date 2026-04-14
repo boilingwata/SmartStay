@@ -22,7 +22,10 @@ export function getTenantHomePath(stage?: TenantStage | null): string {
 
 export function getAuthenticatedHomePath(user?: Pick<User, 'role' | 'tenantStage'> | null): string {
   if (!user) return '/';
-  if (user.role !== 'Tenant') return '/admin/dashboard';
+  if (user.role === 'SuperAdmin') return '/super-admin/dashboard';
+  if (user.role === 'Owner') return '/owner/dashboard';
+  if (user.role === 'Staff') return '/staff/dashboard';
+  if (user.role !== 'Tenant') return '/owner/dashboard';
   return getTenantHomePath(user.tenantStage);
 }
 
@@ -38,8 +41,24 @@ export function getPostLoginRedirect(
   const safePath = sanitizeInternalRedirect(requestedPath);
 
   if (safePath && user) {
+    if (user.role === 'SuperAdmin') {
+      return safePath.startsWith('/super-admin') ? safePath : '/super-admin/dashboard';
+    }
+
+    if (user.role === 'Owner') {
+      if (safePath.startsWith('/owner')) return safePath;
+      if (safePath.startsWith('/admin')) return safePath.replace('/admin', '/owner');
+      return '/owner/dashboard';
+    }
+
+    if (user.role === 'Staff') {
+      if (safePath.startsWith('/staff')) return safePath;
+      if (safePath.startsWith('/admin')) return safePath.replace('/admin', '/staff');
+      return '/staff/dashboard';
+    }
+
     if (user.role !== 'Tenant') {
-      return safePath.startsWith('/portal') ? '/admin/dashboard' : safePath;
+      return '/owner/dashboard';
     }
 
     if (safePath.startsWith('/listings')) return safePath;

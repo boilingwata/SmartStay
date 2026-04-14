@@ -100,14 +100,15 @@ export const Sidebar = () => {
     staleTime: 5 * 60 * 1000,
   });
   const activeBuilding = buildings?.find(b => String(b.id) === String(activeBuildingId));
+  const workspaceBase = user?.role === 'Staff' ? '/staff' : '/owner';
 
   const handleLogout = () => {
     logout();
     toast.success(t('auth.logoutSuccess'));
-    navigate('/public/login', { replace: true });
+    navigate('/login', { replace: true });
   };
   
-  const isAdmin = user?.role === 'Admin';
+  const isAdmin = user?.role === 'Owner' || user?.role === 'SuperAdmin';
   
   
   return (
@@ -170,7 +171,7 @@ export const Sidebar = () => {
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.route}
-                  to={item.route}
+                  to={item.route.replace('/admin', workspaceBase)}
                   className={({ isActive }) => cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-all group relative",
                     isActive
@@ -215,8 +216,8 @@ export const Sidebar = () => {
           </div>
           {sidebarOpen && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate leading-none">{user?.username || 'Administrator'}</p>
-              <p className="text-[10px] text-white/40 mt-1 uppercase tracking-tighter">{user?.role || 'Admin'}</p>
+              <p className="text-sm font-bold truncate leading-none">{user?.username || 'Workspace User'}</p>
+              <p className="text-[10px] text-white/40 mt-1 uppercase tracking-tighter">{user?.role || 'Owner'}</p>
             </div>
           )}
           <button 

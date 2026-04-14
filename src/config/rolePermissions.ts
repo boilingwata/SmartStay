@@ -51,7 +51,15 @@ export const ROLE_PERMISSION_CONFIG: RolePermissionConfig = {
     { permissionKey: 'system.config',    module: 'Hệ thống', description: 'Cấu hình hệ thống' },
   ],
   roleMap: {
-    Admin: [
+    SuperAdmin: [
+      'contract.view', 'contract.create', 'contract.delete',
+      'invoice.view', 'invoice.create', 'payment.view',
+      'payment.approve', 'room.view', 'ticket.view',
+      'ticket.view.all', 'report.view',
+      'building.view', 'building.manage', 'tenant.view', 'tenant.manage',
+      'service.manage', 'pii.view', 'system.config',
+    ],
+    Owner: [
       'contract.view', 'contract.create', 'contract.delete',
       'invoice.view', 'invoice.create', 'payment.view',
       'payment.approve', 'room.view', 'ticket.view',

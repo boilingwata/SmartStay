@@ -85,7 +85,7 @@ const ResetPasswordPage = () => {
           </div>
           <h2 className="text-h1 text-primary">Thành công!</h2>
           <p className="text-body text-muted">Mật khẩu mới của bạn đã được cập nhật. Bây giờ bạn có thể đăng nhập bằng mật khẩu mới này.</p>
-          <button onClick={() => navigate('/public/login')} className="w-full py-4 bg-primary text-white rounded-md font-bold">Quay lại Đăng nhập</button>
+          <button onClick={() => navigate('/login')} className="w-full py-4 bg-primary text-white rounded-md font-bold">Quay lại Đăng nhập</button>
         </div>
       </div>
     );

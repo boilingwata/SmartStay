@@ -88,7 +88,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'notifications', element: <NotificationPage /> },
   { path: 'services', element: <ServiceCatalog /> },
   {
-    element: <ProtectedRoute requiredRole="Admin" />,
+    element: <ProtectedRoute requiredRole="Owner" />,
     children: [
       {
         path: 'reports',

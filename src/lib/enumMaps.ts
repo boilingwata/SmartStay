@@ -13,17 +13,18 @@ function createMapper<TFrom extends StringRecord>(map: TFrom) {
 
 // --- Role ---
 const ROLE_FROM_DB: StringRecord = {
-  admin: 'Admin',
-  manager: 'Admin',
+  admin: 'Owner',
+  manager: 'Owner',
   staff: 'Staff',
-  landlord: 'Admin',
+  landlord: 'Owner',
   tenant: 'Tenant',
 }
 const ROLE_TO_DB: StringRecord = {
-  Admin: 'admin',
+  Owner: 'admin',
   Staff: 'staff',
   Tenant: 'tenant',
   Viewer: 'tenant',
+  SuperAdmin: 'admin',
 }
 
 // --- Room Status ---

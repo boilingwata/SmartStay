@@ -167,7 +167,7 @@ const StaffMyTickets = () => {
           tickets={tickets || []}
           columns={['Open', 'InProgress', 'Resolved']}
           onStatusChange={(id, status) => updateStatusMutation.mutate({ id, status })}
-          onTicketClick={(id) => navigate(`/tickets/${id}`)}
+          onTicketClick={(id) => navigate(`/staff/tickets/${id}`)}
         />
       ) : (
         <div className="card-container p-0 overflow-hidden">

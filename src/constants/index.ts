@@ -8,7 +8,7 @@ export const ROUTES = {
 };
 
 export const API_ENDPOINTS = {
-  AUTH: '/auth',
+  AUTH: '/login',
   USERS: '/users',
   CONTRACTS: '/contracts',
   INVOICES: '/invoices'

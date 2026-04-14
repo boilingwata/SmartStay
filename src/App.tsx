@@ -5,6 +5,8 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import PortalAuthGuard from './components/auth/PortalAuthGuard';
 import { AdminLayout, PublicLayout } from './views/layouts/Layouts';
 import PortalLayout from './components/layout/PortalLayout';
+import SuperAdminLayout from './views/layouts/SuperAdminLayout';
+import StaffLayout from './views/layouts/StaffLayout';
 import { Spinner } from './components/ui/Feedback';
 import { getAuthenticatedHomePath } from './lib/authRouting';
 
@@ -32,6 +34,8 @@ const NotificationPage = lazy(() => import('@/views/admin/communications/Notific
 const Documents = lazy(() => import('@/views/portal/profile/Documents'));
 
 import { adminRoutes } from './routes/adminRoutes';
+import { staffRoutes } from './routes/staffRoutes';
+import { superAdminRoutes } from './routes/superAdminRoutes';
 
 import { portalRoutes, portalGuestRoutes, Onboarding } from './routes/portalRoutes';
 
@@ -107,12 +111,18 @@ const App = () => {
 
               {/* 3.2 Auth Pages (Public Namespace) */}
               <Route path="/public" element={<PublicLayout showHeader={false} />}>
-                <Route path="login" element={<LoginPage />} />
+                <Route path="login" element={<Navigate to="/login" replace />} />
                 <Route path="forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="reset-password" element={<ResetPasswordPage />} />
                 <Route path="change-password" element={<ChangePasswordPage />} />
                 <Route path="register" element={<RegisterPage />} />
               </Route>
+
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth" element={<Navigate to="/login" replace />} />
+              <Route path="/owner/login" element={<Navigate to="/login" replace />} />
+              <Route path="/staff/login" element={<Navigate to="/login" replace />} />
+              <Route path="/super-admin/login" element={<Navigate to="/login" replace />} />
 
               <Route element={<PublicLayout />}>
                 <Route path="/listings" element={<ListingsPage />} />
@@ -120,12 +130,9 @@ const App = () => {
                 <Route path="/listings/:id/apply" element={<ListingApplyPage />} />
               </Route>
 
-              {/* 3.2.1 Admin Login Shortcut */}
-              <Route path="/login" element={<Navigate to="/public/login" replace />} />
-
-              {/* 1. Admin & Staff Namespace (Protected) */}
-              <Route element={<ProtectedRoute allowedRoles={['Admin', 'Staff']} />}>
-                  <Route path="admin" element={<AdminLayout />}>
+              {/* 1. Owner Namespace */}
+              <Route element={<ProtectedRoute allowedRoles={['Owner']} />}>
+                  <Route path="owner" element={<AdminLayout />}>
                     {mapRoutes(adminRoutes)}
                     {/* Explicit routes for architectural visibility [H1] */}
                     <Route path="payments/:id" element={<PaymentDetail />} />
@@ -135,17 +142,32 @@ const App = () => {
                     <Route path="announcements" element={<AnnouncementPage />} />
                     <Route path="notifications" element={<NotificationPage />} />
                   </Route>
+              </Route>
 
-                   <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-                   <Route path="/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
-                   <Route path="/rooms/*" element={<LegacyRedirect to="/admin/rooms" />} />
-                   <Route path="/contracts/*" element={<LegacyRedirect to="/admin/contracts" />} />
-                   <Route path="/tenants/*" element={<LegacyRedirect to="/admin/tenants" />} />
-                   <Route path="/invoices/*" element={<LegacyRedirect to="/admin/invoices" />} />
-                   <Route path="/payments/*" element={<LegacyRedirect to="/admin/payments" />} />
-                   <Route path="/tickets/*" element={<LegacyRedirect to="/admin/tickets" />} />
-                   <Route path="/buildings/*" element={<LegacyRedirect to="/admin/buildings" />} />
-                 </Route>
+              {/* 2. Staff Namespace */}
+              <Route element={<ProtectedRoute allowedRoles={['Staff']} />}>
+                <Route path="staff" element={<StaffLayout />}>
+                  {mapRoutes(staffRoutes)}
+                </Route>
+              </Route>
+
+              {/* 3. Super Admin Namespace */}
+              <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
+                <Route path="super-admin" element={<SuperAdminLayout />}>
+                  {mapRoutes(superAdminRoutes)}
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                </Route>
+              </Route>
+
+              <Route path="/dashboard" element={<Navigate to="/owner/dashboard" replace />} />
+              <Route path="/admin/*" element={<LegacyRedirect to="/owner" />} />
+              <Route path="/rooms/*" element={<LegacyRedirect to="/owner/rooms" />} />
+              <Route path="/contracts/*" element={<LegacyRedirect to="/owner/contracts" />} />
+              <Route path="/tenants/*" element={<LegacyRedirect to="/owner/tenants" />} />
+              <Route path="/invoices/*" element={<LegacyRedirect to="/owner/invoices" />} />
+              <Route path="/payments/*" element={<LegacyRedirect to="/owner/payments" />} />
+              <Route path="/tickets/*" element={<LegacyRedirect to="/owner/tickets" />} />
+              <Route path="/buildings/*" element={<LegacyRedirect to="/owner/buildings" />} />
 
               <Route path="/portal">
                 {/* 3.2.2 Guest Routes (Login, etc.) */}

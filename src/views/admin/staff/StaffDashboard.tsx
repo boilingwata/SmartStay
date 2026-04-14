@@ -109,14 +109,14 @@ const StaffDashboard = () => {
         <div className="lg:col-span-2 card-container p-8 bg-white/40 backdrop-blur-md">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Vé yêu cầu được phân công</h3>
-            <button onClick={() => navigate('/admin/tickets?assignedTo=me')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">Xem tất cả</button>
+            <button onClick={() => navigate('/staff/my-tickets')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">Xem tất cả</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {staffTickets?.map((ticket: any) => (
               <div 
                 key={ticket.id} 
                 className="flex flex-col gap-3 p-4 hover:bg-white rounded-[24px] border border-transparent hover:border-primary/10 hover:shadow-xl transition-all cursor-pointer group"
-                onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
@@ -148,7 +148,7 @@ const StaffDashboard = () => {
           <h3 className="text-h3 text-slate-400 font-black uppercase tracking-[3px] mb-8">Thao tác nhanh</h3>
           <div className="space-y-4">
             <button 
-              onClick={() => navigate('/admin/tickets?action=create')}
+              onClick={() => navigate('/staff/my-tickets')}
               className="w-full flex items-center gap-4 p-5 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-all group active:scale-95"
             >
               <div className="w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center text-white shadow-lg">
@@ -160,7 +160,7 @@ const StaffDashboard = () => {
               </div>
             </button>
             <button 
-              onClick={() => navigate('/admin/invoices')}
+              onClick={() => navigate('/owner/invoices')}
               className="w-full flex items-center gap-4 p-5 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-all group active:scale-95"
             >
               <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg">

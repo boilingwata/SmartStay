@@ -227,8 +227,8 @@ const PortalLogin: React.FC = () => {
             <div className="mt-10 pt-10 border-t text-center space-y-4">
               <p className="text-small text-muted font-bold uppercase tracking-widest">
                 Bạn là Quản trị viên? <br />
-                <Link to="/public/login" className="inline-flex items-center gap-2 text-primary hover:text-primary-light transition-colors mt-2 font-black border-b-2 border-primary/20 hover:border-primary">
-                  <ArrowLeft size={16} /> Quay lại trang Quản trị
+                <Link to="/auth" className="inline-flex items-center gap-2 text-primary hover:text-primary-light transition-colors mt-2 font-black border-b-2 border-primary/20 hover:border-primary">
+                  <ArrowLeft size={16} /> Quay lại chọn cổng
                 </Link>
               </p>
             </div>

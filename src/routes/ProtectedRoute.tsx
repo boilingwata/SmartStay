@@ -9,6 +9,10 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRoleType[];
 }
 
+function getLoginPath(pathname: string): string {
+  return '/login';
+}
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, allowedRoles }) => {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const role = useAuthStore(s => s.role);
@@ -24,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, allowedRo
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/public/login" state={{ from: location }} replace />;
+    return <Navigate to={getLoginPath(location.pathname)} state={{ from: location }} replace />;
   }
 
   if (requiredRole && role !== requiredRole) {

@@ -3,11 +3,10 @@
 /**
  * create-user
  *
- * Creates a new application user by:
+ * Creates a preview or application user by:
  *   1. Creating an auth.users row with the service role
- *   2. Upserting the matching smartstay.profiles row
- *   3. Persisting UI-only fields (username, email, building access, force-change-password)
- *      in profiles.preferences until the schema grows first-class columns for them
+ *   2. Upserting the matching smartstay.profiles row for tenant-side roles
+ *   3. Marking platform-only roles such as super_admin in app_metadata
  */
 
 import { handleOptions } from '../_shared/cors.ts';
@@ -15,13 +14,14 @@ import { requireAdminRole } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
-type SupportedRole = 'admin' | 'staff' | 'tenant';
+type SupportedRole = 'admin' | 'staff' | 'tenant' | 'super_admin';
 type TenantStage = 'prospect' | 'applicant' | 'resident_pending_onboarding' | 'resident_active';
 
 interface CreateUserRequest {
   fullName: string;
   username: string;
   email: string;
+  password?: string;
   phone?: string | null;
   avatarUrl?: string | null;
   role?: SupportedRole;
@@ -31,7 +31,7 @@ interface CreateUserRequest {
   tenantStage?: TenantStage;
 }
 
-const SUPPORTED_ROLES: SupportedRole[] = ['admin', 'staff', 'tenant'];
+const SUPPORTED_ROLES: SupportedRole[] = ['admin', 'staff', 'tenant', 'super_admin'];
 const SUPPORTED_TENANT_STAGES: TenantStage[] = [
   'prospect',
   'applicant',
@@ -43,10 +43,16 @@ function normalizeUsername(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
 }
 
-function roleLabel(role: SupportedRole): 'Admin' | 'Staff' | 'Tenant' {
-  if (role === 'admin') return 'Admin';
+function roleLabel(role: SupportedRole): 'Owner' | 'Staff' | 'Tenant' | 'SuperAdmin' {
+  if (role === 'admin') return 'Owner';
   if (role === 'staff') return 'Staff';
-  return 'Tenant';
+  if (role === 'tenant') return 'Tenant';
+  return 'SuperAdmin';
+}
+
+function workspaceRole(role: SupportedRole): 'owner' | 'staff' | 'tenant' | 'super_admin' {
+  if (role === 'admin') return 'owner';
+  return role;
 }
 
 Deno.serve(async (req: Request) => {
@@ -64,6 +70,7 @@ Deno.serve(async (req: Request) => {
 
   const fullName = body.fullName?.trim();
   const email = body.email?.trim().toLowerCase();
+  const password = body.password?.trim();
   const username = normalizeUsername(body.username ?? '');
   const role = body.role ?? 'staff';
   const tenantStage = body.tenantStage ?? 'prospect';
@@ -83,15 +90,24 @@ Deno.serve(async (req: Request) => {
   if (!SUPPORTED_TENANT_STAGES.includes(tenantStage)) {
     return errorResponse(`Unsupported tenantStage "${body.tenantStage}"`, 400);
   }
+  if (password && password.length < 8) {
+    return errorResponse('password must contain at least 8 characters', 400);
+  }
 
   const adminClient = createAdminClient();
+  const accessRole = workspaceRole(role);
 
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email,
+    password,
     email_confirm: true,
+    app_metadata: {
+      workspace_role: accessRole,
+    },
     user_metadata: {
       full_name: fullName,
       username,
+      workspace_role: accessRole,
     },
   });
 
@@ -109,6 +125,21 @@ Deno.serve(async (req: Request) => {
     buildings_access: Array.isArray(body.buildingsAccess) ? body.buildingsAccess : [],
     force_change_password: body.forceChangePassword ?? true,
   };
+
+  if (role === 'super_admin') {
+    return successResponse({
+      user: {
+        id: userId,
+        username,
+        fullName,
+        email,
+        role: roleLabel(role),
+        isActive: body.isActive ?? true,
+        isTwoFactorEnabled: false,
+        forceChangePassword: preferences.force_change_password,
+      },
+    }, 201);
+  }
 
   const { data: profileRow, error: profileError } = await adminClient
     .from('profiles')

@@ -73,7 +73,7 @@ export const PublicTopbar = () => {
 
         <div className="hidden items-center gap-4 lg:flex">
           <Link
-            to="/portal/login"
+            to="/login"
             className={cn(
               'rounded-md border px-5 py-2 text-sm font-bold transition-all',
               useSolidSurface
@@ -81,7 +81,7 @@ export const PublicTopbar = () => {
                 : 'border-white/30 text-white hover:bg-white/10'
             )}
           >
-            Sign in
+            Đăng nhập
           </Link>
           <Link
             to="/public/register"
@@ -128,8 +128,8 @@ export const PublicTopbar = () => {
             )
           )}
           <div className="grid grid-cols-2 gap-4 border-t pt-4">
-            <Link to="/portal/login" className="btn-primary border bg-bg text-center text-primary">
-              Sign in
+            <Link to="/login" className="btn-primary border bg-bg text-center text-primary">
+              Đăng nhập
             </Link>
             <Link to="/public/register" className="btn-primary text-center">
               Register
