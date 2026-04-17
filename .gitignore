@@ -1,13 +1,21 @@
 # Dependencies
 node_modules/
 .pnp
-.pnp.js
+.pnp.*
 
-# Build output
+# Build output and caches
 dist/
 dist-ssr/
 build/
+coverage/
+.nyc_output/
+.cache/
+.turbo/
+.next/
 *.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+vite.config.js.timestamp-*.mjs
 
 # Environment variables
 .env
@@ -18,12 +26,7 @@ build/
 *.local
 
 # Editor / IDE
-**/.vscode/
-!.vscode/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/launch.json
-supabase/functions/.vscode/
+.vscode/
 .idea/
 *.suo
 *.ntvs*
@@ -33,7 +36,7 @@ supabase/functions/.vscode/
 .history/
 *.orig
 
-# OS Files
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -41,6 +44,11 @@ supabase/functions/.vscode/
 .Trashes
 Thumbs.db
 desktop.ini
+
+# Browser / download artifacts
+*.crdownload
+*.part
+*.download
 
 # Logs
 *.log
@@ -50,7 +58,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# AI & Tooling
+# Local AI / agent tooling
 .agent/
 .agents/
 .adal/
@@ -84,13 +92,12 @@ lerna-debug.log*
 .windsurf/
 .zencoder/
 .mcp.json
+skills/
 skills-lock.json
-*.tmp
-.turbo
-.next
+
+# Supabase local state
 .supabase/
 supabase/.temp/
-skills/
 
 # Secrets / credentials
 *.pem
@@ -102,7 +109,7 @@ skills/
 secrets/
 *.secrets.*
 
-# Testing & Reports
+# Test artifacts and reports
 playwright-report/
 test-results/
 blob-report/
@@ -115,6 +122,11 @@ tmp/
 tmp-*/
 tmp-*.png
 tmp-*.json
+test-results*.json
+junit.xml
+lint_output*.txt
+
+# Local planning / audit notes
 *-REPORT.md
 AUDIT.md
 CLAUDE.md
@@ -122,13 +134,7 @@ IMPROVEMENTS.md
 findings.md
 progress.md
 task_plan.md
-coverage/
-.nyc_output/
-test-results*.json
-junit.xml
-lint_output*.txt
 
-# Vite
-vite.config.d.ts
-vite.config.js
-vite.config.js.timestamp-*.mjs
+# Misc generated files
+*.tmp
+.eslintcache
