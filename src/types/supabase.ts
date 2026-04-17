@@ -710,7 +710,6 @@ export type Database = {
           id: number
           invoice_id: number
           line_total: number
-          meter_reading_id: number | null
           quantity: number | null
           sort_order: number | null
           unit_price: number
@@ -721,7 +720,6 @@ export type Database = {
           id?: number
           invoice_id: number
           line_total: number
-          meter_reading_id?: number | null
           quantity?: number | null
           sort_order?: number | null
           unit_price: number
@@ -732,7 +730,6 @@ export type Database = {
           id?: number
           invoice_id?: number
           line_total?: number
-          meter_reading_id?: number | null
           quantity?: number | null
           sort_order?: number | null
           unit_price?: number
@@ -743,13 +740,6 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_items_meter_reading_id_fkey"
-            columns: ["meter_reading_id"]
-            isOneToOne: false
-            referencedRelation: "meter_readings"
             referencedColumns: ["id"]
           },
         ]

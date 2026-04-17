@@ -49,8 +49,12 @@ const SuperAdminLayout: React.FC = () => {
           </div>
           <button
             onClick={async () => {
-              await logout()
-              navigate('/login', { replace: true })
+              try {
+                await logout()
+                navigate('/login', { replace: true })
+              } catch (error) {
+                console.error('Lỗi đăng xuất:', error)
+              }
             }}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 font-bold hover:bg-white/6 transition-colors"
           >

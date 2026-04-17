@@ -53,7 +53,7 @@ interface ServiceDetailModalProps {
   onSuccess: () => void;
 }
 
-const BILLING_METHOD_DESCRIPTIONS: Record<BillingMethod, string> = {
+const BILLING_METHOD_DESCRIPTIONS: Partial<Record<BillingMethod, string>> = {
   Fixed: "Tính phí cố định hàng tháng, không phụ thuộc sử dụng",
   PerPerson: "Tính theo số người ghi trong hợp đồng",
   PerM2: "Tính theo diện tích phòng (m²)",

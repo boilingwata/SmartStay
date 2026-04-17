@@ -5,11 +5,14 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  FileWarning,
   Loader2,
   Play,
   RefreshCcw,
   SearchCheck,
   ShieldAlert,
+  History,
+  LayoutDashboard
 } from 'lucide-react';
 import { toast } from 'sonner';
 import utilityAdminService from '@/services/utilityAdminService';
@@ -67,7 +70,7 @@ function getDueDatePresets(billingPeriod: string) {
     const next = new Date(endDate);
     next.setDate(endDate.getDate() + offset);
     return {
-      label: `+${offset} ngay`,
+      label: `+${offset} ngày`,
       value: formatLocalDate(next),
     };
   });
@@ -83,22 +86,22 @@ function getBillingRunStatusMeta(status: string) {
   switch (status.toLowerCase()) {
     case 'running':
       return {
-        label: 'Dang chay',
+        label: 'Đang chạy',
         className: 'bg-amber-100 text-amber-800 border-amber-200',
       };
     case 'completed':
       return {
-        label: 'Hoan thanh',
+        label: 'Hoàn thành',
         className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       };
     case 'failed':
       return {
-        label: 'That bai',
+        label: 'Thất bại',
         className: 'bg-rose-100 text-rose-800 border-rose-200',
       };
     case 'cancelled':
       return {
-        label: 'Da huy',
+        label: 'Đã hủy',
         className: 'bg-slate-200 text-slate-700 border-slate-300',
       };
     default:
@@ -121,41 +124,21 @@ function getBillingPreviewGuidance(error: Error | null) {
   const message = error?.message ?? '';
   if (message.includes('401') || message.toLowerCase().includes('xac thuc')) {
     return [
-      'Function utility billing dang bi tu choi xac thuc o phia Supabase.',
-      'Neu ban van dang o trong trang admin thi day la loi auth/quyen cua edge function, khong phai do ban vua chon sai thang hay ngay.',
-      'Man hinh nay se hien thong tin chan doan cu the thay vi chi bao dang nhap lai.',
-    ];
-  }
-
-  return [
-    'He thong chua the kiem tra ky tinh tien nay.',
-    'Hay doi chieu thang billing, han thanh toan va du lieu hop dong hoa don hien co truoc khi thu lai.',
-  ];
-}
-
-function getUserGuidance(error: Error | null) {
-  const message = error?.message ?? '';
-  if (message.includes('401') || message.toLowerCase().includes('xac thuc')) {
-    return [
-      'Function utility billing dang bi tu choi xac thuc o phia Supabase.',
-      'Neu ban van dang o trong trang admin thi day la loi auth/quyen cua edge function, khong phai do ban vua chon sai thang hay ngay.',
-    ];
-  }
-  if (message.includes('Phiên đăng nhập')) {
-    return [
-      'Phiên đăng nhập quản trị đang không hợp lệ để chạy tác vụ này.',
-      'Hãy đăng xuất rồi đăng nhập lại, sau đó bấm “Xem trước kỳ tính tiền” thêm một lần.',
+      'Function utility billing đang bị từ chối xác thực ở phía Supabase.',
+      'Nếu bạn vẫn đang ở trong trang admin thì đây là lỗi auth/quyền của edge function, không phải do bạn vừa chọn sai tháng hay ngày.',
+      'Màn hình này sẽ hiện thông tin chẩn đoán cụ thể thay vì chỉ báo đăng nhập lại.',
     ];
   }
 
   return [
     'Hệ thống chưa thể kiểm tra kỳ tính tiền này.',
-    'Hãy kiểm tra lại tháng tính tiền, ngày đến hạn và dữ liệu hợp đồng trước khi thử lại.',
+    'Hãy đối chiếu tháng billing, hạn thanh toán và dữ liệu hợp đồng hóa đơn hiện có trước khi thử lại.',
   ];
 }
 
 export default function BillingRunsPage() {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'control' | 'history'>('control');
   const [billingPeriod, setBillingPeriod] = useState(getDefaultBillingPeriod);
   const [dueDate, setDueDate] = useState(() => getDefaultDueDate(getDefaultBillingPeriod()));
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -187,13 +170,14 @@ export default function BillingRunsPage() {
   const runMutation = useMutation({
     mutationFn: () => utilityAdminService.startBillingRun(billingPeriod, dueDate),
     onSuccess: async (result) => {
-      toast.success(`Ky ${result.billingPeriod}: tao ${result.createdInvoices}, bo qua ${result.skippedInvoices}.`);
+      toast.success(`Kỳ ${result.billingPeriod}: Tạo ${result.createdInvoices}, Bỏ qua ${result.skippedInvoices}.`);
       setSelectedRunId(result.billingRunId ?? null);
+      setActiveTab('history');
       await queryClient.invalidateQueries({ queryKey: ['billing-runs'] });
       await queryClient.invalidateQueries({ queryKey: ['billing-run-snapshots'] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Khong the chay utility billing.');
+      toast.error(error instanceof Error ? error.message : 'Không thể chạy quy trình tính tiền.');
     },
   });
 
@@ -209,538 +193,562 @@ export default function BillingRunsPage() {
   const previewReady = preview ? isPreviewReady(preview.eligibleContracts) : false;
   const selectedRunStatus = currentRun ? getBillingRunStatusMeta(currentRun.status) : null;
   const isDueDateBeforePeriodEnd = canSubmit && dueDate < billingPeriodBounds.end;
+  const currentRunSkippedContracts = Array.isArray((currentRun?.summary as { skippedContracts?: unknown[]; ineligibleContracts?: unknown[] } | undefined)?.skippedContracts)
+    ? ((currentRun?.summary as { skippedContracts?: Array<{ contractCode: string; reason: string }> }).skippedContracts ?? [])
+    : Array.isArray((currentRun?.summary as { ineligibleContracts?: unknown[] } | undefined)?.ineligibleContracts)
+      ? ((currentRun?.summary as { ineligibleContracts?: Array<{ contractCode: string; reason: string }> }).ineligibleContracts ?? [])
+      : [];
+  const currentRunExistingInvoiceContracts = Array.isArray((currentRun?.summary as { existingInvoiceContracts?: unknown[] } | undefined)?.existingInvoiceContracts)
+    ? ((currentRun?.summary as { existingInvoiceContracts?: Array<{ contractCode: string }> }).existingInvoiceContracts ?? [])
+    : [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-5 py-8 pb-20 md:px-6" style={pageFontStyle}>
-      <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(135deg,_#0f172a_0%,_#111827_45%,_#1f2937_100%)] p-6 text-white shadow-2xl shadow-slate-900/10 md:p-8">
-        <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+      {/* HEADER SECTION */}
+      <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(135deg,_#0f172a_0%,_#111827_45%,_#1f2937_100%)] p-8 text-white shadow-2xl shadow-slate-900/10 transition-all duration-500 hover:shadow-slate-900/20">
+        <div className="grid gap-8 xl:grid-cols-[1fr_auto]">
           <div className="space-y-5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.26em] text-emerald-100">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-100 backdrop-blur-md">
               <CalendarClock size={14} />
-              Utility Billing Control
+              Quản lý kỳ tính tiền
             </div>
-            <div className="space-y-3">
-              <h1 className="max-w-3xl text-3xl font-black tracking-[-0.04em] text-white md:text-5xl">
-                Xem trước kỳ tính tiền, kiểm tra điều kiện, rồi mới tạo hóa đơn.
-              </h1>
-              <p className="max-w-3xl text-sm font-medium leading-6 text-slate-300 md:text-base">
-                Đây là màn hình kiểm tra và chạy tiền điện nước theo chính sách chung của hệ thống. Hệ thống sẽ tự
-                tìm đúng mức giá đang áp dụng, bỏ qua những hợp đồng không phù hợp với luồng này, rồi mới tạo hóa đơn.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Buoc 1</p>
-                <p className="mt-2 text-lg font-black">Chọn kỳ + hạn thanh toán</p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Buoc 2</p>
-                <p className="mt-2 text-lg font-black">Xem trước danh sách hợp lệ</p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Buoc 3</p>
-                <p className="mt-2 text-lg font-black">Chạy tạo hóa đơn</p>
-              </div>
-            </div>
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white md:text-5xl">
+              Điều khiển nghiệp vụ tính tiền
+            </h1>
+            <p className="max-w-2xl text-sm font-medium leading-relaxed text-slate-300 md:text-base">
+              Kiểm tra trước khi chạy hóa đơn. Hệ thống sẽ tự tìm mức giá áp dụng và tạo hóa đơn hàng loạt cho các hợp đồng hợp lệ.
+            </p>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Trạng thái hiện tại</p>
-                <p className="mt-2 text-2xl font-black">Bộ điều khiển tiền điện nước</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-3 py-2 text-right">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Runs</p>
-                <p className="text-2xl font-black" style={numericStyle}>
-                  {runs.length}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-3 text-sm font-medium text-slate-200">
-              <div className="rounded-2xl border border-amber-300/25 bg-amber-400/10 px-4 py-3">
-                Những hợp đồng đang tính điện nước theo công tơ riêng sẽ không được chạy ở màn hình này để tránh tính sai.
-              </div>
-              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3">
-                Mỗi tháng chỉ có một lần chạy chính. Nếu chạy lại cùng tháng, hệ thống sẽ cập nhật theo cùng một đợt xử lý thay vì tạo lung tung nhiều bản.
-              </div>
-              <div className="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3">
-                Nếu phiên đăng nhập hết hạn, màn hình sẽ yêu cầu bạn đăng nhập lại trước khi cho chạy tác vụ.
-              </div>
+          <div className="flex w-full min-w-[200px] flex-col justify-center space-y-4 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Tổng đợt chạy</p>
+              <p className="mt-1 text-4xl font-black text-white" style={numericStyle}>
+                {runs.length}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">Thiết lập kỳ tính tiền</p>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Bảng điều khiển</h2>
-              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                Hãy xem trước để biết hợp đồng nào được tạo hóa đơn, hợp đồng nào bị loại và vì sao bị loại.
-              </p>
-            </div>
-            <button
-              onClick={() => runsQuery.refetch()}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-            >
-              <RefreshCcw size={16} />
-              Tai lai lich su
-            </button>
-          </div>
+      {/* TABS NAVIGATION */}
+      <div className="flex space-x-2 overflow-x-auto rounded-3xl bg-slate-900/5 p-1.5 shadow-inner backdrop-blur-xl">
+        <button
+          onClick={() => setActiveTab('control')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-[20px] px-6 py-3.5 text-sm font-bold transition-all duration-300 md:flex-none ${
+            activeTab === 'control'
+              ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5'
+              : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
+          }`}
+        >
+          <LayoutDashboard size={18} />
+          Bảng Điều Khiển
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-[20px] px-6 py-3.5 text-sm font-bold transition-all duration-300 md:flex-none ${
+            activeTab === 'history'
+              ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5'
+              : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
+          }`}
+        >
+          <History size={18} />
+          Lịch Sử & Chi Tiết
+        </button>
+      </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Tháng tính tiền</span>
-              <input
-                type="month"
-                className="input-base h-12 w-full rounded-2xl border-slate-200 bg-slate-50"
-                style={numericStyle}
-                value={billingPeriod}
-                onChange={(event) => {
-                  const nextPeriod = event.target.value;
-                  setBillingPeriod(nextPeriod);
-                  setDueDate(getDefaultDueDate(nextPeriod));
-                }}
-              />
-              <p className="text-xs font-medium text-slate-500">Chọn tháng phát sinh tiền điện nước.</p>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Hạn thanh toán</span>
-              <input
-                type="date"
-                className="input-base h-12 w-full rounded-2xl border-slate-200 bg-slate-50"
-                style={numericStyle}
-                value={dueDate}
-                min={billingPeriodBounds.end}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-              <p className="text-xs font-medium text-slate-500">Ngày khách cần thanh toán hóa đơn.</p>
-            </label>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {dueDatePresets.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => setDueDate(preset.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.16em] transition ${
-                    dueDate === preset.value
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 grid gap-3 text-sm font-medium text-slate-600 md:grid-cols-3">
-              <p>Ky billing: {billingPeriodBounds.start} den {billingPeriodBounds.end}</p>
-              <p>Han thanh toan cach cuoi ky: {Number.isFinite(dueDateGapDays) ? `${dueDateGapDays} ngay` : '-'}</p>
-              <p>{isDueDateBeforePeriodEnd ? 'Han thanh toan dang nam trong ky billing, can kiem tra lai.' : 'Han thanh toan dang sau ngay chot ky.'}</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
-            <button
-              onClick={() => previewQuery.refetch()}
-              disabled={!canSubmit || previewQuery.isFetching}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-950 px-5 font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {previewQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <SearchCheck size={16} />}
-              {previewQuery.isFetching ? 'Đang kiểm tra...' : 'Xem trước kỳ tính tiền'}
-            </button>
-
-            <button
-              onClick={() => runMutation.mutate()}
-              disabled={!canSubmit || runMutation.isPending}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {runMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-              {runMutation.isPending ? 'Đang tạo hóa đơn...' : 'Chạy tạo hóa đơn'}
-            </button>
-          </div>
-
-          {previewQuery.isError && (
-            <div className="space-y-3 rounded-[24px] border border-rose-200 bg-rose-50 p-4">
-              <ErrorBanner
-                message={previewQuery.error instanceof Error ? previewQuery.error.message : 'Không thể kiểm tra kỳ tính tiền.'}
-                onRetry={() => previewQuery.refetch()}
-              />
-              <div className="space-y-2 text-sm text-rose-900">
-                {getBillingPreviewGuidance(previewQuery.error instanceof Error ? previewQuery.error : null).map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Tổng hợp đồng đang hiệu lực</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {preview?.totalContracts ?? 0}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Hợp đồng áp dụng màn hình này</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {preview?.policyContracts ?? 0}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Đã có hóa đơn trong tháng</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {preview?.existingInvoices ?? 0}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Có thể tạo mới</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {preview?.eligibleContracts.length ?? 0}
-              </p>
-            </div>
-          </div>
-
-          {preview && (
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Chan doan ky billing</p>
-                <p className="mt-2 text-sm font-medium text-slate-600">
-                  {preview.diagnostics.totalContracts} hop dong giao ky, {preview.diagnostics.policyContracts} hop dong theo luong utility policy.
-                </p>
-                <p className="mt-2 text-xs font-medium text-slate-500">
-                  Ky duoc tinh tu {preview.diagnostics.billingPeriodStart} den {preview.diagnostics.billingPeriodEnd}.
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Bi loai vi cong to</p>
-                <p className="mt-2 text-2xl font-black text-slate-900" style={numericStyle}>
-                  {preview.diagnostics.legacyMeteredContracts}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Da co hoa don</p>
-                <p className="mt-2 text-2xl font-black text-slate-900" style={numericStyle}>
-                  {preview.diagnostics.existingInvoiceContracts}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {preview?.existingInvoiceContracts.length ? (
-            <div className="rounded-[24px] border border-sky-200 bg-sky-50/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Da ton tai hoa don trong ky</p>
-                  <p className="mt-2 text-sm font-medium text-slate-700">
-                    Day la cac hop dong da co hoa don utility trong ky {preview.billingPeriod}, vi vay preview se bo qua khi tao moi.
-                  </p>
-                </div>
-                <p className="text-2xl font-black text-sky-900" style={numericStyle}>
-                  {preview.existingInvoiceContracts.length}
-                </p>
-              </div>
-              <div className="mt-4 flex max-h-40 flex-wrap gap-2 overflow-auto">
-                {preview.existingInvoiceContracts.map((contract) => (
-                  <span
-                    key={contract.contractId}
-                    className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-sky-700"
-                  >
-                    {contract.contractCode}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,_rgba(15,23,42,0.02),_rgba(16,185,129,0.06))] p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* TAB CONTENT: BẢNG ĐIỀU KHIỂN */}
+      {activeTab === 'control' && (
+        <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Kiểm tra trước khi chạy</p>
-                <h3 className="mt-2 text-xl font-black text-slate-900">Có nên bấm chạy không?</h3>
-              </div>
-              {preview ? (
-                <span
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${
-                    previewReady
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-amber-200 bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  {previewReady ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
-                  {previewReady ? 'Sẵn sàng tạo hóa đơn' : 'Chưa có hợp đồng nào để tạo'}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-600">
-                  <Clock3 size={14} />
-                  Chưa kiểm tra
-                </span>
-              )}
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-[24px] border border-white/80 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Hợp đồng đủ điều kiện</p>
-                <div className="mt-3 flex max-h-56 flex-wrap gap-2 overflow-auto">
-                  {preview?.eligibleContracts.length ? (
-                    preview.eligibleContracts.map((contract) => (
-                      <span
-                        key={contract.contractId}
-                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-700"
-                      >
-                        {contract.contractCode}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm font-medium text-slate-500">Bấm xem trước để kiểm tra hợp đồng nào sẽ được tạo hóa đơn.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-white/80 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Hợp đồng chưa thể chạy ở đây</p>
-                <div className="mt-3 max-h-56 space-y-2 overflow-auto">
-                  {preview?.ineligibleContracts.length ? (
-                    preview.ineligibleContracts.map((contract) => (
-                      <div key={contract.contractId} className="rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3">
-                        <p className="font-black text-slate-900">{contract.contractCode}</p>
-                        <p className="mt-1 text-sm font-medium leading-5 text-slate-600">{contract.reason}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm font-medium text-slate-500">
-                      Hiện chưa có hợp đồng nào bị loại khỏi đợt xử lý này.
-                    </p>
-                  )}
-                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">Thiết lập kỳ tính tiền</p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Bảng điều khiển chạy hóa đơn</h2>
+                <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+                  Hãy xem trước để biết hợp đồng nào được tạo hóa đơn, hợp đồng nào bị loại và xác nhận dữ liệu trước khi chạy thực tế.
+                </p>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Lịch sử chạy</p>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Các đợt đã xử lý</h2>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Selected</p>
-              <p className="text-lg font-black text-slate-900" style={numericStyle}>
-                {currentRun?.id ?? '-'}
-              </p>
-            </div>
-          </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Tháng tính tiền</span>
+                <input
+                  type="month"
+                  className="input-base h-12 w-full rounded-2xl border-slate-200 bg-slate-50"
+                  style={numericStyle}
+                  value={billingPeriod}
+                  onChange={(event) => {
+                    const nextPeriod = event.target.value;
+                    setBillingPeriod(nextPeriod);
+                    setDueDate(getDefaultDueDate(nextPeriod));
+                  }}
+                />
+                <p className="text-xs font-medium text-slate-500">Tháng phát sinh tiền điện nước.</p>
+              </label>
 
-          {runsQuery.isLoading ? (
-            <div className="h-64 animate-pulse rounded-[28px] bg-slate-100" />
-          ) : runsQuery.isError ? (
-            <ErrorBanner message="Khong tai duoc billing runs." onRetry={() => runsQuery.refetch()} />
-          ) : runs.length === 0 ? (
-            <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-              <p className="text-lg font-black text-slate-900">Chưa có đợt xử lý nào.</p>
-              <p className="mt-2 text-sm font-medium text-slate-500">Hãy xem trước rồi chạy tháng đầu tiên để hệ thống bắt đầu ghi nhận lịch sử.</p>
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Hạn thanh toán</span>
+                <input
+                  type="date"
+                  className="input-base h-12 w-full rounded-2xl border-slate-200 bg-slate-50"
+                  style={numericStyle}
+                  value={dueDate}
+                  min={billingPeriodBounds.end}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
+                <p className="text-xs font-medium text-slate-500">Ngày yêu cầu thanh toán hóa đơn.</p>
+              </label>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {runs.map((run) => {
-                const statusMeta = getBillingRunStatusMeta(run.status);
-                return (
+
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-2 text-xs font-bold uppercase tracking-wider text-slate-500">Góp ý hạn thanh toán:</span>
+                {dueDatePresets.map((preset) => (
                   <button
-                    key={run.id}
-                    onClick={() => setSelectedRunId(run.id)}
-                    className={`w-full rounded-[24px] border p-4 text-left transition ${
-                      selectedRunId === run.id
-                        ? 'border-emerald-300 bg-emerald-50 shadow-md shadow-emerald-900/5'
-                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setDueDate(preset.value)}
+                    className={`rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-[0.16em] transition-all duration-300 ${
+                      dueDate === preset.value
+                        ? 'border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-black text-slate-900" style={numericStyle}>
-                            {run.billingPeriod}
-                          </p>
-                          <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] ${statusMeta.className}`}>
-                            {statusMeta.label}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-slate-500">
-                          Đã tạo {getRunSummaryNumber(run.summary, 'createdInvoices')} hóa đơn, bỏ qua{' '}
-                          {getRunSummaryNumber(run.summary, 'skippedInvoices')}, lỗi{' '}
-                          {getRunSummaryNumber(run.summary, 'failedInvoices')}.
-                        </p>
-                      </div>
-                      <div className="text-right text-xs font-bold text-slate-500" style={numericStyle}>
-                        <div>{run.startedAt ? formatDate(run.startedAt) : 'Chua bat dau'}</div>
-                        <div>{run.completedAt ? formatDate(run.completedAt) : 'Dang mo'}</div>
-                      </div>
-                    </div>
+                    {preset.label}
                   </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {currentRun && (
-        <section className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-900">Billing run #{currentRun.id}</h2>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-600" style={numericStyle}>
-                  {currentRun.billingPeriod}
-                </span>
-                {selectedRunStatus && (
-                  <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${selectedRunStatus.className}`}>
-                    {selectedRunStatus.label}
-                  </span>
-                )}
+                ))}
               </div>
-              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                Phần này cho bạn biết đợt chạy đó đã tạo được bao nhiêu hóa đơn, hợp đồng nào lỗi, và kết quả tính tiền của từng phòng.
-              </p>
-            </div>
-            <button
-              onClick={() => snapshotsQuery.refetch()}
-              disabled={snapshotsQuery.isFetching || selectedRunId == null}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {snapshotsQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-              Tai lai snapshots
-            </button>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Da tao</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {getRunSummaryNumber(currentRun.summary, 'createdInvoices')}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Da bo qua</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {getRunSummaryNumber(currentRun.summary, 'skippedInvoices')}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">That bai</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {getRunSummaryNumber(currentRun.summary, 'failedInvoices')}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Version khoa</p>
-              <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
-                {currentRun.lockVersion}
-              </p>
-            </div>
-          </div>
-
-          {Array.isArray((currentRun.error as { failures?: unknown[] }).failures) &&
-            (currentRun.error as { failures?: Array<{ contractCode: string; message: string }> }).failures!.length > 0 && (
-              <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-5">
-                <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-rose-700">
-                  <AlertTriangle size={16} />
-                  Hợp đồng bị lỗi khi chạy
+              <div className="mt-5 grid gap-4 text-sm font-medium text-slate-600 md:grid-cols-3">
+                <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-400">Kỳ Billing</span>
+                  <span className="mt-1 block font-bold text-slate-800">{billingPeriodBounds.start} - {billingPeriodBounds.end}</span>
                 </div>
-                <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  {(currentRun.error as { failures?: Array<{ contractCode: string; message: string }> }).failures!.map((failure, index) => (
-                    <div key={`${failure.contractCode}-${index}`} className="rounded-2xl border border-rose-100 bg-white px-4 py-3">
-                      <p className="font-black text-slate-900">{failure.contractCode}</p>
-                      <p className="mt-1 text-sm font-medium leading-5 text-slate-600">{failure.message}</p>
-                    </div>
+                <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-400">Giãn cách từ cuối kỳ</span>
+                  <span className="mt-1 block font-bold text-slate-800">{Number.isFinite(dueDateGapDays) ? `${dueDateGapDays} ngày` : '-'}</span>
+                </div>
+                <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-400">Tình trạng hạn thanh toán</span>
+                  <span className={`mt-1 block font-bold ${isDueDateBeforePeriodEnd ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {isDueDateBeforePeriodEnd ? 'Hạn quá sớm, cần kiểm tra.' : 'Hạn hợp lệ sau kỳ tính.'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+              <button
+                onClick={() => previewQuery.refetch()}
+                disabled={!canSubmit || previewQuery.isFetching}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-5 font-black text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {previewQuery.isFetching ? <Loader2 size={18} className="animate-spin" /> : <SearchCheck size={18} />}
+                {previewQuery.isFetching ? 'Đang kiểm tra...' : 'Xem Trước Quy Trình'}
+              </button>
+
+              <button
+                onClick={() => runMutation.mutate()}
+                disabled={!canSubmit || runMutation.isPending || !previewReady}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 font-black text-white shadow-md transition hover:bg-emerald-700 hover:shadow-lg focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {runMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+                {runMutation.isPending ? 'Đang xuất hóa đơn...' : 'Bắt Đầu Chạy Hóa Đơn'}
+              </button>
+            </div>
+
+            {previewQuery.isError && (
+              <div className="mt-6 rounded-[24px] border border-rose-200 bg-rose-50 p-5">
+                <ErrorBanner
+                  message={previewQuery.error instanceof Error ? previewQuery.error.message : 'Không thể xem trước do lỗi kết nối kết máy chủ.'}
+                  onRetry={() => previewQuery.refetch()}
+                />
+                <div className="mt-3 space-y-2 text-sm text-rose-900">
+                  {getBillingPreviewGuidance(previewQuery.error instanceof Error ? previewQuery.error : null).map((line) => (
+                    <p key={line}>• {line}</p>
                   ))}
                 </div>
               </div>
             )}
 
-          <div className="overflow-hidden rounded-[28px] border border-slate-200">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr className="text-left text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                    <th className="px-4 py-4">Contract</th>
-                    <th className="px-4 py-4">Room</th>
-                    <th className="px-4 py-4">Electric</th>
-                    <th className="px-4 py-4">Water</th>
-                    <th className="px-4 py-4">Occupants</th>
-                    <th className="px-4 py-4">Occupied days</th>
-                    <th className="px-4 py-4">Policy source</th>
-                    <th className="px-4 py-4">Warnings</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white text-sm">
-                  {snapshotsQuery.isLoading ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
-                        Đang tải chi tiết...
-                      </td>
-                    </tr>
-                  ) : snapshots.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
-                        Chưa có chi tiết tính tiền cho đợt chạy này.
-                      </td>
-                    </tr>
-                  ) : (
-                    snapshots.map((snapshot) => (
-                      <tr key={snapshot.id} className="align-top">
-                        <td className="px-4 py-4 font-black text-slate-900">{snapshot.contractCode}</td>
-                        <td className="px-4 py-4 font-bold text-slate-600">{snapshot.roomCode}</td>
-                        <td className="px-4 py-4 font-bold text-slate-700" style={numericStyle}>
-                          {formatVND(snapshot.electricFinalAmount)}
-                        </td>
-                        <td className="px-4 py-4 font-bold text-slate-700" style={numericStyle}>
-                          {formatVND(snapshot.waterFinalAmount)}
-                        </td>
-                        <td className="px-4 py-4 font-bold text-slate-700" style={numericStyle}>
-                          {snapshot.occupantsForBilling}
-                        </td>
-                        <td className="px-4 py-4 font-bold text-slate-700" style={numericStyle}>
-                          {snapshot.occupiedDays}
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-slate-700">
-                            {snapshot.policySourceType}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            {snapshot.warnings.length === 0 ? (
-                              <span className="text-xs font-bold text-slate-400">Không có lưu ý</span>
-                            ) : (
-                              snapshot.warnings.map((warning) => (
-                                <span
-                                  key={`${snapshot.id}-${warning.code}`}
-                                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-amber-700"
-                                  title={warning.message}
-                                >
-                                  {warning.code}
-                                </span>
-                              ))
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 hover:bg-slate-100 transition-colors">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Hợp đồng hiệu lực</p>
+                <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
+                  {preview?.totalContracts ?? 0}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 hover:bg-slate-100 transition-colors">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Áp dụng màn hình này</p>
+                <p className="mt-3 text-3xl font-black text-emerald-600" style={numericStyle}>
+                  {preview?.validContracts ?? 0}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 hover:bg-slate-100 transition-colors">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Đã có hóa đơn</p>
+                <p className="mt-3 text-3xl font-black text-sky-600" style={numericStyle}>
+                  {preview?.existingInvoices ?? 0}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 hover:bg-slate-100 transition-colors">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Có thể tạo mới</p>
+                <p className="mt-3 text-3xl font-black text-slate-900" style={numericStyle}>
+                  {preview?.eligibleContracts.length ?? 0}
+                </p>
+              </div>
+            </div>
+
+            {preview && (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Chẩn đoán kỳ Billing</p>
+                  <p className="mt-3 text-sm font-medium text-slate-700">
+                    <span className="font-bold text-slate-900">{preview.diagnostics.totalContracts}</span> hợp đồng giao kỳ, 
+                    <span className="font-bold text-slate-900 ml-1">{preview.diagnostics.validContracts}</span> hợp lệ cho utility policy.
+                  </p>
+                  <p className="mt-2 bg-slate-50 p-2 rounded-lg text-xs font-medium text-slate-500">
+                    Từ {preview.diagnostics.billingPeriodStart} đến {preview.diagnostics.billingPeriodEnd}
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị loại do công tơ</p>
+                  <p className="mt-3 text-3xl font-black text-amber-700" style={numericStyle}>
+                    {preview.diagnostics.skippedContracts}
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-600">Đã xuất hóa đơn</p>
+                  <p className="mt-3 text-3xl font-black text-sky-700" style={numericStyle}>
+                    {preview.diagnostics.existingInvoiceContracts}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {preview?.existingInvoiceContracts.length ? (
+              <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Đã Tồn Tại Hóa Đơn</p>
+                    <p className="mt-2 text-sm font-medium text-slate-700">
+                      Các hợp đồng sau đã xuất tiền tiện ích kỳ {preview.billingPeriod}, sẽ bị bỏ qua khi bạn nhấn chạy.
+                    </p>
+                  </div>
+                  <p className="text-2xl font-black text-sky-900" style={numericStyle}>
+                    {preview.existingInvoiceContracts.length}
+                  </p>
+                </div>
+                <div className="mt-4 flex max-h-40 flex-wrap gap-2 overflow-auto">
+                  {preview.existingInvoiceContracts.map((contract) => (
+                    <span
+                      key={contract.contractId}
+                      className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-sky-700 shadow-sm"
+                    >
+                      {contract.contractCode}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 to-emerald-50/30 p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Phân loại dữ liệu trước chạy</p>
+                  <h3 className="mt-2 text-xl font-black text-slate-900">Chi tiết hợp đồng để xuất hóa đơn</h3>
+                </div>
+                {preview ? (
+                  <span
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.18em] shadow-sm ${
+                      previewReady
+                        ? 'border-emerald-200 bg-emerald-100 text-emerald-800'
+                        : 'border-amber-200 bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {previewReady ? <CheckCircle2 size={16} /> : <ShieldAlert size={16} />}
+                    {previewReady ? 'Sẵn sàng chạy' : 'Không có hợp đồng hợp lệ'}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm">
+                    <Clock3 size={16} />
+                    Vui lòng bấm Xem Trước
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Sẵn Sàng Xuất Hóa Đơn</p>
+                  <div className="mt-4 flex max-h-56 flex-wrap gap-2 overflow-auto">
+                    {preview?.eligibleContracts.length ? (
+                      preview.eligibleContracts.map((contract) => (
+                        <span
+                          key={contract.contractId}
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 shadow-sm"
+                        >
+                          {contract.contractCode}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Chưa có thông tin. Bấm "Xem Trước" để kiểm tra.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị Từ Chối (Ineligible)</p>
+                  <div className="mt-4 max-h-56 space-y-3 overflow-auto">
+                    {preview?.ineligibleContracts.length ? (
+                      preview.ineligibleContracts.map((contract) => (
+                        <div key={contract.contractId} className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 shadow-sm">
+                          <p className="font-black text-rose-900">{contract.contractCode}</p>
+                          <p className="mt-1 text-sm font-medium leading-5 text-rose-700">{contract.reason}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Không có hợp đồng nào nằm trong sách sách từ chối.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* TAB CONTENT: LỊCH SỬ CHẠY */}
+      {activeTab === 'history' && (
+        <section className="animate-in fade-in slide-in-from-bottom-2 duration-500 space-y-6">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Log Hệ Thống</p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Danh sách các đợt đã xử lý</h2>
+              </div>
+              <button
+                onClick={() => runsQuery.refetch()}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100"
+              >
+                <RefreshCcw size={16} />
+                Tải lại
+              </button>
+            </div>
+
+            <div className="mt-6">
+              {runsQuery.isLoading ? (
+                <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-32 animate-pulse rounded-[24px] bg-slate-100" />
+                  ))}
+                </div>
+              ) : runsQuery.isError ? (
+                <ErrorBanner message="Không tải được lịch sử quá trình chạy hóa đơn." onRetry={() => runsQuery.refetch()} />
+              ) : runs.length === 0 ? (
+                <div className="rounded-[28px] border-2 border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+                  <Play size={48} className="mx-auto text-slate-300 mb-4" />
+                  <p className="text-xl font-black text-slate-900">Chưa có đợt cập nhật nào</p>
+                  <p className="mt-2 text-sm font-medium text-slate-500 max-w-sm mx-auto">Vui lòng quay lại bảng điều khiển, thực hiện xem trước và chạy đợt tính tiền đầu tiên của bạn.</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {runs.map((run) => {
+                    const statusMeta = getBillingRunStatusMeta(run.status);
+                    return (
+                      <button
+                        key={run.id}
+                        onClick={() => setSelectedRunId(run.id)}
+                        className={`group relative w-full rounded-[24px] border p-5 text-left transition-all duration-300 ${
+                          selectedRunId === run.id
+                            ? 'border-emerald-400 bg-emerald-50 shadow-md ring-2 ring-emerald-500/20'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="absolute top-4 right-4">
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] shadow-sm ${statusMeta.className}`}>
+                            {statusMeta.label}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">RUN #{run.id}</p>
+                        <p className="text-2xl font-black text-slate-900 mb-4" style={numericStyle}>
+                          Ky: {run.billingPeriod}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 bg-white rounded-xl p-3 border border-slate-100 shadow-sm mb-4">
+                          <div className="text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Tạo</p>
+                            <p className="font-black text-emerald-600">{getRunSummaryNumber(run.summary, 'createdInvoices')}</p>
+                          </div>
+                          <div className="text-center border-l border-r border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Skip</p>
+                            <p className="font-black text-amber-600">{getRunSummaryNumber(run.summary, 'skippedInvoices')}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Lỗi</p>
+                            <p className="font-black text-rose-600">{getRunSummaryNumber(run.summary, 'failedInvoices')}</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-[11px] font-bold text-slate-500" style={numericStyle}>
+                          <span>Thành công: {run.completedAt ? formatDate(run.completedAt) : '--'}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {currentRun && (
+            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 animate-in fade-in duration-500 zoom-in-95">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-2xl font-black tracking-[-0.03em] text-slate-900 flex items-center gap-3">
+                    Chi tiết Run #{currentRun.id}
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-600" style={numericStyle}>
+                      {currentRun.billingPeriod}
+                    </span>
+                  </h3>
+                  <p className="mt-2 text-sm font-medium text-slate-500">Kết quả chi tiết của từng hợp đồng được xem xét trong đợt chạy này.</p>
+                </div>
+                <button
+                  onClick={() => snapshotsQuery.refetch()}
+                  disabled={snapshotsQuery.isFetching}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {snapshotsQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                  Tải lại Snapshot
+                </button>
+              </div>
+
+              {/* Failures & skips */}
+              {(currentRunSkippedContracts.length > 0 || currentRunExistingInvoiceContracts.length > 0 || (currentRun.error as any)?.failures?.length > 0) && (
+                <div className="mb-6 grid gap-4 lg:grid-cols-2">
+                  {((currentRun.error as any)?.failures ?? []).length > 0 && (
+                    <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-5 col-span-full">
+                      <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-rose-700">
+                        <AlertTriangle size={16} /> Hợp đồng bị lỗi khi chạy
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        {((currentRun.error as any)?.failures ?? []).map((failure: any, index: number) => (
+                          <div key={`${failure.contractCode}-${index}`} className="rounded-xl border border-rose-100 bg-white p-3 shadow-sm">
+                            <p className="font-black text-rose-900">{failure.contractCode}</p>
+                            <p className="text-xs font-medium text-rose-600 mt-1">{failure.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentRunSkippedContracts.length > 0 && (
+                    <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-5">
+                      <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-amber-800">
+                        <FileWarning size={16} /> Bỏ qua do dữ liệu
+                      </div>
+                      <div className="mt-4 max-h-60 space-y-2 overflow-auto">
+                        {currentRunSkippedContracts.map((contract, index) => (
+                          <div key={`${contract.contractCode}-${index}`} className="rounded-xl border border-amber-100 bg-white p-3 shadow-sm">
+                            <p className="font-black text-amber-900">{contract.contractCode}</p>
+                            <p className="text-xs font-medium text-amber-700 mt-1">{contract.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentRunExistingInvoiceContracts.length > 0 && (
+                    <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+                      <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-sky-800">
+                        <Clock3 size={16} /> Đã có Hóa đơn từ trước
+                      </div>
+                      <div className="mt-4 flex max-h-60 flex-wrap gap-2 overflow-auto">
+                        {currentRunExistingInvoiceContracts.map((contract, index) => (
+                          <span key={`${contract.contractCode}-${index}`} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-black uppercase text-sky-700 shadow-sm">
+                            {contract.contractCode}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Table details */}
+              <div className="overflow-hidden rounded-[24px] border border-slate-200 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr className="text-left text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4">Mã Hợp Đồng</th>
+                        <th className="px-5 py-4 text-center">Phòng</th>
+                        <th className="px-5 py-4 text-right">Tiền Điện</th>
+                        <th className="px-5 py-4 text-right">Tiền Nước</th>
+                        <th className="px-5 py-4 text-center">Người (Thực tế)</th>
+                        <th className="px-5 py-4">Khoản Áp Dụng</th>
+                        <th className="px-5 py-4">Lưu ý</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white text-sm">
+                      {snapshotsQuery.isLoading ? (
+                        <tr>
+                          <td colSpan={7} className="px-5 py-12 text-center">
+                            <Loader2 className="mx-auto text-slate-300 animate-spin mb-2" size={24} />
+                            <span className="text-slate-500 font-medium">Đang tải Snapshot dữ liệu...</span>
+                          </td>
+                        </tr>
+                      ) : snapshots.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-5 py-12 text-center">
+                            <span className="text-slate-500 font-medium">Không có chi tiết snapshot nào cho đợt chạy này.</span>
+                          </td>
+                        </tr>
+                      ) : (
+                        snapshots.map((snapshot) => (
+                          <tr key={snapshot.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-5 py-4 font-black text-slate-900">{snapshot.contractCode}</td>
+                            <td className="px-5 py-4 font-bold text-slate-600 text-center">{snapshot.roomCode}</td>
+                            <td className="px-5 py-4 font-bold text-emerald-700 text-right" style={numericStyle}>
+                              {formatVND(snapshot.electricFinalAmount)}
+                            </td>
+                            <td className="px-5 py-4 font-bold text-blue-700 text-right" style={numericStyle}>
+                              {formatVND(snapshot.waterFinalAmount)}
+                            </td>
+                            <td className="px-5 py-4 font-bold text-slate-600 text-center" style={numericStyle}>
+                              {snapshot.occupantsForBilling}
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                                {snapshot.policySourceType}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-wrap gap-1">
+                                {snapshot.warnings.length === 0 ? (
+                                  <span className="text-xs text-slate-400 italic">...</span>
+                                ) : (
+                                  snapshot.warnings.map((warning) => (
+                                    <span
+                                      key={`${snapshot.id}-${warning.code}`}
+                                      className="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 border border-amber-200"
+                                      title={warning.message}
+                                    >
+                                      {warning.code}
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>
   );
 }
+

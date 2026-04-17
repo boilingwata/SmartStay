@@ -15,11 +15,6 @@ import { requireAdminRole } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
-interface TenantEntry {
-  id: number;
-  isPrimary: boolean;
-}
-
 interface ServiceEntry {
   serviceId: number;
   fixedPrice?: number;
@@ -33,7 +28,10 @@ interface CreateContractRequest {
   rentPrice: number;
   depositAmount: number;
   paymentCycle: number;
-  tenants: TenantEntry[];
+  paymentDueDay?: number;
+  utilityPolicyId?: number | null;
+  primaryTenantId: number;
+  occupantIds: number[];
   selectedServices?: ServiceEntry[];
   markDepositReceived?: boolean;
 }
@@ -58,7 +56,10 @@ Deno.serve(async (req: Request) => {
     rentPrice,
     depositAmount,
     paymentCycle,
-    tenants,
+    paymentDueDay = 5,
+    primaryTenantId,
+    utilityPolicyId = null,
+    occupantIds,
     selectedServices = [],
     markDepositReceived = false,
   } = body;
@@ -67,26 +68,40 @@ Deno.serve(async (req: Request) => {
   if (!roomId || typeof roomId !== 'number') return errorResponse('roomId is required');
   if (!startDate || !endDate) return errorResponse('startDate and endDate are required');
   if (typeof rentPrice !== 'number' || rentPrice <= 0) return errorResponse('rentPrice must be positive');
-  if (!Array.isArray(tenants) || tenants.length === 0) return errorResponse('At least one tenant is required');
+  if (!primaryTenantId || typeof primaryTenantId !== 'number') return errorResponse('primaryTenantId is required');
+  if (!Array.isArray(occupantIds)) return errorResponse('occupantIds must be an array');
 
-  const primaryTenant = tenants.find((t) => t.isPrimary) ?? tenants[0];
-  const tenantIds = tenants.map((t) => t.id);
   const serviceIds = selectedServices.map((s) => s.serviceId);
-  const servicePrices = selectedServices.map((s) => s.fixedPrice ?? null);
-  const serviceQuantities = selectedServices.map((s) => s.quantity ?? 1);
-
   const db = createAdminClient();
+  const { data: serviceRows, error: serviceError } = serviceIds.length === 0
+    ? { data: [], error: null }
+    : await db
+        .from('service_catalog')
+        .select('id')
+        .in('id', serviceIds);
 
-  const { data, error } = await db.rpc('create_contract', {
+  if (serviceError) {
+    return errorResponse(serviceError.message, 500);
+  }
+
+  const catalogServiceIds = new Set((serviceRows ?? []).map((item) => item.id));
+  const filteredServices = selectedServices.filter((service) => catalogServiceIds.has(service.serviceId));
+  const filteredServiceIds = filteredServices.map((s) => s.serviceId);
+  const servicePrices = filteredServices.map((s) => s.fixedPrice ?? null);
+  const serviceQuantities = filteredServices.map((s) => s.quantity ?? 1);
+
+  const { data, error } = await db.rpc('create_contract_v2', {
     p_room_id:               roomId,
     p_start_date:            startDate,
     p_end_date:              endDate,
     p_monthly_rent:          rentPrice,
     p_deposit_amount:        depositAmount ?? 0,
     p_payment_cycle_months:  paymentCycle ?? 1,
-    p_tenant_ids:            tenantIds,
-    p_primary_tenant_id:     primaryTenant.id,
-    p_service_ids:           serviceIds.length > 0 ? serviceIds : null,
+    p_primary_tenant_id:     primaryTenantId,
+    p_occupant_ids:          occupantIds,
+    p_payment_due_day:       paymentDueDay ?? 5,
+    p_utility_policy_id:     utilityPolicyId,
+    p_service_ids:           filteredServiceIds.length > 0 ? filteredServiceIds : null,
     p_service_prices:        servicePrices.length > 0 ? servicePrices : null,
     p_service_quantities:    serviceQuantities.length > 0 ? serviceQuantities : null,
     p_mark_deposit_received: markDepositReceived,

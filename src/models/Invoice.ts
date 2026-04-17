@@ -59,4 +59,34 @@ export interface InvoiceDetail extends Invoice {
     bankName: string;
     qrContent: string;
   };
+  utilitySnapshot?: {
+    policySourceType: string;
+    resolvedPolicyId?: number | null;
+    occupantsForBilling: number;
+    occupiedDays: number;
+    daysInPeriod: number;
+    prorateRatio: number;
+    roundingIncrement: number;
+    electricBaseAmount: number;
+    electricDeviceSurcharge: number;
+    electricSubtotal: number;
+    electricSeasonMultiplier: number;
+    electricLocationMultiplier: number;
+    electricRawAmount: number;
+    electricRoundedAmount: number;
+    minElectricFloor: number;
+    electricFinalAmount: number;
+    waterBaseAmount: number;
+    waterPerPersonAmount: number;
+    waterPersonCharge: number;
+    waterSubtotal: number;
+    waterLocationMultiplier: number;
+    waterRawAmount: number;
+    waterRoundedAmount: number;
+    minWaterFloor: number;
+    waterFinalAmount: number;
+    resolvedDeviceSurcharges: Array<{ deviceCode: string; chargeAmount: number }>;
+    formulaSnapshot?: Record<string, unknown>;
+    warnings: Array<{ code: string; message: string }>;
+  };
 }

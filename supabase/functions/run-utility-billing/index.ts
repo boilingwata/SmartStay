@@ -4,10 +4,7 @@ import { handleOptions } from '../_shared/cors.ts';
 import { requireAdminRole } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
-import {
-  buildUtilityInvoicePayload,
-  resolveContractUtilityMode,
-} from '../_shared/utilityInvoiceBuilder.ts';
+import { buildUtilityInvoicePayload } from '../_shared/utilityInvoiceBuilder.ts';
 
 interface RunUtilityBillingRequest {
   billingPeriod?: string;
@@ -122,12 +119,8 @@ Deno.serve(async (req: Request) => {
     .select(`
       id,
       contract_code,
-      contract_services (
-        service_id,
-        quantity,
-        fixed_price,
-        services ( name, calc_type )
-      )
+      occupants_for_billing,
+      utility_billing_type
     `)
     .eq('status', 'active')
     .eq('is_deleted', false)
@@ -139,12 +132,8 @@ Deno.serve(async (req: Request) => {
   const contracts = (contractRows ?? []) as Array<{
     id: number;
     contract_code: string;
-    contract_services?: Array<{
-      service_id: number;
-      quantity: number | null;
-      fixed_price: number | null;
-      services: { name: string; calc_type: string | null } | null;
-    }>;
+    occupants_for_billing: number | null;
+    utility_billing_type: string | null;
   }>;
   if (contracts.length === 0) {
     return successResponse({
@@ -179,12 +168,20 @@ Deno.serve(async (req: Request) => {
   const ineligibleContracts: Array<{ contractId: number; contractCode: string; reason: string }> = [];
 
   for (const contract of contracts) {
-    const utilityMode = resolveContractUtilityMode(contract.contract_services ?? []);
-    if (utilityMode === 'legacy_metered') {
+    if ((contract.utility_billing_type ?? 'policy') !== 'policy') {
       ineligibleContracts.push({
         contractId: contract.id,
         contractCode: contract.contract_code,
-        reason: 'Hợp đồng đang dùng dịch vụ công tơ (`contract_services` per_unit), không thuộc luồng utility policy tự động.',
+        reason: 'Hop dong chua duoc chuan hoa sang utility policy.',
+      });
+      continue;
+    }
+
+    if (!Number.isFinite(Number(contract.occupants_for_billing)) || Number(contract.occupants_for_billing) <= 0) {
+      ineligibleContracts.push({
+        contractId: contract.id,
+        contractCode: contract.contract_code,
+        reason: 'Hop dong thieu occupants_for_billing hop le.',
       });
       continue;
     }
@@ -212,7 +209,8 @@ Deno.serve(async (req: Request) => {
       billingPeriod,
       dueDate,
       totalContracts: contracts.length,
-      policyContracts: policyContracts.length,
+      validContracts: policyContracts.length,
+      skippedContracts: ineligibleContracts.length,
       ineligibleContracts,
       existingInvoices: existingMap.size,
       existingInvoiceContracts,
@@ -221,8 +219,8 @@ Deno.serve(async (req: Request) => {
         billingPeriodStart: bounds.start,
         billingPeriodEnd: bounds.end,
         totalContracts: contracts.length,
-        policyContracts: policyContracts.length,
-        legacyMeteredContracts: ineligibleContracts.length,
+        validContracts: policyContracts.length,
+        skippedContracts: ineligibleContracts.length,
         existingInvoiceContracts: existingInvoiceContracts.length,
         eligibleContracts: eligibleContracts.length,
       },
@@ -237,8 +235,10 @@ Deno.serve(async (req: Request) => {
     summary_json: {
       trigger,
       totalContracts: contracts.length,
-      policyContracts: policyContracts.length,
-      ineligibleContracts: ineligibleContracts.length,
+      validContracts: policyContracts.length,
+      skippedContracts: ineligibleContracts.length,
+      ineligibleContracts,
+      existingInvoiceContracts,
       startedAt: new Date().toISOString(),
     },
     error_json: null,
@@ -301,8 +301,10 @@ Deno.serve(async (req: Request) => {
     billingPeriod,
     dueDate,
     totalContracts: contracts.length,
-    policyContracts: policyContracts.length,
+    validContracts: policyContracts.length,
+    skippedContracts: ineligibleContracts.length,
     ineligibleContracts,
+    existingInvoiceContracts,
     createdInvoices,
     skippedInvoices,
     failedInvoices: failures.length,

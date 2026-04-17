@@ -17,6 +17,7 @@ export interface Contract {
   autoRenew: boolean;
   paymentCycle: number;
   isRepresentative: boolean;
+  occupantCount?: number;
 }
 
 export interface ContractDetail extends Contract {
@@ -30,9 +31,12 @@ export interface ContractDetail extends Contract {
   terminationReason?: string;
   note?: string;
   tenants: ContractTenant[];
+  primaryTenant?: ContractTenant;
+  occupants: ContractOccupant[];
   services: ContractService[];
   renewals?: ContractRenewal[];
   invoices?: ContractInvoice[];
+  transfers?: ContractTransfer[];
   addendumSourceAvailable?: boolean;
   addendums?: ContractAddendum[];
 
@@ -48,6 +52,39 @@ export interface ContractTenant {
   isRepresentative: boolean;
   joinedAt: string;
   leftAt?: string;
+}
+
+export interface ContractOccupant {
+  id: string;
+  tenantId: string;
+  fullName: string;
+  avatarUrl?: string;
+  cccd: string;
+  phone?: string;
+  email?: string;
+  isPrimaryTenant: boolean;
+  relationshipToPrimary?: string;
+  note?: string;
+  moveInAt: string;
+  moveOutAt?: string;
+  status: 'active' | 'moved_out';
+}
+
+export interface ContractTransfer {
+  id: string;
+  oldContractId: string;
+  newContractId: string;
+  fromTenantId: string;
+  fromTenantName: string;
+  toTenantId: string;
+  toTenantName: string;
+  transferDate: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  depositMode: string;
+  carryOverDepositAmount: number;
+  note?: string;
+  approvedBy?: string;
+  createdAt?: string;
 }
 
 export interface ContractRenewal {

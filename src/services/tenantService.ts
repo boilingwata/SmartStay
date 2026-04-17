@@ -617,6 +617,10 @@ export const tenantService = {
     permanentAddress?: string;
     vehiclePlates?: string[];
     avatarUrl?: string;
+    cccdFrontUrl?: string;
+    cccdBackUrl?: string;
+    cccdIssuedDate?: string;
+    cccdIssuedPlace?: string;
   }): Promise<TenantSummary> => {
     const normalizedIdNumber = normalizeIdNumber(data.cccd);
 
@@ -643,6 +647,18 @@ export const tenantService = {
     }
     if (data.avatarUrl) {
       documentsPayload.avatar_url = data.avatarUrl;
+    }
+    const cccdImages = [data.cccdFrontUrl, data.cccdBackUrl].filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0
+    );
+    if (cccdImages.length > 0) {
+      documentsPayload.cccd_images = cccdImages;
+    }
+    if (data.cccdIssuedDate) {
+      documentsPayload.cccd_issued_date = data.cccdIssuedDate;
+    }
+    if (data.cccdIssuedPlace) {
+      documentsPayload.cccd_issued_place = data.cccdIssuedPlace.trim();
     }
     if (data.nationality) {
       documentsPayload.nationality = data.nationality.trim();
@@ -714,6 +730,10 @@ export const tenantService = {
       permanentAddress?: string;
       vehiclePlates?: string[];
       avatarUrl?: string;
+      cccdFrontUrl?: string;
+      cccdBackUrl?: string;
+      cccdIssuedDate?: string;
+      cccdIssuedPlace?: string;
     }
   ): Promise<void> => {
     const numericId = Number(id);
@@ -739,6 +759,10 @@ export const tenantService = {
     if (
       data.vehiclePlates !== undefined
       || data.avatarUrl !== undefined
+      || data.cccdFrontUrl !== undefined
+      || data.cccdBackUrl !== undefined
+      || data.cccdIssuedDate !== undefined
+      || data.cccdIssuedPlace !== undefined
       || data.nationality !== undefined
       || data.occupation !== undefined
     ) {
@@ -756,6 +780,24 @@ export const tenantService = {
       if (data.avatarUrl !== undefined) {
         if (data.avatarUrl) nextDocuments.avatar_url = data.avatarUrl;
         else delete nextDocuments.avatar_url;
+      }
+      if (data.cccdFrontUrl !== undefined || data.cccdBackUrl !== undefined) {
+        const currentImages = Array.isArray(nextDocuments.cccd_images)
+          ? [...(nextDocuments.cccd_images as string[])]
+          : [];
+        const nextImages = [data.cccdFrontUrl ?? currentImages[0], data.cccdBackUrl ?? currentImages[1]].filter(
+          (value): value is string => typeof value === 'string' && value.trim().length > 0
+        );
+        if (nextImages.length > 0) nextDocuments.cccd_images = nextImages;
+        else delete nextDocuments.cccd_images;
+      }
+      if (data.cccdIssuedDate !== undefined) {
+        if (data.cccdIssuedDate) nextDocuments.cccd_issued_date = data.cccdIssuedDate;
+        else delete nextDocuments.cccd_issued_date;
+      }
+      if (data.cccdIssuedPlace !== undefined) {
+        if (data.cccdIssuedPlace.trim()) nextDocuments.cccd_issued_place = data.cccdIssuedPlace.trim();
+        else delete nextDocuments.cccd_issued_place;
       }
       if (data.nationality !== undefined) {
         if (data.nationality.trim()) nextDocuments.nationality = data.nationality.trim();

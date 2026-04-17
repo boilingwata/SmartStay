@@ -1,118 +1,216 @@
-import React, { useState, useEffect } from 'react';
-import { X, Receipt, Calculator, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { cn, formatVND } from '@/utils';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Calculator, Receipt, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { contractService } from '@/services/contractService';
+import type { ContractDetail } from '@/models/Contract';
+import { cn, formatVND } from '@/utils';
 
 interface LiquidationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  contract: any;
+  contract: ContractDetail;
+  defaultReason?: string;
 }
 
-export const LiquidationModal = ({ isOpen, onClose, contract }: LiquidationModalProps) => {
+export const LiquidationModal = ({
+  isOpen,
+  onClose,
+  contract,
+  defaultReason,
+}: LiquidationModalProps) => {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     liquidationDate: new Date().toISOString().split('T')[0],
     depositUsed: 0,
     additionalCharge: 0,
-    reason: '',
-    status: 'Draft'
+    reason: defaultReason ?? '',
   });
 
-  const depositAmount = contract?.depositAmount || 0;
-  const refundAmount = depositAmount - formData.depositUsed - formData.additionalCharge;
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      liquidationDate: new Date().toISOString().split('T')[0],
+      depositUsed: 0,
+      additionalCharge: 0,
+      reason: defaultReason ?? '',
+    });
+  }, [defaultReason, isOpen]);
+
+  const refundAmount = useMemo(() => {
+    return (contract.depositAmount || 0) - formData.depositUsed - formData.additionalCharge;
+  }, [contract.depositAmount, formData.additionalCharge, formData.depositUsed]);
+
+  const liquidateMutation = useMutation({
+    mutationFn: () =>
+      contractService.liquidateContract({
+        contractId: contract.id,
+        terminationDate: formData.liquidationDate,
+        reason: formData.reason.trim() || 'Thanh lý hợp đồng',
+        depositUsed: formData.depositUsed,
+        additionalCharges: formData.additionalCharge,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['contract', contract.id] });
+      await queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      await queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success('Đã thanh lý hợp đồng.');
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể thanh lý hợp đồng.');
+    },
+  });
 
   if (!isOpen) return null;
 
-  const handleComplete = () => {
-    toast.success('Thanh lý hợp đồng thành công!');
-    toast.info('Trigger: Đã gửi NPS Survey và yêu cầu feedback Check-out cho cư dân.');
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-accent/10 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-      
-      <div className="relative w-full max-w-[650px] bg-white rounded-3xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="flex items-center justify-between p-6 border-b bg-accent/5">
-          <h2 className="text-h2 text-accent flex items-center gap-2">
-            <Receipt size={24} /> Thanh lý hợp đồng (Nghiệm thu)
-          </h2>
-          <button onClick={onClose} className="p-2 hover:bg-accent/10 rounded-full transition-colors">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full max-w-[680px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-amber-50 px-6 py-5">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-black text-slate-900">
+              <Receipt size={22} className="text-amber-600" />
+              Thanh lý hợp đồng
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">{contract.contractCode}</p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-               <div className="space-y-1.5">
-                  <label className="text-small font-bold text-muted uppercase">Ngày thanh lý</label>
-                  <input type="date" className="input-base w-full" value={formData.liquidationDate} onChange={(e) => setFormData({...formData, liquidationDate: e.target.value})} />
-               </div>
-
-               <div className="space-y-4 p-5 bg-bg/50 rounded-2xl border border-border/50">
-                  <div className="flex justify-between items-center">
-                    <span className="text-small text-muted font-medium">Tổng tiền cọc:</span>
-                    <span className="font-display font-bold text-primary">{formatVND(depositAmount)}</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-danger uppercase tracking-tighter">Bồi thường từ cọc (-)</label>
-                    <input 
-                      type="number" 
-                      className="input-base w-full font-display font-bold text-danger bg-white" 
-                      value={formData.depositUsed} 
-                      onChange={(e) => setFormData({...formData, depositUsed: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-danger uppercase tracking-tighter">Phụ phí phát sinh (-)</label>
-                    <input 
-                      type="number" 
-                      className="input-base w-full font-display font-bold text-danger bg-white" 
-                      value={formData.additionalCharge} 
-                      onChange={(e) => setFormData({...formData, additionalCharge: Number(e.target.value)})}
-                    />
-                  </div>
-               </div>
+        <div className="grid gap-8 p-6 lg:grid-cols-[1fr_300px]">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Ngày thanh lý</label>
+              <input
+                type="date"
+                className="input-base w-full"
+                value={formData.liquidationDate}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    liquidationDate: event.target.value,
+                  }))
+                }
+              />
             </div>
 
-            <div className="flex flex-col gap-4">
-              <div className="flex-1 bg-success/5 border border-success/20 rounded-3xl p-6 flex flex-col items-center justify-center text-center space-y-2">
-                 <Calculator className="text-success mb-2" size={32} />
-                 <p className="text-[10px] font-bold text-success uppercase tracking-widest">Tiền hoàn lại cư dân</p>
-                 <p className={cn(
-                   "text-h1 font-display font-bold",
-                   refundAmount < 0 ? 'text-danger' : 'text-success'
-                 )}>
-                   {formatVND(refundAmount)}
-                 </p>
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Lý do thanh lý</label>
+              <textarea
+                className="input-base min-h-[120px] w-full"
+                placeholder="Ví dụ: cả người đại diện và occupant đều đã rời khỏi phòng."
+                value={formData.reason}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    reason: event.target.value,
+                  }))
+                }
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-small font-bold text-muted uppercase">Lý do thanh lý</label>
-                <textarea 
-                  className="input-base w-full min-h-[120px]" 
-                  placeholder="Nghiệm thu tài sản, trừ tiền vệ sinh..."
-                  value={formData.reason}
-                  onChange={(e) => setFormData({...formData, reason: e.target.value})}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Khấu trừ từ cọc</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input-base w-full"
+                  value={formData.depositUsed}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      depositUsed: Number(event.target.value || 0),
+                    }))
+                  }
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Chi phí phát sinh</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input-base w-full"
+                  value={formData.additionalCharge}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      additionalCharge: Number(event.target.value || 0),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <p>
+                  Hệ thống sẽ kết thúc hợp đồng, đóng toàn bộ occupant còn hiệu lực và trả phòng về trạng thái
+                  trống nếu không còn hợp đồng active nào khác trên phòng này.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-3xl border border-slate-100 bg-slate-50 p-5">
+            <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[1px] text-slate-500">
+              <Calculator size={16} />
+              Tóm tắt tài chính
+            </div>
+
+            <div className="rounded-2xl border border-white bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-[1px] text-slate-400">Tiền cọc hiện tại</p>
+              <p className="mt-2 text-2xl font-black text-slate-900">{formatVND(contract.depositAmount)}</p>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-white bg-white p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Khấu trừ cọc</span>
+                <span className="font-bold text-rose-600">-{formatVND(formData.depositUsed)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Chi phí phát sinh</span>
+                <span className="font-bold text-rose-600">-{formatVND(formData.additionalCharge)}</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-[1px] text-emerald-700">Dự kiến hoàn lại</p>
+              <p
+                className={cn(
+                  'mt-2 text-3xl font-black',
+                  refundAmount < 0 ? 'text-rose-600' : 'text-emerald-700'
+                )}
+              >
+                {formatVND(refundAmount)}
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="p-6 bg-bg/50 border-t flex justify-between items-center">
-          <div className="flex items-center gap-2 text-muted truncate max-w-[200px]">
-            <AlertTriangle size={14} className="text-warning shrink-0" />
-            <span className="text-[10px] font-medium leading-tight italic">Hợp đồng sẽ chuyển thành 'Terminated' sau khi hoàn tất.</span>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="btn-outline">Hủy bỏ</button>
-            <button onClick={handleComplete} className="btn-primary bg-accent hover:bg-accent/80 border-accent flex items-center gap-2">
-               <ShieldCheck size={18} /> Hoàn tất thanh lý
-            </button>
-          </div>
+        <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-5">
+          <button onClick={onClose} className="btn-outline">
+            Hủy
+          </button>
+          <button
+            onClick={() => liquidateMutation.mutate()}
+            className="btn-primary flex items-center gap-2 bg-amber-600 hover:bg-amber-700"
+            disabled={liquidateMutation.isPending}
+          >
+            <ShieldCheck size={18} />
+            {liquidateMutation.isPending ? 'Đang xử lý...' : 'Xác nhận thanh lý'}
+          </button>
         </div>
       </div>
     </div>

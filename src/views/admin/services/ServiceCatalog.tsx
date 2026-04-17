@@ -79,11 +79,11 @@ const ServiceCatalog: React.FC = () => {
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => 
       toggleServiceActive(id, isActive),
     onSuccess: (_, variables) => {
-      toast.success(`Đã ${variables.isActive ? "kích hoạt" : "vô hiệu hóa"} dịch vụ`);
+      toast.success(`Đã ${variables.isActive ? "kích hoạt" : "vô hiệu hóa"} dịch vụ tính tiền`);
       queryClient.invalidateQueries({ queryKey: ["services"] });
     },
     onError: () => {
-      toast.error("Không thể thay đổi trạng thái dịch vụ");
+      toast.error("Không thể thay đổi trạng thái dịch vụ tính tiền");
     }
   });
 
@@ -91,7 +91,7 @@ const ServiceCatalog: React.FC = () => {
     const newStatus = !service.isActive;
     if (!newStatus) {
       const isConfirmed = await confirm({
-        title: "Vô hiệu hóa dịch vụ?",
+        title: "Vô hiệu hóa dịch vụ tính tiền?",
         description: `Dịch vụ '${service.serviceName}' (${service.serviceCode}) sẽ không thể chọn khi tạo hợp đồng mới.`,
         variant: "danger",
         confirmLabel: "Vô hiệu hóa",
@@ -123,7 +123,7 @@ const ServiceCatalog: React.FC = () => {
   const columns = [
     {
       id: "serviceName",
-      header: "Dịch vụ",
+      header: "Dịch vụ tính tiền",
       accessorKey: "serviceName",
       cell: ({ row }: { row: { original: Service } }) => (
         <div className="flex flex-col">
@@ -225,14 +225,14 @@ const ServiceCatalog: React.FC = () => {
            <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-                    Dịch vụ & Giá
+                    Dịch vụ tính tiền
                 </h1>
                 <span className="hidden sm:inline-block bg-primary/10 text-primary text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-[2px] border border-primary/20">
                     {data?.total || 0} mục
                 </span>
               </div>
               <p className="text-slate-500 text-sm font-medium mt-1">
-                Quản lý phí & dịch vụ theo quy tắc <span className="text-slate-900 font-bold underline decoration-primary/30 underline-offset-4 cursor-help" title="Lịch sử giá là bất biến">bất biến (RULE-08)</span>.
+                Chỉ quản lý các khoản thu cố định theo hợp đồng. Điện nước và tiện ích đặt chỗ đã được tách sang domain riêng.
               </p>
            </div>
         </div>
@@ -247,7 +247,7 @@ const ServiceCatalog: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative flex items-center justify-center gap-3">
             <Plus size={20} className="group-hover:rotate-90 transition-transform duration-500" />
-            Thêm dịch vụ
+            Thêm dịch vụ tính tiền
           </div>
         </button>
       </div>
@@ -261,7 +261,7 @@ const ServiceCatalog: React.FC = () => {
                   </div>
                   <input 
                     type="text"
-                    placeholder="Tìm kiếm theo tên dịch vụ hoặc mã..."
+                    placeholder="Tìm theo tên dịch vụ tính tiền hoặc mã..."
                     value={filters.search}
                     onChange={(e) => updateFilters({ search: e.target.value })}
                     className="w-full h-14 pl-16 pr-6 bg-white border border-slate-100 rounded-2xl outline-none focus:border-primary shadow-sm hover:shadow-md focus:shadow-xl focus:shadow-primary/5 transition-all text-sm font-bold text-slate-800"
@@ -329,7 +329,7 @@ const ServiceCatalog: React.FC = () => {
              ))}
           </div>
         ) : isError ? (
-          <ErrorBanner message="Không thể tải danh sách dịch vụ" onRetry={refetch} />
+          <ErrorBanner message="Không thể tải danh sách dịch vụ tính tiền" onRetry={refetch} />
         ) : data?.data.length === 0 ? (
           <div className="py-24 flex flex-col items-center justify-center text-center px-6">
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">

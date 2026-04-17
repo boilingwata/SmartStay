@@ -385,7 +385,7 @@ const ContractList = () => {
                             {contract.tenantName}
                           </p>
                           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                            Ký ngày {format(parseISO(contract.startDate), 'dd/MM/yyyy')}
+                            Đại diện • {contract.occupantCount ?? 1} người ở
                           </p>
                         </div>
                       </div>

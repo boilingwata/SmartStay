@@ -12,10 +12,6 @@ import {
   DollarSign,
   Wrench,
   ChevronRight,
-  Zap,
-  Droplets,
-  Wifi,
-  Shield,
   FilePlus,
   AlertCircle
 } from 'lucide-react';
@@ -27,14 +23,7 @@ import { toast } from 'sonner';
 import { ContractDetail, ContractService } from '@/models/Contract';
 import portalService from '@/services/portalService';
 
-const getServiceIcon = (name: string) => {
-  const n = (name || '').toLowerCase();
-  if (n.includes('điện')) return Zap;
-  if (n.includes('nước')) return Droplets;
-  if (n.includes('internet') || n.includes('wifi')) return Wifi;
-  if (n.includes('an ninh') || n.includes('bảo vệ')) return Shield;
-  return Wrench;
-};
+const getServiceIcon = () => Wrench;
 
 const ContractView = () => {
   const { data: contract, isLoading, isError, refetch } = useQuery<ContractDetail | null>({
@@ -140,7 +129,7 @@ const ContractView = () => {
               <div className="space-y-4">
                 {(contract?.services || []).length > 0 ? (
                   (contract?.services || []).map((svc: ContractService, idx: number) => {
-                    const Icon = getServiceIcon(svc.serviceName);
+                    const Icon = getServiceIcon();
                     return (
                       <div key={svc.id || idx} className="bg-white p-6 rounded-[32px] border border-slate-100 flex items-center justify-between hover:shadow-xl hover:-translate-y-1 transition-all group">
                         <div className="flex items-center gap-4">
@@ -159,7 +148,7 @@ const ContractView = () => {
                 ) : (
                   <div className="bg-white/50 border border-slate-100 rounded-[32px] p-10 text-center space-y-2">
                     <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mx-auto">
-                       <Zap size={20} />
+                       <Wrench size={20} />
                     </div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Chưa có dịch vụ đính kèm</p>
                   </div>

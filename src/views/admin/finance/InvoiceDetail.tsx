@@ -206,6 +206,102 @@ const InvoiceDetail = () => {
                   </p>
                </div>
             </div>
+
+            {invoice.utilitySnapshot && (
+              <div className="card-container p-8 space-y-6 bg-white shadow-xl shadow-primary/5">
+                <div>
+                  <p className="text-label text-muted">Utility Snapshot</p>
+                  <h3 className="text-h3 text-primary">Công thức utility đã chốt từ snapshot</h3>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-border/40 bg-bg/20 p-4">
+                    <p className="text-small font-bold uppercase text-muted">Nguồn policy</p>
+                    <p className="mt-2 text-body font-bold text-primary">{invoice.utilitySnapshot.policySourceType}</p>
+                    <p className="mt-2 text-small text-muted">
+                      Occupants: {invoice.utilitySnapshot.occupantsForBilling} • Days: {invoice.utilitySnapshot.occupiedDays}/{invoice.utilitySnapshot.daysInPeriod}
+                    </p>
+                    <p className="mt-2 text-small text-muted">
+                      Prorate ratio: {invoice.utilitySnapshot.prorateRatio.toFixed(4)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-bg/20 p-4">
+                    <p className="text-small font-bold uppercase text-muted">Làm tròn</p>
+                    <p className="mt-2 text-body font-bold text-primary">{formatVND(invoice.utilitySnapshot.roundingIncrement)}</p>
+                    <p className="mt-2 text-small text-muted">Policy #{invoice.utilitySnapshot.resolvedPolicyId ?? 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-warning/20 bg-warning/5 p-5">
+                    <p className="text-small font-bold uppercase text-warning">Điện</p>
+                    <div className="mt-3 space-y-2 text-small text-muted">
+                      <p>Base: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.electricBaseAmount)}</span></p>
+                      <p>Thiết bị: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.electricDeviceSurcharge)}</span></p>
+                      <p>Subtotal: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.electricSubtotal)}</span></p>
+                      <p>Mùa nóng: <span className="font-bold text-primary">{invoice.utilitySnapshot.electricSeasonMultiplier}x</span></p>
+                      <p>Vị trí: <span className="font-bold text-primary">{invoice.utilitySnapshot.electricLocationMultiplier}x</span></p>
+                      <p>Raw: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.electricRawAmount)}</span></p>
+                      <p>Rounded: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.electricRoundedAmount)}</span></p>
+                      <p>Floor: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.minElectricFloor)}</span></p>
+                      <p className="pt-2 text-body font-black text-primary">Chốt điện: {formatVND(invoice.utilitySnapshot.electricFinalAmount)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-secondary/20 bg-secondary/5 p-5">
+                    <p className="text-small font-bold uppercase text-secondary">Nước</p>
+                    <div className="mt-3 space-y-2 text-small text-muted">
+                      <p>Base: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterBaseAmount)}</span></p>
+                      <p>Theo đầu người: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterPerPersonAmount)}</span></p>
+                      <p>Tiền người ở: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterPersonCharge)}</span></p>
+                      <p>Subtotal: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterSubtotal)}</span></p>
+                      <p>Vị trí: <span className="font-bold text-primary">{invoice.utilitySnapshot.waterLocationMultiplier}x</span></p>
+                      <p>Raw: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterRawAmount)}</span></p>
+                      <p>Rounded: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.waterRoundedAmount)}</span></p>
+                      <p>Floor: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.minWaterFloor)}</span></p>
+                      <p className="pt-2 text-body font-black text-primary">Chốt nước: {formatVND(invoice.utilitySnapshot.waterFinalAmount)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {invoice.utilitySnapshot.resolvedDeviceSurcharges.length > 0 && (
+                  <div className="rounded-2xl border border-border/40 bg-bg/20 p-4">
+                    <p className="text-small font-bold uppercase text-muted">Phụ thu thiết bị đã resolve</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {invoice.utilitySnapshot.resolvedDeviceSurcharges.map((item) => (
+                        <span key={`${item.deviceCode}-${item.chargeAmount}`} className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-white">
+                          {item.deviceCode}: {formatVND(item.chargeAmount)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {invoice.utilitySnapshot.warnings.length > 0 && (
+                  <div className="rounded-2xl border border-warning/20 bg-warning/5 p-4">
+                    <p className="text-small font-bold uppercase text-warning">Warnings</p>
+                    <div className="mt-3 space-y-2 text-small text-muted">
+                      {invoice.utilitySnapshot.warnings.map((warning) => (
+                        <p key={`${warning.code}-${warning.message}`}>
+                          <span className="font-bold text-primary">{warning.code}</span>: {warning.message}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!invoice.utilitySnapshot && (
+              <div className="bg-warning/5 p-6 rounded-3xl border border-warning/20 flex gap-4">
+                <AlertCircle className="text-warning shrink-0" size={24} />
+                <div className="space-y-1">
+                  <p className="text-body font-bold text-warning">Invoice này không có utility snapshot</p>
+                  <p className="text-small text-warning/80 font-medium">
+                    Đây là dữ liệu cũ trước khi snapshot trở thành bắt buộc. Trang này không được phép tự tính lại utility từ policy hiện tại vì sẽ sai so với số tiền đã chốt.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - 40% */}

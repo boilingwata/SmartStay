@@ -1,12 +1,9 @@
+import { FunctionsHttpError, type Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
 import type { DbInvoiceStatus } from '@/types/supabase';
-import {
-  buildPolicyInvoiceDraft,
-  inferUtilityKind,
-  resolveContractUtilityMode,
-} from '@/services/utilityBillingService';
+import { buildPolicyInvoiceDraft } from '@/services/utilityBillingService';
 import {
   Invoice,
   InvoiceDetail,
@@ -32,7 +29,6 @@ export interface InvoiceFilter {
   tenantId?: string;
   page?: number;
   limit?: number;
-  // Advanced filters
   minAmount?: number;
   maxAmount?: number;
   dueDateFrom?: string;
@@ -50,6 +46,8 @@ export interface InvoiceCreateContractOption {
   buildingName: string;
   tenantName: string;
   monthlyRent: number;
+  startDate: string;
+  createdAt: string;
 }
 
 export interface InvoiceDraftPreviewItem {
@@ -57,7 +55,6 @@ export interface InvoiceDraftPreviewItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
-  meterReadingId?: number;
   source: 'rent' | 'service' | 'utility' | 'discount';
 }
 
@@ -112,15 +109,10 @@ export interface BulkInvoiceCreateResult {
   totalRequested: number;
 }
 
-// ---------------------------------------------------------------------------
-// Internal DB row shapes (used only inside this file via `as unknown as`)
-// ---------------------------------------------------------------------------
-
-// NOTE: id fields are numbers in DB (not strings). We keep string for frontend compat via String()
 interface DbInvoiceRow {
-  id: number;           // DB: integer
+  id: number;
   invoice_code: string;
-  contract_id: number;  // DB: integer
+  contract_id: number;
   billing_period: string | null;
   subtotal: number | null;
   tax_amount: number | null;
@@ -152,7 +144,6 @@ interface DbInvoiceRow {
   };
 }
 
-// Matches actual smartstay.invoice_items columns exactly
 interface DbInvoiceItemRow {
   id: number;
   invoice_id: number;
@@ -160,7 +151,6 @@ interface DbInvoiceItemRow {
   quantity: number | null;
   unit_price: number;
   line_total: number;
-  meter_reading_id: number | null;
   sort_order: number | null;
 }
 
@@ -174,10 +164,43 @@ interface DbPaymentRow {
   notes: string | null;
 }
 
+interface DbUtilitySnapshotRow {
+  policy_source_type: string;
+  resolved_policy_id: number | null;
+  occupants_for_billing: number;
+  occupied_days: number;
+  days_in_period: number;
+  prorate_ratio: number;
+  rounding_increment: number;
+  electric_base_amount: number;
+  electric_device_surcharge: number;
+  electric_subtotal: number;
+  electric_season_multiplier: number;
+  electric_location_multiplier: number;
+  electric_raw_amount: number;
+  electric_rounded_amount: number;
+  min_electric_floor: number;
+  electric_final_amount: number;
+  water_base_amount: number;
+  water_per_person_amount: number;
+  water_person_charge: number;
+  water_subtotal: number;
+  water_location_multiplier: number;
+  water_raw_amount: number;
+  water_rounded_amount: number;
+  min_water_floor: number;
+  water_final_amount: number;
+  resolved_device_surcharges_json: Array<{ deviceCode?: string; device_code?: string; chargeAmount?: number; charge_amount?: number }> | null;
+  formula_snapshot_json: Record<string, unknown> | null;
+  warnings_json: Array<{ code: string; message: string }> | null;
+}
+
 interface ContractOptionRow {
   id: number;
   contract_code: string;
   room_id: number;
+  start_date: string;
+  created_at: string | null;
   monthly_rent: number | null;
   rooms: {
     room_code: string;
@@ -193,38 +216,9 @@ interface ContractOptionRow {
 }
 
 interface ContractDraftRow extends ContractOptionRow {
-  contract_services: {
-    service_id: number;
-    quantity: number | null;
-    fixed_price: number | null;
-    services: {
-      name: string;
-      calc_type: string | null;
-    } | null;
-  }[];
+  occupants_for_billing: number | null;
+  utility_billing_type: string | null;
 }
-
-interface ServicePriceRow {
-  service_id: number;
-  unit_price: number;
-  effective_from: string;
-}
-
-interface MeterReadingDraftRow {
-  id: number;
-  room_id: number;
-  billing_period: string;
-  electricity_previous: number;
-  electricity_current: number;
-  electricity_usage: number | null;
-  water_previous: number;
-  water_current: number;
-  water_usage: number | null;
-}
-
-// ---------------------------------------------------------------------------
-// Mappers
-// ---------------------------------------------------------------------------
 
 function mapDbRowToInvoice(row: DbInvoiceRow): Invoice {
   const contract = row.contracts;
@@ -256,28 +250,24 @@ function mapDbRowToInvoice(row: DbInvoiceRow): Invoice {
   };
 }
 
-/**
- * Derive a frontend item type from the description text.
- * The DB has no `type` column — we infer from keywords.
- */
 function deriveItemType(description: string): InvoiceItem['type'] {
-  const lower = description.toLowerCase();
-  if (lower.includes('điện') || lower.includes('electr')) return 'Electricity';
-  if (lower.includes('nước') || lower.includes('water')) return 'Water';
-  if (lower.includes('thuê') || lower.includes('rent')) return 'Rent';
+  const lower = description.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (lower.includes('dien') || lower.includes('electr')) return 'Electricity';
+  if (lower.includes('nuoc') || lower.includes('water')) return 'Water';
+  if (lower.includes('thue') || lower.includes('rent')) return 'Rent';
   return 'Service';
 }
 
 function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
   return {
-    id:                String(item.id),
-    description:       item.description,
-    quantity:          item.quantity ?? 1,
+    id: String(item.id),
+    description: item.description,
+    quantity: item.quantity ?? 1,
     unitPriceSnapshot: Number(item.unit_price),
-    amount:            Number(item.line_total),
-    type:              deriveItemType(item.description),
-    snapshotPrice:     Number(item.unit_price),
-    snapshotLabel:     item.description,
+    amount: Number(item.line_total),
+    type: deriveItemType(item.description),
+    snapshotPrice: Number(item.unit_price),
+    snapshotLabel: item.description,
   };
 }
 
@@ -306,6 +296,8 @@ function mapContractRowToOption(row: ContractOptionRow): InvoiceCreateContractOp
     buildingName: row.rooms?.buildings?.name ?? '',
     tenantName: primaryTenant?.tenants?.full_name ?? '',
     monthlyRent: row.monthly_rent ?? 0,
+    startDate: row.start_date,
+    createdAt: row.created_at ?? row.start_date,
   };
 }
 
@@ -318,15 +310,131 @@ function normalizeForMatch(value: string): string {
 
 function isExistingInvoiceError(message: string): boolean {
   const normalized = normalizeForMatch(message);
-  return normalized.includes('hoa don') && normalized.includes('ton tai')
-    || normalized.includes('already exists');
+  return (
+    (normalized.includes('hoa don') && normalized.includes('ton tai')) ||
+    normalized.includes('already exists')
+  );
 }
 
-function getMissingMeterReadingsMessage(draft: InvoiceDraftPreview): string {
-  const missingItems = draft.missingUtilityItems.join(', ');
-  return missingItems
-    ? `Không thể tạo hóa đơn: thiếu chỉ số công tơ cho kỳ này (${missingItems}).`
-    : 'Không thể tạo hóa đơn: thiếu chỉ số công tơ cho kỳ này.';
+function isAuthErrorMessage(message: string): boolean {
+  return (
+    message.includes('401') ||
+    message.includes('403') ||
+    message.includes('unauthorized') ||
+    message.includes('invalid token') ||
+    message.includes('expired token') ||
+    message.includes('jwt') ||
+    message.includes('auth')
+  );
+}
+
+async function validateSession(session: Session | null): Promise<Session> {
+  if (!session?.access_token) {
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tạo hóa đơn.');
+  }
+
+  const activeSession = session as Session;
+  const { data: userData, error: userError } = await supabase.auth.getUser(activeSession.access_token);
+  if (userError || !userData.user) {
+    throw new Error('Không xác minh được phiên đăng nhập hiện tại. Vui lòng đăng nhập lại.');
+  }
+
+  return activeSession;
+}
+
+async function requireInvoiceFunctionSession(): Promise<Session> {
+  const { data, error } = await supabase.auth.getSession();
+  if (!error && data.session?.access_token) {
+    try {
+      return await validateSession(data.session);
+    } catch {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && refreshData.session?.access_token) {
+        return validateSession(refreshData.session);
+      }
+    }
+  }
+
+  throw new Error('Không lấy được access token hợp lệ để gọi chức năng tạo hóa đơn.');
+}
+
+async function getFunctionErrorMessage(error: Error, fallback: string): Promise<string> {
+  const normalizedMessage = error.message.toLowerCase();
+  const status =
+    error instanceof FunctionsHttpError && error.context instanceof Response
+      ? error.context.status
+      : null;
+
+  let responseMessage: string | null = null;
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    try {
+      const json = (await error.context.clone().json()) as { error?: string; message?: string };
+      responseMessage = json.error ?? json.message ?? null;
+    } catch {
+      try {
+        responseMessage = await error.context.clone().text();
+      } catch {
+        responseMessage = null;
+      }
+    }
+  }
+
+  if (status === 401) {
+    return responseMessage
+      ? `Tạo hóa đơn bị từ chối xác thực (401): ${responseMessage}`
+      : 'Tạo hóa đơn bị từ chối xác thực (401). Vui lòng đăng nhập lại.';
+  }
+
+  if (status === 403) {
+    return responseMessage
+      ? `Tài khoản hiện tại không có quyền tạo hóa đơn (403): ${responseMessage}`
+      : 'Tài khoản hiện tại không có quyền tạo hóa đơn (403).';
+  }
+
+  if (normalizedMessage.includes('invoice already exists')) {
+    return responseMessage ?? 'Hóa đơn của hợp đồng này trong kỳ đã tồn tại.';
+  }
+
+  if (isAuthErrorMessage(normalizedMessage)) {
+    return responseMessage ?? 'Supabase Auth từ chối access token khi gọi Edge Function.';
+  }
+
+  if (normalizedMessage.includes('non-2xx')) {
+    return responseMessage ? `Edge Function trả lỗi: ${responseMessage}` : fallback;
+  }
+
+  return responseMessage ?? error.message ?? fallback;
+}
+
+async function invokeCreateUtilityInvoice(
+  payload: Omit<CreateInvoiceInput, 'contractId'> & { contractId: number }
+): Promise<{ invoiceId: number; invoiceCode?: string }> {
+  const session = await requireInvoiceFunctionSession();
+
+  const attemptInvoke = async (accessToken: string) =>
+    supabase.functions.invoke('create-utility-invoice', {
+      body: payload,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+  let { data, error } = await attemptInvoke(session.access_token);
+
+  if (error && isAuthErrorMessage(error.message.toLowerCase())) {
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshData.session?.access_token) {
+      throw new Error('Không thể làm mới phiên đăng nhập để tạo hóa đơn.');
+    }
+
+    ({ data, error } = await attemptInvoke(refreshData.session.access_token));
+  }
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, 'Không thể gọi Edge Function tạo hóa đơn.'));
+  }
+
+  return (data ?? {}) as { invoiceId: number; invoiceCode?: string };
 }
 
 async function fetchContractDraft(contractId: number): Promise<ContractDraftRow> {
@@ -337,6 +445,10 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
         id,
         contract_code,
         room_id,
+        start_date,
+        created_at,
+        occupants_for_billing,
+        utility_billing_type,
         monthly_rent,
         rooms (
           room_code,
@@ -346,12 +458,6 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
         contract_tenants (
           is_primary,
           tenants ( full_name )
-        ),
-        contract_services (
-          service_id,
-          quantity,
-          fixed_price,
-          services ( name, calc_type )
         )
       `)
       .eq('id', contractId)
@@ -361,140 +467,18 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
   )) as unknown as ContractDraftRow;
 }
 
-async function buildLegacyMeteredInvoiceDraft(
-  input: CreateInvoiceInput,
-  draftRow: ContractDraftRow,
-): Promise<InvoiceDraftPreview> {
-  const contract = mapContractRowToOption(draftRow);
-  const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
-  const items: InvoiceDraftPreviewItem[] = [];
-  const missingUtilityItems: string[] = [];
-
-  if (contract.monthlyRent > 0) {
-    items.push({
-      description: `Tiền thuê tháng ${input.monthYear}`,
-      quantity: 1,
-      unitPrice: contract.monthlyRent,
-      lineTotal: contract.monthlyRent,
-      source: 'rent',
-    });
-  }
-
-  const contractServices = draftRow.contract_services ?? [];
-  const serviceIds = contractServices.map((service) => service.service_id);
-  const priceMap = new Map<number, number>();
-
-  if (serviceIds.length > 0) {
-    const servicePriceRows = (await unwrap(
-      supabase
-        .from('service_prices')
-        .select('service_id, unit_price, effective_from')
-        .in('service_id', serviceIds)
-        .eq('is_active', true)
-        .order('effective_from', { ascending: false })
-    )) as unknown as ServicePriceRow[];
-
-    for (const row of servicePriceRows) {
-      if (!priceMap.has(row.service_id)) {
-        priceMap.set(row.service_id, Number(row.unit_price ?? 0));
-      }
-    }
-  }
-
-  const meterReading = contract.roomId
-    ? ((await unwrap(
-        supabase
-          .from('meter_readings')
-          .select('id, room_id, billing_period, electricity_previous, electricity_current, electricity_usage, water_previous, water_current, water_usage')
-          .eq('room_id', Number(contract.roomId))
-          .eq('billing_period', input.monthYear)
-          .maybeSingle()
-      )) as unknown as MeterReadingDraftRow | null)
-    : null;
-
-  for (const service of contractServices) {
-    const serviceName = service.services?.name ?? `Dịch vụ #${service.service_id}`;
-    const calcType = service.services?.calc_type ?? 'flat_rate';
-    const quantity = Math.max(1, Number(service.quantity ?? 1));
-    const unitPrice = Number(service.fixed_price ?? priceMap.get(service.service_id) ?? 0);
-
-    if (calcType === 'per_unit') {
-      const utilityKind = inferUtilityKind(serviceName);
-      if (!utilityKind || !meterReading) {
-        missingUtilityItems.push(serviceName);
-        continue;
-      }
-
-      const usage = utilityKind === 'electricity'
-        ? (meterReading.electricity_usage ?? (meterReading.electricity_current - meterReading.electricity_previous))
-        : (meterReading.water_usage ?? (meterReading.water_current - meterReading.water_previous));
-
-      items.push({
-        description: `${serviceName} tháng ${input.monthYear}`,
-        quantity: Math.max(0, usage),
-        unitPrice,
-        lineTotal: Math.max(0, usage) * unitPrice,
-        meterReadingId: meterReading.id,
-        source: 'utility',
-      });
-      continue;
-    }
-
-    items.push({
-      description: `${serviceName} tháng ${input.monthYear}`,
-      quantity,
-      unitPrice,
-      lineTotal: quantity * unitPrice,
-      source: 'service',
-    });
-  }
-
-  if (discountAmount > 0) {
-    items.push({
-      description: input.discountReason?.trim()
-        ? `Giảm trừ: ${input.discountReason.trim()}`
-        : 'Giảm trừ hóa đơn',
-      quantity: 1,
-      unitPrice: -discountAmount,
-      lineTotal: -discountAmount,
-      source: 'discount',
-    });
-  }
-
-  const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  if (subtotal < 0) {
-    throw new Error('Giảm trừ không thể lớn hơn tổng tiền hóa đơn.');
-  }
-
-  return {
-    contractId: contract.id,
-    contractCode: contract.contractCode,
-    roomId: contract.roomId,
-    roomCode: contract.roomCode,
-    buildingId: contract.buildingId,
-    buildingName: contract.buildingName,
-    tenantName: contract.tenantName,
-    billingPeriod: input.monthYear,
-    dueDate: input.dueDate,
-    items,
-    subtotal,
-    totalAmount: subtotal,
-    missingUtilityItems,
-    note: input.note?.trim() || undefined,
-  };
-}
-
 async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraftPreview> {
   const contractId = Number(input.contractId);
   if (!Number.isFinite(contractId)) {
-    throw new Error('Hợp đồng không hợp lệ.');
+    throw new Error('Hop dong khong hop le.');
   }
 
   const contractDraft = await fetchContractDraft(contractId);
-  const utilityMode = resolveContractUtilityMode(contractDraft.contract_services ?? []);
-
-  if (utilityMode === 'legacy_metered') {
-    return buildLegacyMeteredInvoiceDraft(input, contractDraft);
+  if ((contractDraft.utility_billing_type ?? 'policy') !== 'policy') {
+    throw new Error('Hop dong nay chua duoc chuyen sang utility policy.');
+  }
+  if (!Number.isFinite(Number(contractDraft.occupants_for_billing)) || Number(contractDraft.occupants_for_billing) <= 0) {
+    throw new Error('Hop dong thieu occupants_for_billing hop le.');
   }
 
   const draft = await buildPolicyInvoiceDraft(input);
@@ -522,10 +506,6 @@ async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraf
     note: draft.note,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Base query builder (shared select string for list + detail)
-// ---------------------------------------------------------------------------
 
 const INVOICE_SELECT = `
   id,
@@ -558,10 +538,6 @@ const INVOICE_SELECT = `
   )
 `.trim();
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
 export const invoiceService = {
   getCreateInvoiceContracts: async (): Promise<InvoiceCreateContractOption[]> => {
     const rows = (await unwrap(
@@ -571,6 +547,8 @@ export const invoiceService = {
           id,
           contract_code,
           room_id,
+          start_date,
+          created_at,
           monthly_rent,
           rooms (
             room_code,
@@ -584,7 +562,7 @@ export const invoiceService = {
         `)
         .eq('status', 'active')
         .eq('is_deleted', false)
-        .order('contract_code', { ascending: true })
+        .order('created_at', { ascending: false })
     )) as unknown as ContractOptionRow[];
 
     return rows.map(mapContractRowToOption);
@@ -596,10 +574,10 @@ export const invoiceService = {
 
   previewBulkInvoices: async (input: BulkInvoiceInput): Promise<BulkInvoicePreviewRow[]> => {
     if (!/^\d{4}-\d{2}$/.test(input.monthYear)) {
-      throw new Error('Kỳ thanh toán không hợp lệ.');
+      throw new Error('Ky thanh toan khong hop le.');
     }
     if (!input.dueDate) {
-      throw new Error('Vui lòng chọn hạn thanh toán.');
+      throw new Error('Vui long chon han thanh toan.');
     }
 
     const contracts = await invoiceService.getCreateInvoiceContracts();
@@ -631,7 +609,7 @@ export const invoiceService = {
             status: 'duplicate' as const,
             canCreate: false,
             existingInvoiceCode,
-            issue: `Đã có hóa đơn ${existingInvoiceCode} cho kỳ ${input.monthYear}.`,
+            issue: `Da co hoa don ${existingInvoiceCode} cho ky ${input.monthYear}.`,
           };
         }
 
@@ -651,7 +629,7 @@ export const invoiceService = {
             status: preview.missingUtilityItems.length > 0 ? 'blocked' as const : 'ready' as const,
             canCreate: preview.missingUtilityItems.length === 0,
             issue: preview.missingUtilityItems.length > 0
-              ? getMissingMeterReadingsMessage(preview)
+              ? `Thieu cau hinh utility cho: ${preview.missingUtilityItems.join(', ')}.`
               : undefined,
           };
         } catch (error) {
@@ -659,7 +637,7 @@ export const invoiceService = {
             contract,
             status: 'error' as const,
             canCreate: false,
-            issue: error instanceof Error ? error.message : 'Không thể xem trước hóa đơn.',
+            issue: error instanceof Error ? error.message : 'Khong the xem truoc hoa don.',
           };
         }
       })
@@ -697,7 +675,7 @@ export const invoiceService = {
         });
         created.push(invoice);
       } catch (error) {
-        const reason = error instanceof Error ? error.message : 'Không thể tạo hóa đơn.';
+        const reason = error instanceof Error ? error.message : 'Khong the tao hoa don.';
         const bucket = isExistingInvoiceError(reason) ? skipped : failed;
         bucket.push({ contractId, contractCode, reason });
       } finally {
@@ -724,7 +702,6 @@ export const invoiceService = {
       roomCode,
     } = filters;
 
-    // 1. Base query (apply basic filters that work directly on `invoices` table)
     let query = supabase
       .from('invoices')
       .select(INVOICE_SELECT, { count: 'exact' })
@@ -741,21 +718,15 @@ export const invoiceService = {
     if (dueDateFrom) query = query.gte('due_date', dueDateFrom);
     if (dueDateTo) query = query.lte('due_date', dueDateTo);
 
-    // Determine if we need to do in-memory filtering for nested relations or complex criteria
     const isInMemoryNeeded = !!(buildingId || tenantId || search || minAmount !== undefined || maxAmount !== undefined || roomCode);
-
-    // If we need in-memory filtering, we should fetch a larger batch
-    // to ensure we capture enough matches for the current page.
     const typedPage = Math.max(1, Number(page));
     const typedLimit = Math.max(1, Number(limit));
-
 
     if (!isInMemoryNeeded) {
       const from = (typedPage - 1) * typedLimit;
       const to = from + typedLimit - 1;
       query = query.range(from, to);
     } else {
-      // Limit the "deep scan" to 1000 items for performance
       query = query.limit(1000);
     }
 
@@ -765,7 +736,6 @@ export const invoiceService = {
 
     let items = (data as unknown as DbInvoiceRow[]).map(mapDbRowToInvoice);
 
-    // Apply in-memory filters
     if (isInMemoryNeeded) {
       items = items.filter((item) => {
         const matchesBuilding = !buildingId || String(item.buildingId) === String(buildingId);
@@ -792,9 +762,7 @@ export const invoiceService = {
 
     const filteredTotal = isInMemoryNeeded ? items.length : (count ?? 0);
 
-    // Apply client-side sort + pagination on the filtered results
     if (isInMemoryNeeded) {
-      // Sort newest due_date first (mirrors the DB order)
       items.sort((a, b) => {
         const aTime = a.dueDate ? new Date(a.dueDate).getTime() : 0;
         const bTime = b.dueDate ? new Date(b.dueDate).getTime() : 0;
@@ -811,7 +779,6 @@ export const invoiceService = {
       limit: typedLimit,
     };
   },
-
 
   getInvoiceCounts: async (): Promise<Record<InvoiceStatus | 'All', number>> => {
     const rows = await unwrap(
@@ -831,7 +798,6 @@ export const invoiceService = {
   },
 
   getInvoiceDetail: async (id: string): Promise<InvoiceDetail> => {
-    // 1. Fetch the invoice base row
     const invoiceRow = await unwrap(
       supabase
         .from('invoices')
@@ -842,18 +808,16 @@ export const invoiceService = {
 
     const base = mapDbRowToInvoice(invoiceRow);
 
-    // 2. Fetch invoice items — select only columns that exist in smartstay.invoice_items
     const itemRows = await unwrap(
       supabase
         .from('invoice_items')
-        .select('id, invoice_id, description, quantity, unit_price, line_total, meter_reading_id, sort_order')
+        .select('id, invoice_id, description, quantity, unit_price, line_total, sort_order')
         .eq('invoice_id', Number(id))
         .order('sort_order', { ascending: true, nullsFirst: false })
     ) as unknown as DbInvoiceItemRow[];
 
     const items: InvoiceItem[] = itemRows.map(mapDbItemToInvoiceItem);
 
-    // 3. Fetch payments
     const paymentRows = await unwrap(
       supabase
         .from('payments')
@@ -863,6 +827,42 @@ export const invoiceService = {
     ) as unknown as DbPaymentRow[];
 
     const payments: PaymentTransaction[] = paymentRows.map(mapDbPaymentToTransaction);
+    const utilitySnapshot = (await unwrap(
+      supabase
+        .from('invoice_utility_snapshots')
+        .select(`
+          policy_source_type,
+          resolved_policy_id,
+          occupants_for_billing,
+          occupied_days,
+          days_in_period,
+          prorate_ratio,
+          rounding_increment,
+          electric_base_amount,
+          electric_device_surcharge,
+          electric_subtotal,
+          electric_season_multiplier,
+          electric_location_multiplier,
+          electric_raw_amount,
+          electric_rounded_amount,
+          min_electric_floor,
+          electric_final_amount,
+          water_base_amount,
+          water_per_person_amount,
+          water_person_charge,
+          water_subtotal,
+          water_location_multiplier,
+          water_raw_amount,
+          water_rounded_amount,
+          min_water_floor,
+          water_final_amount,
+          resolved_device_surcharges_json,
+          formula_snapshot_json,
+          warnings_json
+        `)
+        .eq('invoice_id', Number(id))
+        .maybeSingle()
+    )) as unknown as DbUtilitySnapshotRow | null;
 
     return {
       ...base,
@@ -872,6 +872,46 @@ export const invoiceService = {
       taxAmount: invoiceRow.tax_amount ?? 0,
       discountAmount: 0,
       overdueFee: 0,
+      utilitySnapshot: utilitySnapshot
+        ? {
+            policySourceType: utilitySnapshot.policy_source_type,
+            resolvedPolicyId: utilitySnapshot.resolved_policy_id,
+            occupantsForBilling: Number(utilitySnapshot.occupants_for_billing ?? 0),
+            occupiedDays: Number(utilitySnapshot.occupied_days ?? 0),
+            daysInPeriod: Number(utilitySnapshot.days_in_period ?? 0),
+            prorateRatio: Number(utilitySnapshot.prorate_ratio ?? 0),
+            roundingIncrement: Number(utilitySnapshot.rounding_increment ?? 0),
+            electricBaseAmount: Number(utilitySnapshot.electric_base_amount ?? 0),
+            electricDeviceSurcharge: Number(utilitySnapshot.electric_device_surcharge ?? 0),
+            electricSubtotal: Number(utilitySnapshot.electric_subtotal ?? 0),
+            electricSeasonMultiplier: Number(utilitySnapshot.electric_season_multiplier ?? 1),
+            electricLocationMultiplier: Number(utilitySnapshot.electric_location_multiplier ?? 1),
+            electricRawAmount: Number(utilitySnapshot.electric_raw_amount ?? 0),
+            electricRoundedAmount: Number(utilitySnapshot.electric_rounded_amount ?? 0),
+            minElectricFloor: Number(utilitySnapshot.min_electric_floor ?? 0),
+            electricFinalAmount: Number(utilitySnapshot.electric_final_amount ?? 0),
+            waterBaseAmount: Number(utilitySnapshot.water_base_amount ?? 0),
+            waterPerPersonAmount: Number(utilitySnapshot.water_per_person_amount ?? 0),
+            waterPersonCharge: Number(utilitySnapshot.water_person_charge ?? 0),
+            waterSubtotal: Number(utilitySnapshot.water_subtotal ?? 0),
+            waterLocationMultiplier: Number(utilitySnapshot.water_location_multiplier ?? 1),
+            waterRawAmount: Number(utilitySnapshot.water_raw_amount ?? 0),
+            waterRoundedAmount: Number(utilitySnapshot.water_rounded_amount ?? 0),
+            minWaterFloor: Number(utilitySnapshot.min_water_floor ?? 0),
+            waterFinalAmount: Number(utilitySnapshot.water_final_amount ?? 0),
+            resolvedDeviceSurcharges: Array.isArray(utilitySnapshot.resolved_device_surcharges_json)
+              ? utilitySnapshot.resolved_device_surcharges_json.map((item) => ({
+                  deviceCode: String(item.deviceCode ?? item.device_code ?? ''),
+                  chargeAmount: Number(item.chargeAmount ?? item.charge_amount ?? 0),
+                }))
+              : [],
+            formulaSnapshot:
+              utilitySnapshot.formula_snapshot_json && typeof utilitySnapshot.formula_snapshot_json === 'object'
+                ? utilitySnapshot.formula_snapshot_json
+                : undefined,
+            warnings: Array.isArray(utilitySnapshot.warnings_json) ? utilitySnapshot.warnings_json : [],
+          }
+        : undefined,
     };
   },
 
@@ -881,7 +921,6 @@ export const invoiceService = {
     amount?: number
   ): Promise<{ success: boolean; redirectUrl?: string; message?: string }> => {
     if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      // Resolve amount: fetch invoice total if not provided
       let paymentAmount = amount;
       if (paymentAmount === undefined) {
         const row = (await unwrap(
@@ -891,23 +930,26 @@ export const invoiceService = {
       }
 
       const methodMap: Record<PaymentMethod, string> = {
-        Wallet: 'other', VNPay: 'vnpay', MoMo: 'momo', ZaloPay: 'zalopay', Transfer: 'bank_transfer',
+        Wallet: 'other',
+        VNPay: 'vnpay',
+        MoMo: 'momo',
+        ZaloPay: 'zalopay',
+        Transfer: 'bank_transfer',
       };
 
       const { error } = await supabase.functions.invoke('process-payment', {
         body: {
-          invoiceId:   Number(invoiceId),
-          amount:      paymentAmount,
-          method:      methodMap[method] ?? 'other',
+          invoiceId: Number(invoiceId),
+          amount: paymentAmount,
+          method: methodMap[method] ?? 'other',
           paymentDate: new Date().toISOString(),
           autoConfirm: true,
         },
       });
       if (error) throw new Error(error.message);
-      return { success: true, message: 'Thanh toán đã được ghi nhận' };
+      return { success: true, message: 'Thanh toan da duoc ghi nhan' };
     }
 
-    // Legacy path: direct invoice update only (no payment row created)
     const invoiceRow = (await unwrap(
       supabase
         .from('invoices')
@@ -946,12 +988,10 @@ export const invoiceService = {
         .eq('id', Number(invoiceId))
     );
 
-    return { success: true, message: 'Thanh toán đã được ghi nhận' };
+    return { success: true, message: 'Thanh toan da duoc ghi nhan' };
   },
 
-  // B32 FIX: sendNotification — toast-promise backed, logs to console (no notifications table yet)
   sendNotification: async (invoiceId: string): Promise<void> => {
-    // In production: insert into a notifications table or call edge function
     console.info(`[invoiceService] Notification sent for invoice ${invoiceId}`);
   },
 
@@ -960,97 +1000,33 @@ export const invoiceService = {
     if (!Number.isFinite(contractId)) {
       throw new Error('Hợp đồng không hợp lệ.');
     }
+    if (!/^\d{4}-\d{2}$/.test(input.monthYear)) {
+      throw new Error('Kỳ thanh toán không hợp lệ. Định dạng đúng là YYYY-MM.');
+    }
+    if (!input.dueDate) {
+      throw new Error('Vui lòng chọn hạn thanh toán.');
+    }
 
     const contractDraft = await fetchContractDraft(contractId);
-    const utilityMode = resolveContractUtilityMode(contractDraft.contract_services ?? []);
-
-    if (utilityMode === 'legacy_metered') {
-      const billingPeriod = input.monthYear;
-      const draft = await buildLegacyMeteredInvoiceDraft(input, contractDraft);
-
-      if (draft.missingUtilityItems.length > 0) {
-        throw new Error(getMissingMeterReadingsMessage(draft));
-      }
-
-      const existingInvoice = (await unwrap(
-        supabase
-          .from('invoices')
-          .select('id, invoice_code')
-          .eq('contract_id', contractId)
-          .eq('billing_period', billingPeriod)
-          .neq('status', 'cancelled')
-          .maybeSingle()
-      )) as unknown as { id: number; invoice_code: string } | null;
-
-      if (existingInvoice) {
-        throw new Error(`Hóa đơn ${existingInvoice.invoice_code} đã tồn tại cho kỳ ${input.monthYear}.`);
-      }
-
-      const insertedInvoice = (await unwrap(
-        supabase
-          .from('invoices')
-          .insert({
-            contract_id: contractId,
-            billing_period: billingPeriod,
-            subtotal: draft.subtotal,
-            tax_amount: 0,
-            total_amount: draft.totalAmount,
-            amount_paid: 0,
-            due_date: input.dueDate,
-            status: 'pending_payment',
-            notes: input.note?.trim() || null,
-          })
-          .select('id')
-          .single()
-      )) as unknown as { id: number };
-
-      if (draft.items.length > 0) {
-        await unwrap(
-          supabase
-            .from('invoice_items')
-            .insert(
-              draft.items.map((item, index) => ({
-                invoice_id: insertedInvoice.id,
-                description: item.description,
-                quantity: item.quantity,
-                unit_price: item.unitPrice,
-                line_total: item.lineTotal,
-                meter_reading_id: item.meterReadingId ?? null,
-                sort_order: index + 1,
-              }))
-            )
-        );
-      }
-
-      const createdInvoice = (await unwrap(
-        supabase
-          .from('invoices')
-          .select(INVOICE_SELECT)
-          .eq('id', insertedInvoice.id)
-          .single()
-      )) as unknown as DbInvoiceRow;
-
-      return mapDbRowToInvoice(createdInvoice);
+    if ((contractDraft.utility_billing_type ?? 'policy') !== 'policy') {
+      throw new Error('Hợp đồng này chưa được chuyển sang utility policy.');
+    }
+    if (!Number.isFinite(Number(contractDraft.occupants_for_billing)) || Number(contractDraft.occupants_for_billing) <= 0) {
+      throw new Error('Hợp đồng thiếu occupants_for_billing hợp lệ.');
     }
 
-    const { data, error } = await supabase.functions.invoke('create-utility-invoice', {
-      body: {
-        contractId,
-        monthYear: input.monthYear,
-        dueDate: input.dueDate,
-        discountAmount: input.discountAmount ?? 0,
-        discountReason: input.discountReason ?? null,
-        note: input.note ?? null,
-      },
+    const data = await invokeCreateUtilityInvoice({
+      contractId,
+      monthYear: input.monthYear,
+      dueDate: input.dueDate,
+      discountAmount: input.discountAmount ?? 0,
+      discountReason: input.discountReason?.trim() || undefined,
+      note: input.note?.trim() || undefined,
     });
-
-    if (error) {
-      throw new Error(error.message);
-    }
 
     const invoiceId = Number((data as { invoiceId?: number | string } | null)?.invoiceId);
     if (!Number.isFinite(invoiceId)) {
-      throw new Error('Không thể tạo hóa đơn utility.');
+      throw new Error('Edge Function không trả về `invoiceId` hợp lệ sau khi tạo hóa đơn.');
     }
 
     const createdInvoice = (await unwrap(
@@ -1065,7 +1041,7 @@ export const invoiceService = {
   },
 
   logInvoiceView: async (_invoiceId: string): Promise<void> => {
-    // no-op stub — view tracking not yet implemented on the backend
+    // no-op
   },
 };
 

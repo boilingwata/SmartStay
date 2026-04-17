@@ -1,5 +1,6 @@
 import { createAdminClient } from './supabaseAdmin.ts';
 import { errorResponse } from './errors.ts';
+import * as jose from 'jsr:@panva/jose@6';
 
 export type AdminRole = 'admin' | 'manager' | 'staff';
 export type AnyRole = AdminRole | 'tenant';
@@ -18,6 +19,12 @@ export class AuthError extends Error {
   }
 }
 
+const SUPABASE_JWT_ISSUER =
+  Deno.env.get('SB_JWT_ISSUER') ?? `${Deno.env.get('SUPABASE_URL')}/auth/v1`;
+const SUPABASE_JWT_KEYS = jose.createRemoteJWKSet(
+  new URL(`${Deno.env.get('SUPABASE_URL')}/auth/v1/.well-known/jwks.json`)
+);
+
 /**
  * Extract JWT from Authorization header. Throws AuthError if missing.
  */
@@ -34,23 +41,30 @@ export function extractJwt(req: Request): string {
  */
 export async function requireAuth(req: Request): Promise<Caller> {
   const jwt = extractJwt(req);
+  let payload: jose.JWTPayload;
+  try {
+    const verified = await jose.jwtVerify(jwt, SUPABASE_JWT_KEYS, {
+      issuer: SUPABASE_JWT_ISSUER,
+    });
+    payload = verified.payload;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'JWT verification failed';
+    throw new AuthError(`Invalid or expired token: ${detail}`);
+  }
+
+  const userId = typeof payload.sub === 'string' ? payload.sub : null;
+  if (!userId) throw new AuthError('Invalid token payload: missing sub');
+
   const client = createAdminClient();
-
-  // Pass jwt explicitly — auth.getUser() without an argument looks for a
-  // persisted session which doesn't exist in the edge runtime (persistSession: false).
-  // auth.getUser(jwt) validates directly against the auth server regardless of session state.
-  const { data: { user }, error } = await client.auth.getUser(jwt);
-  if (error || !user) throw new AuthError('Invalid or expired token');
-
   const { data: profile, error: profileError } = await client
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', userId)
     .maybeSingle();
 
   if (profileError) throw new AuthError('Failed to resolve caller profile', 500);
 
-  return { userId: user.id, role: (profile?.role as AnyRole) ?? 'tenant' };
+  return { userId, role: (profile?.role as AnyRole) ?? 'tenant' };
 }
 
 /**

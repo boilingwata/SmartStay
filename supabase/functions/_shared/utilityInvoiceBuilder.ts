@@ -1,15 +1,14 @@
 /// <reference path="./deno-globals.d.ts" />
 
-import type { SupabaseClient } from './supabaseAdmin.ts';
+import type { SupabaseClient } from "./supabaseAdmin.ts";
 import {
   computeUtilitySnapshot,
   parseSeasonMonths,
-  readTermsOccupants,
   resolveEffectivePolicy,
   type UtilityDeviceAdjustmentInput,
   type UtilityOverrideInput,
   type UtilityPolicyInput,
-} from './utilityBilling.ts';
+} from "./utilityBilling.ts";
 
 export interface BuildUtilityInvoiceInput {
   contractId: number;
@@ -40,7 +39,8 @@ interface ContractInvoiceRow {
   room_id: number;
   start_date: string;
   end_date: string;
-  terms: unknown;
+  occupants_for_billing: number;
+  utility_policy_id: number | null;
   monthly_rent: number | null;
   rooms: {
     room_code: string;
@@ -53,19 +53,19 @@ interface ContractInvoiceRow {
     tenants: { full_name: string } | null;
   }>;
   contract_services: Array<{
-    service_id: number;
+    service_catalog_id: number;
     quantity: number | null;
     fixed_price: number | null;
-    services: {
+    service_catalog: {
       name: string;
-      calc_type: string | null;
+      unit: string | null;
     } | null;
   }>;
 }
 
 interface UtilityPolicyRow {
   id: number;
-  scope_type: UtilityPolicyInput['scopeType'];
+  scope_type: UtilityPolicyInput["scopeType"];
   scope_id: number | null;
   electric_base_amount: number;
   water_base_amount: number;
@@ -97,31 +97,6 @@ interface UtilityPolicyDeviceAdjustmentRow {
   charge_amount: number | null;
 }
 
-function normalizeText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
-export function inferUtilityKind(serviceName: string): 'electricity' | 'water' | null {
-  const normalized = normalizeText(serviceName);
-  if (normalized.includes('dien') || normalized.includes('electric')) return 'electricity';
-  if (normalized.includes('nuoc') || normalized.includes('water')) return 'water';
-  return null;
-}
-
-export function isLegacyMeteredService(service: ContractInvoiceRow['contract_services'][number]): boolean {
-  const serviceName = service.services?.name ?? '';
-  return service.services?.calc_type === 'per_unit' && inferUtilityKind(serviceName) != null;
-}
-
-export function resolveContractUtilityMode(
-  contractServices: ContractInvoiceRow['contract_services'] = [],
-): 'policy' | 'legacy_metered' {
-  return contractServices.some(isLegacyMeteredService) ? 'legacy_metered' : 'policy';
-}
-
 function toPolicyInput(row: UtilityPolicyRow): UtilityPolicyInput {
   return {
     id: Number(row.id),
@@ -145,14 +120,12 @@ function toOverrideInput(row: UtilityOverrideRow | null): UtilityOverrideInput |
   if (!row) return null;
   return {
     id: Number(row.id),
-    occupantsForBillingOverride:
-      row.occupants_for_billing_override == null ? null : Number(row.occupants_for_billing_override),
+    occupantsForBillingOverride: row.occupants_for_billing_override == null ? null : Number(row.occupants_for_billing_override),
     electricBaseOverride: row.electric_base_override == null ? null : Number(row.electric_base_override),
     electricFinalOverride: row.electric_final_override == null ? null : Number(row.electric_final_override),
     waterBaseOverride: row.water_base_override == null ? null : Number(row.water_base_override),
     waterFinalOverride: row.water_final_override == null ? null : Number(row.water_final_override),
-    locationMultiplierOverride:
-      row.location_multiplier_override == null ? null : Number(row.location_multiplier_override),
+    locationMultiplierOverride: row.location_multiplier_override == null ? null : Number(row.location_multiplier_override),
     seasonMonthsOverride: parseSeasonMonths(row.season_months_override),
     electricHotSeasonMultiplierOverride:
       row.electric_hot_season_multiplier_override == null
@@ -161,19 +134,28 @@ function toOverrideInput(row: UtilityOverrideRow | null): UtilityOverrideInput |
   };
 }
 
+export function inferUtilityKind(_serviceName: string): "electricity" | "water" | null {
+  return null;
+}
+
+export function isLegacyMeteredService(): boolean {
+  return false;
+}
+
 export async function buildUtilityInvoicePayload(
   db: SupabaseClient,
   input: BuildUtilityInvoiceInput,
 ): Promise<BuiltUtilityInvoicePayload> {
   const { data: contract, error: contractError } = await db
-    .from('contracts')
+    .from("contracts")
     .select(`
       id,
       contract_code,
       room_id,
       start_date,
       end_date,
-      terms,
+      occupants_for_billing,
+      utility_policy_id,
       monthly_rent,
       rooms (
         room_code,
@@ -186,33 +168,25 @@ export async function buildUtilityInvoicePayload(
         tenants ( full_name )
       ),
       contract_services (
-        service_id,
+        service_catalog_id,
         quantity,
         fixed_price,
-        services ( name, calc_type )
+        service_catalog!contract_services_service_catalog_id_fkey ( name, unit )
       )
     `)
-    .eq('id', input.contractId)
-    .eq('status', 'active')
-    .eq('is_deleted', false)
+    .eq("id", input.contractId)
+    .eq("status", "active")
+    .eq("is_deleted", false)
     .single();
 
-  if (contractError || !contract) {
-    throw new Error(contractError?.message ?? 'Contract not found');
-  }
+  if (contractError || !contract) throw new Error(contractError?.message ?? "Contract not found");
 
   const typedContract = contract as unknown as ContractInvoiceRow;
   const room = typedContract.rooms;
-  if (!room) {
-    throw new Error('Room not found for this contract');
-  }
-
-  if (resolveContractUtilityMode(typedContract.contract_services ?? []) === 'legacy_metered') {
-    throw new Error('Contract uses legacy metered utility flow and is not eligible for policy utility billing');
-  }
+  if (!room) throw new Error("Room not found for this contract");
 
   const { data: policies, error: policyError } = await db
-    .from('utility_policies')
+    .from("utility_policies")
     .select(`
       id,
       scope_type,
@@ -229,14 +203,12 @@ export async function buildUtilityInvoicePayload(
       effective_from,
       effective_to
     `)
-    .eq('is_active', true);
+    .eq("is_active", true);
 
-  if (policyError) {
-    throw new Error(policyError.message);
-  }
+  if (policyError) throw new Error(policyError.message);
 
   const { data: overrideRow, error: overrideError } = await db
-    .from('invoice_utility_overrides')
+    .from("invoice_utility_overrides")
     .select(`
       id,
       occupants_for_billing_override,
@@ -248,45 +220,42 @@ export async function buildUtilityInvoicePayload(
       season_months_override,
       electric_hot_season_multiplier_override
     `)
-    .eq('contract_id', input.contractId)
-    .eq('billing_period', input.billingPeriod)
+    .eq("contract_id", input.contractId)
+    .eq("billing_period", input.billingPeriod)
     .maybeSingle();
 
-  if (overrideError) {
-    throw new Error(overrideError.message);
-  }
+  if (overrideError) throw new Error(overrideError.message);
 
-  const resolved = resolveEffectivePolicy(
-    ((policies ?? []) as unknown as UtilityPolicyRow[]).map((row) => toPolicyInput(row)),
-    input.billingPeriod,
-    ['contract', 'room', 'building', 'system'],
-    {
-      contract: input.contractId,
-      room: Number(typedContract.room_id),
-      building: Number(room.building_id),
-      system: null,
-    },
-  );
+  const normalizedPolicies = ((policies ?? []) as unknown as UtilityPolicyRow[]).map((row) => toPolicyInput(row));
+  const pinnedPolicy =
+    typedContract.utility_policy_id == null
+      ? null
+      : normalizedPolicies.find((policy) => policy.id === Number(typedContract.utility_policy_id)) ?? null;
+  const resolved = pinnedPolicy
+    ? { policy: pinnedPolicy, sourceType: "contract" as const }
+    : resolveEffectivePolicy(normalizedPolicies, input.billingPeriod, ["contract", "room", "building", "system"], {
+        contract: input.contractId,
+        room: Number(typedContract.room_id),
+        building: Number(room.building_id),
+        system: null,
+      });
 
-  if (!resolved.policy) {
-    throw new Error('No active utility policy found for this contract');
-  }
+  if (!resolved.policy) throw new Error("No active utility policy found for this contract");
 
   const { data: deviceRows, error: deviceError } = await db
-    .from('utility_policy_device_adjustments')
-    .select('device_code, charge_amount')
-    .eq('utility_policy_id', resolved.policy.id)
-    .eq('is_active', true);
+    .from("utility_policy_device_adjustments")
+    .select("device_code, charge_amount")
+    .eq("utility_policy_id", resolved.policy.id)
+    .eq("is_active", true);
 
-  if (deviceError) {
-    throw new Error(deviceError.message);
-  }
+  if (deviceError) throw new Error(deviceError.message);
 
-  const deviceAdjustments: UtilityDeviceAdjustmentInput[] =
-    ((deviceRows ?? []) as unknown as UtilityPolicyDeviceAdjustmentRow[]).map((row) => ({
+  const deviceAdjustments: UtilityDeviceAdjustmentInput[] = ((deviceRows ?? []) as unknown as UtilityPolicyDeviceAdjustmentRow[]).map(
+    (row) => ({
       deviceCode: String(row.device_code),
       chargeAmount: Number(row.charge_amount ?? 0),
-    }));
+    }),
+  );
 
   const contractTenants = typedContract.contract_tenants ?? [];
   const primaryTenant = contractTenants.find((item) => Boolean(item.is_primary)) ?? contractTenants[0];
@@ -301,15 +270,16 @@ export async function buildUtilityInvoicePayload(
     billingRunId: input.billingRunId ?? null,
     contractStartDate: typedContract.start_date,
     contractEndDate: typedContract.end_date,
-    occupantsForBilling:
-      override?.occupantsForBillingOverride ??
-      readTermsOccupants(typedContract.terms) ??
-      contractTenants.length,
+    occupantsForBilling: override?.occupantsForBillingOverride ?? Number(typedContract.occupants_for_billing ?? 0),
     roomAmenities: room.amenities,
     policy: resolved.policy,
     override,
     deviceAdjustments,
   });
+
+  if (!Number.isFinite(utilitySnapshot.occupantsForBilling) || utilitySnapshot.occupantsForBilling <= 0) {
+    throw new Error("Contract is missing a valid occupants_for_billing value");
+  }
 
   const items: Array<Record<string, unknown>> = [];
   let sortOrder = 1;
@@ -317,7 +287,7 @@ export async function buildUtilityInvoicePayload(
 
   if (monthlyRent > 0) {
     items.push({
-      description: `Ti\u1ec1n thu\u00ea th\u00e1ng ${input.billingPeriod}`,
+      description: `Tiền thuê tháng ${input.billingPeriod}`,
       quantity: 1,
       unitPrice: monthlyRent,
       lineTotal: monthlyRent,
@@ -326,13 +296,11 @@ export async function buildUtilityInvoicePayload(
   }
 
   for (const service of typedContract.contract_services ?? []) {
-    const serviceName = String(service.services?.name ?? `D\u1ecbch v\u1ee5 #${service.service_id}`);
-    if (inferUtilityKind(serviceName)) continue;
-
+    const serviceName = String(service.service_catalog?.name ?? `Dịch vụ #${service.service_catalog_id}`);
     const quantity = Math.max(1, Number(service.quantity ?? 1));
     const unitPrice = Number(service.fixed_price ?? 0);
     items.push({
-      description: `${serviceName} th\u00e1ng ${input.billingPeriod}`,
+      description: `${serviceName} tháng ${input.billingPeriod}`,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -341,7 +309,7 @@ export async function buildUtilityInvoicePayload(
   }
 
   items.push({
-    description: `Ti\u1ec1n \u0111i\u1ec7n th\u00e1ng ${input.billingPeriod}`,
+    description: `Tiền điện tháng ${input.billingPeriod}`,
     quantity: 1,
     unitPrice: utilitySnapshot.electricFinalAmount,
     lineTotal: utilitySnapshot.electricFinalAmount,
@@ -349,7 +317,7 @@ export async function buildUtilityInvoicePayload(
   });
 
   items.push({
-    description: `Ti\u1ec1n n\u01b0\u1edbc th\u00e1ng ${input.billingPeriod}`,
+    description: `Tiền nước tháng ${input.billingPeriod}`,
     quantity: 1,
     unitPrice: utilitySnapshot.waterFinalAmount,
     lineTotal: utilitySnapshot.waterFinalAmount,
@@ -359,9 +327,7 @@ export async function buildUtilityInvoicePayload(
   const normalizedDiscount = Math.max(0, Number(input.discountAmount ?? 0));
   if (normalizedDiscount > 0) {
     items.push({
-      description: input.discountReason?.trim()
-        ? `Gi\u1ea3m tr\u1eeb: ${input.discountReason.trim()}`
-        : 'Gi\u1ea3m tr\u1eeb h\u00f3a \u0111\u01a1n',
+      description: input.discountReason?.trim() ? `Giảm trừ: ${input.discountReason.trim()}` : "Giảm trừ hóa đơn",
       quantity: 1,
       unitPrice: -normalizedDiscount,
       lineTotal: -normalizedDiscount,
@@ -370,9 +336,7 @@ export async function buildUtilityInvoicePayload(
   }
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.lineTotal ?? 0), 0);
-  if (subtotal < 0) {
-    throw new Error('Discount cannot exceed invoice subtotal');
-  }
+  if (subtotal < 0) throw new Error("Discount cannot exceed invoice subtotal");
 
   return {
     contractId: input.contractId,

@@ -37,7 +37,7 @@ interface DbContractRow {
     id: number;
     quantity: number | null;
     fixed_price: number | null;
-    services: { name: string; calc_type: string | null } | null;
+    service_catalog: { name: string; unit: string | null } | null;
   }[];
 }
 
@@ -95,8 +95,8 @@ function toContractDetail(row: DbContractRow): ContractDetail {
 
   const services: ContractService[] = (row.contract_services ?? []).map(cs => ({
     id: String(cs.id),
-    serviceName: cs.services?.name ?? '',
-    unit: cs.services?.calc_type ?? '',
+    serviceName: cs.service_catalog?.name ?? '',
+    unit: cs.service_catalog?.unit ?? '',
     unitPriceSnapshot: cs.fixed_price ?? 0,
     quantity: cs.quantity ?? 1,
     totalPerCycle: (cs.fixed_price ?? 0) * (cs.quantity ?? 1),
@@ -127,7 +127,10 @@ function toContractDetail(row: DbContractRow): ContractDetail {
     paymentDueDay: 5,
     terminationReason: row.termination_reason ?? undefined,
     tenants,
+    primaryTenant: tenants.find((tenant) => tenant.isRepresentative) ?? tenants[0],
+    occupants: [],
     services,
+    transfers: [],
     addendums: [],
   };
 }
@@ -170,7 +173,7 @@ export const portalService = {
           ),
           contract_services (
             id, quantity, fixed_price,
-            services ( name, calc_type )
+            service_catalog!contract_services_service_catalog_id_fkey ( name, unit )
           )
         `)
         .eq('id', contractLink.contract_id)

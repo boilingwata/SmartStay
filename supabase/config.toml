@@ -15,11 +15,21 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/run-utility-billing/index.ts"
 
+[functions.create-contract]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/create-contract/index.ts"
+
 [functions.create-user]
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/create-user/index.ts"
 
+[functions.create-utility-invoice]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/create-utility-invoice/index.ts"
+
 [db.seed]
 enabled = true
-sql_paths = ["./seed.sql"]
+sql_paths = ["./seed.sql", "./seeds/domain_demo_seed.sql"]

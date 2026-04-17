@@ -229,12 +229,18 @@ const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        if (get().authMode === 'supabase') {
-          await supabase.auth.signOut()
+        try {
+          if (get().authMode === 'supabase') {
+            const { error } = await supabase.auth.signOut()
+            if (error) throw error
+          }
+        } catch (error) {
+          console.error('Lỗi đăng xuất từ Supabase:', error)
+        } finally {
+          set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
+          setSentryUser(null)
+          localStorage.removeItem('smartstay-auth-storage')
         }
-        set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
-        setSentryUser(null)
-        localStorage.removeItem('smartstay-auth-storage')
       },
 
       setUser: (user) => set({ user, role: user.role }),

@@ -74,6 +74,10 @@ const TenantList = () => {
         permanentAddress: data.permanentAddress,
         vehiclePlates: data.vehiclePlates,
         avatarUrl: data.avatarUrl,
+        cccdFrontUrl: data.cccdFrontUrl,
+        cccdBackUrl: data.cccdBackUrl,
+        cccdIssuedDate: data.cccdIssuedDate,
+        cccdIssuedPlace: data.cccdIssuedPlace,
       });
       toast.success(`Hồ sơ cư dân ${data.fullName} đã được tạo thành công!`);
       setIsModalOpen(false);

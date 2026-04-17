@@ -34,6 +34,8 @@ const StaffRatings = lazy(() => import('@/views/admin/tickets/StaffRatings'));
 const UtilityPoliciesPage = lazy(() => import('@/views/admin/settings/UtilityPoliciesPage'));
 const UtilityOverridesPage = lazy(() => import('@/views/admin/settings/UtilityOverridesPage'));
 const BillingRunsPage = lazy(() => import('@/views/admin/settings/BillingRunsPage'));
+const UtilityHubPage = lazy(() => import('@/views/admin/settings/UtilityHubPage'));
+const AmenityManagementPage = lazy(() => import('@/views/admin/settings/AmenityManagementPage'));
 const UserManagement = lazy(() => import('@/views/admin/settings/UserListPage'));
 const PermissionMatrix = lazy(() => import('@/views/admin/settings/PermissionMatrix'));
 const AuditLogs = lazy(() => import('@/views/admin/settings/AuditLogs'));
@@ -66,6 +68,8 @@ export const adminRoutes: RouteObject[] = [
   { path: 'payments', element: <PaymentList /> },
   { path: 'payments/webhooks', element: <WebhookLogs /> },
   { path: 'payments/:id', element: <PaymentDetail /> },
+  { path: 'amenities', element: <AmenityManagementPage /> },
+  { path: 'utility-billing', element: <UtilityHubPage /> },
   { path: 'tenants', element: <TenantList /> },
   { path: 'tenants/:id', element: <TenantDetail /> },
   { path: 'tenants/:id/balance', element: <TenantBalance /> },

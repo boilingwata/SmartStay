@@ -108,7 +108,8 @@ export interface BillingRunPreview {
   billingPeriod: string;
   dueDate: string;
   totalContracts: number;
-  policyContracts: number;
+  validContracts: number;
+  skippedContracts: number;
   existingInvoices: number;
   eligibleContracts: Array<{ contractId: number; contractCode: string }>;
   existingInvoiceContracts: Array<{ contractId: number; contractCode: string }>;
@@ -117,8 +118,8 @@ export interface BillingRunPreview {
     billingPeriodStart: string;
     billingPeriodEnd: string;
     totalContracts: number;
-    policyContracts: number;
-    legacyMeteredContracts: number;
+    validContracts: number;
+    skippedContracts: number;
     existingInvoiceContracts: number;
     eligibleContracts: number;
   };
@@ -130,12 +131,14 @@ export interface BillingRunExecutionResult {
   billingPeriod: string;
   dueDate: string;
   totalContracts: number;
-  policyContracts: number;
+  validContracts: number;
+  skippedContracts: number;
   createdInvoices: number;
   skippedInvoices: number;
   failedInvoices: number;
   failures: Array<{ contractId: number; contractCode: string; message: string }>;
   ineligibleContracts: Array<{ contractId: number; contractCode: string; reason: string }>;
+  existingInvoiceContracts?: Array<{ contractId: number; contractCode: string }>;
 }
 
 export interface BillingRunSnapshotRecord {
@@ -208,6 +211,7 @@ function isAuthErrorMessage(message: string): boolean {
   return (
     message.includes('401') ||
     message.includes('unauthorized') ||
+    message.includes('unsupported jwt algorithm') ||
     message.includes('invalid token') ||
     message.includes('expired token') ||
     message.includes('jwt') ||
@@ -268,29 +272,28 @@ async function getEdgeFunctionMessage(error: Error): Promise<string> {
   }
 
   if (status === 401) {
+    if ((responseBodyMessage ?? '').toLowerCase().includes('unsupported jwt algorithm')) {
+      return `Utility billing bi tu choi xac thuc (401): ${responseBodyMessage}. Edge function dang bi verify_jwt o layer Supabase thay vi custom auth, can deploy lai voi verify_jwt=false.`;
+    }
     return responseBodyMessage
       ? `Utility billing bi tu choi xac thuc (401): ${responseBodyMessage}`
       : 'Utility billing bi tu choi xac thuc (401).';
-    return 'Phiên đăng nhập quản trị không còn hợp lệ để chạy kỳ tính tiền. Hãy đăng xuất rồi đăng nhập lại.';
   }
 
   if (status === 403) {
     return responseBodyMessage
       ? `Tai khoan hien tai khong du quyen chay utility billing (403): ${responseBodyMessage}`
       : 'Tai khoan hien tai khong du quyen chay utility billing (403).';
-    return 'Tài khoản hiện tại không có quyền chạy kỳ tính tiền. Hãy dùng tài khoản quản trị viên.';
   }
 
   if (isAuthErrorMessage(message)) {
     return responseBodyMessage ?? 'Utility billing tra ve loi xac thuc tu Supabase.';
-    return 'Phiên đăng nhập quản trị đã hết hạn hoặc không còn hợp lệ. Vui lòng đăng nhập lại.';
   }
 
   if (message.includes('non-2xx')) {
     return responseBodyMessage
       ? `Khong the chay utility billing: ${responseBodyMessage}`
       : 'Khong the chay utility billing vi edge function tra ve non-2xx.';
-    return 'Không thể chạy kỳ tính tiền điện nước. Vui lòng kiểm tra lại phiên đăng nhập và cấu hình tính tiền.';
   }
 
   return responseBodyMessage ?? error.message;
@@ -604,7 +607,8 @@ export const utilityAdminService = {
       billingPeriod: payload.billingPeriod,
       dueDate: payload.dueDate,
       totalContracts: Number(payload.totalContracts ?? 0),
-      policyContracts: Number(payload.policyContracts ?? 0),
+      validContracts: Number(payload.validContracts ?? 0),
+      skippedContracts: Number(payload.skippedContracts ?? payload.ineligibleContracts?.length ?? 0),
       existingInvoices: Number(payload.existingInvoices ?? 0),
       eligibleContracts: Array.isArray(payload.eligibleContracts) ? payload.eligibleContracts : [],
       existingInvoiceContracts: Array.isArray(payload.existingInvoiceContracts) ? payload.existingInvoiceContracts : [],
@@ -613,8 +617,8 @@ export const utilityAdminService = {
         billingPeriodStart: String(payload.diagnostics?.billingPeriodStart ?? `${payload.billingPeriod}-01`),
         billingPeriodEnd: String(payload.diagnostics?.billingPeriodEnd ?? `${payload.billingPeriod}-31`),
         totalContracts: Number(payload.diagnostics?.totalContracts ?? payload.totalContracts ?? 0),
-        policyContracts: Number(payload.diagnostics?.policyContracts ?? payload.policyContracts ?? 0),
-        legacyMeteredContracts: Number(payload.diagnostics?.legacyMeteredContracts ?? payload.ineligibleContracts?.length ?? 0),
+        validContracts: Number(payload.diagnostics?.validContracts ?? payload.validContracts ?? 0),
+        skippedContracts: Number(payload.diagnostics?.skippedContracts ?? payload.skippedContracts ?? payload.ineligibleContracts?.length ?? 0),
         existingInvoiceContracts: Number(payload.diagnostics?.existingInvoiceContracts ?? payload.existingInvoices ?? 0),
         eligibleContracts: Number(payload.diagnostics?.eligibleContracts ?? payload.eligibleContracts?.length ?? 0),
       },

@@ -21,6 +21,10 @@ type TenantFormData = {
   phone: string;
   email?: string;
   cccd: string;
+  cccdFrontUrl?: string;
+  cccdBackUrl?: string;
+  cccdIssuedDate?: string;
+  cccdIssuedPlace?: string;
   dateOfBirth?: string;
   gender?: 'Male' | 'Female' | 'Other';
   nationality?: string;
@@ -40,6 +44,10 @@ interface TenantModalProps {
     phone?: string;
     email?: string;
     cccd?: string;
+    cccdFrontUrl?: string;
+    cccdBackUrl?: string;
+    cccdIssuedDate?: string;
+    cccdIssuedPlace?: string;
     dateOfBirth?: string;
     gender?: 'Male' | 'Female' | 'Other';
     nationality?: string;
@@ -65,6 +73,10 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
     phone: initialData?.phone ?? '',
     email: initialData?.email ?? '',
     cccd: initialData?.cccd ?? '',
+    cccdFrontUrl: initialData?.cccdFrontUrl ?? '',
+    cccdBackUrl: initialData?.cccdBackUrl ?? '',
+    cccdIssuedDate: initialData?.cccdIssuedDate ?? '',
+    cccdIssuedPlace: initialData?.cccdIssuedPlace ?? '',
     dateOfBirth: initialData?.dateOfBirth ?? '',
     gender: initialData?.gender ?? 'Male',
     nationality: initialData?.nationality ?? 'Việt Nam',
@@ -79,6 +91,8 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
   });
 
   const savedAvatarUrl = watch('avatarUrl');
+  const savedCCCDFrontUrl = watch('cccdFrontUrl');
+  const savedCCCDBackUrl = watch('cccdBackUrl');
   const isBusy = isUploadingAvatar || isSubmitting;
 
   React.useEffect(() => {
@@ -136,6 +150,8 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
         <div className="flex-1 p-8 md:p-12 overflow-y-auto custom-scrollbar">
           <form onSubmit={handleSubmit(submitTenant)} className="space-y-8">
             <input type="hidden" {...register('avatarUrl')} />
+            <input type="hidden" {...register('cccdFrontUrl')} />
+            <input type="hidden" {...register('cccdBackUrl')} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -194,11 +210,54 @@ export const TenantFormModal = ({ isOpen, onClose, initialData, onSubmit }: Tena
               </div>
 
               <div className="space-y-2">
+                <label className="text-label text-muted font-black uppercase tracking-widest">Ngày cấp CCCD</label>
+                <div className="relative">
+                  <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                  <input type="date" {...register('cccdIssuedDate')} className="input-base pl-12 h-14" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-label text-muted font-black uppercase tracking-widest">Nơi cấp CCCD</label>
+                <div className="relative">
+                  <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                  <input
+                    {...register('cccdIssuedPlace')}
+                    className="input-base pl-12 h-14"
+                    placeholder="VD: Cục CSQLHC về TTXH"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-label text-muted font-black uppercase tracking-widest">Email</label>
                 <div className="relative">
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
                   <input {...register('email')} className="input-base pl-12 h-14" placeholder="example@gmail.com" />
                 </div>
+              </div>
+
+              <div className="col-span-full space-y-3">
+                <label className="text-label text-muted font-black uppercase tracking-widest">Ảnh CCCD / Hộ chiếu</label>
+                <div className="grid grid-cols-1 gap-4 rounded-[32px] border border-border/40 bg-bg/20 p-5 md:grid-cols-2">
+                  <ImageUploadCard
+                    value={savedCCCDFrontUrl || undefined}
+                    label="Mặt trước"
+                    alt="CCCD mặt trước"
+                    successMessage="Đã tải ảnh CCCD mặt trước"
+                    onUploaded={(url) => setValue('cccdFrontUrl', url, { shouldDirty: true })}
+                  />
+                  <ImageUploadCard
+                    value={savedCCCDBackUrl || undefined}
+                    label="Mặt sau"
+                    alt="CCCD mặt sau"
+                    successMessage="Đã tải ảnh CCCD mặt sau"
+                    onUploaded={(url) => setValue('cccdBackUrl', url, { shouldDirty: true })}
+                  />
+                </div>
+                <p className="text-[10px] text-muted font-medium">
+                  OCR tự động chưa được kết nối. Hiện owner/staff upload ảnh để lưu và đối chiếu an toàn trước khi ký hợp đồng.
+                </p>
               </div>
 
               <div className="space-y-2">

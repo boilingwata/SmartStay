@@ -87,7 +87,7 @@ const Profile = () => {
     });
 
     if (ok) {
-        authLogout();
+        await authLogout();
         navigate('/login', { replace: true });
         toast.success('Đã đăng xuất an toàn.');
     }

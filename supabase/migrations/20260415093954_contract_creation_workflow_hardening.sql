@@ -1,0 +1,241 @@
+create or replace function smartstay.create_contract_v2(
+  p_room_id integer,
+  p_start_date date,
+  p_end_date date,
+  p_monthly_rent numeric,
+  p_deposit_amount numeric,
+  p_payment_cycle_months integer,
+  p_primary_tenant_id integer,
+  p_occupant_ids integer[] default '{}'::integer[],
+  p_payment_due_day integer default 5,
+  p_service_ids integer[] default '{}'::integer[],
+  p_service_prices numeric[] default '{}'::numeric[],
+  p_service_quantities integer[] default '{}'::integer[],
+  p_mark_deposit_received boolean default false
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_contract_id integer;
+  v_contract_code text;
+  v_room smartstay.rooms%rowtype;
+  v_all_occupants integer[];
+  v_occupant_count integer;
+  v_idx integer;
+begin
+  select *
+  into v_room
+  from smartstay.rooms
+  where id = p_room_id
+    and coalesce(is_deleted, false) = false
+  for update;
+
+  if v_room.id is null then
+    raise exception 'Không tìm thấy phòng';
+  end if;
+
+  if p_primary_tenant_id is null or p_primary_tenant_id <= 0 then
+    raise exception 'Tenant đại diện không hợp lệ';
+  end if;
+
+  if p_start_date is null or p_end_date is null or p_end_date <= p_start_date then
+    raise exception 'Khoảng thời gian hợp đồng không hợp lệ';
+  end if;
+
+  if p_monthly_rent is null or p_monthly_rent < 0 or p_deposit_amount is null or p_deposit_amount < 0 then
+    raise exception 'Giá trị tiền không hợp lệ';
+  end if;
+
+  if p_payment_due_day is null or p_payment_due_day < 1 or p_payment_due_day > 31 then
+    raise exception 'Ngày đến hạn thanh toán phải nằm trong khoảng 1-31';
+  end if;
+
+  if not exists (
+    select 1
+    from smartstay.tenants t
+    where t.id = p_primary_tenant_id
+      and coalesce(t.is_deleted, false) = false
+  ) then
+    raise exception 'Không tìm thấy tenant đại diện';
+  end if;
+
+  if exists (
+    select 1
+    from smartstay.contracts c
+    where c.room_id = p_room_id
+      and coalesce(c.is_deleted, false) = false
+      and c.status in ('active', 'pending_signature')
+      and daterange(c.start_date, c.end_date, '[]') && daterange(p_start_date, p_end_date, '[]')
+  ) then
+    raise exception 'Phòng đã có hợp đồng active/pending chồng lấn';
+  end if;
+
+  v_all_occupants := array(
+    select distinct item
+    from unnest(array_append(coalesce(p_occupant_ids, '{}'::integer[]), p_primary_tenant_id)) as item
+    where item is not null
+  );
+
+  v_occupant_count := coalesce(array_length(v_all_occupants, 1), 0);
+
+  if v_occupant_count = 0 then
+    raise exception 'Hợp đồng phải có ít nhất 1 người ở';
+  end if;
+
+  if v_room.max_occupants is not null and v_occupant_count > v_room.max_occupants then
+    raise exception 'Vượt số người tối đa của phòng';
+  end if;
+
+  if exists (
+    select 1
+    from unnest(v_all_occupants) as occupant_id
+    join smartstay.room_occupants ro on ro.tenant_id = occupant_id
+    join smartstay.contracts c on c.id = ro.contract_id
+    where ro.status = 'active'
+      and c.status in ('active', 'pending_signature')
+      and coalesce(c.is_deleted, false) = false
+      and c.room_id <> p_room_id
+  ) then
+    raise exception 'Có occupant đang active ở hợp đồng/phòng khác';
+  end if;
+
+  insert into smartstay.contracts (
+    room_id, primary_tenant_id, start_date, end_date, signing_date, payment_cycle_months, payment_due_day,
+    monthly_rent, deposit_amount, deposit_status, status, terms, is_deleted
+  )
+  values (
+    p_room_id, p_primary_tenant_id, p_start_date, p_end_date, p_start_date, coalesce(p_payment_cycle_months, 1),
+    p_payment_due_day, coalesce(p_monthly_rent, 0), coalesce(p_deposit_amount, 0),
+    case when coalesce(p_mark_deposit_received, false) then 'received'::smartstay.deposit_status else 'pending'::smartstay.deposit_status end,
+    'active'::smartstay.contract_status,
+    jsonb_build_object('occupants_for_billing', v_occupant_count, 'contract_model', 'single_representative'),
+    false
+  )
+  returning id, contract_code into v_contract_id, v_contract_code;
+
+  insert into smartstay.contract_tenants (contract_id, tenant_id, is_primary)
+  values (v_contract_id, p_primary_tenant_id, true)
+  on conflict (contract_id, tenant_id) do update set is_primary = excluded.is_primary;
+
+  insert into smartstay.room_occupants (contract_id, room_id, tenant_id, is_primary_tenant, move_in_at, status)
+  select v_contract_id, p_room_id, occupant_id, occupant_id = p_primary_tenant_id, p_start_date, 'active'::smartstay.occupant_status
+  from unnest(v_all_occupants) as occupant_id;
+
+  if coalesce(array_length(p_service_ids, 1), 0) > 0 then
+    for v_idx in 1..array_length(p_service_ids, 1) loop
+      insert into smartstay.contract_services (contract_id, service_id, fixed_price, quantity)
+      values (v_contract_id, p_service_ids[v_idx], coalesce(p_service_prices[v_idx], 0), coalesce(p_service_quantities[v_idx], 1));
+    end loop;
+  end if;
+
+  insert into smartstay.tenant_balances (tenant_id, balance)
+  values (p_primary_tenant_id, 0)
+  on conflict (tenant_id) do nothing;
+
+  update smartstay.rooms
+  set status = 'occupied'::smartstay.room_status,
+      updated_at = now()
+  where id = p_room_id;
+
+  return jsonb_build_object('contractId', v_contract_id, 'contractCode', v_contract_code);
+end;
+$$;
+
+create or replace function smartstay.add_contract_occupant(
+  p_contract_id integer,
+  p_tenant_id integer,
+  p_move_in_date date,
+  p_relationship_to_primary text default null,
+  p_note text default null,
+  p_processed_by uuid default auth.uid()
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_contract smartstay.contracts%rowtype;
+  v_room smartstay.rooms%rowtype;
+  v_active_occupants integer;
+begin
+  select *
+  into v_contract
+  from smartstay.contracts
+  where id = p_contract_id
+    and coalesce(is_deleted, false) = false
+  for update;
+
+  if v_contract.id is null then
+    raise exception 'Không tìm thấy hợp đồng';
+  end if;
+
+  if v_contract.status not in ('active', 'pending_signature') then
+    raise exception 'Chỉ được thêm occupant vào hợp đồng đang hiệu lực';
+  end if;
+
+  if p_tenant_id = v_contract.primary_tenant_id then
+    raise exception 'Tenant chính không được thêm lại như occupant';
+  end if;
+
+  if p_move_in_date is null or p_move_in_date < v_contract.start_date or p_move_in_date > v_contract.end_date then
+    raise exception 'Ngày vào ở không hợp lệ';
+  end if;
+
+  select *
+  into v_room
+  from smartstay.rooms
+  where id = v_contract.room_id
+  for update;
+
+  select count(*)
+  into v_active_occupants
+  from smartstay.room_occupants ro
+  where ro.contract_id = p_contract_id
+    and ro.status = 'active';
+
+  if v_room.max_occupants is not null and v_active_occupants + 1 > v_room.max_occupants then
+    raise exception 'Vượt số người tối đa của phòng';
+  end if;
+
+  if exists (
+    select 1
+    from smartstay.room_occupants ro
+    join smartstay.contracts c on c.id = ro.contract_id
+    where ro.tenant_id = p_tenant_id
+      and ro.status = 'active'
+      and c.status in ('active', 'pending_signature')
+      and coalesce(c.is_deleted, false) = false
+      and c.id <> p_contract_id
+  ) then
+    raise exception 'Occupant đang active tại hợp đồng khác';
+  end if;
+
+  insert into smartstay.room_occupants (
+    contract_id, room_id, tenant_id, is_primary_tenant, relationship_to_primary, note, move_in_at, status, created_by
+  )
+  values (
+    p_contract_id, v_contract.room_id, p_tenant_id, false, p_relationship_to_primary, p_note, p_move_in_date, 'active', p_processed_by
+  )
+  on conflict (contract_id, tenant_id)
+  do update set
+    relationship_to_primary = excluded.relationship_to_primary,
+    note = excluded.note,
+    move_in_at = excluded.move_in_at,
+    move_out_at = null,
+    status = 'active'::smartstay.occupant_status,
+    updated_at = now();
+
+  select count(*)
+  into v_active_occupants
+  from smartstay.room_occupants ro
+  where ro.contract_id = p_contract_id
+    and ro.status = 'active';
+
+  update smartstay.contracts
+  set terms = coalesce(terms, '{}'::jsonb) || jsonb_build_object('occupants_for_billing', v_active_occupants),
+      updated_at = now()
+  where id = p_contract_id;
+
+  return jsonb_build_object('contractId', p_contract_id, 'tenantId', p_tenant_id, 'activeOccupants', v_active_occupants);
+end;
+$$;
