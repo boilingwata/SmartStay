@@ -79,14 +79,14 @@ const ListingApplyPage: React.FC = () => {
   const residentStage = user?.tenantStage === 'resident_active' || user?.tenantStage === 'resident_pending_onboarding';
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] pt-28">
-      <div className="mx-auto max-w-[1040px] px-6 pb-20">
+    <div className="min-h-screen bg-[#F5F7FB] pt-[65px]">
+      <div className="mx-auto max-w-[1040px] px-6 pb-20 pt-8">
         <Link
           to={`/listings/${id}`}
           className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600 shadow-sm"
         >
           <ArrowLeft size={14} />
-          Back to listing
+          Quay lại phòng
         </Link>
 
         {loadingListing ? (
@@ -99,25 +99,25 @@ const ListingApplyPage: React.FC = () => {
         ) : !isAuthenticated ? (
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
             <section className="rounded-[40px] border border-slate-200 bg-white p-8 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#0D8A8A]">Apply for {listing.roomCode}</p>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">Sign in only when you are ready to verify and apply.</h1>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#0D8A8A]">Đăng ký thuê — {listing.roomCode}</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">Tạo tài khoản để tiếp tục đăng ký và xác minh.</h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                Browsing stays public. To continue with this application we need an account so your verification step can be tied to the room you chose.
+                Bạn có thể xem phòng mà không cần đăng nhập. Để hoàn tất đăng ký, chúng tôi cần tài khoản để liên kết bước xác minh với phòng bạn đã chọn.
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 <Link
-                  to={`/public/register?redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
+                  to={`/public/register?intent=renter&redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
                   className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-slate-900 text-[12px] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-[#0D8A8A]"
                 >
-                  Create account
+                  Tạo tài khoản
                   <ArrowRight size={16} />
                 </Link>
                 <Link
-                  to={`/login?redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
+                  to={`/login?intent=renter&redirect=${encodeURIComponent(`/listings/${id}/apply`)}`}
                   className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-[12px] font-black uppercase tracking-[0.18em] text-slate-700 transition-all hover:border-[#0D8A8A] hover:text-[#0D8A8A]"
                 >
-                  I already have an account
+                  Đã có tài khoản
                 </Link>
               </div>
             </section>
@@ -145,13 +145,15 @@ const ListingApplyPage: React.FC = () => {
           </div>
         ) : residentStage ? (
           <div className="mt-6 rounded-[40px] border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-black text-slate-900">Resident accounts do not use the prospect application flow</h1>
-            <p className="mt-2 text-sm text-slate-500">Your account already belongs to the resident journey. Continue inside the resident portal instead.</p>
+            <h1 className="text-2xl font-black text-slate-900">Tài khoản này hiện không dùng luồng đăng ký thuê mới</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              SmartStay đang giữ launch ở phạm vi marketplace. Nếu bạn cần hỗ trợ với hồ sơ hiện tại, vui lòng liên hệ đội ngũ SmartStay thay vì tiếp tục qua luồng này.
+            </p>
             <Link
-              to={user.tenantStage === 'resident_pending_onboarding' ? '/portal/onboarding' : '/portal/dashboard'}
+              to="/listings"
               className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-[12px] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-[#0D8A8A]"
             >
-              Open resident portal
+              Quay lại danh sách phòng
               <ArrowRight size={16} />
             </Link>
           </div>
@@ -164,7 +166,7 @@ const ListingApplyPage: React.FC = () => {
               </div>
               <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">Verification now belongs to this room application.</h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                Your browsing account stays lightweight until you decide to apply. From here, staff can review the application and move you into the resident activation flow later.
+                Tài khoản người thuê chỉ cần đủ nhẹ để khám phá và nộp hồ sơ. Từ đây, đội ngũ SmartStay có thể xem xét đơn thuê và phản hồi trực tiếp cho bạn.
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -201,7 +203,7 @@ const ListingApplyPage: React.FC = () => {
               <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#0D8A8A]">Application + verification</p>
               <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">Apply for {listing.roomCode} without going through resident onboarding first.</h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                This step captures only the details needed to review the room application. If your application is approved and a resident record is created, the resident portal onboarding will happen later.
+                Biểu mẫu này chỉ thu thập những gì cần để xét duyệt nhu cầu thuê. SmartStay giữ luồng này gọn để bạn có thể nộp hồ sơ nhanh ngay từ trang tin đăng.
               </p>
 
               <div className="mt-8 space-y-4">

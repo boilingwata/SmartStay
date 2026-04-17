@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
+  FileSearch,
   Receipt,
   CreditCard,
   Users,
@@ -46,7 +47,6 @@ interface NavItem {
 }
 
 const sidebarText: Record<string, string> = {
-  // Nhóm chức năng (Groups)
   'sidebar.overview': 'TỔNG QUAN',
   'sidebar.property': 'BẤT ĐỘNG SẢN',
   'sidebar.leasing': 'THUÊ & HỢP ĐỒNG',
@@ -54,41 +54,32 @@ const sidebarText: Record<string, string> = {
   'sidebar.finance': 'TÀI CHÍNH',
   'sidebar.operations': 'VẬN HÀNH & CSKH',
   'sidebar.settings': 'CÀI ĐẶT HỆ THỐNG',
-
-  // Các mục con (Items)
-  'sidebar.dashboard': 'Bảng điều khiển',
+  'sidebar.dashboard': 'Tổng quan launch',
   'sidebar.reports': 'Báo cáo phân tích',
-  
   'sidebar.buildings': 'Tòa nhà',
-  'sidebar.rooms': 'Phòng',
+  'sidebar.rooms': 'Tin đăng',
   'sidebar.assets': 'Tài sản & Thiết bị',
   'sidebar.amenities': 'Khu tiện ích',
-
   'sidebar.tenants': 'Khách thuê',
+  'sidebar.leads': 'Đơn thuê',
   'sidebar.contracts': 'Hợp đồng thuê',
   'sidebar.contractAddendums': 'Phụ lục hợp đồng',
-
   'sidebar.utilities': 'Quản lý điện nước',
   'sidebar.billingRuns': 'Đợt chốt chỉ số',
   'sidebar.utilityPolicies': 'Chính sách tiện ích',
   'sidebar.utilityOverrides': 'Điều chỉnh thủ công',
   'sidebar.services': 'Bảng giá dịch vụ',
-
   'sidebar.invoices': 'Hóa đơn',
   'sidebar.payments': 'Phiếu thu / Thanh toán',
-
   'sidebar.allTickets': 'Yêu cầu hỗ trợ',
   'sidebar.announcements': 'Thông báo nội bộ',
   'sidebar.visitorCheckin': 'Check-in Khách',
   'sidebar.amenityCheckin': 'Check-in Tiện ích',
-
   'sidebar.owners': 'Chủ sở hữu',
   'sidebar.users': 'Nhân sự & Tài khoản',
   'sidebar.permissions': 'Phân quyền',
   'sidebar.systemConfig': 'Cấu hình hệ thống',
   'sidebar.auditLogs': 'Nhật ký hoạt động',
-
-  // Khác
   'sidebar.commandCenter': 'TRUNG TÂM ĐIỀU KHIỂN',
   'sidebar.activeBuilding': 'Tòa nhà đang chọn',
 };
@@ -114,6 +105,7 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
     groupKey: 'sidebar.leasing',
     items: [
       { labelKey: 'sidebar.tenants', route: '/admin/tenants', icon: Users, permission: 'tenant.view' },
+      { labelKey: 'sidebar.leads', route: '/admin/leads', icon: FileSearch },
       { labelKey: 'sidebar.contracts', route: '/admin/contracts', icon: FileText, permission: 'contract.view' },
       { labelKey: 'sidebar.contractAddendums', route: '/admin/contracts/addendums', icon: FilePlus2, permission: 'contract.view' },
     ],
@@ -203,8 +195,8 @@ export const Sidebar = () => {
           </div>
           {sidebarOpen && (
             <div className="animate-in slide-in-from-left-4 fade-in duration-500">
-              <h1 className="text-xl font-display font-bold tracking-tight whitespace-nowrap">
-                SmartStay <span className="text-accent">BMS</span>
+              <h1 className="whitespace-nowrap text-xl font-display font-bold tracking-tight">
+                SmartStay <span className="text-accent">Launch</span>
               </h1>
               <p className="text-[9px] font-mono tracking-[0.2em] text-white/40">{tt('sidebar.commandCenter')}</p>
             </div>

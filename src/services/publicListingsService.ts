@@ -239,11 +239,11 @@ export const publicListingsService = {
     }
 
     if (profile.role !== 'tenant') {
-      throw new Error('Only tenant accounts can submit rental applications.');
+      throw new Error('Chỉ tài khoản người thuê mới có thể gửi đơn thuê.');
     }
 
     if (profile.tenantStage === 'resident_active' || profile.tenantStage === 'resident_pending_onboarding') {
-      throw new Error('Resident accounts should use the resident portal instead of the application flow.');
+      throw new Error('Tài khoản này hiện không dùng luồng đăng ký thuê mới. Vui lòng liên hệ SmartStay để được hỗ trợ.');
     }
 
     const payload = {

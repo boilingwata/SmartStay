@@ -5,12 +5,11 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Building2, MapPin, MessageSquare, Se
 import { formatVND } from '@/utils';
 import publicListingsService from '@/services/publicListingsService';
 import useAuthStore from '@/stores/authStore';
-import { getAuthenticatedHomePath } from '@/lib/authRouting';
 import QuickInquiryModal from '@/components/portal/QuickInquiryModal';
 
 const ListingDetailPage: React.FC = () => {
   const { id } = useParams();
-  const { user, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const [showInquiry, setShowInquiry] = useState(false);
 
   const { data: listing, isLoading, isError } = useQuery({
@@ -23,14 +22,11 @@ const ListingDetailPage: React.FC = () => {
     return <Navigate to="/listings" replace />;
   }
 
-  const isResident = user?.tenantStage === 'resident_active' || user?.tenantStage === 'resident_pending_onboarding';
-  const ctaHref = isResident
-    ? getAuthenticatedHomePath(user)
-    : `/listings/${id}/apply`;
+  const ctaHref = `/listings/${id}/apply`;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] pt-28">
-      <div className="mx-auto max-w-[1120px] px-6 pb-20">
+    <div className="min-h-screen bg-[#F5F7FB] pt-[65px]">
+      <div className="mx-auto max-w-[1120px] px-6 pb-20 pt-8">
         <Link
           to="/listings"
           className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600 shadow-sm"
@@ -51,7 +47,6 @@ const ListingDetailPage: React.FC = () => {
             <section className="overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-sm">
               <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="bg-gradient-to-br from-[#16324F] via-[#0D8A8A] to-[#91C8E4] p-8 text-white lg:p-12">
-                  {/* SmartStay Verified badge */}
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-white backdrop-blur-sm mb-4">
                     <ShieldCheck size={13} />
                     SmartStay Verified
@@ -111,13 +106,12 @@ const ListingDetailPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* CTA buttons */}
                   <div className="flex flex-col gap-3">
                     <Link
                       to={ctaHref}
                       className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 text-[12px] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-[#0D8A8A]"
                     >
-                      {isResident ? 'Vào cổng thông tin' : isAuthenticated ? 'Tiếp tục đăng ký' : 'Đăng ký thuê phòng'}
+                      {isAuthenticated ? 'Tiếp tục đăng ký' : 'Đăng ký thuê phòng'}
                       <ArrowRight size={16} />
                     </Link>
 

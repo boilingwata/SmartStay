@@ -1,12 +1,11 @@
-import { lazy } from 'react';
-import { RouteObject, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
 import { PageSkeleton } from '@/components/ui/StatusStates';
-import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
 import ProtectedRoute from '@/routes/ProtectedRoute';
 
 // View Imports
-const Dashboard = lazy(() => import('@/views/admin/Dashboard'));
+const MarketplaceDashboard = lazy(() => import('@/views/admin/MarketplaceDashboard'));
 const InvoiceList = lazy(() => import('@/views/admin/finance/InvoiceList'));
 const InvoiceDetail = lazy(() => import('@/views/admin/finance/InvoiceDetail'));
 const ContractList = lazy(() => import('@/views/admin/contracts/ContractList'));
@@ -30,6 +29,7 @@ const OwnerList = lazy(() => import('@/views/admin/owners/OwnerList'));
 const OwnerDetail = lazy(() => import('@/views/admin/owners/OwnerDetail'));
 const TicketList = lazy(() => import('@/views/admin/tickets/TicketList'));
 const TicketDetail = lazy(() => import('@/views/admin/tickets/TicketDetail'));
+const LeadList = lazy(() => import('@/views/admin/leads/LeadList'));
 const StaffRatings = lazy(() => import('@/views/admin/tickets/StaffRatings'));
 const UtilityPoliciesPage = lazy(() => import('@/views/admin/settings/UtilityPoliciesPage'));
 const UtilityOverridesPage = lazy(() => import('@/views/admin/settings/UtilityOverridesPage'));
@@ -58,7 +58,7 @@ const StaffReport = lazy(() => import('@/views/admin/reports/StaffReport'));
 const AlertsReport = lazy(() => import('@/views/admin/reports/AlertsReport'));
 
 export const adminRoutes: RouteObject[] = [
-  { path: 'dashboard', element: <Dashboard /> },
+  { path: 'dashboard', element: <MarketplaceDashboard /> },
   { path: 'invoices', element: <InvoiceList /> },
   { path: 'invoices/:id', element: <InvoiceDetail /> },
   { path: 'contracts', element: <ContractList /> },
@@ -83,6 +83,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'owners/:id', element: <OwnerDetail /> },
   { path: 'tickets', element: <TicketList /> },
   { path: 'tickets/:id', element: <TicketDetail /> },
+  { path: 'leads', element: <LeadList /> },
   { path: 'staff/dashboard', element: <StaffDashboard /> },
   { path: 'staff/my-tickets', element: <StaffMyTickets /> },
   { path: 'staff/visitor-checkin', element: <VisitorCheckin /> },
@@ -132,8 +133,9 @@ export const adminRoutes: RouteObject[] = [
           { path: 'audit-logs', element: <AuditLogs /> },
         ],
       },
-
     ],
   },
   { path: '', element: <Navigate to="dashboard" replace /> },
 ];
+
+export default adminRoutes;

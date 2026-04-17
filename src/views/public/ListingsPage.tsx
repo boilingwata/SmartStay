@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, MapPin, Search, SlidersHorizontal, Users, X, ChevronDown } from 'lucide-react';
-import { cn, formatVND } from '@/utils';
+import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { cn } from '@/utils';
 import publicListingsService from '@/services/publicListingsService';
+import { ListingPreviewCard } from '@/components/public/ListingPreviewCard';
 
 type SortOption = 'price_asc' | 'price_desc' | 'area_desc' | 'newest';
 
@@ -14,16 +15,53 @@ const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Mới nhất',
 };
 
+const matchesRoomTypeFilter = (listingType: string, selectedType: string) => {
+  if (selectedType === 'all') return true;
+
+  const normalizedListing = listingType.trim().toLowerCase();
+  const normalizedSelected = selectedType.trim().toLowerCase();
+
+  if (normalizedListing === normalizedSelected) return true;
+
+  const aliases: Record<string, string[]> = {
+    room: ['studio', 'room', 'phong', 'phòng', 'phong tro', 'phòng trọ'],
+    apartment: ['apartment', 'can ho', 'căn hộ', '1 bedroom', '2 bedroom'],
+    house: ['house', 'nha', 'nhà', 'townhouse'],
+    retail: ['retail', 'mat bang', 'mặt bằng', 'shophouse', 'shop'],
+  };
+
+  return (aliases[normalizedSelected] ?? []).some((alias) => normalizedListing.includes(alias));
+};
+
+const formatRoomTypeLabel = (value: string) => {
+  const labels: Record<string, string> = {
+    all: 'Tất cả loại phòng',
+    room: 'Phòng trọ',
+    apartment: 'Căn hộ',
+    house: 'Nhà nguyên căn',
+    retail: 'Mặt bằng',
+  };
+
+  return labels[value] ?? value;
+};
+
 const ListingsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
-  const [roomType, setRoomType] = useState('all');
+  const [roomType, setRoomType] = useState(searchParams.get('roomType') ?? 'all');
   const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') ?? '');
   const [minArea, setMinArea] = useState('');
   const [maxArea, setMaxArea] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('price_asc');
   const [showFilters, setShowFilters] = useState(false);
+  const urlSearch = searchParams.toString();
+
+  useEffect(() => {
+    setSearch(searchParams.get('search') ?? '');
+    setRoomType(searchParams.get('roomType') ?? 'all');
+    setMaxPrice(searchParams.get('maxPrice') ?? '');
+  }, [urlSearch]);
 
   const { data: listings = [], isLoading, isError } = useQuery({
     queryKey: ['public-room-listings'],
@@ -31,8 +69,8 @@ const ListingsPage: React.FC = () => {
   });
 
   const roomTypes = useMemo(
-    () => ['all', ...Array.from(new Set(listings.map((l) => l.roomType).filter(Boolean)))],
-    [listings]
+    () => Array.from(new Set(['all', 'room', 'apartment', 'house', 'retail', roomType, ...listings.map((l) => l.roomType).filter(Boolean)])),
+    [listings, roomType]
   );
 
   const activeFilterCount = [
@@ -68,7 +106,7 @@ const ListingsPage: React.FC = () => {
         listing.buildingAddress,
       ].some((field) => field.toLowerCase().includes(normalizedSearch));
 
-      const matchesType = roomType === 'all' || listing.roomType === roomType;
+      const matchesType = matchesRoomTypeFilter(listing.roomType, roomType);
       const matchesMinPrice = minP === null || listing.baseRent >= minP;
       const matchesMaxPrice = maxP === null || listing.baseRent <= maxP;
       const matchesMinArea = minA === null || listing.areaSqm >= minA;
@@ -81,42 +119,17 @@ const ListingsPage: React.FC = () => {
       if (sortBy === 'price_asc') return a.baseRent - b.baseRent;
       if (sortBy === 'price_desc') return b.baseRent - a.baseRent;
       if (sortBy === 'area_desc') return b.areaSqm - a.areaSqm;
-      return 0; // 'newest' — keep server order
+      return 0;
     });
 
     return result;
   }, [listings, roomType, search, minPrice, maxPrice, minArea, maxArea, sortBy]);
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] pt-28">
-      <section className="mx-auto max-w-[1280px] px-6 pb-8">
-        <div className="overflow-hidden rounded-[40px] bg-gradient-to-br from-[#173B63] via-[#0D8A8A] to-[#6AAFD8] px-8 py-10 text-white shadow-[0_30px_80px_-40px_rgba(13,138,138,0.65)] lg:px-12 lg:py-14">
-          <p className="text-[11px] font-black uppercase tracking-[0.28em] text-white/65">Hybrid tenant journey</p>
-          <div className="mt-4 grid gap-8 lg:grid-cols-[1.3fr_0.9fr] lg:items-end">
-            <div className="space-y-4">
-              <h1 className="max-w-3xl text-4xl font-black tracking-tight lg:text-6xl">Browse available homes before any verification step.</h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-white/80 lg:text-base">
-                SmartStay now lets prospects explore rooms first. Verification only starts when you choose to apply.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 backdrop-blur-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Có thể vào ở ngay</p>
-                <p className="mt-2 text-3xl font-black">{listings.length}</p>
-              </div>
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/20 p-5 backdrop-blur-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">Best for</p>
-                <p className="mt-2 text-base font-bold leading-snug">Prospects, applicants, and future residents</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1280px] px-6 pb-20">
+    <div className="min-h-screen bg-[#F5F7FB] pt-[65px]">
+      <section className="mx-auto max-w-[1280px] px-6 pb-20 pt-8">
         {/* Filter bar */}
         <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
-          {/* Search + room type + mobile filter toggle */}
           <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr_auto]">
             <label className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -136,12 +149,11 @@ const ListingsPage: React.FC = () => {
                 className="h-14 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-[#0D8A8A] focus:bg-white"
               >
                 {roomTypes.map((type) => (
-                  <option key={type} value={type}>{type === 'all' ? 'Tất cả loại phòng' : type}</option>
+                  <option key={type} value={type}>{formatRoomTypeLabel(type)}</option>
                 ))}
               </select>
             </label>
 
-            {/* Mobile: toggle advanced filters; desktop: sort dropdown */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -159,7 +171,6 @@ const ListingsPage: React.FC = () => {
                 <ChevronDown size={14} className={cn('transition-transform', showFilters && 'rotate-180')} />
               </button>
 
-              {/* Desktop sort */}
               <div className="hidden lg:block relative">
                 <select
                   value={sortBy}
@@ -182,11 +193,10 @@ const ListingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Advanced filters — always visible on desktop, collapsible on mobile */}
           <div className={cn(
             'mt-4 grid gap-3 grid-cols-2 sm:grid-cols-4 transition-all',
-            'lg:grid', // always show on desktop
-            !showFilters && 'hidden lg:grid' // hide on mobile unless toggled
+            'lg:grid',
+            !showFilters && 'hidden lg:grid'
           )}>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Giá tối thiểu (VNĐ)</label>
@@ -233,7 +243,6 @@ const ListingsPage: React.FC = () => {
               />
             </div>
 
-            {/* Mobile sort */}
             <div className="col-span-2 sm:col-span-4 lg:hidden space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Sắp xếp theo</label>
               <select
@@ -251,7 +260,7 @@ const ListingsPage: React.FC = () => {
 
         <div className="mt-8 flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#0D8A8A]">Public listings</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#0D8A8A]">Phòng trống</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
               {filteredListings.length} phòng phù hợp
             </h2>
@@ -261,13 +270,13 @@ const ListingsPage: React.FC = () => {
         {isLoading ? (
           <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[280px] animate-pulse rounded-[32px] border border-slate-200 bg-white" />
+              <ListingPreviewCard key={i} listing={{} as never} index={i} skeleton />
             ))}
           </div>
         ) : isError ? (
           <div className="mt-8 rounded-[32px] border border-red-100 bg-white p-8 text-center shadow-sm">
-            <h3 className="text-xl font-black text-slate-900">Listings are unavailable right now</h3>
-            <p className="mt-2 text-sm text-slate-500">Please try again in a moment.</p>
+            <h3 className="text-xl font-black text-slate-900">Danh sách phòng tạm thời không khả dụng</h3>
+            <p className="mt-2 text-sm text-slate-500">Vui lòng thử lại sau giây lát.</p>
           </div>
         ) : filteredListings.length === 0 ? (
           <div className="mt-8 rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -281,55 +290,13 @@ const ListingsPage: React.FC = () => {
           </div>
         ) : (
           <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredListings.map((listing) => (
-              <article key={listing.roomId} className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
-                <div className="bg-gradient-to-br from-[#E0F2FE] via-[#F8FAFC] to-[#CCFBF1] p-6">
-                  <div className="inline-flex rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-[#0D8A8A]">
-                    {listing.availabilityLabel}
-                  </div>
-                  <h3 className="mt-6 text-2xl font-black tracking-tight text-slate-900">{listing.roomCode}</h3>
-                  <p className="mt-1 text-sm font-medium text-slate-500">{listing.roomType} tại {listing.buildingName}</p>
-                </div>
-
-                <div className="space-y-5 p-6">
-                  <div className="flex items-start gap-3 text-sm text-slate-500">
-                    <MapPin size={18} className="mt-0.5 text-[#0D8A8A]" />
-                    <span>{listing.buildingAddress}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Giá thuê</p>
-                      <p className="mt-2 text-lg font-black text-slate-900">{formatVND(listing.baseRent)}</p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Diện tích</p>
-                      <p className="mt-2 text-lg font-black text-slate-900">{listing.areaSqm} m²</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Users size={16} className="text-[#0D8A8A]" />
-                    <span>Tối đa {listing.maxOccupants} người</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(listing.amenities.slice(0, 4).length > 0 ? listing.amenities.slice(0, 4) : ['Sẵn sàng vào ở', 'Cổng thông tin cư dân']).map((amenity) => (
-                      <span key={`${listing.roomId}-${amenity}`} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
-                        {amenity}
-                      </span>
-                    ))}
-                  </div>
-
-                  <Link
-                    to={`/listings/${listing.roomId}`}
-                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 text-[12px] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-[#0D8A8A]"
-                  >
-                    Xem chi tiết
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </article>
+            {filteredListings.map((listing, index) => (
+              <ListingPreviewCard
+                key={listing.roomId}
+                listing={listing}
+                index={index}
+                accent="latest"
+              />
             ))}
           </div>
         )}

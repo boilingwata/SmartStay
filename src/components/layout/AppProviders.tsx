@@ -6,6 +6,7 @@ import { OfflineBanner, SessionExpiredOverlay } from '../ui/StatusStates';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 import useAuthStore from '@/stores/authStore';
 import useUIStore from '@/stores/uiStore';
+import i18n from '@/i18n/i18n';
 
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -14,6 +15,7 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
   const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
 
   const theme = useUIStore((s) => s.theme);
+  const language = useUIStore((s) => s.language);
   
   // Apply theme to document
   useEffect(() => {
@@ -24,6 +26,12 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
       root.classList.remove('dark');
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (i18n.language !== language) {
+      i18n.changeLanguage(language);
+    }
+  }, [language]);
 
   const handleLoginRedirect = () => {
     setSessionExpired(false);

@@ -1,11 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { TenantBalance, TenantBalanceTransaction, TransactionType } from '@/models/TenantBalance';
 import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
+import { TenantBalance, TenantBalanceTransaction, TransactionType } from '@/models/TenantBalance';
+import type { Database } from '@/types/supabase';
 
-// ---------------------------------------------------------------------------
-// Internal DB row shapes
-// ---------------------------------------------------------------------------
+type DbPaymentAttemptMethod = Database['smartstay']['Enums']['payment_attempt_method'];
+type DbPaymentStatus = Database['smartstay']['Enums']['payment_status'];
 
 interface DbBalanceRow {
   tenant_id: number;
@@ -36,63 +36,118 @@ interface DbInvoiceRow {
   billing_period: string | null;
 }
 
-interface PaymentHistoryItem {
+interface DbPaymentHistoryRow {
+  id: number;
+  payment_code: string | null;
+  amount: number;
+  method: string | null;
+  payment_date: string;
+  confirmed_at: string | null;
+  notes: string | null;
+  invoice_id: number;
+  payment_attempt_id: number | null;
+  reference_number: string | null;
+  bank_name: string | null;
+}
+
+interface DbPaymentAttemptHistoryRow {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  method: DbPaymentAttemptMethod;
+  status: DbPaymentStatus;
+  reference_number: string | null;
+  bank_name: string | null;
+  notes: string | null;
+  rejection_reason: string | null;
+  payment_id: number | null;
+  created_at: string | null;
+}
+
+export interface PortalPaymentHistoryItem {
   id: string;
+  code: string;
   amount: number;
   method: string;
-  status: 'Pending' | 'Confirmed' | 'Rejected';
+  status: 'Pending' | 'Confirmed' | 'Rejected' | 'Cancelled';
   createdAt: string;
   description: string;
   invoiceId: string;
+  invoiceCode: string;
+  referenceNumber: string | null;
+  bankName: string | null;
+  source: 'payment' | 'attempt';
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 async function getCurrentTenantId(): Promise<number | null> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
   if (authError || !user) throw new Error('Not authenticated');
 
-  const tenants = await unwrap(
+  const tenants = (await unwrap(
     supabase
       .from('tenants')
       .select('id')
       .eq('profile_id', user.id)
       .eq('is_deleted', false)
       .limit(1)
-  ) as unknown as { id: number }[];
+  )) as unknown as { id: number }[];
 
   return tenants?.[0]?.id ?? null;
 }
 
 function mapTransactionType(dbType: string): TransactionType {
-  // PF-01: DB enum balance_transaction_type = deposit | deduction | refund | adjustment
-  // The values below that are NOT in the enum (payment, overpayment, auto_offset) are legacy
-  // labels that may appear in historical balance_history.notes or from application logic paths.
-  // They fall through to 'Other' via the fallback \u2014 no crash, but the display label will be 'Other'.
   const map: Record<string, TransactionType> = {
-    // DB enum values:
     deposit: 'ManualTopUp',
     deduction: 'ManualDeduct',
     refund: 'Refund',
     adjustment: 'Correction',
-    // Extended values (not in DB enum \u2014 may appear from application-level writes):
     payment: 'Payment',
     overpayment: 'Overpayment',
     auto_offset: 'AutoOffset',
   };
+
   return map[dbType] ?? 'Other';
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
+function normalizeAttemptMethod(method: DbPaymentAttemptMethod): string {
+  if (method === 'bank_transfer') return mapPaymentMethod.fromDb('bank_transfer');
+  if (method === 'cash') return mapPaymentMethod.fromDb('cash');
+  return mapPaymentMethod.fromDb('momo');
+}
+
+function mapAttemptStatus(status: DbPaymentStatus): PortalPaymentHistoryItem['status'] {
+  if (status === 'succeeded') return 'Confirmed';
+  if (status === 'failed' || status === 'rejected') return 'Rejected';
+  if (status === 'cancelled') return 'Cancelled';
+  return 'Pending';
+}
+
+function mapAttemptDescription(attempt: DbPaymentAttemptHistoryRow): string {
+  if (attempt.rejection_reason) {
+    return `Bi tu choi: ${attempt.rejection_reason}`;
+  }
+
+  const trimmedNote = attempt.notes?.trim();
+  if (trimmedNote) {
+    return trimmedNote;
+  }
+
+  if (attempt.method === 'bank_transfer') {
+    return 'Yeu cau chuyen khoan dang cho doi soat';
+  }
+
+  if (attempt.method === 'momo') {
+    return 'Yeu cau thanh toan dien tu dang xu ly';
+  }
+
+  return 'Yeu cau thanh toan dang cho xac nhan';
+}
 
 export const portalFinanceService = {
-  /**
-   * RULE-05: Real-time balance — no cache, always fetched fresh.
-   */
   getFreshBalance: async (): Promise<TenantBalance> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) {
@@ -106,15 +161,14 @@ export const portalFinanceService = {
       };
     }
 
-    const row = await unwrap(
+    const row = (await unwrap(
       supabase
         .from('tenant_balances')
         .select('tenant_id, balance, last_updated')
         .eq('tenant_id', tenantId)
-        .maybeSingle()  // C-06: dùng maybeSingle() thay single() để tránh crash khi tenant mới chưa có balance row
-    ) as unknown as DbBalanceRow | null;
+        .maybeSingle()
+    )) as unknown as DbBalanceRow | null;
 
-    // C-06: Tenant mới chưa có row trong tenant_balances → trả về balance 0
     if (!row) {
       return {
         tenantId: String(tenantId),
@@ -126,30 +180,26 @@ export const portalFinanceService = {
       };
     }
 
-    // Also compute total paid / unpaid from invoices
-    const contractLinks = await unwrap(
-      supabase
-        .from('contract_tenants')
-        .select('contract_id')
-        .eq('tenant_id', tenantId)
-    ) as unknown as { contract_id: number }[];
+    const contractLinks = (await unwrap(
+      supabase.from('contract_tenants').select('contract_id').eq('tenant_id', tenantId)
+    )) as unknown as { contract_id: number }[];
 
     let totalPaid = 0;
     let totalUnpaid = 0;
 
-    if (contractLinks && contractLinks.length > 0) {
-      const contractIds = contractLinks.map(cl => cl.contract_id);
-      const invoices = await unwrap(
+    if (contractLinks.length > 0) {
+      const contractIds = contractLinks.map((link) => link.contract_id);
+      const invoices = (await unwrap(
         supabase
           .from('invoices')
           .select('amount_paid, balance_due, status')
           .in('contract_id', contractIds)
-      ) as unknown as { amount_paid: number; balance_due: number; status: string | null }[];
+      )) as unknown as { amount_paid: number; balance_due: number; status: string | null }[];
 
-      for (const inv of invoices ?? []) {
-        totalPaid += inv.amount_paid ?? 0;
-        if (inv.status !== 'paid' && inv.status !== 'cancelled') {
-          totalUnpaid += inv.balance_due ?? 0;
+      for (const invoice of invoices ?? []) {
+        totalPaid += invoice.amount_paid ?? 0;
+        if (invoice.status !== 'paid' && invoice.status !== 'cancelled') {
+          totalUnpaid += invoice.balance_due ?? 0;
         }
       }
     }
@@ -164,97 +214,120 @@ export const portalFinanceService = {
     };
   },
 
-  /**
-   * RULE-07: Immutable Ledger — returns all balance_history rows for the tenant.
-   */
   getBalanceTransactions: async (): Promise<{ items: TenantBalanceTransaction[] }> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return { items: [] };
 
-    const rows = await unwrap(
+    const rows = (await unwrap(
       supabase
         .from('balance_history')
         .select('id, tenant_id, transaction_type, amount, balance_before, balance_after, notes, invoice_id, created_at')
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
-    ) as unknown as DbBalanceHistoryRow[];
+    )) as unknown as DbBalanceHistoryRow[];
 
-    const items: TenantBalanceTransaction[] = (rows ?? []).map(r => ({
-      id: String(r.id),
-      tenantId: String(r.tenant_id),
-      type: mapTransactionType(r.transaction_type),
-      amount: r.amount,
-      balanceBefore: r.balance_before,
-      balanceAfter: r.balance_after,
-      description: r.notes ?? '',
-      relatedInvoiceId: r.invoice_id != null ? String(r.invoice_id) : undefined,
-      createdAt: r.created_at ?? new Date().toISOString(),
+    const items: TenantBalanceTransaction[] = (rows ?? []).map((row) => ({
+      id: String(row.id),
+      tenantId: String(row.tenant_id),
+      type: mapTransactionType(row.transaction_type),
+      amount: row.amount,
+      balanceBefore: row.balance_before,
+      balanceAfter: row.balance_after,
+      description: row.notes ?? '',
+      relatedInvoiceId: row.invoice_id != null ? String(row.invoice_id) : undefined,
+      createdAt: row.created_at ?? new Date().toISOString(),
     }));
 
     return { items };
   },
 
-  getPaymentHistory: async (): Promise<{ items: PaymentHistoryItem[] }> => {
+  getPaymentHistory: async (): Promise<{ items: PortalPaymentHistoryItem[] }> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return { items: [] };
 
-    const contractLinks = await unwrap(
-      supabase
-        .from('contract_tenants')
-        .select('contract_id')
-        .eq('tenant_id', tenantId)
-    ) as unknown as { contract_id: number }[];
+    const contractLinks = (await unwrap(
+      supabase.from('contract_tenants').select('contract_id').eq('tenant_id', tenantId)
+    )) as unknown as { contract_id: number }[];
 
-    if (!contractLinks || contractLinks.length === 0) return { items: [] };
+    if (contractLinks.length === 0) return { items: [] };
 
-    const contractIds = contractLinks.map(cl => cl.contract_id);
+    const contractIds = contractLinks.map((link) => link.contract_id);
+    const invoiceRows = (await unwrap(
+      supabase.from('invoices').select('id, invoice_code').in('contract_id', contractIds)
+    )) as unknown as Pick<DbInvoiceRow, 'id' | 'invoice_code'>[];
 
-    const invoiceRows = await unwrap(
-      supabase
-        .from('invoices')
-        .select('id')
-        .in('contract_id', contractIds)
-    ) as unknown as { id: number }[];
+    if (invoiceRows.length === 0) return { items: [] };
 
-    if (!invoiceRows || invoiceRows.length === 0) return { items: [] };
+    const invoiceIds = invoiceRows.map((row) => row.id);
+    const invoiceCodeById = new Map(invoiceRows.map((row) => [row.id, row.invoice_code]));
 
-    const invoiceIds = invoiceRows.map(r => r.id);
+    const [payments, attempts] = await Promise.all([
+      unwrap(
+        supabase
+          .from('payments')
+          .select('id, payment_code, amount, method, payment_date, confirmed_at, notes, invoice_id, payment_attempt_id, reference_number, bank_name')
+          .in('invoice_id', invoiceIds)
+          .order('payment_date', { ascending: false })
+      ) as unknown as Promise<DbPaymentHistoryRow[]>,
+      unwrap(
+        supabase
+          .from('payment_attempts')
+          .select('id, invoice_id, amount, method, status, reference_number, bank_name, notes, rejection_reason, payment_id, created_at')
+          .in('invoice_id', invoiceIds)
+          .order('created_at', { ascending: false })
+      ) as unknown as Promise<DbPaymentAttemptHistoryRow[]>,
+    ]);
 
-    interface DbPaymentRow {
-      id: number;
-      payment_code: string | null;
-      amount: number;
-      method: string | null;
-      payment_date: string;
-      confirmed_at: string | null;
-      notes: string | null;
-      invoice_id: number;
-    }
+    const linkedAttemptIds = new Set(
+      (payments ?? [])
+        .map((payment) => payment.payment_attempt_id)
+        .filter((value): value is number => value != null)
+    );
 
-    const payments = await unwrap(
-      supabase
-        .from('payments')
-        .select('id, payment_code, amount, method, payment_date, confirmed_at, notes, invoice_id')
-        .in('invoice_id', invoiceIds)
-        .order('payment_date', { ascending: false })
-    ) as unknown as DbPaymentRow[];
-
-    const items: PaymentHistoryItem[] = (payments ?? []).map((p) => {
-      // Derive status the same way as paymentService.deriveStatus()
-      let status: PaymentHistoryItem['status'] = 'Pending';
-      if (p.confirmed_at) status = 'Confirmed';
-      else if (p.notes?.startsWith('[REJECTED]')) status = 'Rejected';
+    const paymentItems: PortalPaymentHistoryItem[] = (payments ?? []).map((payment) => {
+      let status: PortalPaymentHistoryItem['status'] = 'Pending';
+      if (payment.confirmed_at) status = 'Confirmed';
+      else if (payment.notes?.startsWith('[REJECTED]')) status = 'Rejected';
 
       return {
-        id: p.payment_code ?? String(p.id),
-        amount: p.amount,
-        method: mapPaymentMethod.fromDb(p.method ?? 'cash'),
+        id: `payment-${payment.id}`,
+        code: payment.payment_code ?? `PAY-${payment.id}`,
+        amount: payment.amount,
+        method: mapPaymentMethod.fromDb(payment.method ?? 'cash'),
         status,
-        createdAt: p.payment_date,
-        description: (p.notes && !p.notes.startsWith('[REJECTED]')) ? p.notes : 'Thanh toán hóa đơn',
-        invoiceId: String(p.invoice_id),
+        createdAt: payment.payment_date,
+        description:
+          payment.notes && !payment.notes.startsWith('[REJECTED]')
+            ? payment.notes
+            : 'Thanh toan hoa don',
+        invoiceId: String(payment.invoice_id),
+        invoiceCode: invoiceCodeById.get(payment.invoice_id) ?? `INV-${payment.invoice_id}`,
+        referenceNumber: payment.reference_number,
+        bankName: payment.bank_name,
+        source: 'payment',
       };
     });
+
+    const attemptItems: PortalPaymentHistoryItem[] = (attempts ?? [])
+      .filter((attempt) => attempt.payment_id == null && !linkedAttemptIds.has(attempt.id))
+      .map((attempt) => ({
+        id: `attempt-${attempt.id}`,
+        code: attempt.reference_number ?? `REQ-${attempt.id}`,
+        amount: attempt.amount,
+        method: normalizeAttemptMethod(attempt.method),
+        status: mapAttemptStatus(attempt.status),
+        createdAt: attempt.created_at ?? new Date().toISOString(),
+        description: mapAttemptDescription(attempt),
+        invoiceId: String(attempt.invoice_id),
+        invoiceCode: invoiceCodeById.get(attempt.invoice_id) ?? `INV-${attempt.invoice_id}`,
+        referenceNumber: attempt.reference_number,
+        bankName: attempt.bank_name,
+        source: 'attempt',
+      }));
+
+    const items = [...paymentItems, ...attemptItems].sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    );
 
     return { items };
   },
@@ -263,34 +336,30 @@ export const portalFinanceService = {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return [];
 
-    const contractLinks = await unwrap(
-      supabase
-        .from('contract_tenants')
-        .select('contract_id')
-        .eq('tenant_id', tenantId)
-    ) as unknown as { contract_id: number }[];
+    const contractLinks = (await unwrap(
+      supabase.from('contract_tenants').select('contract_id').eq('tenant_id', tenantId)
+    )) as unknown as { contract_id: number }[];
 
-    if (!contractLinks || contractLinks.length === 0) return [];
+    if (contractLinks.length === 0) return [];
 
-    const contractIds = contractLinks.map(cl => cl.contract_id);
-
-    const rows = await unwrap(
+    const contractIds = contractLinks.map((link) => link.contract_id);
+    const rows = (await unwrap(
       supabase
         .from('invoices')
         .select('id, invoice_code, total_amount, amount_paid, balance_due, due_date, status, billing_period')
         .in('contract_id', contractIds)
         .order('due_date', { ascending: false })
-    ) as unknown as DbInvoiceRow[];
+    )) as unknown as DbInvoiceRow[];
 
-    return (rows ?? []).map(r => ({
-      id: String(r.id),
-      invoiceCode: r.invoice_code,
-      totalAmount: r.total_amount,
-      paidAmount: r.amount_paid,
-      balanceDue: r.balance_due,
-      dueDate: r.due_date,
-      status: mapInvoiceStatus.fromDb(r.status ?? 'draft'),
-      period: r.billing_period?.slice(0, 7) ?? '',
+    return (rows ?? []).map((row) => ({
+      id: String(row.id),
+      invoiceCode: row.invoice_code,
+      totalAmount: row.total_amount,
+      paidAmount: row.amount_paid,
+      balanceDue: row.balance_due,
+      dueDate: row.due_date,
+      status: mapInvoiceStatus.fromDb(row.status ?? 'draft'),
+      period: row.billing_period?.slice(0, 7) ?? '',
     }));
   },
 };

@@ -142,6 +142,58 @@
 }
 
 @layer components {
+  .public-section {
+    @apply mx-auto max-w-[1280px] px-6 py-20 lg:py-24;
+  }
+
+  .public-section-header {
+    @apply mx-auto mb-12 max-w-3xl text-center lg:mb-16;
+  }
+
+  .public-kicker {
+    @apply text-[11px] font-black uppercase tracking-[0.28em] text-secondary;
+  }
+
+  .public-title {
+    @apply mt-4 text-4xl font-black tracking-tight text-slate-950 dark:text-white md:text-5xl;
+  }
+
+  .public-subtitle {
+    @apply mt-4 text-base leading-8 text-slate-600 dark:text-slate-300;
+  }
+
+  .public-feature-card {
+    @apply rounded-[28px] border border-border bg-card p-6 shadow-[0_20px_56px_-42px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_68px_-38px_rgba(15,23,42,0.5)] dark:bg-white/5;
+  }
+
+  .public-feature-icon {
+    @apply mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-primary;
+    background-color: rgb(27 58 107 / 0.1);
+  }
+
+  .public-metric-card {
+    @apply rounded-[24px] border px-5 py-4 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.38)] backdrop-blur-xl;
+    border-color: rgb(255 255 255 / 0.4);
+    background-color: rgb(255 255 255 / 0.75);
+  }
+
+  .public-metric-value {
+    @apply text-3xl font-black tracking-tight text-slate-950 dark:text-white;
+  }
+
+  .public-metric-label {
+    @apply mt-1 text-sm text-slate-600 dark:text-slate-300;
+  }
+
+  .dark .public-feature-icon {
+    background-color: rgb(56 189 248 / 0.14);
+  }
+
+  .dark .public-metric-card {
+    border-color: rgb(255 255 255 / 0.1);
+    background-color: rgb(255 255 255 / 0.05);
+  }
+
   .card-premium {
     @apply bg-white rounded-[40px] border border-white shadow-premium transition-all duration-500 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] active:scale-[0.98];
   }
@@ -184,6 +236,3 @@
       0 0 40px rgba(13, 138, 138, 0.05);
   }
 }
-
-
-
