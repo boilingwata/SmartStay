@@ -1,5 +1,6 @@
-import { supabase } from "@/lib/supabase";
-import { unwrap } from "@/lib/supabaseHelpers";
+import { buildBillableAssetLines } from '@/lib/assetBilling';
+import { supabase } from '@/lib/supabase';
+import { unwrap } from '@/lib/supabaseHelpers';
 import {
   computeUtilitySnapshot,
   parseSeasonMonths,
@@ -8,15 +9,18 @@ import {
   type UtilityOverrideInput,
   type UtilityPolicyInput,
   type UtilitySnapshotResult,
-} from "@/lib/utilityBilling";
+} from '@/lib/utilityBilling';
 
 export interface UtilityBillingLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
-  source: "rent" | "service" | "utility" | "discount";
+  itemType: 'rent' | 'utility_electric' | 'utility_water' | 'service' | 'asset' | 'discount' | 'other';
+  source: 'rent' | 'service' | 'utility' | 'asset' | 'discount';
   sortOrder: number;
+  sourceRefType?: string;
+  sourceRefId?: number;
 }
 
 export interface PolicyInvoiceDraft {
@@ -61,12 +65,28 @@ interface ContractDraftRow {
     amenities: unknown;
     max_occupants: number | null;
     buildings: { name: string } | null;
+      room_assets?: Array<{
+      id: number;
+      status: string | null;
+      quantity: number | null;
+      assigned_at: string | null;
+      is_billable: boolean | null;
+      billing_label: string | null;
+      monthly_charge: number | null;
+      billing_start_date: string | null;
+        billing_end_date: string | null;
+        billing_status: string | null;
+        assets: {
+          name: string;
+          category: string | null;
+        } | null;
+      }> | null;
   } | null;
-  contract_tenants: {
+  contract_tenants: Array<{
     is_primary: boolean | null;
     tenants: { full_name: string } | null;
-  }[];
-  contract_services: {
+  }>;
+  contract_services: Array<{
     service_catalog_id: number;
     quantity: number | null;
     fixed_price: number | null;
@@ -74,12 +94,12 @@ interface ContractDraftRow {
       name: string;
       unit: string | null;
     } | null;
-  }[];
+  }>;
 }
 
 interface UtilityPolicyRow {
   id: number;
-  scope_type: UtilityPolicyInput["scopeType"];
+  scope_type: UtilityPolicyInput['scopeType'];
   scope_id: number | null;
   electric_base_amount: number;
   water_base_amount: number;
@@ -142,8 +162,8 @@ function toOverrideInput(row: UtilityOverrideRow | null): UtilityOverrideInput |
 
 async function fetchContractDraft(contractId: number): Promise<ContractDraftRow> {
   return (await unwrap(
-    supabase
-      .from("contracts")
+    (supabase as any)
+      .from('contracts')
       .select(`
         id,
         contract_code,
@@ -158,7 +178,20 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
           building_id,
           amenities,
           max_occupants,
-          buildings ( name )
+          buildings ( name ),
+          room_assets (
+            id,
+            status,
+            quantity,
+            assigned_at,
+            is_billable,
+            billing_label,
+            monthly_charge,
+            billing_start_date,
+            billing_end_date,
+            billing_status,
+      assets ( name, category )
+          )
         ),
         contract_tenants (
           is_primary,
@@ -171,17 +204,17 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
           service_catalog!contract_services_service_catalog_id_fkey ( name, unit )
         )
       `)
-      .eq("id", contractId)
-      .eq("status", "active")
-      .eq("is_deleted", false)
-      .single(),
-  )) as unknown as ContractDraftRow;
+      .eq('id', contractId)
+      .eq('status', 'active')
+      .eq('is_deleted', false)
+      .single()
+  )) as ContractDraftRow;
 }
 
 async function fetchPolicies(): Promise<UtilityPolicyInput[]> {
   const rows = (await unwrap(
     supabase
-      .from("utility_policies")
+      .from('utility_policies')
       .select(`
         id,
         scope_type,
@@ -198,8 +231,8 @@ async function fetchPolicies(): Promise<UtilityPolicyInput[]> {
         effective_from,
         effective_to
       `)
-      .eq("is_active", true),
-  )) as unknown as UtilityPolicyRow[];
+      .eq('is_active', true)
+  )) as UtilityPolicyRow[];
 
   return rows.map(toPolicyInput);
 }
@@ -207,7 +240,7 @@ async function fetchPolicies(): Promise<UtilityPolicyInput[]> {
 async function fetchOverride(contractId: number, billingPeriod: string): Promise<UtilityOverrideInput | null> {
   const row = (await unwrap(
     supabase
-      .from("invoice_utility_overrides")
+      .from('invoice_utility_overrides')
       .select(`
         id,
         occupants_for_billing_override,
@@ -219,10 +252,10 @@ async function fetchOverride(contractId: number, billingPeriod: string): Promise
         season_months_override,
         electric_hot_season_multiplier_override
       `)
-      .eq("contract_id", contractId)
-      .eq("billing_period", billingPeriod)
-      .maybeSingle(),
-  )) as unknown as UtilityOverrideRow | null;
+      .eq('contract_id', contractId)
+      .eq('billing_period', billingPeriod)
+      .maybeSingle()
+  )) as UtilityOverrideRow | null;
 
   return toOverrideInput(row);
 }
@@ -230,11 +263,11 @@ async function fetchOverride(contractId: number, billingPeriod: string): Promise
 async function fetchDeviceAdjustments(policyId: number): Promise<UtilityDeviceAdjustmentInput[]> {
   const rows = (await unwrap(
     supabase
-      .from("utility_policy_device_adjustments")
-      .select("device_code, charge_amount")
-      .eq("utility_policy_id", policyId)
-      .eq("is_active", true),
-  )) as unknown as Array<{ device_code: string; charge_amount: number }>;
+      .from('utility_policy_device_adjustments')
+      .select('device_code, charge_amount')
+      .eq('utility_policy_id', policyId)
+      .eq('is_active', true)
+  )) as Array<{ device_code: string; charge_amount: number }>;
 
   return rows.map((row) => ({
     deviceCode: row.device_code,
@@ -242,7 +275,7 @@ async function fetchDeviceAdjustments(policyId: number): Promise<UtilityDeviceAd
   }));
 }
 
-export function inferUtilityKind(_serviceName: string): "electricity" | "water" | null {
+export function inferUtilityKind(_serviceName: string): 'electricity' | 'water' | null {
   return null;
 }
 
@@ -250,21 +283,22 @@ export function isLegacyMeteredService(): boolean {
   return false;
 }
 
-export function resolveContractUtilityMode(): "policy" | "legacy_metered" {
-  return "policy";
+export function resolveContractUtilityMode(): 'policy' | 'legacy_metered' {
+  return 'policy';
 }
 
 export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<PolicyInvoiceDraft> {
   const contractId = Number(input.contractId);
-  if (!Number.isFinite(contractId)) throw new Error("Hợp đồng không hợp lệ.");
-  if (!/^\d{4}-\d{2}$/.test(input.monthYear)) throw new Error("Kỳ thanh toán không hợp lệ.");
-  if (!input.dueDate) throw new Error("Vui lòng chọn hạn thanh toán.");
+  if (!Number.isFinite(contractId)) throw new Error('Hop dong khong hop le.');
+  if (!/^\d{4}-\d{2}$/.test(input.monthYear)) throw new Error('Ky thanh toan khong hop le.');
+  if (!input.dueDate) throw new Error('Vui long chon han thanh toan.');
 
   const contract = await fetchContractDraft(contractId);
   const policies = await fetchPolicies();
   const override = await fetchOverride(contractId, input.monthYear);
   const room = contract.rooms;
-  if (!room) throw new Error("Không tìm thấy phòng cho hợp đồng này.");
+
+  if (!room) throw new Error('Khong tim thay phong cua hop dong.');
 
   const pinnedPolicy =
     contract.utility_policy_id == null
@@ -272,8 +306,8 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
       : policies.find((policy) => policy.id === contract.utility_policy_id) ?? null;
 
   const policyResolution = pinnedPolicy
-    ? { policy: pinnedPolicy, sourceType: "contract" as const }
-    : resolveEffectivePolicy(policies, input.monthYear, ["contract", "room", "building", "system"], {
+    ? { policy: pinnedPolicy, sourceType: 'contract' as const }
+    : resolveEffectivePolicy(policies, input.monthYear, ['contract', 'room', 'building', 'system'], {
         contract: contract.id,
         room: contract.room_id,
         building: room.building_id,
@@ -281,14 +315,14 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
       });
 
   if (!policyResolution.policy) {
-    throw new Error("Thiếu utility policy để tính điện nước cho hợp đồng này.");
+    throw new Error('Thieu utility policy de tinh hoa don.');
   }
 
   const primaryTenant = contract.contract_tenants.find((item) => item.is_primary) ?? contract.contract_tenants[0];
-  const tenantName = primaryTenant?.tenants?.full_name ?? "";
+  const tenantName = primaryTenant?.tenants?.full_name ?? '';
   const occupantsForBilling = override?.occupantsForBillingOverride ?? Number(contract.occupants_for_billing ?? 0);
   if (!Number.isFinite(occupantsForBilling) || occupantsForBilling <= 0) {
-    throw new Error("Hợp đồng thiếu occupants_for_billing hợp lệ để tính utility.");
+    throw new Error('Hop dong thieu occupants_for_billing hop le.');
   }
 
   const deviceAdjustments = await fetchDeviceAdjustments(policyResolution.policy.id);
@@ -301,10 +335,15 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
     contractStartDate: contract.start_date,
     contractEndDate: contract.end_date,
     occupantsForBilling,
-    roomAmenities: room.amenities,
-    policy: policyResolution.policy,
-    override,
-    deviceAdjustments,
+      roomAmenities: room.amenities,
+      roomAssets: (room.room_assets ?? []).map((asset) => ({
+        assetName: asset.assets?.name ?? null,
+        assetType: asset.assets?.category ?? null,
+        billingLabel: asset.billing_label ?? null,
+      })),
+      policy: policyResolution.policy,
+      override,
+      deviceAdjustments,
   });
 
   const items: UtilityBillingLineItem[] = [];
@@ -313,61 +352,103 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
 
   if (monthlyRent > 0) {
     items.push({
-      description: `Tiền thuê tháng ${input.monthYear}`,
+      description: `Tien thue thang ${input.monthYear}`,
       quantity: 1,
       unitPrice: monthlyRent,
       lineTotal: monthlyRent,
-      source: "rent",
+      itemType: 'rent',
+      source: 'rent',
       sortOrder: sortOrder++,
     });
   }
 
   for (const service of contract.contract_services ?? []) {
-    const serviceName = service.service_catalog?.name ?? `Dịch vụ #${service.service_catalog_id}`;
+    const serviceName = service.service_catalog?.name ?? `Dich vu #${service.service_catalog_id}`;
     const quantity = Math.max(1, Number(service.quantity ?? 1));
     const unitPrice = Number(service.fixed_price ?? 0);
     items.push({
-      description: `${serviceName} tháng ${input.monthYear}`,
+      description: `${serviceName} thang ${input.monthYear}`,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
-      source: "service",
+      itemType: 'service',
+      source: 'service',
       sortOrder: sortOrder++,
+      sourceRefType: 'contract_service',
+      sourceRefId: service.service_catalog_id,
     });
   }
 
+  const assetItems = buildBillableAssetLines({
+    monthYear: input.monthYear,
+    contractStartDate: contract.start_date,
+    contractEndDate: contract.end_date,
+    startingSortOrder: sortOrder,
+    assets: (room.room_assets ?? []).map((asset) => ({
+      id: asset.id,
+      assetName: asset.assets?.name ?? `Tai san #${asset.id}`,
+      billingLabel: asset.billing_label,
+      quantity: asset.quantity,
+      monthlyCharge: asset.monthly_charge,
+      billingStartDate: asset.billing_start_date,
+      billingEndDate: asset.billing_end_date,
+      assignedAt: asset.assigned_at,
+      isBillable: asset.is_billable,
+      billingStatus: asset.billing_status,
+      physicalStatus: asset.status,
+    })),
+  });
+
+  for (const assetItem of assetItems) {
+    items.push({
+      description: assetItem.description,
+      quantity: assetItem.quantity,
+      unitPrice: assetItem.unitPrice,
+      lineTotal: assetItem.lineTotal,
+      itemType: assetItem.itemType,
+      source: assetItem.source,
+      sortOrder: assetItem.sortOrder,
+      sourceRefType: 'room_asset',
+      sourceRefId: Number(assetItem.assetId),
+    });
+  }
+  sortOrder += assetItems.length;
+
   items.push({
-    description: `Tiền điện tháng ${input.monthYear}`,
+    description: `Tien dien thang ${input.monthYear}`,
     quantity: 1,
     unitPrice: utilitySnapshot.electricFinalAmount,
     lineTotal: utilitySnapshot.electricFinalAmount,
-    source: "utility",
+    itemType: 'utility_electric',
+    source: 'utility',
     sortOrder: sortOrder++,
   });
 
   items.push({
-    description: `Tiền nước tháng ${input.monthYear}`,
+    description: `Tien nuoc thang ${input.monthYear}`,
     quantity: 1,
     unitPrice: utilitySnapshot.waterFinalAmount,
     lineTotal: utilitySnapshot.waterFinalAmount,
-    source: "utility",
+    itemType: 'utility_water',
+    source: 'utility',
     sortOrder: sortOrder++,
   });
 
   const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
   if (discountAmount > 0) {
     items.push({
-      description: input.discountReason?.trim() ? `Giảm trừ: ${input.discountReason.trim()}` : "Giảm trừ hóa đơn",
+      description: input.discountReason?.trim() ? `Giam tru: ${input.discountReason.trim()}` : 'Giam tru hoa don',
       quantity: 1,
       unitPrice: -discountAmount,
       lineTotal: -discountAmount,
-      source: "discount",
+      itemType: 'discount',
+      source: 'discount',
       sortOrder: sortOrder++,
     });
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  if (subtotal < 0) throw new Error("Giảm trừ không thể lớn hơn tổng tiền hóa đơn.");
+  if (subtotal < 0) throw new Error('Giam tru khong the lon hon tong tien hoa don.');
 
   return {
     contractId: String(contract.id),
@@ -375,7 +456,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
     roomId: String(contract.room_id),
     roomCode: room.room_code,
     buildingId: String(room.building_id),
-    buildingName: room.buildings?.name ?? "",
+    buildingName: room.buildings?.name ?? '',
     tenantName,
     billingPeriod: input.monthYear,
     dueDate: input.dueDate,

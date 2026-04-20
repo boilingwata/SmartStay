@@ -141,4 +141,25 @@ describe('Utility Billing Logic - computeUtilitySnapshot', () => {
     expect(result.electricFinalAmount).toBe(500000);
     expect(result.waterFinalAmount).toBe(0); // Allowed to be 0 if final override is 0
   });
+
+  it('should include room assets when resolving device surcharge', () => {
+    const result = computeUtilitySnapshot({
+      ...baseInput,
+      roomAmenities: ['WiFi'],
+      roomAssets: [
+        { assetName: 'Máy lạnh Panasonic', assetType: 'appliance', billingLabel: 'Máy lạnh phòng ngủ' },
+        { assetName: 'Bình nóng lạnh Ferroli', assetType: 'appliance', billingLabel: null },
+      ],
+      deviceAdjustments: [
+        { deviceCode: 'aircon', chargeAmount: 50000 },
+        { deviceCode: 'water_heater', chargeAmount: 30000 },
+      ],
+    });
+
+    expect(result.electricDeviceSurcharge).toBe(80000);
+    expect(result.resolvedDeviceSurcharges).toEqual([
+      { deviceCode: 'aircon', chargeAmount: 50000 },
+      { deviceCode: 'water_heater', chargeAmount: 30000 },
+    ]);
+  });
 });

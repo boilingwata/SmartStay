@@ -1,4 +1,4 @@
-/// <reference path="../_shared/deno-globals.d.ts" />
+import '../_shared/deno-globals.d.ts';
 
 /**
  * create-contract
@@ -21,6 +21,10 @@ interface ServiceEntry {
   quantity?: number;
 }
 
+interface ServiceCatalogRow {
+  id: number;
+}
+
 interface CreateContractRequest {
   roomId: number;
   startDate: string;
@@ -34,6 +38,20 @@ interface CreateContractRequest {
   occupantIds: number[];
   selectedServices?: ServiceEntry[];
   markDepositReceived?: boolean;
+  ownerRep?: {
+    fullName: string;
+    cccd?: string | null;
+    role: string;
+  };
+  ownerLegalConfirmation?: {
+    legalBasisType: 'owner' | 'authorized_representative' | 'business_entity';
+    legalBasisNote?: string | null;
+    supportingDocumentUrls?: string[];
+    hasLegalRentalRightsConfirmed: boolean;
+    propertyEligibilityConfirmed: boolean;
+    landlordResponsibilitiesAccepted: boolean;
+    finalAcknowledgementAccepted: boolean;
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -46,7 +64,7 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json();
   } catch {
-    return errorResponse('Invalid JSON body');
+    return errorResponse('Dữ liệu gửi lên không hợp lệ.');
   }
 
   const {
@@ -62,14 +80,34 @@ Deno.serve(async (req: Request) => {
     occupantIds,
     selectedServices = [],
     markDepositReceived = false,
+    ownerRep,
+    ownerLegalConfirmation,
   } = body;
 
-  // Basic validation
-  if (!roomId || typeof roomId !== 'number') return errorResponse('roomId is required');
-  if (!startDate || !endDate) return errorResponse('startDate and endDate are required');
-  if (typeof rentPrice !== 'number' || rentPrice <= 0) return errorResponse('rentPrice must be positive');
-  if (!primaryTenantId || typeof primaryTenantId !== 'number') return errorResponse('primaryTenantId is required');
-  if (!Array.isArray(occupantIds)) return errorResponse('occupantIds must be an array');
+  if (!roomId || typeof roomId !== 'number') return errorResponse('Thiếu thông tin phòng hợp lệ.');
+  if (!startDate || !endDate) return errorResponse('Thiếu ngày bắt đầu hoặc ngày kết thúc hợp đồng.');
+  if (typeof rentPrice !== 'number' || rentPrice <= 0) return errorResponse('Giá thuê phải lớn hơn 0.');
+  if (!primaryTenantId || typeof primaryTenantId !== 'number') return errorResponse('Thiếu người đứng tên hợp đồng.');
+  if (!Array.isArray(occupantIds)) return errorResponse('Danh sách người ở cùng không hợp lệ.');
+  if (!ownerLegalConfirmation?.legalBasisType) return errorResponse('Thiếu căn cứ pháp lý của bên cho thuê.');
+  if (!ownerLegalConfirmation?.hasLegalRentalRightsConfirmed) {
+    return errorResponse('Chưa xác nhận quyền cho thuê hợp pháp.');
+  }
+  if (!ownerLegalConfirmation?.propertyEligibilityConfirmed) {
+    return errorResponse('Chưa xác nhận nhà hoặc phòng đủ điều kiện cho thuê.');
+  }
+  if (!ownerLegalConfirmation?.landlordResponsibilitiesAccepted) {
+    return errorResponse('Chưa xác nhận trách nhiệm của bên cho thuê.');
+  }
+  if (!ownerLegalConfirmation?.finalAcknowledgementAccepted) {
+    return errorResponse('Chưa xác nhận cam kết cuối trước khi tạo hợp đồng.');
+  }
+  if (
+    ownerLegalConfirmation.legalBasisType === 'authorized_representative' &&
+    (ownerLegalConfirmation.supportingDocumentUrls?.length ?? 0) === 0
+  ) {
+    return errorResponse('Người được ủy quyền phải có ít nhất 1 hồ sơ pháp lý đính kèm.');
+  }
 
   const serviceIds = selectedServices.map((s) => s.serviceId);
   const db = createAdminClient();
@@ -84,13 +122,13 @@ Deno.serve(async (req: Request) => {
     return errorResponse(serviceError.message, 500);
   }
 
-  const catalogServiceIds = new Set((serviceRows ?? []).map((item) => item.id));
+  const catalogServiceIds = new Set(((serviceRows ?? []) as ServiceCatalogRow[]).map((item: ServiceCatalogRow) => item.id));
   const filteredServices = selectedServices.filter((service) => catalogServiceIds.has(service.serviceId));
   const filteredServiceIds = filteredServices.map((s) => s.serviceId);
   const servicePrices = filteredServices.map((s) => s.fixedPrice ?? null);
   const serviceQuantities = filteredServices.map((s) => s.quantity ?? 1);
 
-  const { data, error } = await db.rpc('create_contract_v2', {
+  const { data, error } = await db.rpc('create_contract_v3', {
     p_room_id:               roomId,
     p_start_date:            startDate,
     p_end_date:              endDate,
@@ -105,12 +143,25 @@ Deno.serve(async (req: Request) => {
     p_service_prices:        servicePrices.length > 0 ? servicePrices : null,
     p_service_quantities:    serviceQuantities.length > 0 ? serviceQuantities : null,
     p_mark_deposit_received: markDepositReceived,
+    p_owner_legal_basis_type: ownerLegalConfirmation?.legalBasisType ?? 'owner',
+    p_owner_legal_basis_note: ownerLegalConfirmation?.legalBasisNote ?? null,
+    p_owner_supporting_document_urls: ownerLegalConfirmation?.supportingDocumentUrls ?? [],
+    p_owner_has_legal_rental_rights: ownerLegalConfirmation?.hasLegalRentalRightsConfirmed ?? false,
+    p_owner_property_eligibility_confirmed: ownerLegalConfirmation?.propertyEligibilityConfirmed ?? false,
+    p_owner_responsibilities_accepted: ownerLegalConfirmation?.landlordResponsibilitiesAccepted ?? false,
+    p_owner_final_acknowledgement: ownerLegalConfirmation?.finalAcknowledgementAccepted ?? false,
+    p_owner_rep_full_name: ownerRep?.fullName ?? null,
+    p_owner_rep_cccd: ownerRep?.cccd ?? null,
+    p_owner_rep_role: ownerRep?.role ?? null,
   });
 
   if (error) {
-    console.error('[create-contract] RPC error:', error);
-    // Surface validation errors (room not available, etc.) as 400
-    if (error.message.includes('not available') || error.message.includes('not found')) {
+    if (
+      error.message.includes('Kh') ||
+      error.message.includes('kh') ||
+      error.message.includes('not available') ||
+      error.message.includes('not found')
+    ) {
       return errorResponse(error.message, 400);
     }
     return errorResponse(error.message, 500);

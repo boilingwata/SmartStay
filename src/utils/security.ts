@@ -112,6 +112,25 @@ export const checkPdfIntegrity = async (file: Blob): Promise<boolean> => {
   });
 };
 
+export const checkOfficeDocumentIntegrity = async (file: Blob): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = (e) => {
+      if (!e.target?.result) return resolve(false);
+      const arr = new Uint8Array(e.target.result as ArrayBuffer).subarray(0, 8);
+      let header = '';
+      for (let i = 0; i < arr.length; i++) {
+        header += arr[i].toString(16).padStart(2, '0');
+      }
+
+      const isLegacyDoc = header.startsWith('d0cf11e0');
+      const isDocxZip = header.startsWith('504b0304') || header.startsWith('504b0506') || header.startsWith('504b0708');
+      resolve(isLegacyDoc || isDocxZip);
+    };
+    reader.readAsArrayBuffer(file.slice(0, 8));
+  });
+};
+
 /**
  * Strictly validates and normalizes a URL string. 
  * Only allows http: and https: protocols AND requires the host

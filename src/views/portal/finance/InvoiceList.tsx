@@ -57,6 +57,17 @@ const getStatusChip = (status: PortalInvoiceStatus) =>
     cancelled: { label: 'Đã hủy', className: 'bg-slate-100 text-slate-600 border border-slate-200' },
   })[status];
 
+const getLineItemTypeLabel = (itemType: PortalInvoiceDetail['lineItems'][number]['itemType']) =>
+  ({
+    rent: 'Tien phong',
+    utility_electric: 'Dien',
+    utility_water: 'Nuoc',
+    service: 'Dich vu',
+    asset: 'Tai san',
+    discount: 'Giam tru',
+    other: 'Khac',
+  })[itemType];
+
 const toIsoString = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
@@ -598,7 +609,10 @@ const InvoiceList: React.FC = () => {
                 ) : (
                   detailQuery.data.lineItems.map((item) => (
                     <div key={item.id} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                      <div>
+                      <div className="space-y-1.5">
+                        <span className="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700">
+                          {getLineItemTypeLabel(item.itemType)}
+                        </span>
                         <p className="font-bold text-slate-900">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.quantity} × {formatVND(item.unitPrice)}</p>
                       </div>

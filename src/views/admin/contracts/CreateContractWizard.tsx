@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,7 +14,10 @@ import {
   ChevronRight,
   CircleDollarSign,
   FileText,
+  Loader2,
   Plus,
+  ShieldCheck,
+  Upload,
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,12 +26,15 @@ import { TenantFormModal } from '@/components/forms/TenantFormModal';
 import { contractSchema, ContractFormData } from '@/schemas/contractSchema';
 import { buildingService } from '@/services/buildingService';
 import { contractService } from '@/services/contractService';
+import { fileService } from '@/services/fileService';
 import { roomService } from '@/services/roomService';
 import { getServices } from '@/services/serviceService';
 import { tenantService } from '@/services/tenantService';
 import utilityAdminService from '@/services/utilityAdminService';
 import { supabase } from '@/lib/supabase';
+import useAuthStore from '@/stores/authStore';
 import { formatVND } from '@/utils';
+import type { BuildingSummary } from '@/models/Building';
 import type { Room, RoomDetail } from '@/models/Room';
 import type { TenantSummary } from '@/models/Tenant';
 import type { Service } from '@/types/service';
@@ -51,11 +57,21 @@ const HE_SO_GIA: Record<ContractFormData['type'], number> = {
   Office: 1.35,
 };
 
-const TEN_LOAI_HOP_DONG: Record<ContractFormData['type'], string> = {
+const TEN_LOAI_HOP_DONG_HIEN_THI: Record<ContractFormData['type'], string> = {
   Residential: 'Nhà ở',
   Commercial: 'Kinh doanh',
   Office: 'Văn phòng',
 };
+
+const TEN_CAN_CU_PHAP_LY_HIEN_THI: Record<ContractFormData['ownerLegalConfirmation']['legalBasisType'], string> = {
+  Owner: 'Chủ sở hữu hoặc người có quyền cho thuê',
+  AuthorizedRepresentative: 'Người được ủy quyền hợp pháp',
+  BusinessEntity: 'Pháp nhân hoặc đơn vị kinh doanh cho thuê',
+};
+
+const DANH_SACH_CAN_CU_PHAP_LY = Object.entries(TEN_CAN_CU_PHAP_LY_HIEN_THI) as Array<
+  [ContractFormData['ownerLegalConfirmation']['legalBasisType'], string]
+>;
 
 function locCuDan(ds: TenantSummary[], tuKhoa: string) {
   const q = tuKhoa.trim().toLowerCase();
@@ -72,6 +88,7 @@ export default function CreateContractWizard() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const authUser = useAuthStore((state) => state.user);
   const presetRoomId = (location.state as { roomId?: string } | null)?.roomId ?? '';
 
   const [buoc, setBuoc] = useState(1);
@@ -81,6 +98,7 @@ export default function CreateContractWizard() {
   const [phanTramGiam, setPhanTramGiam] = useState(0);
   const [daChinhGiaThuCong, setDaChinhGiaThuCong] = useState(false);
   const [thongBaoBuoc2, setThongBaoBuoc2] = useState('');
+  const [dangTaiHoSoPhapLy, setDangTaiHoSoPhapLy] = useState(false);
 
   const form = useForm<ContractFormData>({
     resolver: zodResolver(contractSchema) as never,
@@ -100,6 +118,15 @@ export default function CreateContractWizard() {
       autoRenew: false,
       selectedServices: [],
       utilityPolicyId: '',
+      ownerLegalConfirmation: {
+        legalBasisType: 'Owner',
+        legalBasisNote: '',
+        supportingDocumentUrls: [],
+        hasLegalRentalRightsConfirmed: false,
+        propertyEligibilityConfirmed: false,
+        landlordResponsibilitiesAccepted: false,
+        finalAcknowledgementAccepted: false,
+      },
       ownerRep: {
         fullName: 'Trần Văn Quản Lý',
         cccd: '001092009999',
@@ -127,10 +154,23 @@ export default function CreateContractWizard() {
   const ngayKetThuc = watch('endDate');
   const giaThue = watch('rentPrice');
   const tienCoc = watch('depositAmount');
-  const chuKyThanhToan = watch('paymentCycle');
   const ngayDenHan = watch('paymentDueDay');
   const dichVuDaChon = watch('selectedServices');
   const utilityPolicyId = watch('utilityPolicyId');
+  const legalBasisType = watch('ownerLegalConfirmation.legalBasisType');
+  const legalBasisNote = watch('ownerLegalConfirmation.legalBasisNote');
+  const supportingDocumentUrls = watch('ownerLegalConfirmation.supportingDocumentUrls');
+  const hasLegalRentalRightsConfirmed = watch('ownerLegalConfirmation.hasLegalRentalRightsConfirmed');
+  const propertyEligibilityConfirmed = watch('ownerLegalConfirmation.propertyEligibilityConfirmed');
+  const landlordResponsibilitiesAccepted = watch('ownerLegalConfirmation.landlordResponsibilitiesAccepted');
+  const finalAcknowledgementAccepted = watch('ownerLegalConfirmation.finalAcknowledgementAccepted');
+  const canSubmitLegalStep =
+    !!legalBasisType &&
+    hasLegalRentalRightsConfirmed &&
+    propertyEligibilityConfirmed &&
+    landlordResponsibilitiesAccepted &&
+    finalAcknowledgementAccepted &&
+    (legalBasisType !== 'AuthorizedRepresentative' || (supportingDocumentUrls?.length ?? 0) > 0);
 
   const { data: buildings = [] } = useQuery({
     queryKey: ['buildings-summary'],
@@ -229,7 +269,7 @@ export default function CreateContractWizard() {
   const sucChuaToiDa = roomDetail?.maxOccupancy ?? 0;
   const vuotSucChua = sucChuaToiDa > 0 && tongNguoiO > sucChuaToiDa;
   const toaNhaDangChon =
-    (buildings.find((building: any) => String(building.id) === buildingId)?.buildingName as string | undefined) ?? '';
+    (buildings.find((building: BuildingSummary) => String(building.id) === buildingId)?.buildingName as string | undefined) ?? '';
   const phongDangChon = rooms.find((room) => room.id === roomId) ?? null;
   const giaNiemYet = roomDetail?.baseRentPrice ?? phongDangChon?.baseRentPrice ?? 0;
   const heSoGia = HE_SO_GIA[loaiHopDong];
@@ -269,6 +309,29 @@ export default function CreateContractWizard() {
   }, [roomId, setValue, getValues, daChinhGiaThuCong]);
 
   useEffect(() => {
+    if (!authUser) return;
+
+    const currentName = getValues('ownerRep.fullName');
+    const currentCccd = getValues('ownerRep.cccd');
+    const roleLabel =
+      authUser.role === 'Owner'
+        ? 'Chủ nhà / người đại diện'
+        : authUser.role === 'Staff'
+          ? 'Nhân sự vận hành'
+          : 'Người đại diện';
+
+    if (!currentName || currentName === 'Trần Văn Quản Lý') {
+      setValue('ownerRep.fullName', authUser.fullName ?? '', { shouldDirty: false });
+    }
+
+    if (currentCccd === '001092009999') {
+      setValue('ownerRep.cccd', '', { shouldDirty: false });
+    }
+
+    setValue('ownerRep.role', roleLabel, { shouldDirty: false });
+  }, [authUser, getValues, setValue]);
+
+  useEffect(() => {
     if (!giaNiemYet || daChinhGiaThuCong) return;
     setValue('rentPrice', giaDeXuat, {
       shouldDirty: false,
@@ -282,7 +345,7 @@ export default function CreateContractWizard() {
       await queryClient.invalidateQueries({ queryKey: ['contracts'] });
       await queryClient.invalidateQueries({ queryKey: ['rooms'] });
       toast.success(`Đã tạo hợp đồng ${contract.contractCode}`);
-      navigate('/owner/contracts');
+      navigate(`/admin/contracts/${contract.id}`);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Không thể tạo hợp đồng');
@@ -349,7 +412,7 @@ export default function CreateContractWizard() {
         ? ['buildingId', 'roomId', 'primaryTenantId', 'occupantIds']
         : buoc === 2
           ? ['type', 'startDate', 'endDate', 'rentPrice', 'depositAmount', 'paymentCycle', 'paymentDueDay']
-        : ['utilityPolicyId', 'ownerRep.fullName', 'ownerRep.cccd'];
+        : ['utilityPolicyId', 'ownerRep.fullName'];
 
     setThongBaoBuoc2('');
     const hopLe = await trigger(danhSachTruong as never);
@@ -380,7 +443,7 @@ export default function CreateContractWizard() {
     setBuoc((hienTai) => Math.min(hienTai + 1, 4));
   };
 
-  const taoNhanhCuDan = async (payload: any) => {
+  const taoNhanhCuDan = async (payload: Parameters<typeof tenantService.createTenant>[0]) => {
     const tenant = await tenantService.createTenant(payload);
     await queryClient.invalidateQueries({ queryKey: ['tenants-all'] });
     chonTenantChinh(tenant.id);
@@ -389,6 +452,51 @@ export default function CreateContractWizard() {
 
   const submit = (payload: ContractFormData) => {
     taoHopDong.mutate(payload);
+  };
+
+  const taiHoSoPhapLy = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+
+    try {
+      setDangTaiHoSoPhapLy(true);
+      const uploadedUrls = await Promise.all(
+        files.map((file) =>
+          fileService.uploadFile(file, file.name, {
+            allowedTypes: [
+              'image/jpeg',
+              'image/png',
+              'image/webp',
+              'application/pdf',
+              'application/msword',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ],
+            maxSize: 10 * 1024 * 1024,
+            pathPrefix: 'contracts/legal-documents',
+          }),
+        ),
+      );
+
+      setValue(
+        'ownerLegalConfirmation.supportingDocumentUrls',
+        [...(supportingDocumentUrls ?? []), ...uploadedUrls],
+        { shouldDirty: true, shouldValidate: true },
+      );
+      toast.success(`Đã tải lên ${uploadedUrls.length} hồ sơ pháp lý`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể tải lên hồ sơ pháp lý');
+    } finally {
+      setDangTaiHoSoPhapLy(false);
+      event.target.value = '';
+    }
+  };
+
+  const xoaHoSoPhapLy = (url: string) => {
+    setValue(
+      'ownerLegalConfirmation.supportingDocumentUrls',
+      (supportingDocumentUrls ?? []).filter((item) => item !== url),
+      { shouldDirty: true, shouldValidate: true },
+    );
   };
 
   return (
@@ -403,6 +511,14 @@ export default function CreateContractWizard() {
             <p className="max-w-3xl text-sm leading-6 text-slate-600">
               Màn này tách rõ người chưa thuê, người đang thuê, phòng trống và phòng đang có hợp đồng
               để thao tác ngắn gọn hơn. Tóm tắt hợp đồng luôn cập nhật theo dữ liệu đang nhập.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-slate-700">
+            <p className="font-black text-slate-900">Hướng dẫn nhanh</p>
+            <p className="mt-2">
+              Đi lần lượt từ chọn phòng, chốt điều khoản, chọn dịch vụ đến xác nhận pháp lý. Hợp đồng chỉ được tạo khi
+              thông tin cư trú hợp lệ, không trùng thời gian thuê và phần cam kết pháp lý đã hoàn tất.
             </p>
           </div>
 
@@ -440,7 +556,7 @@ export default function CreateContractWizard() {
                   </label>
                   <select {...register('buildingId')} className="input-base w-full">
                     <option value="">Chọn tòa nhà</option>
-                    {buildings.map((building: any) => (
+                    {buildings.map((building: BuildingSummary) => (
                       <option key={building.id} value={building.id}>
                         {building.buildingName}
                       </option>
@@ -581,7 +697,7 @@ export default function CreateContractWizard() {
                     <CalendarDays className="mt-1 text-slate-700" size={18} />
                     <div>
                       <h2 className="text-lg font-black text-slate-900">Thời hạn hợp đồng</h2>
-                      <p className="text-sm text-slate-600">
+                      <p className="text-sm font-slate-600">
                         Có gợi ý nhanh để đặt ngày kết thúc. Hệ thống kiểm tra trùng hợp đồng khi sang bước kế tiếp.
                       </p>
                     </div>
@@ -620,6 +736,7 @@ export default function CreateContractWizard() {
                       )}
                     </div>
                   </div>
+
                 </div>
 
                 <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
@@ -676,7 +793,7 @@ export default function CreateContractWizard() {
                       </div>
                       <p className="mt-2 text-sm text-slate-600">
                         Giá niêm yết {formatVND(giaNiemYet)} x hệ số {heSoGia} cho loại{' '}
-                        {TEN_LOAI_HOP_DONG[loaiHopDong]}
+                        {TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]}
                         {phanTramGiam > 0 ? `, giảm ${phanTramGiam}%` : ''}.
                       </p>
                     </div>
@@ -818,7 +935,7 @@ export default function CreateContractWizard() {
                     <div>
                       <p className="text-sm font-black text-slate-900">Chính sách điện nước</p>
                       <p className="text-sm text-slate-600">
-                        Điện nước được tính từ `utility_policies`, không suy diễn từ tên dịch vụ.
+                        Điện nước được tính từ utility_policies, không suy diễn từ tên dịch vụ.
                       </p>
                     </div>
 
@@ -835,7 +952,7 @@ export default function CreateContractWizard() {
                       <option value="">Chọn chính sách điện nước</option>
                       {utilityPolicies.map((policy) => (
                         <option key={policy.id} value={String(policy.id)}>
-                          {policy.name} ({policy.code})
+                          {policy.name}
                         </option>
                       ))}
                     </select>
@@ -858,13 +975,13 @@ export default function CreateContractWizard() {
                     <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                       Họ tên người ký
                     </label>
-                    <input {...register('ownerRep.fullName')} className="input-base w-full" />
+                    <input {...register('ownerRep.fullName')} className="input-base w-full" placeholder="Tự động lấy theo tài khoản" />
                   </div>
                   <div>
                     <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                       CCCD người ký
                     </label>
-                    <input {...register('ownerRep.cccd')} className="input-base w-full" />
+                    <input {...register('ownerRep.cccd')} className="input-base w-full" placeholder="Để trống nếu không cần hiện trên hợp đồng" />
                   </div>
                   <div>
                     <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
@@ -874,6 +991,17 @@ export default function CreateContractWizard() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {buoc === 4 && (
+            <div className="mb-4 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+              <p className="font-black text-slate-900">Cách hoàn tất bước xác nhận</p>
+              <p className="mt-2">
+                Kiểm tra lại thông tin hợp đồng ở các thẻ bên dưới, sau đó chọn căn cứ pháp lý, tải hồ sơ nếu cần và
+                xác nhận đủ 4 cam kết bắt buộc. Nếu chọn <b>Người được ủy quyền hợp pháp</b>, bạn phải có ít nhất 1 hồ
+                sơ pháp lý mới được tạo hợp đồng.
+              </p>
             </div>
           )}
 
@@ -898,7 +1026,7 @@ export default function CreateContractWizard() {
               <TheXemLai
                 tieuDe="Điều khoản"
                 rows={[
-                  ['Loại hợp đồng', TEN_LOAI_HOP_DONG[loaiHopDong]],
+                  ['Loại hợp đồng', TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]],
                   ['Ngày bắt đầu', ngayBatDau || 'Chưa chọn'],
                   ['Ngày kết thúc', ngayKetThuc || 'Chưa chọn'],
                   ['Ngày đến hạn', `Ngày ${ngayDenHan}`],
@@ -928,6 +1056,150 @@ export default function CreateContractWizard() {
             </div>
           )}
 
+          {buoc === 4 && (
+            <div className="mt-6 rounded-[28px] border border-amber-200 bg-amber-50 p-5">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-1 text-amber-700" size={18} />
+                <div className="space-y-2">
+                  <h2 className="text-lg font-black text-slate-900">Cam kết pháp lý bên cho thuê</h2>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Bước này xác nhận căn cứ pháp lý, trách nhiệm và minh bạch hồ sơ trước khi tạo hợp đồng.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                      Căn cứ pháp lý bên cho thuê
+                    </label>
+                    <select {...register('ownerLegalConfirmation.legalBasisType')} className="input-base w-full">
+                      {DANH_SACH_CAN_CU_PHAP_LY.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                      Ghi chú pháp lý
+                    </label>
+                    <textarea
+                      {...register('ownerLegalConfirmation.legalBasisNote')}
+                      rows={4}
+                      className="input-base min-h-[120px] w-full resize-none"
+                      placeholder="Ví dụ: sở hữu trực tiếp, được ủy quyền theo văn bản, hoặc cho thuê theo pháp nhân."
+                    />
+                    <p className="mt-2 text-xs text-slate-500">Căn cứ đã chọn: {TEN_CAN_CU_PHAP_LY_HIEN_THI[legalBasisType]}.</p>
+                    {errors.ownerLegalConfirmation?.legalBasisNote && (
+                      <p className="mt-2 text-sm font-semibold text-rose-600">
+                        {errors.ownerLegalConfirmation.legalBasisNote.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-3xl border border-dashed border-amber-300 bg-white p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-900">Hồ sơ pháp lý đính kèm</p>
+                        <p className="text-sm leading-6 text-slate-600">
+                          Hỗ trợ ảnh, PDF, DOC, DOCX. Trường hợp được ủy quyền thì phải đính kèm ít nhất 1 tệp.
+                        </p>
+                      </div>
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-900 hover:text-slate-900">
+                        {dangTaiHoSoPhapLy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                        Tải hồ sơ
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
+                          onChange={taiHoSoPhapLy}
+                          disabled={dangTaiHoSoPhapLy}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {supportingDocumentUrls?.length ? (
+                        supportingDocumentUrls.map((url, index) => (
+                          <div
+                            key={`${url}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          >
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate text-sm font-semibold text-slate-700 hover:text-slate-900"
+                            >
+                              Hồ sơ {index + 1}
+                            </a>
+                            <Button type="button" variant="ghost" onClick={() => xoaHoSoPhapLy(url)}>
+                              Xóa
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                          Chưa có hồ sơ pháp lý nào được đính kèm.
+                        </div>
+                      )}
+                    </div>
+                    {errors.ownerLegalConfirmation?.supportingDocumentUrls && (
+                      <p className="mt-2 text-sm font-semibold text-rose-600">
+                        {errors.ownerLegalConfirmation.supportingDocumentUrls.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+                    Xác nhận bắt buộc trước khi tạo
+                  </p>
+
+                  <CamKetCheckbox
+                    label="Bên cho thuê xác nhận có quyền cho thuê hợp pháp hoặc được ủy quyền hợp lệ."
+                    checked={hasLegalRentalRightsConfirmed}
+                    error={errors.ownerLegalConfirmation?.hasLegalRentalRightsConfirmed?.message}
+                    inputProps={register('ownerLegalConfirmation.hasLegalRentalRightsConfirmed')}
+                  />
+                  <CamKetCheckbox
+                    label="Nhà/phòng cho thuê đủ điều kiện giao dịch, không tranh chấp, không bị kê biên hoặc thu hồi theo thông tin hiện có."
+                    checked={propertyEligibilityConfirmed}
+                    error={errors.ownerLegalConfirmation?.propertyEligibilityConfirmed?.message}
+                    inputProps={register('ownerLegalConfirmation.propertyEligibilityConfirmed')}
+                  />
+                  <CamKetCheckbox
+                    label="Bên cho thuê chấp nhận trách nhiệm bàn giao, bảo trì, hỗ trợ hồ sơ cư trú và các nghĩa vụ theo hợp đồng/pháp luật áp dụng."
+                    checked={landlordResponsibilitiesAccepted}
+                    error={errors.ownerLegalConfirmation?.landlordResponsibilitiesAccepted?.message}
+                    inputProps={register('ownerLegalConfirmation.landlordResponsibilitiesAccepted')}
+                  />
+                  <CamKetCheckbox
+                    label="Tôi đồng ý lưu vết cam kết này trong hợp đồng và chịu trách nhiệm về tính chính xác của thông tin."
+                    checked={finalAcknowledgementAccepted}
+                    error={errors.ownerLegalConfirmation?.finalAcknowledgementAccepted?.message}
+                    inputProps={register('ownerLegalConfirmation.finalAcknowledgementAccepted')}
+                  />
+
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Người ký xác nhận: {getValues('ownerRep.fullName') || 'Chưa có'}.
+                    <br />
+                    Căn cứ hiện tại: {TEN_CAN_CU_PHAP_LY_HIEN_THI[legalBasisType]}.
+                    <br />
+                    Số hồ sơ đính kèm: {supportingDocumentUrls?.length ?? 0}.
+                    {legalBasisNote ? <span> Ghi chú: {legalBasisNote}</span> : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mt-8 flex items-center justify-between">
             <Button
               type="button"
@@ -944,7 +1216,11 @@ export default function CreateContractWizard() {
                 Tiếp tục
               </Button>
             ) : (
-              <Button type="submit" leftIcon={<Check size={16} />} disabled={taoHopDong.isPending}>
+              <Button
+                type="submit"
+                leftIcon={<Check size={16} />}
+                disabled={taoHopDong.isPending || dangTaiHoSoPhapLy || !canSubmitLegalStep}
+              >
                 {taoHopDong.isPending ? 'Đang tạo hợp đồng...' : 'Tạo hợp đồng'}
               </Button>
             )}
@@ -959,7 +1235,7 @@ export default function CreateContractWizard() {
                 <DongTomTat label="Tòa nhà" value={toaNhaDangChon || 'Chưa chọn'} />
                 <DongTomTat label="Phòng" value={phongDangChon?.roomCode ?? 'Chưa chọn'} />
                 <DongTomTat label="Giá niêm yết" value={formatVND(giaNiemYet)} />
-                <DongTomTat label="Loại hợp đồng" value={TEN_LOAI_HOP_DONG[loaiHopDong]} />
+                <DongTomTat label="Loại hợp đồng" value={TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]} />
                 <DongTomTat label="Khuyến mãi giảm giá" value={`${String(phanTramGiam).padStart(2, '0')} %`} />
                 <DongTomTat label="Số tiền giảm" value={formatVND(giaGiam)} />
                 <DongTomTat label="Giá thuê đang nhập" value={formatVND(giaThue || 0)} />
@@ -1014,6 +1290,32 @@ export default function CreateContractWizard() {
         onSubmit={taoNhanhCuDan}
       />
     </div>
+  );
+}
+
+function CamKetCheckbox({
+  label,
+  checked,
+  error,
+  inputProps,
+}: {
+  label: string;
+  checked: boolean;
+  error?: string;
+  inputProps: Record<string, unknown>;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+        checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'
+      }`}
+    >
+      <input type="checkbox" className="mt-1 h-4 w-4 accent-slate-900" {...inputProps} />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-6 text-slate-700">{label}</p>
+        {error ? <p className="mt-2 text-sm font-semibold text-rose-600">{error}</p> : null}
+      </div>
+    </label>
   );
 }
 

@@ -29,6 +29,7 @@ export interface RoomDetail extends Room {
   lastMaintenanceDate?: string;
   images: RoomImage[];
   amenities: string[];
+  amenityDetails?: Array<{ code: string; label: string }>;
   meters: RoomMeter[];
   assets: RoomAsset[];
   statusHistory: RoomStatusHistory[];
@@ -58,6 +59,10 @@ export interface RoomAsset {
   type: string;
   condition: 'New' | 'Good' | 'Fair' | 'Poor';
   assignedAt: string;
+  isBillable?: boolean;
+  monthlyCharge?: number;
+  billingStatus?: 'Inactive' | 'Active' | 'Suspended' | 'Stopped';
+  billingLabel?: string;
 }
 
 export interface RoomStatusHistory {

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { checkImageIntegrity, checkPdfIntegrity } from '@/utils/security';
+import { checkImageIntegrity, checkOfficeDocumentIntegrity, checkPdfIntegrity } from '@/utils/security';
 
 const UPLOAD_TIMESTAMPS: number[] = [];
 const RATE_LIMIT_COUNT = 5;
@@ -38,11 +38,16 @@ export const fileService = {
 
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf';
+    const isOfficeDocument =
+      file.type === 'application/msword' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const isValid = isImage
       ? await checkImageIntegrity(file)
       : isPdf
         ? await checkPdfIntegrity(file)
-        : false;
+        : isOfficeDocument
+          ? await checkOfficeDocumentIntegrity(file)
+          : false;
 
     if (!isValid) {
       throw new Error('SECURITY_REJECTION: Tệp không hợp lệ hoặc bị hỏng.');

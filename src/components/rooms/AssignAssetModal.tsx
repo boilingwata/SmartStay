@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { X, Search, Package, Check, Zap, Layout, Loader2 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Layout, Loader2, Package, Search, X, Zap } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AssetType } from '@/models/Asset';
 import { assetService } from '@/services/assetService';
-import { Asset, AssetType } from '@/models/Asset';
-import { cn, formatDate } from '@/utils';
+import { cn } from '@/utils';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface AssignAssetModalProps {
   isOpen: boolean;
@@ -18,54 +18,69 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState<AssetType | 'All'>('All');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBillable, setIsBillable] = useState(false);
+  const [monthlyCharge, setMonthlyCharge] = useState('');
+  const [billingLabel, setBillingLabel] = useState('');
+  const [billingStartDate, setBillingStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: unassignedAssets, isLoading } = useQuery({
     queryKey: ['unassigned-assets', search, selectedType],
-    queryFn: () => assetService.getAssets({
-      unassignedOnly: true,
-      search,
-      type: selectedType === 'All' ? undefined : selectedType
-    }),
-    enabled: isOpen
+    queryFn: () =>
+      assetService.getAssets({
+        unassignedOnly: true,
+        search,
+        type: selectedType === 'All' ? undefined : selectedType,
+      }),
+    enabled: isOpen,
   });
 
   const assignMutation = useMutation({
-    mutationFn: (ids: string[]) => assetService.assignAssetsToRoom(ids, roomId),
+    mutationFn: (ids: string[]) =>
+      assetService.assignAssetsToRoom(ids, roomId, {
+        isBillable,
+        monthlyCharge: isBillable ? Number(monthlyCharge || 0) : 0,
+        billingLabel: billingLabel.trim() || undefined,
+        billingStartDate,
+        billingStatus: isBillable ? 'Active' : 'Inactive',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['room', String(roomId)] });
-      toast.success(`Đã gán ${selectedIds.length} tài sản vào phòng`);
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success(`Da gan ${selectedIds.length} tai san vao phong`);
       setSelectedIds([]);
+      setIsBillable(false);
+      setMonthlyCharge('');
+      setBillingLabel('');
+      setBillingStartDate(new Date().toISOString().slice(0, 10));
+      onClose();
     },
-    onError: (err: Error) => {
-      toast.error(`Lỗi: ${err.message}`);
-    }
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
   });
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   };
 
   const toggleSelectAll = () => {
     if (!unassignedAssets) return;
     if (selectedIds.length === unassignedAssets.length && selectedIds.length > 0) {
       setSelectedIds([]);
-    } else {
-      setSelectedIds(unassignedAssets.map(a => a.id));
+      return;
     }
+
+    setSelectedIds(unassignedAssets.map((asset) => asset.id));
   };
 
   if (!isOpen) return null;
 
-  const assetTypes: (AssetType | 'All')[] = ['All', 'Furniture', 'Appliance', 'Electronics', 'Fixture', 'Other'];
+  const assetTypes: Array<AssetType | 'All'> = ['All', 'Furniture', 'Appliance', 'Electronics', 'Fixture', 'Other'];
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-        {/* Backdrop */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -73,126 +88,143 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
           className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
         />
 
-        {/* Modal Content */}
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-4xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[40px] bg-white shadow-2xl"
         >
-          {/* Header */}
-          <div className="p-8 border-b bg-slate-900 flex justify-between items-center text-white">
+          <div className="flex items-center justify-between border-b bg-slate-900 p-8 text-white">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center"><Package size={24} /></div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                <Package size={24} />
+              </div>
               <div>
-                <h2 className="text-xl font-black uppercase tracking-widest text-white">Gán tài sản vào phòng</h2>
-                <p className="text-[10px] text-white/50 font-medium uppercase tracking-widest">Danh sách tài sản đang trống trong kho</p>
+                <h2 className="text-xl font-black uppercase tracking-widest text-white">Gan tai san vao phong</h2>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-white/50">
+                  Chon tai san trong kho va cau hinh billing ngay khi gan
+                </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-all text-white"><X size={24} /></button>
+            <button onClick={onClose} className="rounded-full p-2 text-white transition-all hover:bg-white/10">
+              <X size={24} />
+            </button>
           </div>
 
-          {/* Filters Bar */}
-          <div className="p-6 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative flex-1 w-full">
+          <div className="flex flex-col items-center gap-4 border-b border-slate-100 bg-slate-50 p-6 md:flex-row">
+            <div className="relative w-full flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
+              <input
                 type="text"
-                placeholder="Tìm kiếm theo tên, mã tài sản, serial..."
+                placeholder="Tim theo ten, ma tai san, serial..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-12 pl-12 pr-4 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all shadow-inner-sm"
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 font-bold text-slate-700 shadow-inner-sm transition-all focus:border-primary/30 focus:ring-4 focus:ring-primary/10"
               />
             </div>
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-              {assetTypes.map(type => (
+            <div className="flex w-full gap-2 overflow-x-auto pb-2 md:w-auto md:pb-0 scrollbar-hide">
+              {assetTypes.map((type) => (
                 <button
                   key={type}
                   onClick={() => setSelectedType(type)}
                   className={cn(
-                    "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all",
-                    selectedType === type 
-                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                      : "bg-white text-slate-500 border border-slate-200 hover:border-primary/30"
+                    'whitespace-nowrap rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all',
+                    selectedType === type
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                      : 'border border-slate-200 bg-white text-slate-500 hover:border-primary/30'
                   )}
                 >
-                  {type === 'All' ? 'Tất cả' : type}
+                  {type === 'All' ? 'Tat ca' : type}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Asset List */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-slate-50/30">
+          <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/30 p-8">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Đang tải tài sản...</p>
+              <div className="flex flex-col items-center justify-center gap-4 py-20">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Dang tai tai san...</p>
               </div>
             ) : unassignedAssets?.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 animate-in fade-in duration-500">
-                <div className="w-20 h-20 bg-slate-100 rounded-[32px] flex items-center justify-center text-slate-300 shadow-inner">
+              <div className="space-y-4 py-20 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[32px] bg-slate-100 text-slate-300 shadow-inner">
                   <Package size={40} />
                 </div>
-                <p className="text-[13px] font-bold text-slate-400 italic">Không tìm thấy tài sản nào phù hợp trong kho.</p>
+                <p className="text-[13px] font-bold italic text-slate-400">Khong tim thay tai san nao trong kho.</p>
               </div>
             ) : (
               <>
-                <div className="flex justify-between items-center mb-6 px-2">
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tìm thấy {unassignedAssets?.length} tài sản</p>
-                  <button 
+                <div className="mb-6 flex items-center justify-between px-2">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                    Tim thay {unassignedAssets?.length} tai san
+                  </p>
+                  <button
                     onClick={toggleSelectAll}
                     type="button"
-                    className="text-[11px] font-black text-primary uppercase tracking-[2px] hover:underline"
+                    className="text-[11px] font-black uppercase tracking-[2px] text-primary hover:underline"
                   >
-                    {selectedIds.length === unassignedAssets?.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                    {selectedIds.length === unassignedAssets?.length ? 'Bo chon tat ca' : 'Chon tat ca'}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   {unassignedAssets?.map((asset, index) => (
-                    <motion.div 
+                    <motion.div
                       key={asset.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                       onClick={() => toggleSelect(asset.id)}
                       className={cn(
-                        "p-6 rounded-[32px] border-2 transition-all cursor-pointer group flex items-center gap-5 bg-white relative overflow-hidden",
+                        'group relative flex cursor-pointer items-center gap-5 overflow-hidden rounded-[32px] border-2 bg-white p-6 transition-all',
                         selectedIds.includes(asset.id)
-                          ? "border-primary shadow-xl shadow-primary/5"
-                          : "border-transparent hover:border-primary/20 shadow-sm hover:shadow-md"
+                          ? 'border-primary shadow-xl shadow-primary/5'
+                          : 'border-transparent shadow-sm hover:border-primary/20 hover:shadow-md'
                       )}
                     >
-                      <div className={cn(
-                        "w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 z-10",
-                        selectedIds.includes(asset.id) ? "bg-primary border-primary text-white" : "border-slate-200"
-                      )}>
+                      <div
+                        className={cn(
+                          'z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border-2 transition-all',
+                          selectedIds.includes(asset.id) ? 'border-primary bg-primary text-white' : 'border-slate-200'
+                        )}
+                      >
                         {selectedIds.includes(asset.id) && <Check size={16} />}
                       </div>
-                      <div className={cn(
-                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-inner bg-slate-50 flex-shrink-0 group-hover:scale-110",
-                        selectedIds.includes(asset.id) ? "text-primary" : "text-slate-400"
-                      )}>
-                         {asset.type === 'Appliance' ? <Zap size={28} /> : <Layout size={28} />}
+                      <div
+                        className={cn(
+                          'flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 shadow-inner transition-all group-hover:scale-110',
+                          selectedIds.includes(asset.id) && 'text-primary'
+                        )}
+                      >
+                        {asset.type === 'Appliance' ? <Zap size={28} /> : <Layout size={28} />}
                       </div>
-                      <div className="flex-1 min-w-0 pr-2">
-                        <p className={cn(
-                          "text-[16px] font-black truncate uppercase tracking-tighter transition-colors",
-                          selectedIds.includes(asset.id) ? "text-primary" : "text-slate-900"
-                        )}>{asset.assetName}</p>
-                        <p className="text-[10px] font-mono text-slate-400 font-black truncate tracking-widest mt-0.5">#{asset.assetCode}</p>
-                        <div className="flex items-center gap-3 mt-3">
-                           <span className="px-2.5 py-1 bg-slate-100 text-[9px] font-black text-slate-500 rounded-lg uppercase tracking-widest border border-slate-200/50">{asset.type}</span>
-                           {asset.serialNumber && (
-                             <span className="text-[9px] font-black text-slate-400 uppercase truncate">SN: {asset.serialNumber}</span>
-                           )}
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p
+                          className={cn(
+                            'truncate text-[16px] font-black uppercase tracking-tighter transition-colors',
+                            selectedIds.includes(asset.id) ? 'text-primary' : 'text-slate-900'
+                          )}
+                        >
+                          {asset.assetName}
+                        </p>
+                        <p className="mt-0.5 truncate font-mono text-[10px] font-black tracking-widest text-slate-400">
+                          #{asset.assetCode}
+                        </p>
+                        <div className="mt-3 flex items-center gap-3">
+                          <span className="rounded-lg border border-slate-200/50 bg-slate-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                            {asset.type}
+                          </span>
+                          {asset.serialNumber ? (
+                            <span className="truncate text-[9px] font-black uppercase text-slate-400">
+                              SN: {asset.serialNumber}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 
-                      {/* Glassmorphism accent for selected state */}
-                      {selectedIds.includes(asset.id) && (
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-12 translate-x-12 blur-2xl" />
-                      )}
+                      {selectedIds.includes(asset.id) ? (
+                        <div className="absolute right-0 top-0 h-24 w-24 translate-x-12 -translate-y-12 rounded-full bg-primary/5 blur-2xl" />
+                      ) : null}
                     </motion.div>
                   ))}
                 </div>
@@ -200,27 +232,69 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
             )}
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-10 border-t bg-slate-900 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="text-center md:text-left">
-               <p className="text-[18px] font-black text-white uppercase tracking-tighter">Đang chọn {selectedIds.length} tài sản</p>
-               <p className="text-[10px] text-white/40 italic font-medium tracking-widest uppercase mt-1">Dữ liệu sẽ được cập nhật ngay vào: <span className="text-white font-black">{roomId}</span></p>
+          <div className="flex flex-col gap-6 border-t bg-slate-900 p-10">
+            <div className="grid gap-3 rounded-[28px] border border-white/10 bg-white/5 p-4 md:grid-cols-[180px_1fr_160px_160px]">
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Tinh vao hoa don</span>
+                <input
+                  type="checkbox"
+                  checked={isBillable}
+                  onChange={(event) => setIsBillable(event.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+              </label>
+              <input
+                type="text"
+                value={billingLabel}
+                onChange={(event) => setBillingLabel(event.target.value)}
+                disabled={!isBillable}
+                placeholder="Nhan hien thi tren hoa don"
+                className="input-base h-12 rounded-2xl border-white/10 bg-white/10 px-4 text-sm text-white placeholder:text-white/35 disabled:opacity-50"
+              />
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={monthlyCharge}
+                onChange={(event) => setMonthlyCharge(event.target.value)}
+                disabled={!isBillable}
+                placeholder="Phi thang"
+                className="input-base h-12 rounded-2xl border-white/10 bg-white/10 px-4 text-sm text-white placeholder:text-white/35 disabled:opacity-50"
+              />
+              <input
+                type="date"
+                value={billingStartDate}
+                onChange={(event) => setBillingStartDate(event.target.value)}
+                disabled={!isBillable}
+                className="input-base h-12 rounded-2xl border-white/10 bg-white/10 px-4 text-sm text-white disabled:opacity-50"
+              />
             </div>
-            <div className="flex gap-4 w-full md:w-auto">
-               <button 
-                onClick={onClose}
-                className="flex-1 md:flex-none px-10 py-4 bg-white/5 border border-white/10 text-white/60 font-black uppercase tracking-widest rounded-2xl hover:bg-white/10 hover:text-white transition-all active:scale-95"
-               >
-                 Huỷ
-               </button>
-               <button 
-                disabled={selectedIds.length === 0 || assignMutation.isPending}
-                onClick={() => assignMutation.mutate(selectedIds)}
-                className="flex-1 md:flex-none px-12 py-4 bg-primary text-white font-black uppercase tracking-[3px] rounded-2xl shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:scale-100 flex items-center justify-center gap-3"
-               >
-                 {assignMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Package size={20} />}
-                 Xác nhận gán
-               </button>
+
+            <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+              <div className="text-center md:text-left">
+                <p className="text-[18px] font-black uppercase tracking-tighter text-white">
+                  Dang chon {selectedIds.length} tai san
+                </p>
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-widest text-white/40">
+                  Du lieu se duoc cap nhat ngay vao phong <span className="font-black text-white">{roomId}</span>
+                </p>
+              </div>
+              <div className="flex w-full gap-4 md:w-auto">
+                <button
+                  onClick={onClose}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-10 py-4 font-black uppercase tracking-widest text-white/60 transition-all hover:bg-white/10 hover:text-white active:scale-95 md:flex-none"
+                >
+                  Huy
+                </button>
+                <button
+                  disabled={selectedIds.length === 0 || assignMutation.isPending || (isBillable && Number(monthlyCharge || 0) <= 0)}
+                  onClick={() => assignMutation.mutate(selectedIds)}
+                  className="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-primary px-12 py-4 font-black uppercase tracking-[3px] text-white shadow-2xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-30 md:flex-none"
+                >
+                  {assignMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Package size={20} />}
+                  Xac nhan gan
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

@@ -17,9 +17,11 @@ import {
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import type { ContractDetail as ContractDetailModel, ContractOccupant } from '@/models/Contract';
+import { getContractAddendumSourceLabel, getContractAddendumTypeLabel } from '@/lib/contractAddendums';
 import { LiquidationModal } from '@/components/contracts/modals/LiquidationModal';
 import { AddOccupantModal } from '@/components/contracts/modals/AddOccupantModal';
 import { TransferContractModal } from '@/components/contracts/modals/TransferContractModal';
+import { CreateAddendumModal } from '@/components/contracts/modals/CreateAddendumModal';
 import { Spinner } from '@/components/ui/Feedback';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { contractService } from '@/services/contractService';
@@ -37,10 +39,13 @@ const ContractDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'occupants' | 'transfers' | 'invoices'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'occupants' | 'addendums' | 'transfers' | 'invoices'>(
+    'overview'
+  );
   const [isAddOccupantModalOpen, setAddOccupantModalOpen] = useState(false);
   const [isTransferModalOpen, setTransferModalOpen] = useState(false);
   const [isLiquidationModalOpen, setLiquidationModalOpen] = useState(false);
+  const [isCreateAddendumModalOpen, setCreateAddendumModalOpen] = useState(false);
 
   const { data: contract, isLoading } = useQuery({
     queryKey: ['contract', id],
@@ -56,15 +61,10 @@ const ContractDetail = () => {
         moveOutDate: new Date().toISOString().split('T')[0],
         note: `Occupant ${occupant.fullName} rời phòng`,
       }),
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['contract', id] });
       await queryClient.invalidateQueries({ queryKey: ['contracts'] });
-      await queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      if (result.autoLiquidated) {
-        toast.success('Occupant cuối cùng đã rời đi, hệ thống tự động thanh lý hợp đồng.');
-      } else {
-        toast.success('Đã ghi nhận occupant rời phòng.');
-      }
+      toast.success('Đã ghi nhận occupant rời phòng.');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Không thể cập nhật occupant.');
@@ -96,6 +96,7 @@ const ContractDetail = () => {
   const tabs = [
     { id: 'overview' as const, label: 'Tổng quan', icon: FileText },
     { id: 'occupants' as const, label: 'Người ở cùng', icon: Users },
+    { id: 'addendums' as const, label: 'Phụ lục', icon: FileText },
     { id: 'transfers' as const, label: 'Chuyển hợp đồng', icon: ArrowRightLeft },
     { id: 'invoices' as const, label: 'Hóa đơn', icon: Receipt },
   ];
@@ -140,18 +141,23 @@ const ContractDetail = () => {
               <StatusBadge status={contract.status} size="lg" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <SummaryCard label="Người đại diện" value={contract.primaryTenant?.fullName || contract.tenantName || 'Chưa có'} />
+            <div className="grid gap-4 md:grid-cols-4">
+              <SummaryCard
+                label="Người đại diện"
+                value={contract.primaryTenant?.fullName || contract.tenantName || 'Chưa có'}
+              />
               <SummaryCard label="Occupant đang ở" value={String(activeOccupants.length)} />
+              <SummaryCard label="Phụ lục" value={String(contract.addendums?.length ?? 0)} />
               <SummaryCard label="Tiền cọc" value={formatVND(contract.depositAmount)} />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setAddOccupantModalOpen(true)}
-              className="btn-outline flex items-center gap-2"
-            >
+            <button onClick={() => setCreateAddendumModalOpen(true)} className="btn-outline flex items-center gap-2">
+              <FileText size={18} />
+              Tạo phụ lục
+            </button>
+            <button onClick={() => setAddOccupantModalOpen(true)} className="btn-outline flex items-center gap-2">
               <Users size={18} />
               Thêm occupant
             </button>
@@ -166,7 +172,7 @@ const ContractDetail = () => {
               className="btn-outline flex items-center gap-2"
             >
               <RefreshCcw size={18} />
-              A rời đi
+              Chuyển đại diện / rời đi
             </button>
             <button
               onClick={() => setLiquidationModalOpen(true)}
@@ -210,6 +216,9 @@ const ContractDetail = () => {
               isRemoving={removeOccupantMutation.isPending}
             />
           )}
+          {activeTab === 'addendums' && (
+            <AddendumsTab contract={contract} onCreateAddendum={() => setCreateAddendumModalOpen(true)} />
+          )}
           {activeTab === 'transfers' && <TransfersTab contract={contract} onTransfer={() => setTransferModalOpen(true)} />}
           {activeTab === 'invoices' && <InvoicesTab contract={contract} />}
         </div>
@@ -231,11 +240,13 @@ const ContractDetail = () => {
         isOpen={isLiquidationModalOpen}
         onClose={() => setLiquidationModalOpen(false)}
         contract={contract}
-        defaultReason={
-          activeOccupants.length === 0
-            ? 'Tất cả occupant đã rời phòng.'
-            : 'Người đại diện chính rời đi và không tiếp tục duy trì hợp đồng.'
-        }
+        defaultReason="Người đại diện chính rời đi và không tiếp tục duy trì hợp đồng."
+      />
+
+      <CreateAddendumModal
+        isOpen={isCreateAddendumModalOpen}
+        onClose={() => setCreateAddendumModalOpen(false)}
+        contract={contract}
       />
     </div>
   );
@@ -252,21 +263,13 @@ const OverviewTab = ({ contract }: { contract: ContractDetailModel }) => {
   const activeSecondaryOccupants = contract.occupants.filter(
     (occupant) => occupant.status === 'active' && !occupant.isPrimaryTenant
   );
+  const recurringServiceTotal = contract.services.reduce((sum, service) => sum + service.totalPerCycle, 0);
+  const recurringEstimate = contract.rentPriceSnapshot + recurringServiceTotal;
+  const latestInvoice = contract.invoices?.[0];
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="space-y-6">
-        <section className="rounded-[24px] border border-slate-100 bg-white p-5">
-          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Logic đang áp dụng</h3>
-          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <p>1 hợp đồng chỉ có 1 người đại diện ký hợp đồng.</p>
-            <p>Các occupant chỉ ở cùng, không có quyền ký hay chuyển nghĩa vụ pháp lý của hợp đồng hiện tại.</p>
-            <p>
-              Khi occupant phụ rời đi, hợp đồng giữ nguyên. Khi người đại diện rời đi, hệ thống buộc chọn chuyển hợp đồng cho occupant còn ở lại hoặc thanh lý.
-            </p>
-          </div>
-        </section>
-
         <section className="rounded-[24px] border border-slate-100 bg-white p-5">
           <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Thông tin hợp đồng</h3>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -276,8 +279,33 @@ const OverviewTab = ({ contract }: { contract: ContractDetailModel }) => {
             <InfoItem label="Ngày kết thúc" value={formatDate(contract.endDate)} />
             <InfoItem label="Ngày ký" value={formatDate(contract.signingDate)} />
             <InfoItem label="Đến hạn thanh toán" value={`Ngày ${contract.paymentDueDay} hàng tháng`} />
-            <InfoItem label="Tiền thuê" value={formatVND(contract.rentPriceSnapshot)} />
+            <InfoItem label="Thời hạn báo trước" value={`${contract.noticePeriodDays ?? 30} ngày`} />
             <InfoItem label="Tiền cọc" value={formatVND(contract.depositAmount)} />
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border border-slate-100 bg-white p-5">
+          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Chi phí định kỳ</h3>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <InfoItem label="Tiền phòng / kỳ" value={formatVND(contract.rentPriceSnapshot)} />
+            <InfoItem label="Dịch vụ cố định / kỳ" value={formatVND(recurringServiceTotal)} />
+            <InfoItem label="Tạm tính trước điện nước" value={formatVND(recurringEstimate)} />
+            <InfoItem label="Occupant tính phí" value={String(activeOccupantsCount(contract))} />
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border border-slate-100 bg-white p-5">
+          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Phụ lục</h3>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <InfoItem label="Tổng phụ lục" value={String(contract.addendums?.length ?? 0)} />
+            <InfoItem
+              label="Thủ công"
+              value={String(contract.addendums?.filter((item) => item.sourceType === 'Manual').length ?? 0)}
+            />
+            <InfoItem
+              label="Tự động"
+              value={String(contract.addendums?.filter((item) => item.sourceType === 'RoomAssetAuto').length ?? 0)}
+            />
           </div>
         </section>
       </div>
@@ -301,12 +329,31 @@ const OverviewTab = ({ contract }: { contract: ContractDetailModel }) => {
         </section>
 
         <section className="rounded-[24px] border border-slate-100 bg-slate-50 p-5">
-          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Tình huống 2 theo source of truth</h3>
+          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Tình huống chuyển đại diện</h3>
           <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <p>Nếu A rời đi và còn occupant ở lại: chuyển hợp đồng, tạo hợp đồng mới cho người nhận chuyển.</p>
-            <p>Nếu A rời đi và không còn ai ở lại: thanh lý hợp đồng.</p>
+            <p>Nếu người đại diện rời đi và còn occupant ở lại: chuyển hợp đồng cho một occupant đang ở.</p>
+            <p>Nếu người đại diện rời đi và không còn ai ở lại: thanh lý hợp đồng.</p>
             <p>Hiện tại hợp đồng này có {activeSecondaryOccupants.length} occupant phụ còn ở lại.</p>
           </div>
+        </section>
+
+        <section className="rounded-[24px] border border-slate-100 bg-slate-50 p-5">
+          <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Trạng thái hóa đơn gần nhất</h3>
+          {latestInvoice ? (
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+              <p>
+                Kỳ hóa đơn: <span className="font-black text-slate-900">{latestInvoice.billingPeriod || 'Chưa có kỳ'}</span>
+              </p>
+              <p>
+                Tổng tiền: <span className="font-black text-slate-900">{formatVND(latestInvoice.totalAmount)}</span>
+              </p>
+              <p>
+                Còn thiếu: <span className="font-black text-rose-600">{formatVND(latestInvoice.balanceDue)}</span>
+              </p>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm leading-6 text-slate-600">Chưa phát sinh hóa đơn cho hợp đồng này.</p>
+          )}
         </section>
       </div>
     </div>
@@ -341,13 +388,13 @@ const OccupantsTab = ({
           <div>
             <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Người đại diện</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Khi người đại diện rời đi, hệ thống phải chuyển hợp đồng hoặc thanh lý.
+              Không được xóa người đại diện khỏi hợp đồng. Khi người đại diện rời đi, phải chuyển đại diện hoặc thanh lý.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <button onClick={onTransfer} className="btn-outline" disabled={activeSecondaryOccupants.length === 0}>
-              Chuyển hợp đồng cho B
+              Chuyển hợp đồng cho occupant khác
             </button>
             <button onClick={onLiquidate} className="btn-primary bg-amber-600 hover:bg-amber-700">
               Thanh lý hợp đồng
@@ -369,9 +416,12 @@ const OccupantsTab = ({
           <div>
             <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Occupant ở cùng</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Khi B rời đi, chỉ cần cập nhật occupant sang trạng thái rời đi. Hợp đồng của A không đổi.
+              Mỗi occupant chỉ được tồn tại một lần đang hiệu lực trong cùng một hợp đồng.
             </p>
           </div>
+          <button onClick={onAddOccupant} className="btn-outline">
+            Thêm occupant
+          </button>
         </div>
 
         {secondaryOccupants.length === 0 ? (
@@ -381,19 +431,12 @@ const OccupantsTab = ({
         ) : (
           <div className="mt-4 space-y-3">
             {secondaryOccupants.map((occupant) => (
-              <div
-                key={occupant.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
-              >
+              <div key={occupant.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <OccupantCard occupant={occupant} />
                   {occupant.status === 'active' ? (
-                    <button
-                      onClick={() => onRemoveOccupant(occupant)}
-                      className="btn-outline"
-                      disabled={isRemoving}
-                    >
-                      {isRemoving ? 'Đang xử lý...' : 'Ghi nhận B rời đi'}
+                    <button onClick={() => onRemoveOccupant(occupant)} className="btn-outline" disabled={isRemoving}>
+                      {isRemoving ? 'Đang xử lý...' : 'Ghi nhận rời phòng'}
                     </button>
                   ) : (
                     <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[1px] text-slate-600">
@@ -406,16 +449,58 @@ const OccupantsTab = ({
           </div>
         )}
       </section>
-
-      <section className="rounded-[24px] border border-sky-100 bg-sky-50 p-5 text-sm leading-6 text-sky-900">
-        <p className="font-black uppercase tracking-[2px]">Auto thanh lý</p>
-        <p className="mt-2">
-          Nếu occupant cuối cùng rời đi và không còn ai ở trong hợp đồng, service sẽ tự gọi thanh lý để giữ phòng về trạng thái trống.
-        </p>
-      </section>
     </div>
   );
 };
+
+const AddendumsTab = ({
+  contract,
+  onCreateAddendum,
+}: {
+  contract: ContractDetailModel;
+  onCreateAddendum: () => void;
+}) => (
+  <div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-100 bg-slate-50 p-5">
+      <div>
+        <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Danh sách phụ lục</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Bao gồm phụ lục tạo thủ công và phụ lục hệ thống tạo tự động từ tài sản tính phí của phòng.
+        </p>
+      </div>
+      <button onClick={onCreateAddendum} className="btn-outline">
+        Tạo phụ lục thủ công
+      </button>
+    </div>
+
+    {contract.addendums?.length ? (
+      <div className="space-y-3">
+        {contract.addendums.map((addendum) => (
+          <div key={addendum.id} className="rounded-2xl border border-slate-100 bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-black text-slate-900">{addendum.title}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {addendum.addendumCode} • {getContractAddendumTypeLabel(addendum.type)} •{' '}
+                  {getContractAddendumSourceLabel(addendum.sourceType)}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Hiệu lực: {formatDate(addendum.effectiveDate)} • Phiên bản {addendum.versionNo}
+                </p>
+              </div>
+              <StatusBadge status={addendum.status} size="sm" />
+            </div>
+            {addendum.content ? <p className="mt-3 text-sm leading-6 text-slate-600">{addendum.content}</p> : null}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+        Hợp đồng này chưa có phụ lục nào.
+      </div>
+    )}
+  </div>
+);
 
 const TransfersTab = ({
   contract,
@@ -428,9 +513,7 @@ const TransfersTab = ({
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-100 bg-slate-50 p-5">
       <div>
         <h3 className="text-sm font-black uppercase tracking-[2px] text-slate-500">Lịch sử chuyển hợp đồng</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Lưu lại ai bàn giao, ai nhận chuyển, và cọc được carry-over như thế nào.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Lưu lại ai bàn giao, ai nhận chuyển, và tiền cọc carry-over.</p>
       </div>
 
       <button onClick={onTransfer} className="btn-outline">
@@ -452,13 +535,11 @@ const TransfersTab = ({
                   {formatVND(transfer.carryOverDepositAmount)}
                 </p>
               </div>
-
               <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold uppercase tracking-[1px] text-sky-700">
                 {transfer.status}
               </span>
             </div>
-
-            {transfer.note && <p className="mt-3 text-sm leading-6 text-slate-600">{transfer.note}</p>}
+            {transfer.note ? <p className="mt-3 text-sm leading-6 text-slate-600">{transfer.note}</p> : null}
           </div>
         ))}
       </div>
@@ -540,9 +621,9 @@ const OccupantCard = ({
         {occupant.status === 'active' ? 'Đang ở' : 'Đã rời'}
       </span>
 
-      {occupant.isPrimaryTenant && (
+      {occupant.isPrimaryTenant ? (
         <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">Tenant chính</span>
-      )}
+      ) : null}
     </div>
 
     <p className="mt-3 text-sm text-slate-500">
@@ -558,5 +639,8 @@ const InfoItem = ({ label, value }: { label: string; value: string }) => (
     <p className="mt-2 text-sm font-black text-slate-900">{value}</p>
   </div>
 );
+
+const activeOccupantsCount = (contract: ContractDetailModel) =>
+  contract.occupants.filter((occupant) => occupant.status === 'active').length;
 
 export default ContractDetail;

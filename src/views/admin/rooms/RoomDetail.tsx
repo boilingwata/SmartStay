@@ -311,14 +311,14 @@ const RoomDetail = () => {
 
                 <div className="space-y-8">
                    <h3 className="text-[12px] text-primary font-black uppercase tracking-[4px] border-l-4 border-primary pl-4">Tiện ích căn hộ</h3>
-                   {room.amenities && room.amenities.length > 0 ? (
+                   {(room.amenityDetails ?? []).length > 0 ? (
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                       {room.amenities.map((amenity, i) => (
+                       {(room.amenityDetails ?? []).map((amenity, i) => (
                          <div key={i} className="flex flex-col items-center justify-center p-8 bg-white/40 rounded-[40px] border border-transparent hover:border-primary/10 hover:bg-white transition-all group hover:shadow-2xl hover:shadow-primary/10">
                             <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-inner">
-                               {getAmenityIcon(amenity)}
+                               {getAmenityIcon(amenity.code)}
                             </div>
-                            <span className="text-[10px] font-black text-primary uppercase tracking-[2px]">{amenity}</span>
+                            <span className="text-[10px] font-black text-primary uppercase tracking-[2px]">{amenity.label}</span>
                          </div>
                        ))}
                      </div>
@@ -522,6 +522,7 @@ const RoomDetail = () => {
                           <th className="px-6 py-6 border-l border-white/5">Loại thiết bị</th>
                           <th className="px-6 py-6 border-l border-white/5">Tình trạng vật lý</th>
                           <th className="px-6 py-6 border-l border-white/5">Ngày bàn giao</th>
+                          <th className="px-6 py-6 border-l border-white/5">Thu phí hàng tháng</th>
                           <th className="px-8 py-6 border-l border-white/5 text-right">Thao tác</th>
                         </tr>
                       </thead>
@@ -548,6 +549,16 @@ const RoomDetail = () => {
                                 </div>
                              </td>
                              <td className="px-6 py-6 text-[13px] font-bold text-muted font-mono">{formatDate(asset.assignedAt)}</td>
+                             <td className="px-6 py-6 text-[11px] font-bold text-muted">
+                                {asset.isBillable ? (
+                                  <div className="flex flex-col gap-1">
+                                    <span className="font-black text-primary">{formatVND(asset.monthlyCharge || 0)}/thang</span>
+                                    <span className="text-[10px] uppercase tracking-widest text-muted">{asset.billingStatus}</span>
+                                  </div>
+                                ) : (
+                                  <span className="uppercase tracking-widest text-muted/60">Mien phi</span>
+                                )}
+                             </td>
                              <td className="px-8 py-6 text-right">
                                 <button className="w-10 h-10 bg-bg text-muted hover:bg-white hover:text-primary hover:shadow-lg rounded-xl flex items-center justify-center transition-all group-hover:scale-110">
                                    <MoreVertical size={18} />

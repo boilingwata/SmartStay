@@ -4,6 +4,7 @@ import { BellRing, CalendarClock, ClipboardList, Filter, History, Pencil, Plus, 
 import { toast } from 'sonner';
 import amenityAdminService, {
   type AmenityExceptionFormInput,
+  type AmenityExceptionType,
   type AmenityPolicyFormInput,
   type AmenityPolicyRecord,
 } from '@/services/amenityAdminService';
@@ -50,6 +51,115 @@ function createExceptionForm(): AmenityExceptionFormInput {
   };
 }
 
+type AmenityRulesFormState = {
+  openingHours: string;
+  residentLimitPerDay: number;
+  gracePeriodMinutes: number;
+};
+
+type AmenityExceptionOverrideState = {
+  reasonCode: string;
+  overrideCapacity: number | null;
+  overridePriceAmount: number | null;
+  overrideOpeningHours: string;
+};
+
+function createPolicyRulesForm(): AmenityRulesFormState {
+  return {
+    openingHours: '06:00-22:00',
+    residentLimitPerDay: 1,
+    gracePeriodMinutes: 15,
+  };
+}
+
+function createExceptionOverrideForm(): AmenityExceptionOverrideState {
+  return {
+    reasonCode: 'maintenance',
+    overrideCapacity: null,
+    overridePriceAmount: null,
+    overrideOpeningHours: '',
+  };
+}
+
+function parsePolicyRulesForm(value: Record<string, unknown> | null | undefined): AmenityRulesFormState {
+  return {
+    openingHours:
+      typeof value?.openingHours === 'string' && value.openingHours.trim()
+        ? value.openingHours
+        : '06:00-22:00',
+    residentLimitPerDay: Number(value?.residentLimitPerDay ?? 1) || 1,
+    gracePeriodMinutes: Number(value?.gracePeriodMinutes ?? 15) || 15,
+  };
+}
+
+function buildPolicyRulesJson(value: AmenityRulesFormState): Record<string, unknown> {
+  return {
+    openingHours: value.openingHours.trim() || '06:00-22:00',
+    residentLimitPerDay: Math.max(1, Number(value.residentLimitPerDay) || 1),
+    gracePeriodMinutes: Math.max(0, Number(value.gracePeriodMinutes) || 0),
+  };
+}
+
+function parseExceptionOverrideForm(
+  type: AmenityExceptionType,
+  value: Record<string, unknown> | null | undefined,
+): AmenityExceptionOverrideState {
+  return {
+    reasonCode: typeof value?.reasonCode === 'string' ? value.reasonCode : type === 'closure' ? 'maintenance' : 'manual_override',
+    overrideCapacity:
+      value?.capacityOverride == null || value.capacityOverride === ''
+        ? null
+        : Number(value.capacityOverride),
+    overridePriceAmount:
+      value?.priceOverrideAmount == null || value.priceOverrideAmount === ''
+        ? null
+        : Number(value.priceOverrideAmount),
+    overrideOpeningHours: typeof value?.openingHours === 'string' ? value.openingHours : '',
+  };
+}
+
+function buildExceptionOverrideJson(
+  type: AmenityExceptionType,
+  value: AmenityExceptionOverrideState,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    reasonCode: value.reasonCode.trim() || 'manual_override',
+  };
+
+  if (type === 'capacity_override' && value.overrideCapacity != null) {
+    payload.capacityOverride = Math.max(1, Number(value.overrideCapacity) || 1);
+  }
+
+  if (type === 'price_override' && value.overridePriceAmount != null) {
+    payload.priceOverrideAmount = Math.max(0, Number(value.overridePriceAmount) || 0);
+  }
+
+  if ((type === 'rule_override' || type === 'closure') && value.overrideOpeningHours.trim()) {
+    payload.openingHours = value.overrideOpeningHours.trim();
+  }
+
+  return payload;
+}
+
+function describeExceptionOverride(type: AmenityExceptionType, value: Record<string, unknown>): string {
+  if (type === 'closure') {
+    return 'Tam khoa tien ich trong khoang thoi gian nay.';
+  }
+  if (type === 'blackout') {
+    return 'Chan dat cho trong khung gio da chon.';
+  }
+  if (type === 'capacity_override') {
+    const capacity = Number(value.capacityOverride ?? 0);
+    return capacity > 0 ? `Suc chua tam thoi: ${capacity} luot/slot.` : 'Ghi de suc chua tam thoi.';
+  }
+  if (type === 'price_override') {
+    const price = Number(value.priceOverrideAmount ?? 0);
+    return price > 0 ? `Gia tam thoi: ${formatVND(price)} / luot.` : 'Ghi de gia tam thoi.';
+  }
+  const openingHours = typeof value.openingHours === 'string' ? value.openingHours : '';
+  return openingHours ? `Khung gio van hanh tam thoi: ${openingHours}.` : 'Ghi de quy tac dat cho.';
+}
+
 function statusLabel(value: string) {
   switch (value) {
     case 'approved':
@@ -88,9 +198,13 @@ export default function AmenityManagementPage() {
   const [editingPolicy, setEditingPolicy] = useState<AmenityPolicyRecord | null>(null);
   const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
   const [policyForm, setPolicyForm] = useState<AmenityPolicyFormInput>(createPolicyForm);
-  const [policyRulesText, setPolicyRulesText] = useState(JSON.stringify(createPolicyForm().rulesJson, null, 2));
+  const [policyRules, setPolicyRules] = useState<AmenityRulesFormState>(() =>
+    parsePolicyRulesForm(createPolicyForm().rulesJson),
+  );
   const [exceptionForm, setExceptionForm] = useState<AmenityExceptionFormInput>(createExceptionForm);
-  const [exceptionOverrideText, setExceptionOverrideText] = useState(JSON.stringify(createExceptionForm().overrideJson, null, 2));
+  const [exceptionOverride, setExceptionOverride] = useState<AmenityExceptionOverrideState>(() =>
+    parseExceptionOverrideForm(createExceptionForm().exceptionType, createExceptionForm().overrideJson),
+  );
   const [notificationTitle, setNotificationTitle] = useState('Cập nhật chính sách tiện ích');
   const [notificationMessage, setNotificationMessage] = useState('Ban quản lý vừa cập nhật quy định sử dụng tiện ích. Vui lòng xem lại điều kiện đặt chỗ trước khi sử dụng.');
 
@@ -115,12 +229,12 @@ export default function AmenityManagementPage() {
     const next = createPolicyForm();
     setEditingPolicy(null);
     setPolicyForm(next);
-    setPolicyRulesText(JSON.stringify(next.rulesJson, null, 2));
+    setPolicyRules(parsePolicyRulesForm(next.rulesJson));
   };
 
   const savePolicyMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...policyForm, rulesJson: JSON.parse(policyRulesText || '{}') as Record<string, unknown> };
+      const payload = { ...policyForm, rulesJson: buildPolicyRulesJson(policyRules) };
       if (editingPolicy) {
         return amenityAdminService.updatePolicy(editingPolicy.id, payload);
       }
@@ -160,12 +274,13 @@ export default function AmenityManagementPage() {
     mutationFn: () =>
       amenityAdminService.createException({
         ...exceptionForm,
-        overrideJson: JSON.parse(exceptionOverrideText || '{}') as Record<string, unknown>,
+        overrideJson: buildExceptionOverrideJson(exceptionForm.exceptionType, exceptionOverride),
       }),
     onSuccess: () => {
       toast.success('Đã tạo ngoại lệ tiện ích.');
-      setExceptionForm(createExceptionForm());
-      setExceptionOverrideText(JSON.stringify(createExceptionForm().overrideJson, null, 2));
+      const next = createExceptionForm();
+      setExceptionForm(next);
+      setExceptionOverride(parseExceptionOverrideForm(next.exceptionType, next.overrideJson));
       queryClient.invalidateQueries({ queryKey: ['amenity-exceptions'] });
       queryClient.invalidateQueries({ queryKey: ['amenity-dashboard'] });
     },
@@ -223,7 +338,7 @@ export default function AmenityManagementPage() {
       rulesJson: policy.rulesJson,
       changeSummary: 'Điều chỉnh từ owner portal',
     });
-    setPolicyRulesText(JSON.stringify(policy.rulesJson, null, 2));
+    setPolicyRules(parsePolicyRulesForm(policy.rulesJson));
   };
 
   return (
@@ -388,7 +503,26 @@ export default function AmenityManagementPage() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-600">Luật nâng cao (JSON)</label>
-              <textarea className="input-base min-h-[130px] w-full font-mono text-sm leading-relaxed" value={policyRulesText} onChange={(event) => setPolicyRulesText(event.target.value)} />
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Quy tac van hanh</label>
+                  <p className="text-sm text-slate-500">Khong can nhap JSON. Dien dung khung gio, gioi han va tre check-in.</p>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600">Khung gio mo cua</label>
+                    <input className="input-base w-full" placeholder="06:00-22:00" value={policyRules.openingHours} onChange={(event) => setPolicyRules((current) => ({ ...current, openingHours: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600">So luot / cu dan / ngay</label>
+                    <input type="number" min={1} className="input-base w-full" value={policyRules.residentLimitPerDay} onChange={(event) => setPolicyRules((current) => ({ ...current, residentLimitPerDay: Number(event.target.value) || 1 }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600">Tre check-in toi da (phut)</label>
+                    <input type="number" min={0} className="input-base w-full" value={policyRules.gracePeriodMinutes} onChange={(event) => setPolicyRules((current) => ({ ...current, gracePeriodMinutes: Number(event.target.value) || 0 }))} />
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="flex gap-3">
               <button disabled={savePolicyMutation.isPending} onClick={() => savePolicyMutation.mutate()} className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 font-black text-white hover:bg-cyan-700 disabled:opacity-70"><Plus size={16} />{editingPolicy ? 'Lưu cập nhật' : 'Tạo policy'}</button>
@@ -422,6 +556,7 @@ export default function AmenityManagementPage() {
                   <CalendarClock size={14} />
                   <span>{formatDate(item.startAt)} → {formatDate(item.endAt)}</span>
                 </div>
+                <p className="mt-3 text-sm text-slate-500">{describeExceptionOverride(item.exceptionType, item.overrideJson)}</p>
               </div>
             ))}
             </div>
@@ -448,6 +583,20 @@ export default function AmenityManagementPage() {
               <label className="text-xs font-bold text-slate-600">Tiêu đề ghi đè</label>
               <input className="input-base w-full" placeholder="VD: Đóng cửa bảo trì hồ bơi..." value={exceptionForm.title} onChange={(event) => setExceptionForm((current) => ({ ...current, title: event.target.value }))} />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600">Loai ghi de</label>
+              <select className="input-base w-full" value={exceptionForm.exceptionType} onChange={(event) => {
+                const nextType = event.target.value as AmenityExceptionType;
+                setExceptionForm((current) => ({ ...current, exceptionType: nextType }));
+                setExceptionOverride(parseExceptionOverrideForm(nextType, {}));
+              }}>
+                <option value="closure">Dong tien ich tam thoi</option>
+                <option value="blackout">Chan dat cho</option>
+                <option value="capacity_override">Sua suc chua</option>
+                <option value="price_override">Sua gia tam thoi</option>
+                <option value="rule_override">Sua quy tac van hanh</option>
+              </select>
+            </div>
             
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
@@ -462,7 +611,36 @@ export default function AmenityManagementPage() {
             
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-600">Cấu hình ghi đè (JSON)</label>
-              <textarea className="input-base min-h-[110px] w-full font-mono text-sm leading-relaxed" value={exceptionOverrideText} onChange={(event) => setExceptionOverrideText(event.target.value)} />
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thong tin ghi de</label>
+                  <p className="text-sm text-slate-500">He thong tu sinh du lieu ky thuat o phia sau.</p>
+                </div>
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600">Ly do</label>
+                    <input className="input-base w-full" value={exceptionOverride.reasonCode} onChange={(event) => setExceptionOverride((current) => ({ ...current, reasonCode: event.target.value }))} />
+                  </div>
+                  {exceptionForm.exceptionType === 'capacity_override' ? (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Suc chua tam thoi / slot</label>
+                      <input type="number" min={1} className="input-base w-full" value={exceptionOverride.overrideCapacity ?? ''} onChange={(event) => setExceptionOverride((current) => ({ ...current, overrideCapacity: event.target.value ? Number(event.target.value) : null }))} />
+                    </div>
+                  ) : null}
+                  {exceptionForm.exceptionType === 'price_override' ? (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Gia tam thoi / luot</label>
+                      <input type="number" min={0} className="input-base w-full" value={exceptionOverride.overridePriceAmount ?? ''} onChange={(event) => setExceptionOverride((current) => ({ ...current, overridePriceAmount: event.target.value ? Number(event.target.value) : null }))} />
+                    </div>
+                  ) : null}
+                  {exceptionForm.exceptionType === 'closure' || exceptionForm.exceptionType === 'rule_override' ? (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Khung gio tam thoi</label>
+                      <input className="input-base w-full" placeholder="06:00-18:00" value={exceptionOverride.overrideOpeningHours} onChange={(event) => setExceptionOverride((current) => ({ ...current, overrideOpeningHours: event.target.value }))} />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
             
             <button disabled={createExceptionMutation.isPending} onClick={() => createExceptionMutation.mutate()} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 font-black text-white hover:bg-rose-700 disabled:opacity-70"><Plus size={16} />Xác nhận ngoại lệ</button>

@@ -26,6 +26,10 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
       condition: 'New',
       purchasePrice: 0,
       quantity: 1,
+      isBillable: false,
+      monthlyCharge: 0,
+      billingStatus: 'Inactive',
+      billingStartDate: new Date().toISOString().split('T')[0],
       purchaseDate: new Date().toISOString().split('T')[0],
       warrantyExpiry: ''
     }
@@ -45,6 +49,10 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
         condition: 'New',
         purchasePrice: 0,
         quantity: 1,
+        isBillable: false,
+        monthlyCharge: 0,
+        billingStatus: 'Inactive',
+        billingStartDate: new Date().toISOString().split('T')[0],
         purchaseDate: new Date().toISOString().split('T')[0],
         warrantyExpiry: '',
         brand: '',
@@ -58,6 +66,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
   }, [initialData, reset]);
 
   const [images, setImages] = React.useState<string[]>(initialData?.images || []);
+  const isBillable = watch('isBillable');
 
   if (!isOpen) return null;
 
@@ -265,6 +274,75 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                          ))}
                       </div>
                    </div>
+                </div>
+              </section>
+
+              <section className="space-y-6">
+                <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+                  <FileText size={16} className="text-primary" />
+                  <h3 className="text-[12px] text-slate-900 font-black uppercase tracking-[2px]">Billing tren hoa don</h3>
+                </div>
+
+                <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+                  <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <span className="text-[10px] font-black uppercase tracking-[1.5px] text-muted">Tai san co tinh phi</span>
+                    <input type="checkbox" {...register('isBillable')} className="h-4 w-4 accent-primary" />
+                  </label>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Nhan hoa don</label>
+                    <input
+                      {...register('billingLabel')}
+                      disabled={!isBillable}
+                      className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
+                      placeholder="VD: Phu phi dieu hoa"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Phi hang thang (VND)</label>
+                    <input
+                      type="number"
+                      {...register('monthlyCharge')}
+                      disabled={!isBillable}
+                      className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Ngay bat dau tinh</label>
+                    <input
+                      type="date"
+                      {...register('billingStartDate')}
+                      disabled={!isBillable}
+                      className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Ngay ket thuc tinh</label>
+                    <input
+                      type="date"
+                      {...register('billingEndDate')}
+                      disabled={!isBillable}
+                      className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Trang thai billing</label>
+                    <select
+                      {...register('billingStatus')}
+                      disabled={!isBillable}
+                      className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
+                    >
+                      <option value="Inactive">Tam tat</option>
+                      <option value="Active">Dang tinh</option>
+                      <option value="Suspended">Tam dung</option>
+                      <option value="Stopped">Ngung han</option>
+                    </select>
+                  </div>
                 </div>
               </section>
 

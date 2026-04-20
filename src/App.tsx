@@ -12,12 +12,15 @@ const ForgotPasswordPage = lazy(() => import('@/views/auth/ForgotPasswordPage'))
 const RegisterPage = lazy(() => import('@/views/auth/RegisterPage'));
 const ResetPasswordPage = lazy(() => import('@/views/auth/ResetPasswordPage'));
 const ChangePasswordPage = lazy(() => import('@/views/auth/ChangePasswordPage'));
-const OTPVerifyPage = lazy(() => import('@/views/auth/OTPVerifyPage'));
 const ListingsPage = lazy(() => import('@/views/public/ListingsPage'));
 const ListingDetailPage = lazy(() => import('@/views/public/ListingDetailPage'));
 const ListingApplyPage = lazy(() => import('@/views/public/ListingApplyPage'));
+const PortalContractView = lazy(() => import('@/views/portal/contracts/ContractView'));
 
 import { adminRoutes } from './routes/adminRoutes';
+import { portalRoutes, portalGuestRoutes, Onboarding } from './routes/portalRoutes';
+import PortalAuthGuard from './components/auth/PortalAuthGuard';
+import PortalLayout from './components/layout/PortalLayout';
 
 import useAuthStore from './stores/authStore';
 
@@ -125,7 +128,35 @@ const App = () => {
               <Route path="/tickets/*" element={<Navigate to="/owner/leads" replace />} />
               <Route path="/staff/*" element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="/super-admin/*" element={<Navigate to="/owner/dashboard" replace />} />
-              <Route path="/portal/*" element={<Navigate to="/listings" replace />} />
+
+              {/* 3.3 Portal Namespace (Tenant) */}
+              <Route path="/portal">
+                {/* Guest Routes */}
+                <Route element={<PublicLayout showHeader={false} />}>
+                  {mapRoutes(portalGuestRoutes)}
+                </Route>
+
+                {/* Protected Routes */}
+                <Route element={<PortalAuthGuard />}>
+                  <Route path="onboarding" element={
+                    <PortalLayout title="Thiết lập hồ sơ" showBack={false}>
+                      <Onboarding />
+                    </PortalLayout>
+                  } />
+                  <Route element={<PortalLayout />}>
+                    {mapRoutes(portalRoutes)}
+                  </Route>
+                </Route>
+              </Route>
+
+              <Route path="/tenant">
+                <Route element={<PortalAuthGuard />}>
+                  <Route element={<PortalLayout />}>
+                    <Route index element={<Navigate to="/tenant/contracts" replace />} />
+                    <Route path="contracts" element={<PortalContractView />} />
+                  </Route>
+                </Route>
+              </Route>
 
               {/* 3.3 Error Pages & Global Redirects */}
               <Route path="/403" element={<Error403 />} />

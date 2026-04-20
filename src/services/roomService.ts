@@ -8,6 +8,7 @@ import { Asset } from '@/models/Asset';
 import { supabase } from '@/lib/supabase';
 import { unwrap, buildingScoped } from '@/lib/supabaseHelpers';
 import { mapRoomStatus, mapAssetStatus, mapContractStatus } from '@/lib/enumMaps';
+import { deriveFurnishingFromAssets, deriveRoomType, getAmenityViewModel, normalizeAmenityCodes } from '@/lib/propertyBusiness';
 import type { DbRoomStatus } from '@/types/supabase';
 
 // --- Row interfaces ---
@@ -53,6 +54,11 @@ interface RoomAssetRow {
   status: string | null
   condition_score: number | null
   purchase_date: string | null
+  assigned_at: string | null
+  is_billable: boolean | null
+  monthly_charge: number | null
+  billing_status: string | null
+  billing_label: string | null
   created_at: string | null
   assets?: { id: number; name: string; category: string | null; qr_code: string | null } | null
 }
@@ -75,7 +81,7 @@ function toRoom(row: RoomRow): Room {
     buildingId: String(row.building_id),
     buildingName: (row.buildings as { name?: string } | null)?.name ?? '',
     floorNumber: row.floor_number ?? 1,
-    roomType: (row.room_type ?? 'Studio') as RoomType,
+    roomType: deriveRoomType(row.area_sqm, row.room_type),
     areaSqm: row.area_sqm ?? 0,
     baseRentPrice: row.base_rent ?? 0,
     status: mapRoomStatus.fromDb(row.status ?? 'available') as RoomStatus,
@@ -90,7 +96,7 @@ function toRoomDetail(
   contracts: RoomContractRow[]
 ): RoomDetail {
   const room = toRoom(row);
-  const amenities = Array.isArray(row.amenities) ? (row.amenities as string[]) : [];
+  const amenities = normalizeAmenityCodes(row.amenities);
 
   // Collect tenant names from active contracts
   const activeContracts = contracts.filter(c => c.status === 'active');
@@ -118,18 +124,37 @@ function toRoomDetail(
     description: (row as unknown as { description?: string }).description ?? undefined,
     lastMaintenanceDate: (row as unknown as { last_maintenance_date?: string }).last_maintenance_date ?? undefined,
     maxOccupancy: row.max_occupants ?? 2,
-    furnishing: 'Unfurnished',
+    furnishing: deriveFurnishingFromAssets(
+      assets.map((asset) => ({
+        assetName: asset.assets?.name,
+        type: asset.assets?.category,
+      })),
+    ),
     directionFacing: ((row.facing as string | null) ?? 'N') as import('@/models/Room').DirectionFacing,
     hasBalcony: row.has_balcony ?? false,
     conditionScore: row.condition_score ?? 5,
     tenantNames: tenantNames.length > 0 ? tenantNames : undefined,
     images: [],
     amenities,
+    amenityDetails: getAmenityViewModel(row.amenities),
     meters: [],
     assets: assets.map(toRoomAsset),
     statusHistory: history.map(toStatusHistory),
     contracts: contractSummaries,
   };
+}
+
+function mapRoomAssetBillingStatus(status: string | null): RoomAsset['billingStatus'] {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'suspended':
+      return 'Suspended';
+    case 'stopped':
+      return 'Stopped';
+    default:
+      return 'Inactive';
+  }
 }
 
 function toRoomAsset(row: RoomAssetRow): RoomAsset {
@@ -139,7 +164,11 @@ function toRoomAsset(row: RoomAssetRow): RoomAsset {
     assetCode: row.assets?.qr_code ?? `A${row.id}`,
     type: row.assets?.category ?? 'Other',
     condition: (mapAssetStatus.fromDb(row.status ?? 'in_use') as RoomAsset['condition']),
-    assignedAt: row.created_at ?? '',
+    assignedAt: row.assigned_at ?? row.created_at ?? '',
+    isBillable: row.is_billable ?? false,
+    monthlyCharge: row.monthly_charge ?? undefined,
+    billingStatus: mapRoomAssetBillingStatus(row.billing_status),
+    billingLabel: row.billing_label ?? undefined,
   };
 }
 
@@ -232,7 +261,7 @@ export const roomService = {
       unwrap(
         supabase
           .from('room_assets')
-          .select('*, assets(id, name, category, qr_code)')
+          .select('id, serial_number, status, condition_score, purchase_date, assigned_at, is_billable, monthly_charge, billing_status, billing_label, created_at, assets(id, name, category, qr_code)')
           .eq('room_id', numId)
       ) as unknown as Promise<RoomAssetRow[]>,
 

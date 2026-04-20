@@ -43,6 +43,7 @@ export interface UtilityComputationInput {
   contractEndDate: string;
   occupantsForBilling: number;
   roomAmenities: unknown;
+  roomAssets?: Array<{ assetName?: string | null; assetType?: string | null; billingLabel?: string | null }> | null;
   policy: UtilityPolicyInput;
   override?: UtilityOverrideInput | null;
   deviceAdjustments: UtilityDeviceAdjustmentInput[];
@@ -160,6 +161,22 @@ export function extractDeviceCodes(amenities: unknown): string[] {
       for (const item of value) {
         addCode(item);
       }
+    }
+  }
+
+  return Array.from(deviceCodes);
+}
+
+export function extractRoomAssetDeviceCodes(
+  roomAssets: Array<{ assetName?: string | null; assetType?: string | null; billingLabel?: string | null }> | null | undefined,
+): string[] {
+  const deviceCodes = new Set<string>();
+
+  for (const asset of roomAssets ?? []) {
+    for (const candidate of [asset.assetName, asset.assetType, asset.billingLabel]) {
+      if (typeof candidate !== 'string') continue;
+      const code = normalizeDeviceCode(candidate);
+      if (code) deviceCodes.add(code);
     }
   }
 
@@ -286,7 +303,9 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
     override?.locationMultiplierOverride,
     input.policy.locationMultiplier,
   );
-  const deviceCodes = extractDeviceCodes(input.roomAmenities);
+  const roomAmenityDeviceCodes = extractDeviceCodes(input.roomAmenities);
+  const roomAssetDeviceCodes = extractRoomAssetDeviceCodes(input.roomAssets);
+  const deviceCodes = Array.from(new Set([...roomAmenityDeviceCodes, ...roomAssetDeviceCodes]));
   const resolvedDeviceSurcharges = input.deviceAdjustments
     .filter((adjustment) => deviceCodes.includes(adjustment.deviceCode))
     .map((adjustment) => ({
@@ -305,14 +324,14 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
   const waterPerPersonAmount = Math.max(0, toFiniteNumber(input.policy.waterPerPersonAmount));
   const waterPersonCharge = waterPerPersonAmount * input.occupantsForBilling;
   const electricSubtotal = electricBaseAmount + electricDeviceSurcharge;
-  const electricRawAmount = electricSubtotal * electricSeasonMultiplier * locationMultiplier * prorateRatio;
+  const electricRawAmount = Number((electricSubtotal * electricSeasonMultiplier * locationMultiplier * prorateRatio).toFixed(6));
   const electricRoundedAmount = roundToIncrement(electricRawAmount, input.policy.roundingIncrement);
   const electricFinalAmount = override?.electricFinalOverride != null
     ? Math.max(0, toFiniteNumber(override.electricFinalOverride))
     : Math.max(input.policy.minElectricFloor, electricRoundedAmount);
 
   const waterSubtotal = waterBaseAmount + waterPersonCharge;
-  const waterRawAmount = waterSubtotal * locationMultiplier * prorateRatio;
+  const waterRawAmount = Number((waterSubtotal * locationMultiplier * prorateRatio).toFixed(6));
   const waterRoundedAmount = roundToIncrement(waterRawAmount, input.policy.roundingIncrement);
   const waterFinalAmount = override?.waterFinalOverride != null
     ? Math.max(0, toFiniteNumber(override.waterFinalOverride))
@@ -402,6 +421,8 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
       isHotSeason,
       seasonMonths,
       deviceCodes,
+      roomAmenityDeviceCodes,
+      roomAssetDeviceCodes,
       overrideApplied: override,
       policy: input.policy,
     },

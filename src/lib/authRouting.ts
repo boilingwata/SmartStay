@@ -9,7 +9,8 @@ export function isResidentTenantStage(stage?: TenantStage | null): boolean {
 }
 
 export function getTenantHomePath(stage?: TenantStage | null): string {
-  void stage;
+  if (stage === 'resident_pending_onboarding') return '/portal/onboarding';
+  if (stage === 'resident_active') return '/portal/dashboard';
   return '/listings';
 }
 
@@ -58,6 +59,12 @@ export function getPostLoginRedirect(
   if (safePath && user) {
     if (isInternalWorkspaceRole(user.role) || user.role !== 'Tenant') {
       return normalizeInternalWorkspacePath(safePath);
+    }
+
+    if (safePath.startsWith('/portal')) {
+      return isResidentTenantStage(user.tenantStage)
+        ? safePath
+        : getTenantHomePath(user.tenantStage);
     }
 
     if (safePath.startsWith('/listings')) return safePath;

@@ -18,6 +18,7 @@ export interface UtilityPolicyRecord {
   name: string;
   scopeType: UtilityScopeType;
   scopeId: number | null;
+  scopeLabel?: string;
   isActive: boolean;
   description: string | null;
   electricBaseAmount: number;
@@ -36,7 +37,7 @@ export interface UtilityPolicyRecord {
 }
 
 export interface UtilityPolicyFormInput {
-  code: string;
+  code?: string;
   name: string;
   scopeType: UtilityScopeType;
   scopeId: number | null;
@@ -58,6 +59,12 @@ export interface UtilityPolicyFormInput {
 export interface UtilityScopeOption {
   value: number;
   label: string;
+}
+
+export interface UtilityDeviceCatalogItem {
+  code: string;
+  label: string;
+  description: string;
 }
 
 export interface UtilityOverrideRecord {
@@ -198,7 +205,47 @@ interface EdgeFunctionErrorBody {
   success?: boolean;
 }
 
-const DEFAULT_DEVICE_CODES = ['aircon', 'electric_stove', 'water_heater', 'dryer', 'freezer'];
+const DEVICE_CATALOG: UtilityDeviceCatalogItem[] = [
+  {
+    code: 'aircon',
+    label: 'Máy lạnh / điều hòa',
+    description: 'Cộng phụ thu điện hàng tháng khi phòng có máy lạnh đang gắn.',
+  },
+  {
+    code: 'electric_stove',
+    label: 'Bếp điện',
+    description: 'Dùng cho bếp điện hoặc bếp từ có mức điện tiêu thụ cao.',
+  },
+  {
+    code: 'water_heater',
+    label: 'Bình nóng lạnh',
+    description: 'Dùng cho bình nước nóng hoặc máy nước nóng trong phòng.',
+  },
+  {
+    code: 'dryer',
+    label: 'Máy sấy',
+    description: 'Dùng cho máy sấy quần áo gắn riêng theo phòng.',
+  },
+  {
+    code: 'freezer',
+    label: 'Tủ đông',
+    description: 'Dùng cho tủ đông, tủ mát công suất lớn hoặc thiết bị tương đương.',
+  },
+];
+
+function buildPolicyCode(scopeType: UtilityScopeType, scopeId: number | null, effectiveFrom: string): string {
+  const normalizedDate = (effectiveFrom || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+  const scopePrefix =
+    scopeType === 'system'
+      ? 'SYS'
+      : scopeType === 'building'
+        ? 'BLD'
+        : scopeType === 'room'
+          ? 'ROOM'
+          : 'CTR';
+
+  return `${scopePrefix}-${scopeId ?? 'ALL'}-${normalizedDate}`;
+}
 
 function parseSeasonMonths(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -361,7 +408,7 @@ export const utilityAdminService = {
   },
 
   listPolicies: async (): Promise<UtilityPolicyRecord[]> => {
-    const [policies, adjustments] = await Promise.all([
+    const [policies, adjustments, scopeOptions] = await Promise.all([
       unwrap(
         supabase
           .from('utility_policies')
@@ -381,44 +428,55 @@ export const utilityAdminService = {
           .select('id, utility_policy_id, device_code, charge_amount, is_active')
           .order('device_code'),
       ),
-    ]) as [PolicyRow[], AdjustmentRow[]];
+      utilityAdminService.getPolicyScopeOptions(),
+    ]) as [PolicyRow[], AdjustmentRow[], Record<Exclude<UtilityScopeType, 'system'>, UtilityScopeOption[]>];
 
-    return policies.map((policy) => ({
-      id: policy.id,
-      code: policy.code,
-      name: policy.name,
-      scopeType: policy.scope_type,
-      scopeId: policy.scope_id,
-      isActive: policy.is_active,
-      description: policy.description,
-      electricBaseAmount: Number(policy.electric_base_amount ?? 0),
-      waterBaseAmount: Number(policy.water_base_amount ?? 0),
-      waterPerPersonAmount: Number(policy.water_per_person_amount ?? 0),
-      electricHotSeasonMultiplier: Number(policy.electric_hot_season_multiplier ?? 1.15),
-      locationMultiplier: Number(policy.location_multiplier ?? 1),
-      seasonMonths: parseSeasonMonths(policy.season_months),
-      roundingIncrement: Number(policy.rounding_increment ?? 1000),
-      minElectricFloor: Number(policy.min_electric_floor ?? 120000),
-      minWaterFloor: Number(policy.min_water_floor ?? 60000),
-      effectiveFrom: policy.effective_from,
-      effectiveTo: policy.effective_to,
-      createdAt: policy.created_at,
-      adjustments: adjustments
-        .filter((item) => item.utility_policy_id === policy.id)
-        .map((item) => ({
-          deviceCode: item.device_code,
-          chargeAmount: Number(item.charge_amount ?? 0),
-          isActive: item.is_active,
-        })),
-    }));
+    return policies.map((policy) => {
+      const scopeLabel =
+        policy.scope_type === 'system'
+          ? 'Toan he thong'
+          : scopeOptions[policy.scope_type].find((option) => option.value === policy.scope_id)?.label ??
+            (policy.scope_id != null ? `#${policy.scope_id}` : undefined);
+
+      return {
+        id: policy.id,
+        code: policy.code,
+        name: policy.name,
+        scopeType: policy.scope_type,
+        scopeId: policy.scope_id,
+        scopeLabel,
+        isActive: policy.is_active,
+        description: policy.description,
+        electricBaseAmount: Number(policy.electric_base_amount ?? 0),
+        waterBaseAmount: Number(policy.water_base_amount ?? 0),
+        waterPerPersonAmount: Number(policy.water_per_person_amount ?? 0),
+        electricHotSeasonMultiplier: Number(policy.electric_hot_season_multiplier ?? 1.15),
+        locationMultiplier: Number(policy.location_multiplier ?? 1),
+        seasonMonths: parseSeasonMonths(policy.season_months),
+        roundingIncrement: Number(policy.rounding_increment ?? 1000),
+        minElectricFloor: Number(policy.min_electric_floor ?? 120000),
+        minWaterFloor: Number(policy.min_water_floor ?? 60000),
+        effectiveFrom: policy.effective_from,
+        effectiveTo: policy.effective_to,
+        createdAt: policy.created_at,
+        adjustments: adjustments
+          .filter((item) => item.utility_policy_id === policy.id)
+          .map((item) => ({
+            deviceCode: item.device_code,
+            chargeAmount: Number(item.charge_amount ?? 0),
+            isActive: item.is_active,
+          })),
+      };
+    });
   },
 
   createPolicy: async (input: UtilityPolicyFormInput): Promise<number> => {
     const createdBy = await getCurrentUserId();
+    const generatedCode = buildPolicyCode(input.scopeType, input.scopeId, input.effectiveFrom);
     const { data, error } = await supabase
       .from('utility_policies')
       .insert({
-        code: input.code.trim(),
+        code: input.code?.trim() || generatedCode,
         name: input.name.trim(),
         scope_type: input.scopeType,
         scope_id: input.scopeType === 'system' ? null : input.scopeId,
@@ -471,11 +529,16 @@ export const utilityAdminService = {
   },
 
   getDefaultDeviceAdjustments: (): UtilityPolicyAdjustmentForm[] =>
-    DEFAULT_DEVICE_CODES.map((deviceCode) => ({
-      deviceCode,
+    DEVICE_CATALOG.map((device) => ({
+      deviceCode: device.code,
       chargeAmount: 0,
       isActive: false,
     })),
+
+  getDeviceAdjustmentCatalog: (): UtilityDeviceCatalogItem[] => DEVICE_CATALOG,
+
+  createSuggestedPolicyCode: (scopeType: UtilityScopeType, scopeId: number | null, effectiveFrom: string): string =>
+    buildPolicyCode(scopeType, scopeId, effectiveFrom),
 
   listOverrides: async (): Promise<UtilityOverrideRecord[]> => {
     const rows = await unwrap(

@@ -1,7 +1,7 @@
 import { lazy } from 'react';
-import { Navigate } from 'react-router-dom';
 import { RouteObject } from 'react-router-dom';
 
+const PortalLogin = lazy(() => import('@/views/portal/auth/PortalLogin'));
 const OtpVerification = lazy(() => import('@/views/portal/auth/OtpVerification'));
 const ForgotPassword = lazy(() => import('@/views/portal/auth/ForgotPassword'));
 const Onboarding = lazy(() => import('@/views/portal/onboarding/Onboarding'));
@@ -33,6 +33,7 @@ export const portalRoutes: RouteObject[] = [
   { path: 'payments/history', element: <PortalPaymentHistory /> },
   { path: 'balance', element: <PortalBalanceDetail /> },
   { path: 'contract', element: <PortalContractView /> },
+  { path: 'contracts', element: <PortalContractView /> },
   { path: 'tickets', element: <PortalTicketList /> },
   { path: 'tickets/create', element: <PortalCreateTicket /> },
   { path: 'tickets/:id', element: <PortalTicketDetail /> },
@@ -48,7 +49,7 @@ export const portalRoutes: RouteObject[] = [
 ];
 
 export const portalGuestRoutes: RouteObject[] = [
-  { path: 'login', element: <Navigate to="/login" replace /> },
+  { path: 'login', element: <PortalLogin /> },
   { path: 'verify-otp', element: <OtpVerification /> },
   { path: 'forgot-password', element: <ForgotPassword /> },
 ];

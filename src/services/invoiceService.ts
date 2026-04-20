@@ -2,6 +2,7 @@ import { FunctionsHttpError, type Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
+import { normalizeInvoiceItemType, toUiInvoiceItemType } from '@/lib/invoiceItems';
 import type { DbInvoiceStatus } from '@/types/supabase';
 import { buildPolicyInvoiceDraft } from '@/services/utilityBillingService';
 import {
@@ -55,7 +56,7 @@ export interface InvoiceDraftPreviewItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
-  source: 'rent' | 'service' | 'utility' | 'discount';
+  source: 'rent' | 'service' | 'utility' | 'asset' | 'discount';
 }
 
 export interface InvoiceDraftPreview {
@@ -151,6 +152,7 @@ interface DbInvoiceItemRow {
   quantity: number | null;
   unit_price: number;
   line_total: number;
+  item_type: string | null;
   sort_order: number | null;
 }
 
@@ -250,22 +252,16 @@ function mapDbRowToInvoice(row: DbInvoiceRow): Invoice {
   };
 }
 
-function deriveItemType(description: string): InvoiceItem['type'] {
-  const lower = description.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  if (lower.includes('dien') || lower.includes('electr')) return 'Electricity';
-  if (lower.includes('nuoc') || lower.includes('water')) return 'Water';
-  if (lower.includes('thue') || lower.includes('rent')) return 'Rent';
-  return 'Service';
-}
-
 function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
+  const typeKey = normalizeInvoiceItemType(item.item_type, item.description);
   return {
     id: String(item.id),
     description: item.description,
     quantity: item.quantity ?? 1,
     unitPriceSnapshot: Number(item.unit_price),
     amount: Number(item.line_total),
-    type: deriveItemType(item.description),
+    type: toUiInvoiceItemType(typeKey),
+    typeKey,
     snapshotPrice: Number(item.unit_price),
     snapshotLabel: item.description,
   };
@@ -811,7 +807,7 @@ export const invoiceService = {
     const itemRows = await unwrap(
       supabase
         .from('invoice_items')
-        .select('id, invoice_id, description, quantity, unit_price, line_total, sort_order')
+        .select('id, invoice_id, description, quantity, unit_price, line_total, item_type, sort_order')
         .eq('invoice_id', Number(id))
         .order('sort_order', { ascending: true, nullsFirst: false })
     ) as unknown as DbInvoiceItemRow[];

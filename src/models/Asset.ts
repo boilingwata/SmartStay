@@ -20,6 +20,15 @@ export interface Asset {
   quantity?: number;
   images?: string[];
   note?: string;
+  assignedAt?: string;
+  isBillable?: boolean;
+  billingLabel?: string;
+  monthlyCharge?: number;
+  billingStartDate?: string;
+  billingEndDate?: string;
+  billingStatus?: 'Inactive' | 'Active' | 'Suspended' | 'Stopped';
+  billingNotes?: string;
+  brokenReportedAt?: string;
 }
 
 export interface AssetAssignment {

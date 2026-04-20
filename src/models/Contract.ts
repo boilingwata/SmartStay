@@ -122,10 +122,23 @@ export interface ContractService {
 export interface ContractAddendum {
   id: string;
   addendumCode: string;
-  type: 'PriceChange' | 'RoomChange' | 'RuleChange' | 'Other';
+  type:
+    | 'AssetAssignment'
+    | 'AssetRepricing'
+    | 'AssetStatusChange'
+    | 'RentChange'
+    | 'ServiceChange'
+    | 'RoomChange'
+    | 'PolicyUpdate'
+    | 'Other';
   title: string;
   effectiveDate: string;
   status: 'Draft' | 'Signed' | 'Cancelled';
+  sourceType: 'Manual' | 'RoomAssetAuto';
+  versionNo: number;
+  parentAddendumId?: string;
   fileUrl?: string;
   content?: string;
+  summary?: Record<string, unknown>;
+  createdAt?: string;
 }

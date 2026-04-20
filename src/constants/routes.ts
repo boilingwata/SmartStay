@@ -42,6 +42,7 @@ export const ROUTES = {
   PORTAL: {
     ROOT: '/portal',
     DASHBOARD: '/portal',
+    CONTRACTS: '/tenant/contracts',
     INVOICES: '/portal/invoices',
     TICKETS: '/portal/tickets',
     AMENITIES: '/portal/amenities',

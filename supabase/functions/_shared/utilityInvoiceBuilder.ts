@@ -1,6 +1,7 @@
 /// <reference path="./deno-globals.d.ts" />
 
 import type { SupabaseClient } from "./supabaseAdmin.ts";
+import { buildBillableAssetLines } from "./assetBilling.ts";
 import {
   computeUtilitySnapshot,
   parseSeasonMonths,
@@ -47,6 +48,19 @@ interface ContractInvoiceRow {
     building_id: number;
     amenities: unknown;
     buildings: { name: string } | null;
+    room_assets?: Array<{
+      id: number;
+      status: string | null;
+      quantity: number | null;
+      assigned_at: string | null;
+      is_billable: boolean | null;
+      billing_label: string | null;
+      monthly_charge: number | null;
+      billing_start_date: string | null;
+        billing_end_date: string | null;
+        billing_status: string | null;
+        assets: { name: string; category: string | null } | null;
+      }> | null;
   } | null;
   contract_tenants: Array<{
     is_primary: boolean | null;
@@ -161,7 +175,20 @@ export async function buildUtilityInvoicePayload(
         room_code,
         building_id,
         amenities,
-        buildings ( name )
+        buildings ( name ),
+        room_assets (
+          id,
+          status,
+          quantity,
+          assigned_at,
+          is_billable,
+          billing_label,
+          monthly_charge,
+          billing_start_date,
+          billing_end_date,
+          billing_status,
+          assets ( name, category )
+        )
       ),
       contract_tenants (
         is_primary,
@@ -272,6 +299,11 @@ export async function buildUtilityInvoicePayload(
     contractEndDate: typedContract.end_date,
     occupantsForBilling: override?.occupantsForBillingOverride ?? Number(typedContract.occupants_for_billing ?? 0),
     roomAmenities: room.amenities,
+    roomAssets: (room.room_assets ?? []).map((asset) => ({
+      assetName: asset.assets?.name ?? null,
+      assetType: asset.assets?.category ?? null,
+      billingLabel: asset.billing_label ?? null,
+    })),
     policy: resolved.policy,
     override,
     deviceAdjustments,
@@ -287,50 +319,91 @@ export async function buildUtilityInvoicePayload(
 
   if (monthlyRent > 0) {
     items.push({
-      description: `Tiền thuê tháng ${input.billingPeriod}`,
+      description: `Tien thue thang ${input.billingPeriod}`,
       quantity: 1,
       unitPrice: monthlyRent,
       lineTotal: monthlyRent,
+      itemType: "rent",
       sortOrder: sortOrder++,
     });
   }
 
   for (const service of typedContract.contract_services ?? []) {
-    const serviceName = String(service.service_catalog?.name ?? `Dịch vụ #${service.service_catalog_id}`);
+    const serviceName = String(service.service_catalog?.name ?? `Dich vu #${service.service_catalog_id}`);
     const quantity = Math.max(1, Number(service.quantity ?? 1));
     const unitPrice = Number(service.fixed_price ?? 0);
     items.push({
-      description: `${serviceName} tháng ${input.billingPeriod}`,
+      description: `${serviceName} thang ${input.billingPeriod}`,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
+      itemType: "service",
+      sourceRefType: "contract_service",
+      sourceRefId: Number(service.service_catalog_id),
       sortOrder: sortOrder++,
     });
   }
 
+  const assetItems = buildBillableAssetLines({
+    monthYear: input.billingPeriod,
+    contractStartDate: typedContract.start_date,
+    contractEndDate: typedContract.end_date,
+    startingSortOrder: sortOrder,
+    assets: (room.room_assets ?? []).map((asset) => ({
+      id: asset.id,
+      assetName: asset.assets?.name ?? `Tai san #${asset.id}`,
+      billingLabel: asset.billing_label,
+      quantity: asset.quantity,
+      monthlyCharge: asset.monthly_charge,
+      billingStartDate: asset.billing_start_date,
+      billingEndDate: asset.billing_end_date,
+      assignedAt: asset.assigned_at,
+      isBillable: asset.is_billable,
+      billingStatus: asset.billing_status,
+      physicalStatus: asset.status,
+    })),
+  });
+
+  for (const assetItem of assetItems) {
+    items.push({
+      description: assetItem.description,
+      quantity: assetItem.quantity,
+      unitPrice: assetItem.unitPrice,
+      lineTotal: assetItem.lineTotal,
+      itemType: assetItem.itemType,
+      sourceRefType: "room_asset",
+      sourceRefId: Number(assetItem.assetId),
+      sortOrder: assetItem.sortOrder,
+    });
+  }
+  sortOrder += assetItems.length;
+
   items.push({
-    description: `Tiền điện tháng ${input.billingPeriod}`,
+    description: `Tien dien thang ${input.billingPeriod}`,
     quantity: 1,
     unitPrice: utilitySnapshot.electricFinalAmount,
     lineTotal: utilitySnapshot.electricFinalAmount,
+    itemType: "utility_electric",
     sortOrder: sortOrder++,
   });
 
   items.push({
-    description: `Tiền nước tháng ${input.billingPeriod}`,
+    description: `Tien nuoc thang ${input.billingPeriod}`,
     quantity: 1,
     unitPrice: utilitySnapshot.waterFinalAmount,
     lineTotal: utilitySnapshot.waterFinalAmount,
+    itemType: "utility_water",
     sortOrder: sortOrder++,
   });
 
   const normalizedDiscount = Math.max(0, Number(input.discountAmount ?? 0));
   if (normalizedDiscount > 0) {
     items.push({
-      description: input.discountReason?.trim() ? `Giảm trừ: ${input.discountReason.trim()}` : "Giảm trừ hóa đơn",
+      description: input.discountReason?.trim() ? `Giam tru: ${input.discountReason.trim()}` : "Giam tru hoa don",
       quantity: 1,
       unitPrice: -normalizedDiscount,
       lineTotal: -normalizedDiscount,
+      itemType: "discount",
       sortOrder: sortOrder++,
     });
   }
@@ -381,12 +454,7 @@ export async function buildUtilityInvoicePayload(
       roundingIncrement: utilitySnapshot.roundingIncrement,
       resolvedDeviceSurcharges: utilitySnapshot.resolvedDeviceSurcharges,
       warnings: utilitySnapshot.warnings,
-      formulaSnapshot: {
-        ...utilitySnapshot.formulaSnapshot,
-        contractCode: typedContract.contract_code,
-        tenantName: primaryTenant?.tenants?.full_name ?? null,
-        buildingName: room.buildings?.name ?? null,
-      },
+      formulaSnapshot: utilitySnapshot.formulaSnapshot,
     },
   };
 }

@@ -160,7 +160,10 @@ const InvoiceDetail = () => {
                                <div className="flex items-center gap-3">
                                   {item.type === 'Electricity' ? <Zap className="text-warning" size={16} /> :
                                    item.type === 'Water' ? <Droplets className="text-secondary" size={16} /> :
-                                   item.type === 'Rent' ? <Receipt className="text-primary" size={16} /> : <Info className="text-muted" size={16} />}
+                                   item.type === 'Rent' ? <Receipt className="text-primary" size={16} /> :
+                                   item.type === 'Asset' ? <ShieldCheck className="text-primary" size={16} /> :
+                                   item.type === 'Discount' ? <AlertCircle className="text-warning" size={16} /> :
+                                   <Info className="text-muted" size={16} />}
                                   <span className="text-body font-medium text-text">{item.description}</span>
                                </div>
                             </td>

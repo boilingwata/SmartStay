@@ -11,6 +11,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapContractStatus, mapDepositStatus } from '@/lib/enumMaps';
+import { ContractAddendumRow, toContractAddendum } from '@/lib/contractAddendums';
 import type { DbContractStatus } from '@/types/supabase';
 
 export interface ContractFilter {
@@ -69,6 +70,8 @@ interface ContractRow {
   signing_date: string | null;
   payment_cycle_months: number | null;
   payment_due_day?: number | null;
+  notice_period_days?: number | null;
+  occupants_for_billing?: number | null;
   monthly_rent: number | null;
   deposit_amount: number | null;
   deposit_status: string | null;
@@ -171,6 +174,8 @@ interface ContractTransferRow {
   from_tenant?: TenantRow | null;
   to_tenant?: TenantRow | null;
 }
+
+interface ContractAddendumQueryRow extends ContractAddendumRow {}
 
 interface RpcContractResult {
   contractId: number;
@@ -278,6 +283,9 @@ function toContractTransfer(row: ContractTransferRow): ContractTransfer {
 
 function deriveOccupantCount(row: ContractRow, occupants: ContractOccupant[]): number {
   if (occupants.length > 0) return occupants.filter((item) => item.status === 'active').length;
+  if (typeof row.occupants_for_billing === 'number' && row.occupants_for_billing > 0) {
+    return row.occupants_for_billing;
+  }
   const terms = parseTerms(row.terms);
   const occupantsForBilling = terms.occupants_for_billing;
   if (typeof occupantsForBilling === 'number') return occupantsForBilling;
@@ -318,7 +326,8 @@ function toContractDetail(
   invoiceRows: ContractInvoiceRow[],
   occupantRows: RoomOccupantRow[],
   transferRows: ContractTransferRow[],
-  addendumSourceAvailable: boolean
+  addendumSourceAvailable: boolean,
+  addendumRows: ContractAddendumQueryRow[]
 ): ContractDetail {
   const signers = (row.contract_tenants ?? []).map(toContractTenant);
   const occupants = occupantRows.map(toContractOccupant);
@@ -349,6 +358,7 @@ function toContractDetail(
       row.deposit_status ?? 'pending'
     ) as ContractDetail['depositStatus'],
     paymentDueDay: row.payment_due_day ?? 5,
+    noticePeriodDays: row.notice_period_days ?? undefined,
     terminationDate: row.terminated_at ?? undefined,
     terminationReason: row.termination_reason ?? undefined,
     tenants: signers,
@@ -359,7 +369,7 @@ function toContractDetail(
     invoices: invoiceRows.map(toContractInvoice),
     transfers: transferRows.map(toContractTransfer),
     addendumSourceAvailable,
-    addendums: [],
+    addendums: addendumRows.map(toContractAddendum),
   };
 }
 
@@ -369,7 +379,7 @@ async function fetchContractRow(id: number): Promise<ContractRow> {
       .from('contracts')
       .select(
         `id, uuid, contract_code, room_id, primary_tenant_id, linked_contract_id,
-         start_date, end_date, signing_date, payment_cycle_months, payment_due_day,
+         start_date, end_date, signing_date, payment_cycle_months, payment_due_day, notice_period_days, occupants_for_billing,
          monthly_rent, deposit_amount, deposit_status, status, termination_reason, terminated_at, terms,
          rooms(id, room_code, building_id, buildings(name)),
          contract_tenants(id, contract_id, tenant_id, is_primary,
@@ -389,7 +399,7 @@ export const contractService = {
       .from('contracts')
       .select(
         `id, uuid, contract_code, room_id, primary_tenant_id, start_date, end_date,
-         payment_cycle_months, payment_due_day, monthly_rent, deposit_status, status, terms,
+         payment_cycle_months, payment_due_day, occupants_for_billing, monthly_rent, deposit_status, status, terms,
          rooms!inner(id, room_code, building_id, buildings(name)),
          contract_tenants(id, contract_id, tenant_id, is_primary,
            tenants(id, full_name, id_number, phone, email, profile_id,
@@ -457,7 +467,7 @@ export const contractService = {
 
     const db = supabase as any;
 
-    const [contractRow, serviceRows, renewalRows, invoiceRows, occupantRows, transferRows, addendumSourceAvailable] =
+    const [contractRow, serviceRows, renewalRows, invoiceRows, occupantRows, transferRows, addendumSourceAvailable, addendumRows] =
       await Promise.all([
         fetchContractRow(numId),
         unwrap(
@@ -515,6 +525,15 @@ export const contractService = {
 
           return !error;
         })(),
+        unwrap(
+          db
+            .from('contract_addendums')
+            .select('id, addendum_code, addendum_type, title, content, effective_date, status, signed_file_url, summary_json, created_at, source_type, version_no, parent_addendum_id')
+            .eq('contract_id', numId)
+            .order('effective_date', { ascending: false })
+            .order('version_no', { ascending: false })
+            .order('created_at', { ascending: false })
+        ) as Promise<ContractAddendumQueryRow[]>,
       ]);
 
     return toContractDetail(
@@ -524,7 +543,8 @@ export const contractService = {
       invoiceRows,
       occupantRows,
       transferRows,
-      addendumSourceAvailable
+      addendumSourceAvailable,
+      addendumRows
     );
   },
 
@@ -544,6 +564,13 @@ export const contractService = {
     const representativeId = Number(data.primaryTenantId);
     const selectedServiceIds = data.selectedServices.map((id) => Number(id)).filter(Number.isFinite);
     const utilityPolicyId = data.utilityPolicyId ? Number(data.utilityPolicyId) : null;
+    const legalDocumentUrls = data.ownerLegalConfirmation.supportingDocumentUrls.filter(Boolean);
+    const legalBasisType =
+      data.ownerLegalConfirmation.legalBasisType === 'Owner'
+        ? 'owner'
+        : data.ownerLegalConfirmation.legalBasisType === 'AuthorizedRepresentative'
+          ? 'authorized_representative'
+          : 'business_entity';
 
     if (!Number.isFinite(representativeId)) {
       throw new Error('Người đại diện không hợp lệ');
@@ -584,13 +611,19 @@ export const contractService = {
           utilityPolicyId,
           selectedServices: selectedServiceIds.map((id) => ({ serviceId: id })),
           markDepositReceived: data.depositAmount > 0,
+          ownerRep: data.ownerRep,
+          ownerLegalConfirmation: {
+            ...data.ownerLegalConfirmation,
+            legalBasisType,
+            supportingDocumentUrls: legalDocumentUrls,
+          },
         },
       });
 
       if (error) throw new Error(error.message);
       result = invokeResult as RpcContractResult;
     } else {
-      const { data: rpcResult, error } = await (supabase as any).rpc('create_contract_v2', {
+      const { data: rpcResult, error } = await (supabase as any).rpc('create_contract_v3', {
         p_room_id: numRoomId,
         p_start_date: data.startDate,
         p_end_date: data.endDate,
@@ -605,6 +638,16 @@ export const contractService = {
         p_service_prices: selectedServiceIds.map(() => null),
         p_service_quantities: selectedServiceIds.map(() => 1),
         p_mark_deposit_received: data.depositAmount > 0,
+        p_owner_legal_basis_type: legalBasisType,
+        p_owner_legal_basis_note: data.ownerLegalConfirmation.legalBasisNote || null,
+        p_owner_supporting_document_urls: legalDocumentUrls,
+        p_owner_has_legal_rental_rights: data.ownerLegalConfirmation.hasLegalRentalRightsConfirmed,
+        p_owner_property_eligibility_confirmed: data.ownerLegalConfirmation.propertyEligibilityConfirmed,
+        p_owner_responsibilities_accepted: data.ownerLegalConfirmation.landlordResponsibilitiesAccepted,
+        p_owner_final_acknowledgement: data.ownerLegalConfirmation.finalAcknowledgementAccepted,
+        p_owner_rep_full_name: data.ownerRep.fullName,
+        p_owner_rep_cccd: data.ownerRep.cccd || null,
+        p_owner_rep_role: data.ownerRep.role,
       });
 
       if (error) throw new Error(error.message);

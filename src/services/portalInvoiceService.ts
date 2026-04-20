@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
+import { normalizeInvoiceItemType } from '@/lib/invoiceItems';
 import type { DbInvoiceStatus, DbPaymentMethod, Json } from '@/types/supabase';
 
 type InvoiceRow = {
@@ -42,6 +43,7 @@ type InvoiceItemRow = {
   quantity: number | null;
   unit_price: number;
   line_total: number;
+  item_type: string | null;
   sort_order: number | null;
   created_at: string | null;
 };
@@ -184,6 +186,7 @@ export type PortalInvoiceItem = {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  itemType: 'rent' | 'utility_electric' | 'utility_water' | 'service' | 'asset' | 'discount' | 'other';
   sortOrder: number;
   createdAt: string | null;
 };
@@ -431,6 +434,7 @@ function mapInvoiceItemRow(row: InvoiceItemRow): PortalInvoiceItem {
     quantity: Number(row.quantity ?? 1),
     unitPrice: Number(row.unit_price),
     lineTotal: Number(row.line_total),
+    itemType: normalizeInvoiceItemType(row.item_type, row.description),
     sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
   };
@@ -615,7 +619,7 @@ export async function fetchInvoiceById(invoiceId: string): Promise<PortalInvoice
       unwrap(
         supabase
           .from('invoice_items')
-          .select('id, invoice_id, description, quantity, unit_price, line_total, sort_order, created_at')
+          .select('id, invoice_id, description, quantity, unit_price, line_total, item_type, sort_order, created_at')
           .eq('invoice_id', Number(invoiceId))
           .order('sort_order', { ascending: true })
       ) as unknown as Promise<InvoiceItemRow[]>,

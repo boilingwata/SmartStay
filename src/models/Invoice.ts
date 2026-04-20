@@ -1,5 +1,13 @@
 export type InvoiceStatus = 'Unpaid' | 'Paid' | 'Overdue' | 'Cancelled';
-export type InvoiceItemType = 'Rent' | 'Electricity' | 'Water' | 'Service' | 'Other';
+export type InvoiceItemType = 'Rent' | 'Electricity' | 'Water' | 'Service' | 'Asset' | 'Discount' | 'Other';
+export type InvoiceItemTypeKey =
+  | 'rent'
+  | 'utility_electric'
+  | 'utility_water'
+  | 'service'
+  | 'asset'
+  | 'discount'
+  | 'other';
 
 export interface InvoiceItem {
   id: string;
@@ -9,6 +17,7 @@ export interface InvoiceItem {
   unitPriceSnapshot: number;
   amount: number;
   type: InvoiceItemType;
+  typeKey: InvoiceItemTypeKey;
   snapshotPrice: number | null;
   snapshotLabel: string;
 }
