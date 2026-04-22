@@ -187,7 +187,7 @@ const StaffReport: React.FC = () => {
               ) : sortedData.map((staff) => (
                 <tr key={staff.staffId} className="hover:bg-slate-50 transition-colors group">
                   <td className="py-4 px-6">
-                    <Link to={`/admin/staff/${staff.staffId}/ratings`} className="flex items-center gap-3 group/link">
+                    <Link to={`/owner/staff/${staff.staffId}/ratings`} className="flex items-center gap-3 group/link">
                        <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border-2 border-white shadow-sm transition-transform group-hover/link:scale-110">
                           {staff.avatarUrl ? (
                             <img src={staff.avatarUrl} alt={staff.staffName} className="w-full h-full object-cover" />

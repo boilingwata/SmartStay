@@ -213,23 +213,17 @@ export const publicListingsService = {
     };
   },
 
-  submitInquiry: async (_roomId: string, _data: RoomInquiryData): Promise<void> => {
-    /**
-     * FEATURE STUB (PL-02): The `room_inquiries` table does NOT exist in the `smartstay` schema.
-     *
-     * TO ENABLE THIS FEATURE:
-     *   1. CREATE TABLE smartstay.room_inquiries (
-     *        id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-     *        room_id BIGINT NOT NULL REFERENCES smartstay.rooms(id),
-     *        inquirer_name TEXT NOT NULL,
-     *        inquirer_phone TEXT NOT NULL,
-     *        message TEXT,
-     *        created_at TIMESTAMPTZ DEFAULT NOW()
-     *      );
-     *   2. Re-generate src/types/supabase.ts
-     *   3. Replace this stub with a real insert
-     */
-    throw new Error('Tính năng gửi câu hỏi chưa được kích hoạt. Vui lòng liên hệ quản lý qua số điện thoại hoặc email.');
+  submitInquiry: async (roomId: string, data: RoomInquiryData): Promise<void> => {
+    await unwrap(
+      supabase
+        .from('room_inquiries')
+        .insert({
+          room_id: Number(roomId),
+          inquirer_name: data.name,
+          inquirer_phone: data.phone,
+          message: data.message,
+        })
+    );
   },
 
   submitApplication: async (roomId: string, form: RentalApplicationFormData): Promise<RentalApplicationSummary> => {

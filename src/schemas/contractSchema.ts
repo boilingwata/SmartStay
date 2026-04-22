@@ -13,7 +13,7 @@ export const contractSchema = z
     rentPrice: z.number().min(1000, 'Giá thuê phải lớn hơn 1.000 đồng'),
     depositAmount: z.number().min(0, 'Tiền cọc không được âm'),
     paymentCycle: z.number().min(1),
-    paymentDueDay: z.number().min(1).max(31, 'Ngày đến hạn phải từ 1 đến 31'),
+    paymentDueDay: z.number().min(1).max(31, 'Ngày thu tiền phải từ 1 đến 31'),
     autoRenew: z.boolean().default(false),
 
     selectedServices: z.array(z.string()).default([]),
@@ -80,7 +80,7 @@ export const contractSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['ownerLegalConfirmation', 'finalAcknowledgementAccepted'],
-        message: 'Cần tick cam kết đồng ý trước khi tạo hợp đồng',
+        message: 'Cần xác nhận đối chiếu lần cuối trước khi tạo hợp đồng',
       });
     }
 

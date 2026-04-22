@@ -30,7 +30,7 @@ export const ElectricityChart = ({ data, loading }: ElectricityChartProps) => {
   const buildings = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'month') : [];
 
   const handleBarClick = (buildingName: string, month: string) => {
-    navigate(`/admin/reports/financial?building=${buildingName}&month=${month}`);
+    navigate(`/owner/reports/financial?building=${buildingName}&month=${month}`);
   };
 
   return (

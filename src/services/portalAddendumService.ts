@@ -1,7 +1,6 @@
 import { toContractAddendum, toDbAddendumStatus, toDbAddendumType } from '@/lib/contractAddendums';
-import { unwrap } from '@/lib/supabaseHelpers';
 import { supabase } from '@/lib/supabase';
-import { ContractAddendum } from '@/models/Contract';
+import type { ContractAddendum } from '@/models/Contract';
 import { fileService } from './fileService';
 
 export interface AddendumFormInput {
@@ -24,24 +23,79 @@ export interface AdminAddendumListItem extends ContractAddendum {
   buildingName: string;
 }
 
-async function buildNextAddendumCode(contractId: number): Promise<string> {
-  const contract = await unwrap(
-    (supabase as any)
-      .from('contracts')
-      .select('contract_code')
-      .eq('id', contractId)
-      .single()
-  ) as { contract_code: string };
+interface AddendumRow {
+  id: number | string | null;
+  addendum_code: string | null;
+  addendum_type: string | null;
+  title: string | null;
+  content: string | null;
+  effective_date: string | null;
+  status: string | null;
+  signed_file_url: string | null;
+  summary_json: Record<string, unknown> | null;
+  created_at: string | null;
+  source_type: string | null;
+  version_no: number | string | null;
+  parent_addendum_id: number | string | null;
+}
 
-  const rows = await unwrap(
-    (supabase as any)
-      .from('contract_addendums')
-      .select('id')
-      .eq('contract_id', contractId)
-  ) as Array<{ id: number }>;
+interface AdminAddendumRow extends AddendumRow {
+  contract_id: number | string | null;
+  contracts?: {
+    contract_code?: string | null;
+    rooms?: {
+      room_code?: string | null;
+      buildings?: {
+        name?: string | null;
+      } | null;
+    } | null;
+    contract_tenants?: Array<{
+      is_primary?: boolean | null;
+      tenants?: {
+        full_name?: string | null;
+      } | null;
+    }> | null;
+  } | null;
+}
 
-  const nextSequence = String((rows?.length ?? 0) + 1).padStart(2, '0');
-  return `PL-${contract.contract_code}-${nextSequence}`;
+type UntypedSelectQuery<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }> & {
+  select: (columns: string) => UntypedSelectQuery<T>;
+  eq: (column: string, value: unknown) => UntypedSelectQuery<T>;
+  order: (column: string, options?: { ascending?: boolean }) => UntypedSelectQuery<T>;
+};
+
+interface UntypedSupabaseClient {
+  from: <T>(table: string) => UntypedSelectQuery<T>;
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+}
+
+const supabaseUntyped = supabase as unknown as UntypedSupabaseClient;
+
+async function executeRows<T>(query: UntypedSelectQuery<T>): Promise<T[]> {
+  const { data, error } = await (query as unknown as Promise<{ data: T[] | null; error: { message: string } | null }>);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+function mapAddendumRow(row: AddendumRow): ContractAddendum {
+  return toContractAddendum({
+    id: Number(row.id),
+    addendum_code: row.addendum_code ?? null,
+    addendum_type: row.addendum_type ?? null,
+    title: String(row.title ?? ''),
+    content: row.content ?? null,
+    effective_date: String(row.effective_date ?? ''),
+    status: row.status ?? null,
+    signed_file_url: row.signed_file_url ?? null,
+    summary_json: row.summary_json ?? null,
+    created_at: row.created_at ?? null,
+    source_type: row.source_type ?? null,
+    version_no: Number(row.version_no ?? 1),
+    parent_addendum_id: row.parent_addendum_id ? Number(row.parent_addendum_id) : null,
+  });
 }
 
 export const portalAddendumService = {
@@ -57,39 +111,23 @@ export const portalAddendumService = {
     }),
 
   listByContract: async (contractId: number): Promise<ContractAddendum[]> => {
-    const rows = await unwrap(
-      (supabase as any)
-        .from('contract_addendums')
+    const rows = await executeRows(
+      supabaseUntyped
+        .from<AddendumRow>('contract_addendums')
         .select('id, addendum_code, addendum_type, title, content, effective_date, status, signed_file_url, summary_json, created_at, source_type, version_no, parent_addendum_id')
         .eq('contract_id', contractId)
         .order('effective_date', { ascending: false })
         .order('version_no', { ascending: false })
         .order('created_at', { ascending: false })
-    ) as Array<Record<string, unknown>>;
-
-    return rows.map((row) =>
-      toContractAddendum({
-        id: Number(row.id),
-        addendum_code: (row.addendum_code as string | null) ?? null,
-        addendum_type: (row.addendum_type as string | null) ?? null,
-        title: String(row.title ?? ''),
-        content: (row.content as string | null) ?? null,
-        effective_date: String(row.effective_date ?? ''),
-        status: (row.status as string | null) ?? null,
-        signed_file_url: (row.signed_file_url as string | null) ?? null,
-        summary_json: (row.summary_json as Record<string, unknown> | null) ?? null,
-        created_at: (row.created_at as string | null) ?? null,
-        source_type: (row.source_type as string | null) ?? null,
-        version_no: Number(row.version_no ?? 1),
-        parent_addendum_id: row.parent_addendum_id ? Number(row.parent_addendum_id) : null,
-      })
     );
+
+    return rows.map(mapAddendumRow);
   },
 
   listAdminAddendums: async (): Promise<AdminAddendumListItem[]> => {
-    const rows = await unwrap(
-      (supabase as any)
-        .from('contract_addendums')
+    const rows = await executeRows(
+      supabaseUntyped
+        .from<AdminAddendumRow>('contract_addendums')
         .select(`
           id,
           contract_id,
@@ -119,35 +157,18 @@ export const portalAddendumService = {
         `)
         .order('effective_date', { ascending: false })
         .order('created_at', { ascending: false })
-    ) as Array<Record<string, unknown>>;
+    );
 
     return rows.map((row) => {
-      const contract = (row.contracts as Record<string, unknown> | null) ?? {};
-      const room = (contract.rooms as Record<string, unknown> | null) ?? {};
-      const building = (room.buildings as Record<string, unknown> | null) ?? {};
-      const contractTenants = (contract.contract_tenants as Array<Record<string, unknown>> | null) ?? [];
-      const primaryTenant =
-        contractTenants.find((item) => Boolean(item.is_primary)) ??
-        contractTenants[0] ??
-        null;
-      const tenant = (primaryTenant?.tenants as Record<string, unknown> | null) ?? {};
+      const contract = row.contracts ?? {};
+      const room = contract.rooms ?? {};
+      const building = room.buildings ?? {};
+      const contractTenants = contract.contract_tenants ?? [];
+      const primaryTenant = contractTenants.find((item) => Boolean(item.is_primary)) ?? contractTenants[0] ?? null;
+      const tenant = primaryTenant?.tenants ?? {};
 
       return {
-        ...toContractAddendum({
-          id: Number(row.id),
-          addendum_code: (row.addendum_code as string | null) ?? null,
-          addendum_type: (row.addendum_type as string | null) ?? null,
-          title: String(row.title ?? ''),
-          content: (row.content as string | null) ?? null,
-          effective_date: String(row.effective_date ?? ''),
-          status: (row.status as string | null) ?? null,
-          signed_file_url: (row.signed_file_url as string | null) ?? null,
-          summary_json: (row.summary_json as Record<string, unknown> | null) ?? null,
-          created_at: (row.created_at as string | null) ?? null,
-          source_type: (row.source_type as string | null) ?? null,
-          version_no: Number(row.version_no ?? 1),
-          parent_addendum_id: row.parent_addendum_id ? Number(row.parent_addendum_id) : null,
-        }),
+        ...mapAddendumRow(row),
         contractId: String(row.contract_id ?? ''),
         contractCode: String(contract.contract_code ?? ''),
         tenantName: String(tenant.full_name ?? ''),
@@ -160,7 +181,7 @@ export const portalAddendumService = {
   createAddendum: async (addendum: AddendumFormInput): Promise<ContractAddendum> => {
     void addendum.addendumCode;
 
-    const { data, error } = await (supabase as any).rpc('create_contract_addendum', {
+    const { data, error } = await supabaseUntyped.rpc('create_contract_addendum', {
       p_contract_id: addendum.contractId,
       p_addendum_type: toDbAddendumType(addendum.type),
       p_title: addendum.title.trim(),
@@ -174,23 +195,8 @@ export const portalAddendumService = {
     });
 
     if (error) throw new Error(error.message);
-    const row = data as Record<string, unknown>;
 
-    return toContractAddendum({
-      id: Number(row.id),
-      addendum_code: (row.addendum_code as string | null) ?? null,
-      addendum_type: (row.addendum_type as string | null) ?? null,
-      title: String(row.title ?? ''),
-      content: (row.content as string | null) ?? null,
-      effective_date: String(row.effective_date ?? ''),
-      status: (row.status as string | null) ?? null,
-      signed_file_url: (row.signed_file_url as string | null) ?? null,
-      summary_json: (row.summary_json as Record<string, unknown> | null) ?? null,
-      created_at: (row.created_at as string | null) ?? null,
-      source_type: (row.source_type as string | null) ?? null,
-      version_no: Number(row.version_no ?? 1),
-      parent_addendum_id: row.parent_addendum_id ? Number(row.parent_addendum_id) : null,
-    });
+    return mapAddendumRow(data as AddendumRow);
   },
 };
 

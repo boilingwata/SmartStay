@@ -1,4 +1,9 @@
 import type { ContractAddendum } from '@/models/Contract';
+import {
+  getContractAddendumSourceLabel as getSourceLabel,
+  getContractAddendumStatusLabel as getStatusLabel,
+  getContractAddendumTypeLabel as getTypeLabel,
+} from '@/lib/contractPresentation';
 
 export interface ContractAddendumRow {
   id: number;
@@ -48,6 +53,10 @@ export function mapContractAddendumStatus(status: string | null | undefined): Co
   }
 }
 
+export function getContractAddendumStatusLabel(status: ContractAddendum['status'] | string): string {
+  return getStatusLabel(status);
+}
+
 export function toDbAddendumType(type: ContractAddendum['type']): string {
   switch (type) {
     case 'AssetAssignment':
@@ -81,24 +90,7 @@ export function toDbAddendumStatus(status: ContractAddendum['status']): string {
 }
 
 export function getContractAddendumTypeLabel(type: ContractAddendum['type']): string {
-  switch (type) {
-    case 'AssetAssignment':
-      return 'Bổ sung tài sản tính phí';
-    case 'AssetRepricing':
-      return 'Điều chỉnh giá tài sản';
-    case 'AssetStatusChange':
-      return 'Điều chỉnh trạng thái tài sản';
-    case 'RentChange':
-      return 'Điều chỉnh giá thuê';
-    case 'ServiceChange':
-      return 'Điều chỉnh dịch vụ';
-    case 'RoomChange':
-      return 'Điều chuyển phòng';
-    case 'PolicyUpdate':
-      return 'Điều chỉnh chính sách';
-    default:
-      return 'Phụ lục khác';
-  }
+  return getTypeLabel(type);
 }
 
 export function mapContractAddendumSourceType(
@@ -108,7 +100,7 @@ export function mapContractAddendumSourceType(
 }
 
 export function getContractAddendumSourceLabel(sourceType: ContractAddendum['sourceType']): string {
-  return sourceType === 'RoomAssetAuto' ? 'Tự động từ tài sản phòng' : 'Thủ công';
+  return getSourceLabel(sourceType);
 }
 
 export function toContractAddendum(row: ContractAddendumRow): ContractAddendum {

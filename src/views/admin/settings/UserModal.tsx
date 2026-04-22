@@ -70,12 +70,11 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
   useEffect(() => {
     roleService.getRoles().then(data => {
       setRoles(data);
-      if (!isEdit && data.length > 0) {
-        const defaultRole = data.find(r => r.name === 'Staff') || data[0];
-        setFormData(prev => ({ ...prev, roleId: defaultRole.id }));
-      }
-    }).catch(err => console.error('Failed to fetch roles', err));
-  }, []);
+    }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch roles', err);
+    });
+  }, [isEdit]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,16 +86,47 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
         buildingsAccess: [...(user.buildingsAccess ?? [])],
         roleId: user.roleId || roles.find(r => r.name === user.role)?.id || '',
       });
-    } else {
+    } else if (roles.length > 0) {
+      const staffRole = roles.find(r => r.name === 'Staff') || 
+                       roles.find(r => r.name === 'Nhân viên') || 
+                       roles[0];
       setFormData({
         ...createEmptyForm(),
-        roleId: roles.find(r => r.name === 'Staff')?.id || roles[0]?.id || '',
+        roleId: staffRole.id,
+        role: (staffRole.name === 'Owner' || staffRole.name === 'Chủ sở hữu' ? 'Owner' : 
+               staffRole.name === 'Tenant' || staffRole.name === 'Khách thuê' ? 'Tenant' : 'Staff') as User['role']
       });
     }
-  }, [open, user?.id, roles]);
+  }, [open, user, roles]);
+
+  const handleRoleChange = (selectedRoleId: string) => {
+    const role = roles.find(r => r.id === selectedRoleId);
+    if (!role) return;
+
+    // Map DB role name to legacy UserRoleType
+    let legacyRole: User['role'] = 'Staff';
+    const name = role.name.toLowerCase();
+    
+    if (name.includes('owner') || name.includes('chủ')) {
+      legacyRole = 'Owner';
+    } else if (name.includes('tenant') || name.includes('khách') || name.includes('cư dân')) {
+      legacyRole = 'Tenant';
+    }
+
+    setFormData(prev => ({ 
+      ...prev, 
+      roleId: selectedRoleId,
+      role: legacyRole
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.roleId) {
+      toast.error('Vui lòng chọn quyền hạn cho người dùng');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -205,7 +235,7 @@ const UserModal: React.FC<UserModalProps> = ({ open, onOpenChange, user, onSucce
                     required
                     className="w-full h-12 pl-11 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600/5 focus:border-indigo-600 transition-all text-sm font-semibold text-slate-800 appearance-none bg-white"
                     value={formData.roleId ?? ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, roleId: e.target.value }))}
+                    onChange={(e) => handleRoleChange(e.target.value)}
                   >
                     <option value="">Lựa chọn...</option>
                     {roles.map(role => (

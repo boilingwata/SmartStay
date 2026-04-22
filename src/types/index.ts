@@ -18,7 +18,7 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-export type UserRoleType = "SuperAdmin" | "Owner" | "Staff" | "Tenant" | "Viewer";
+export type UserRoleType = "SuperAdmin" | "Owner" | "Staff" | "Tenant";
 export type TenantStage = 'prospect' | 'applicant' | 'resident_pending_onboarding' | 'resident_active';
 
 export interface Role {
@@ -46,6 +46,7 @@ export interface User {
   };
   role: UserRoleType;
   roleId?: string;
+  roleName?: string;
   buildingsAccess?: (number | string)[];
   isActive: boolean;
   lastLoginAt?: string;

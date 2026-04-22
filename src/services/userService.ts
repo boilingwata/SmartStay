@@ -1,8 +1,14 @@
-import { User } from '@/types';
+import { User, UserRoleType } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapRole } from '@/lib/enumMaps';
-import type { DbTenantStage, DbUserRole } from '@/types/supabase';
+import { Database } from '@/types/supabase';
+
+type ProfileRow = Database['smartstay']['Tables']['profiles']['Row'] & {
+  roles?: {
+    name: string;
+  } | null;
+};
 
 interface ProfilePreferences {
   username?: string;
@@ -10,41 +16,6 @@ interface ProfilePreferences {
   buildings_access?: (number | string)[];
   force_change_password?: boolean;
   [key: string]: any;
-}
-
-interface ProfileRow {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  avatar_url: string | null;
-  role: string | null;
-  role_id: string | null;
-  tenant_stage: DbTenantStage;
-  preferences: ProfilePreferences | null;
-  is_active: boolean | null;
-  identity_number: string | null;
-  date_of_birth: string | null;
-  gender: string | null;
-  address: string | null;
-  created_at: string | null;
-  roles?: {
-    name: string;
-  } | null;
-}
-
-interface ProfileUpdate {
-  full_name?: string;
-  phone?: string | null;
-  avatar_url?: string | null;
-  role?: DbUserRole;
-  role_id?: string | null;
-  tenant_stage?: DbTenantStage;
-  preferences?: ProfilePreferences | null;
-  is_active?: boolean;
-  identity_number?: string | null;
-  date_of_birth?: string | null;
-  gender?: string | null;
-  address?: string | null;
 }
 
 interface CreateUserResult {
@@ -70,12 +41,8 @@ function getPreferences(row: ProfileRow): ProfilePreferences {
   return (row.preferences ?? {}) as ProfilePreferences;
 }
 
-function toSupportedDbRole(role: User['role']): DbUserRole {
-  if (role === 'Viewer') {
-    throw new Error('Vai trò Viewer chưa được hỗ trợ trong cơ sở dữ liệu hiện tại.');
-  }
-
-  return mapRole.toDb(role) as DbUserRole;
+function toSupportedDbRole(role: User['role']): Database['smartstay']['Enums']['user_role'] {
+  return mapRole.toDb(role) as Database['smartstay']['Enums']['user_role'];
 }
 
 function rowToUser(row: ProfileRow): User {
@@ -88,13 +55,14 @@ function rowToUser(row: ProfileRow): User {
     email: preferences.email?.trim() || '',
     phone: row.phone ?? undefined,
     avatar: row.avatar_url ?? undefined,
-    role: (row.roles?.name || mapRole.fromDb(row.role ?? '') || 'Staff') as User['role'],
+    role: mapRole.fromDb(row.role ?? '') as UserRoleType,
     roleId: row.role_id ?? undefined,
+    roleName: row.roles?.name || mapRole.fromDb(row.role ?? ''),
     buildingsAccess: normalizeBuildingsAccess(preferences.buildings_access),
     isActive: row.is_active ?? true,
     isTwoFactorEnabled: false,
     forceChangePassword: preferences.force_change_password ?? false,
-    tenantStage: row.tenant_stage,
+    tenantStage: row.tenant_stage as User['tenantStage'],
     identityNumber: row.identity_number ?? undefined,
     dateOfBirth: row.date_of_birth ?? undefined,
     gender: row.gender ? (row.gender.charAt(0).toUpperCase() + row.gender.slice(1)) as User['gender'] : undefined,
@@ -118,14 +86,15 @@ export const userService = {
     roleId?: string;
     isActive?: boolean | string;
   }): Promise<User[]> => {
-    let query = (supabase.from('profiles') as any)
+    let query = supabase
+      .from('profiles')
       .select(PROFILE_SELECT)
       .order('created_at', { ascending: false });
 
     if (filters?.roleId && filters.roleId !== 'All') {
       query = query.eq('role_id', filters.roleId);
     } else if (filters?.role && filters.role !== 'All') {
-      const dbRole = mapRole.toDb(filters.role) as DbUserRole;
+      const dbRole = mapRole.toDb(filters.role) as Database['smartstay']['Enums']['user_role'];
       query = query.eq('role', dbRole);
     }
 
@@ -134,8 +103,8 @@ export const userService = {
       query = query.eq('is_active', active);
     }
 
-    const rows = await unwrap(query) as ProfileRow[];
-    let users = rows.map(rowToUser);
+    const rows = await unwrap(query);
+    let users = (rows as ProfileRow[]).map(rowToUser);
 
     if (filters?.search) {
       const search = filters.search.toLowerCase();
@@ -152,13 +121,14 @@ export const userService = {
 
   getUserById: async (id: number | string): Promise<User | undefined> => {
     const row = await unwrap(
-      (supabase.from('profiles') as any)
+      supabase
+        .from('profiles')
         .select(PROFILE_SELECT)
         .eq('id', String(id))
         .maybeSingle()
-    ) as ProfileRow | null;
+    );
 
-    return row ? rowToUser(row) : undefined;
+    return row ? rowToUser(row as ProfileRow) : undefined;
   },
 
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
@@ -201,7 +171,8 @@ export const userService = {
   },
 
   updateUser: async (id: number | string, user: Partial<User>): Promise<User> => {
-    const { data: currentRow, error: currentError } = await (supabase.from('profiles') as any)
+    const { data: currentRow, error: currentError } = await supabase
+      .from('profiles')
       .select('role, preferences')
       .eq('id', String(id))
       .maybeSingle();
@@ -210,19 +181,19 @@ export const userService = {
       throw new Error(currentError.message);
     }
 
-    const currentDbRole = (currentRow as { role?: string } | null)?.role ?? '';
-    const currentPreferences = ((currentRow as { preferences?: ProfilePreferences | null } | null)?.preferences ?? {}) as ProfilePreferences;
+    const currentDbRole = String(currentRow?.role ?? '');
+    const currentPreferences = (currentRow?.preferences ?? {}) as ProfilePreferences;
 
-    const updatePayload: ProfileUpdate = {};
+    const updatePayload: Database['smartstay']['Tables']['profiles']['Update'] = {};
     if (user.fullName !== undefined) updatePayload.full_name = user.fullName;
     if (user.phone !== undefined) updatePayload.phone = user.phone ?? null;
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
-    if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as DbTenantStage;
+    if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as any;
     if (user.roleId !== undefined) updatePayload.role_id = user.roleId ?? null;
     if (user.identityNumber !== undefined) updatePayload.identity_number = user.identityNumber ?? null;
     if (user.dateOfBirth !== undefined) updatePayload.date_of_birth = user.dateOfBirth ?? null;
-    if (user.gender !== undefined) updatePayload.gender = user.gender?.toLowerCase() ?? null;
+    if (user.gender !== undefined) updatePayload.gender = (user.gender?.toLowerCase() ?? null) as any;
     if (user.address !== undefined) updatePayload.address = user.address ?? null;
 
     const nextPreferences: ProfilePreferences = { ...currentPreferences };
@@ -251,7 +222,7 @@ export const userService = {
 
     if (user.role !== undefined) {
       const isSafeToUpdateRole =
-        currentDbRole === 'admin' ||
+        currentDbRole === 'owner' ||
         currentDbRole === 'staff' ||
         currentDbRole === 'tenant' ||
         user.role === 'Staff' ||
@@ -263,42 +234,41 @@ export const userService = {
     }
 
     const row = await unwrap(
-      (supabase.from('profiles') as any)
+      supabase
+        .from('profiles')
         .update(updatePayload)
         .eq('id', String(id))
         .select(PROFILE_SELECT)
         .single()
-    ) as ProfileRow;
+    );
 
-    return rowToUser(row);
+    return rowToUser(row as ProfileRow);
   },
 
   deleteUser: async (id: number | string): Promise<void> => {
     await unwrap(
-      (supabase.from('profiles') as any)
-        .update({ is_active: false } as ProfileUpdate)
+      supabase
+        .from('profiles')
+        .update({ is_active: false })
         .eq('id', String(id))
     );
   },
 
   toggleUserStatus: async (id: number | string): Promise<void> => {
-    const { data: row } = await (supabase.from('profiles') as any)
+    const { data: row } = await supabase
+      .from('profiles')
       .select('is_active')
       .eq('id', String(id))
       .maybeSingle();
 
-    const current = (row as { is_active: boolean | null } | null)?.is_active ?? true;
+    const current = row?.is_active ?? true;
 
     await unwrap(
-      (supabase.from('profiles') as any)
-        .update({ is_active: !current } as ProfileUpdate)
+      supabase
+        .from('profiles')
+        .update({ is_active: !current })
         .eq('id', String(id))
     );
-  },
-
-  resetPassword: async (_id: number | string, _newPassword?: string): Promise<void> => {
-    // Password reset requires auth admin API (service-role).
-    // The correct flow is to send a reset email via supabase.auth.resetPasswordForEmail.
   },
 
   sendResetPasswordEmail: async (userId: string): Promise<void> => {
@@ -308,9 +278,19 @@ export const userService = {
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/public/reset-password`,
     });
 
+    if (error) throw error;
+  },
+  
+  resetPassword: async (userId: string, password: string): Promise<void> => {
+    // Note: Admin resetting another user's password usually requires an Edge Function
+    // or service role. For now, we'll try using the admin API if available, 
+    // but ideally this should call a dedicated RPC or Edge Function.
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      password: password
+    });
     if (error) throw error;
   },
 };

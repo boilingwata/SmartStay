@@ -58,7 +58,7 @@ const PortalLogin: React.FC = () => {
     try {
       await loginAuth(identifier, password, {
         allowedRoles: ['Tenant'],
-        invalidRoleMessage: 'Tài khoản này không thuộc Cổng Cư dân. Vui lòng dùng trang quản trị.',
+        invalidRoleMessage: 'Tài khoản này không thuộc Cổng Cư dân. Vui lòng dùng cổng chủ sở hữu.',
       });
       toast.success('Chào mừng trở lại!');
       navigate(getPostLoginRedirect(useAuthStore.getState().user, requestedRedirect), { replace: true });
@@ -226,7 +226,7 @@ const PortalLogin: React.FC = () => {
 
             <div className="mt-10 pt-10 border-t text-center space-y-4">
               <p className="text-small text-muted font-bold uppercase tracking-widest">
-                Bạn là Quản trị viên? <br />
+                Bạn là chủ sở hữu hoặc nhân sự? <br />
                 <Link to="/auth" className="inline-flex items-center gap-2 text-primary hover:text-primary-light transition-colors mt-2 font-black border-b-2 border-primary/20 hover:border-primary">
                   <ArrowLeft size={16} /> Quay lại chọn cổng
                 </Link>

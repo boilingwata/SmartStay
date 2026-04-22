@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -21,7 +21,7 @@ import { User, Role } from '@/types';
 import { userService } from '@/services/userService';
 import { roleService } from '@/services/roleService';
 import { auditService } from '@/services/auditService';
-import { formatRelativeTime, cn } from '@/utils';
+import { cn } from '@/utils';
 import UserModal from './UserModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import { Button } from '@/components/ui/Button';
@@ -38,11 +38,11 @@ const UserListPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [filterValues, setFilterValues] = useState<Record<string, any>>({
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({
     isActive: 'true'
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [userData, roleData] = await Promise.all([
@@ -56,11 +56,11 @@ const UserListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterValues]);
 
   useEffect(() => {
     fetchData();
-  }, [filterValues]);
+  }, [filterValues, fetchData]);
 
   const handleToggleStatus = async (user: User) => {
     try {
@@ -73,12 +73,12 @@ const UserListPage: React.FC = () => {
       });
       fetchData();
       toast.success(`Đã ${user.isActive ? 'khóa' : 'mở'} tài khoản ${user.fullName}`);
-    } catch (error) {
+    } catch {
       toast.error('Không thể cập nhật trạng thái');
     }
   };
 
-  const columns: ColumnDef<User, any>[] = [
+  const columns: ColumnDef<User>[] = [
     {
       header: 'NGƯỜI DÙNG',
       accessorKey: 'fullName',
@@ -135,22 +135,31 @@ const UserListPage: React.FC = () => {
     {
       header: 'VAI TRÒ',
       accessorKey: 'role',
-      cell: ({ getValue }) => {
-        const roleName = String(getValue());
-        const roleLower = roleName.toLowerCase();
-        
-        const config = {
-          admin: { bg: 'bg-indigo-50/80', text: 'text-indigo-700', border: 'border-indigo-100', label: 'Quản trị viên' },
+      cell: ({ row }) => {
+        const user = row.original;
+        const roleLower = user.role.toLowerCase();
+        const roleName = user.roleName || user.role;
+
+        const config: Record<string, { bg: string; text: string; border: string; label: string }> = {
+          superadmin: { bg: 'bg-rose-50/80', text: 'text-rose-700', border: 'border-rose-100', label: roleName },
+          owner: { bg: 'bg-indigo-50/80', text: 'text-indigo-700', border: 'border-indigo-100', label: 'Chủ sở hữu' },
           staff: { bg: 'bg-slate-50/80', text: 'text-slate-600', border: 'border-slate-200', label: 'Nhân viên' },
           tenant: { bg: 'bg-emerald-50/80', text: 'text-emerald-700', border: 'border-emerald-100', label: 'Cư dân' },
-        }[roleLower] || { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-100', label: roleName };
-        
+        };
+
+        const { bg, text, border, label } = config[roleLower] || { 
+          bg: 'bg-gray-50', 
+          text: 'text-gray-500', 
+          border: 'border-gray-100', 
+          label: roleName 
+        };
+
         return (
           <Badge className={cn(
             "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border shadow-none",
-            config.bg, config.text, config.border
+            bg, text, border
           )}>
-            {config.label}
+            {label}
           </Badge>
         );
       },
@@ -192,15 +201,15 @@ const UserListPage: React.FC = () => {
     {
       label: 'Nhật ký hệ thống',
       icon: <History className="w-4 h-4" />,
-      onClick: (user) => navigate(`/admin/settings/audit?userId=${user.id}`)
+      onClick: (user) => navigate(`/owner/settings/audit-logs?userId=${user.id}`)
     },
     {
       label: 'Trạng thái tài khoản',
       icon: <UserX className="w-4 h-4" />,
       variant: 'danger',
       onClick: (u) => {
-        if (u.role.toLowerCase() === 'admin') {
-          toast.error('Không thể thao tác trên tài khoản Admin');
+        if (u.role.toLowerCase() === 'owner') {
+          toast.error('Không thể thao tác trên tài khoản Owner');
           return;
         }
         handleToggleStatus(u);
@@ -255,7 +264,7 @@ const UserListPage: React.FC = () => {
             <div className="flex items-center gap-3">
                <Button 
                 variant="outline" 
-                onClick={() => navigate('/admin/settings/users/permissions')} 
+                onClick={() => navigate('/owner/settings/users/permissions')} 
                 className="h-11 px-5 rounded-xl border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 shadow-sm"
                >
                   <Shield size={16} className="mr-2 opacity-60 text-indigo-600" /> Ma trận quyền
@@ -291,9 +300,9 @@ const UserListPage: React.FC = () => {
                     <Shield size={20} />
                  </div>
                  <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quản trị viên</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chủ sở hữu</p>
                     <h3 className="text-2xl font-bold text-slate-800 leading-none">
-                      {users.filter(u => u.role.toLowerCase() === 'admin').length}
+                      {users.filter(u => u.role.toLowerCase() === 'owner').length}
                     </h3>
                  </div>
               </div>
@@ -372,7 +381,7 @@ const UserListPage: React.FC = () => {
             <Button 
                variant="outline" 
                className="h-11 px-6 rounded-xl border-slate-200 bg-white text-slate-600 font-bold text-xs uppercase tracking-wider shadow-sm flex items-center gap-2 hover:bg-slate-50"
-               onClick={() => navigate('/admin/settings/audit')}
+              onClick={() => navigate('/owner/settings/audit-logs')}
             >
                Xem nhật ký truy vết <ChevronRight size={14} className="opacity-60" />
             </Button>

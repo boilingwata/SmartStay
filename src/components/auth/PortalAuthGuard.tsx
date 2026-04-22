@@ -34,11 +34,11 @@ const PortalAuthGuard: React.FC = () => {
   }
 
   if (sessionExpired) {
-    return <Navigate to="/portal/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/portal/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (role !== 'Tenant') {

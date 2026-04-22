@@ -66,6 +66,7 @@ lerna-debug.log*
 .bob/
 .claude/
 .codebuddy/
+.codex/
 .commandcode/
 .continue/
 .cortex/
@@ -99,6 +100,9 @@ skills-lock.json
 .supabase/
 supabase/.temp/
 
+# Vercel deployment cache
+.vercel/
+
 # Secrets / credentials
 *.pem
 *.key
@@ -123,17 +127,21 @@ tmp-*/
 tmp-*.png
 tmp-*.json
 test-results*.json
+*-results*.json
 junit.xml
 lint_output*.txt
 
 # Local planning / audit notes
 *-REPORT.md
+*-CONTEXT.md
 AUDIT.md
 CLAUDE.md
 IMPROVEMENTS.md
 findings.md
 progress.md
 task_plan.md
+.planning/
+scratch/
 
 # Misc generated files
 *.tmp

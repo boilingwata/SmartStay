@@ -27,6 +27,8 @@ const getDefaults = (activeBuildingId?: string | number | null): RoomFormData =>
   conditionScore: 8,
   amenities: [],
   description: '',
+  status: 'Vacant',
+  isListed: false,
 });
 
 const mapRoomToFormData = (room: Room | RoomDetail | null, defaults: RoomFormData): RoomFormData => {
@@ -45,6 +47,8 @@ const mapRoomToFormData = (room: Room | RoomDetail | null, defaults: RoomFormDat
     conditionScore: 'conditionScore' in room ? room.conditionScore : defaults.conditionScore,
     amenities: 'amenities' in room ? room.amenities : defaults.amenities,
     description: 'description' in room ? (room.description || '') : defaults.description,
+    status: room.status ?? defaults.status,
+    isListed: 'isListed' in room ? room.isListed : defaults.isListed,
   };
 };
 
@@ -71,7 +75,7 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
 
   const defaultValues = useMemo(() => getDefaults(resolvedBuildingId || activeBuildingId), [resolvedBuildingId, activeBuildingId]);
 
-  const { register, handleSubmit, setValue, control, reset, formState: { errors } } = useForm<RoomFormData>({
+  const { register, handleSubmit, setValue, control, reset, watch, formState: { errors } } = useForm<RoomFormData>({
     resolver: zodResolver(roomSchema) as unknown as Resolver<RoomFormData>,
     defaultValues: mapRoomToFormData(room || null, defaultValues),
   });
@@ -96,6 +100,17 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
       reset(mapRoomToFormData(room || null, defaultValues));
     }
   }, [room, isOpen, reset, defaultValues]);
+
+  const currentStatus = watch('status');
+  const isAvailableForListing = currentStatus === 'Vacant';
+  const isListed = watch('isListed');
+
+  // Auto-uncheck isListed if status is not Vacant
+  useEffect(() => {
+    if (!isAvailableForListing && isListed) {
+      setValue('isListed', false);
+    }
+  }, [isAvailableForListing, isListed, setValue]);
 
   useEffect(() => {
     setValue('roomType', deriveRoomType(areaSqm), { shouldDirty: true, shouldValidate: true });
@@ -285,6 +300,18 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
                     </div>
                   </div>
 
+                   <div className="space-y-2.5">
+                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Trạng thái phòng</label>
+                    <select {...register('status')} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10">
+                      <option value="Vacant">Trống (Vacant)</option>
+                      <option value="Occupied">Đang ở (Occupied)</option>
+                      <option value="Maintenance">Sửa chữa (Maintenance)</option>
+                      <option value="Reserved">Đặt chỗ (Reserved)</option>
+                    </select>
+                  </div>
+
+
+
                   <div className="flex flex-col justify-end space-y-4">
                     <label className="group ml-1 flex cursor-pointer items-center gap-3 pb-4">
                       <div className={cn('relative w-12 rounded-full p-1 transition-all', hasBalcony ? 'bg-primary' : 'bg-slate-300')}>
@@ -352,6 +379,38 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
             </div>
 
             <aside className="space-y-6">
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Niêm yết công khai</p>
+                <div className="mt-4 space-y-4">
+                  <label className={cn(
+                    "group flex items-center justify-between rounded-2xl p-4 transition-all",
+                    isAvailableForListing ? "cursor-pointer bg-slate-50 hover:bg-primary/5" : "cursor-not-allowed bg-slate-100 opacity-60"
+                  )}>
+                    <div>
+                      <p className="text-sm font-black text-slate-900">Hiển thị trên website</p>
+                      <p className="text-xs text-slate-500">
+                        {isAvailableForListing 
+                          ? "Người lạ có thể xem và đặt phòng" 
+                          : "Chỉ phòng Trống (Vacant) mới có thể niêm yết"}
+                      </p>
+                    </div>
+                    <div className={cn(
+                      'relative w-12 rounded-full p-1 transition-all', 
+                      isListed ? 'bg-primary' : 'bg-slate-300',
+                      !isAvailableForListing && 'grayscale'
+                    )}>
+                      <div className={cn('h-4 w-4 rounded-full bg-white shadow-sm transition-all', isListed ? 'ml-6' : 'ml-0')} />
+                      <input 
+                        type="checkbox" 
+                        className="sr-only" 
+                        {...register('isListed')} 
+                        disabled={!isAvailableForListing}
+                      />
+                    </div>
+                  </label>
+                </div>
+              </section>
+
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Tóm tắt vận hành</p>
                 <div className="mt-4 space-y-4 text-sm text-slate-600">

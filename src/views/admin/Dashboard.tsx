@@ -260,10 +260,10 @@ const AdminDashboard = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey) {
         switch (e.key) {
-          case '1': navigate('/admin/invoices'); break;
-          case '2': navigate('/admin/payments'); break;
-          case '3': navigate('/admin/tickets'); break;
-          case '4': navigate('/admin/contracts'); break;
+          case '1': navigate('/owner/invoices'); break;
+          case '2': navigate('/owner/payments'); break;
+          case '3': navigate('/owner/tickets'); break;
+          case '4': navigate('/owner/contracts'); break;
         }
       }
     };
@@ -349,7 +349,7 @@ const AdminDashboard = () => {
           icon={Building2} 
           delta={kpis?.deltas.totalBuildings} 
           loading={kpisLoading}
-          onClick={() => navigate('/admin/buildings')}
+          onClick={() => navigate('/owner/buildings')}
         />
         <KPICard
           title={t('pages.dashboard.totalRooms')} 
@@ -357,7 +357,7 @@ const AdminDashboard = () => {
           icon={Home} 
           loading={kpisLoading}
           color="secondary"
-          onClick={() => navigate('/admin/rooms')}
+          onClick={() => navigate('/owner/rooms')}
         />
         <KPICard
           title={t('pages.dashboard.occupancyRate')} 
@@ -373,7 +373,7 @@ const AdminDashboard = () => {
           icon={FileText} 
           loading={kpisLoading}
           color="accent"
-          onClick={() => navigate('/admin/contracts?status=Active')}
+          onClick={() => navigate('/owner/contracts?status=Active')}
         />
         <KPICard
           title={t('pages.dashboard.monthlyRevenue')} 
@@ -392,7 +392,7 @@ const AdminDashboard = () => {
           delta={kpis?.deltas.totalOverdueBalance}
           loading={kpisLoading}
           color="danger"
-          onClick={() => navigate('/admin/invoices?status=Overdue')}
+          onClick={() => navigate('/owner/invoices?status=Overdue')}
         />
         <KPICard
           title={t('pages.dashboard.openTickets')} 
@@ -400,7 +400,7 @@ const AdminDashboard = () => {
           icon={MessageSquare} 
           loading={kpisLoading}
           color={Number(kpis?.openTickets) > 5 ? 'warning' : 'primary'}
-          onClick={() => navigate('/admin/tickets')}
+          onClick={() => navigate('/owner/tickets')}
         />
         <KPICard
           title={t('pages.dashboard.occupiedRooms')} 
@@ -437,7 +437,7 @@ const AdminDashboard = () => {
         <div className="card-container p-8 bg-white/40 backdrop-blur-md">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-h3 text-primary font-black uppercase tracking-widest">{t('pages.dashboard.recentPayments')}</h3>
-            <button onClick={() => navigate('/admin/payments')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">{t('pages.dashboard.viewAll')}</button>
+            <button onClick={() => navigate('/owner/payments')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">{t('pages.dashboard.viewAll')}</button>
           </div>
           <div className="space-y-4">
             {payments?.map((payment) => (
@@ -450,7 +450,7 @@ const AdminDashboard = () => {
                     {payment.tenantName.charAt(0)}
                   </div>
                   <div>
-                    <h4 className="text-small font-black text-primary hover:underline cursor-pointer" onClick={() => navigate(`/admin/tenants/${payment.id}`)}>{payment.tenantName}</h4>
+                    <h4 className="text-small font-black text-primary hover:underline cursor-pointer" onClick={() => navigate(`/owner/tenants/${payment.id}`)}>{payment.tenantName}</h4>
                     <div className="flex items-center gap-2">
                        <span className="text-[10px] text-muted font-mono font-bold">{payment.transactionCode}</span>
                        <button 
@@ -492,7 +492,7 @@ const AdminDashboard = () => {
         <div className="card-container p-8 bg-white/40 backdrop-blur-md">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-h3 text-primary font-black uppercase tracking-widest">{t('pages.dashboard.technicalIssues')}</h3>
-            <button onClick={() => navigate('/admin/tickets')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">{t('pages.dashboard.viewAll')}</button>
+            <button onClick={() => navigate('/owner/tickets')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">{t('pages.dashboard.viewAll')}</button>
           </div>
           <div className="space-y-4">
             {tickets?.map((ticket) => {
@@ -501,7 +501,7 @@ const AdminDashboard = () => {
                 <div 
                   key={ticket.id} 
                   className="flex flex-col gap-3 p-4 hover:bg-white rounded-[20px] border border-transparent hover:border-primary/5 hover:shadow-xl transition-all cursor-pointer group"
-                  onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                  onClick={() => navigate(`/owner/tickets/${ticket.id}`)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
@@ -532,10 +532,10 @@ const AdminDashboard = () => {
           <h3 className="text-h3 text-slate-400 font-black uppercase tracking-[3px] mb-8">{t('pages.dashboard.quickActions')}</h3>
           <div className="grid grid-cols-2 gap-4">
             {[
-              { icon: FileText, label: t('sidebar.invoices'), color: 'bg-primary', link: '/admin/invoices' },
-              { icon: Wallet, label: t('sidebar.payments'), color: 'bg-emerald-500', link: '/admin/payments' },
-              { icon: MessageSquare, label: 'Ticket', color: 'bg-orange-500', link: '/admin/tickets' },
-              { icon: ShieldAlert, label: t('sidebar.contracts'), color: 'bg-indigo-500', link: '/admin/contracts' },
+              { icon: FileText, label: t('sidebar.invoices'), color: 'bg-primary', link: '/owner/invoices' },
+              { icon: Wallet, label: t('sidebar.payments'), color: 'bg-emerald-500', link: '/owner/payments' },
+              { icon: MessageSquare, label: 'Ticket', color: 'bg-orange-500', link: '/owner/tickets' },
+              { icon: ShieldAlert, label: t('sidebar.contracts'), color: 'bg-indigo-500', link: '/owner/contracts' },
             ].map((btn, i) => (
               <button 
                 key={i} 

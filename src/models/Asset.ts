@@ -1,15 +1,21 @@
 export type AssetType = 'Furniture' | 'Appliance' | 'Electronics' | 'Fixture' | 'Other';
 export type AssetCondition = 'New' | 'Good' | 'Fair' | 'Poor';
+export type AssetAssignmentState = 'Assigned' | 'Unassigned';
 
 export interface Asset {
   id: string;
+  assetId: string;
+  roomAssetId?: string;
+  assignmentState: AssetAssignmentState;
   assetName: string;
-  assetCode: string;
+  assetCode?: string;
   type: AssetType;
   condition: AssetCondition;
+  buildingId?: string;
   roomId?: string;
   roomCode?: string;
   buildingName?: string;
+  createdAt?: string;
   purchaseDate?: string;
   purchasePrice?: number;
   warrantyExpiry?: string;
@@ -18,8 +24,7 @@ export interface Asset {
   brand?: string;
   model?: string;
   quantity?: number;
-  images?: string[];
-  note?: string;
+  description?: string;
   assignedAt?: string;
   isBillable?: boolean;
   billingLabel?: string;

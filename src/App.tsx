@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import { AppProviders } from './components/layout/AppProviders';
 import ProtectedRoute from './routes/ProtectedRoute';
 import { AdminLayout, PublicLayout } from './views/layouts/Layouts';
+import SuperAdminLayout from './views/layouts/SuperAdminLayout';
 import { getAuthenticatedHomePath } from './lib/authRouting';
 
 // --- Lazy Load Views ---
@@ -17,8 +18,9 @@ const ListingDetailPage = lazy(() => import('@/views/public/ListingDetailPage'))
 const ListingApplyPage = lazy(() => import('@/views/public/ListingApplyPage'));
 const PortalContractView = lazy(() => import('@/views/portal/contracts/ContractView'));
 
-import { adminRoutes } from './routes/adminRoutes';
-import { portalRoutes, portalGuestRoutes, Onboarding } from './routes/portalRoutes';
+import { ownerRoutes } from './routes/ownerRoutes';
+import { portalRoutes, Onboarding } from './routes/portalRoutes';
+import { superAdminRoutes } from './routes/superAdminRoutes';
 import PortalAuthGuard from './components/auth/PortalAuthGuard';
 import PortalLayout from './components/layout/PortalLayout';
 
@@ -113,7 +115,13 @@ const App = () => {
 
               <Route element={<ProtectedRoute allowedRoles={['Owner', 'Staff', 'SuperAdmin']} />}>
                 <Route path="owner" element={<AdminLayout />}>
-                  {mapRoutes(adminRoutes)}
+                  {mapRoutes(ownerRoutes)}
+                </Route>
+              </Route>
+
+              <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
+                <Route path="super-admin" element={<SuperAdminLayout />}>
+                  {mapRoutes(superAdminRoutes)}
                 </Route>
               </Route>
 
@@ -127,14 +135,12 @@ const App = () => {
               <Route path="/payments/*" element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="/tickets/*" element={<Navigate to="/owner/leads" replace />} />
               <Route path="/staff/*" element={<Navigate to="/owner/dashboard" replace />} />
-              <Route path="/super-admin/*" element={<Navigate to="/owner/dashboard" replace />} />
 
               {/* 3.3 Portal Namespace (Tenant) */}
               <Route path="/portal">
-                {/* Guest Routes */}
-                <Route element={<PublicLayout showHeader={false} />}>
-                  {mapRoutes(portalGuestRoutes)}
-                </Route>
+                <Route path="login" element={<Navigate to="/login" replace />} />
+                <Route path="verify-otp" element={<Navigate to="/login" replace />} />
+                <Route path="forgot-password" element={<Navigate to="/public/forgot-password" replace />} />
 
                 {/* Protected Routes */}
                 <Route element={<PortalAuthGuard />}>

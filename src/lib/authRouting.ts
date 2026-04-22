@@ -3,6 +3,7 @@ import type { TenantStage } from '@/types';
 
 export const RESIDENT_TENANT_STAGES: TenantStage[] = ['resident_pending_onboarding', 'resident_active'];
 const INTERNAL_WORKSPACE_HOME = '/owner/dashboard';
+const SUPER_ADMIN_HOME = '/super-admin/dashboard';
 
 export function isResidentTenantStage(stage?: TenantStage | null): boolean {
   return !!stage && RESIDENT_TENANT_STAGES.includes(stage);
@@ -15,7 +16,7 @@ export function getTenantHomePath(stage?: TenantStage | null): string {
 }
 
 function isInternalWorkspaceRole(role?: User['role'] | null): boolean {
-  return role === 'Owner' || role === 'Staff' || role === 'SuperAdmin';
+  return role === 'Owner' || role === 'Staff';
 }
 
 function normalizeInternalWorkspacePath(path: string): string {
@@ -24,7 +25,7 @@ function normalizeInternalWorkspacePath(path: string): string {
     : path
         .replace(/^\/admin/, '/owner')
         .replace(/^\/staff/, '/owner')
-        .replace(/^\/super-admin/, '/owner');
+        .replace(/^\/super-admin/, '/super-admin');
 
   const allowedPrefixes = [
     '/owner/dashboard',
@@ -40,6 +41,7 @@ function normalizeInternalWorkspacePath(path: string): string {
 
 export function getAuthenticatedHomePath(user?: Pick<User, 'role' | 'tenantStage'> | null): string {
   if (!user) return '/';
+  if (user.role === 'SuperAdmin') return SUPER_ADMIN_HOME;
   if (isInternalWorkspaceRole(user.role)) return INTERNAL_WORKSPACE_HOME;
   if (user.role !== 'Tenant') return INTERNAL_WORKSPACE_HOME;
   return getTenantHomePath(user.tenantStage);
@@ -57,6 +59,11 @@ export function getPostLoginRedirect(
   const safePath = sanitizeInternalRedirect(requestedPath);
 
   if (safePath && user) {
+    if (user.role === 'SuperAdmin') {
+      if (safePath.startsWith('/super-admin')) return safePath;
+      return SUPER_ADMIN_HOME;
+    }
+
     if (isInternalWorkspaceRole(user.role) || user.role !== 'Tenant') {
       return normalizeInternalWorkspacePath(safePath);
     }

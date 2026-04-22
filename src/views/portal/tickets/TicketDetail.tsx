@@ -198,7 +198,7 @@ const TicketDetail: React.FC = () => {
             <div className="space-y-8 pb-32">
               <AnimatePresence mode="popLayout">
                 {comments.map((msg, idx) => {
-                  const isStaff = ['admin', 'manager', 'staff', 'landlord'].includes(msg.authorRole?.toLowerCase());
+                  const isStaff = ['owner', 'staff', 'super_admin'].includes(msg.authorRole?.toLowerCase());
                   return (
                     <m.div
                       layout

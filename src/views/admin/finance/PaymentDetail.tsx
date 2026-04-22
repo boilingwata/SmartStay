@@ -232,7 +232,7 @@ const PaymentDetail = () => {
                          <div className="absolute -left-[5px] top-0 w-[9px] h-[9px] rounded-full bg-success ring-4 ring-success/20" />
                          <p className="text-small font-bold text-success leading-none">Xác nhận thanh toán</p>
                          <p className="text-[10px] text-muted mt-1">{formatDate(payment.paidAt)}</p>
-                         <p className="text-[10px] text-muted italic">Bởi: Admin Root</p>
+                         <p className="text-[10px] text-muted italic">Bởi: Owner Root</p>
                       </div>
                     )}
                  </div>
@@ -257,3 +257,4 @@ const PaymentDetail = () => {
 const ImageIcon = ({ size, className }: any) => <FileText size={size} className={className} />;
 
 export default PaymentDetail;
+

@@ -4,26 +4,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addMonths, format } from 'date-fns';
-import {
-  AlertCircle,
-  BadgePercent,
-  Building2,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  CircleDollarSign,
-  FileText,
-  Loader2,
-  Plus,
-  ShieldCheck,
-  Upload,
-  Users,
-} from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/Button';
 import { TenantFormModal } from '@/components/forms/TenantFormModal';
-import { contractSchema, ContractFormData } from '@/schemas/contractSchema';
+import { ROUTES } from '@/constants/routes';
+import { supabase } from '@/lib/supabase';
+import { contractSchema, type ContractFormData } from '@/schemas/contractSchema';
 import { buildingService } from '@/services/buildingService';
 import { contractService } from '@/services/contractService';
 import { fileService } from '@/services/fileService';
@@ -31,58 +17,20 @@ import { roomService } from '@/services/roomService';
 import { getServices } from '@/services/serviceService';
 import { tenantService } from '@/services/tenantService';
 import utilityAdminService from '@/services/utilityAdminService';
-import { supabase } from '@/lib/supabase';
 import useAuthStore from '@/stores/authStore';
-import { formatVND } from '@/utils';
-import type { BuildingSummary } from '@/models/Building';
-import type { Room, RoomDetail } from '@/models/Room';
-import type { TenantSummary } from '@/models/Tenant';
-import type { Service } from '@/types/service';
+import type { ServiceFilter } from '@/types/service';
+import { cn } from '@/utils';
+import { ContractPreviewSidebar } from './wizard/ContractPreviewSidebar';
+import { ContractWizardProvider } from './wizard/ContractWizardProvider';
+import { WizardStepIndicator } from './wizard/WizardStepIndicator';
+import type { Service, ThongTinHopDongPhong, UtilityPolicy } from './wizard/contractWizardShared';
+import { ContractTermsStep } from './wizard/steps/ContractTermsStep';
+import { ReviewStep } from './wizard/steps/ReviewStep';
+import { RoomTenantStep } from './wizard/steps/RoomTenantStep';
+import { ServicesStep } from './wizard/steps/ServicesStep';
 
-interface ThongTinHopDongPhong {
-  room_id: number;
-  contract_code: string;
-  start_date: string;
-  end_date: string;
-}
-
-const HOM_NAY = new Date();
-const homNayIso = format(HOM_NAY, 'yyyy-MM-dd');
-const CAC_BUOC = ['Cư trú', 'Điều khoản', 'Dịch vụ', 'Xác nhận'];
-const hop = 'rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm';
-
-const HE_SO_GIA: Record<ContractFormData['type'], number> = {
-  Residential: 1,
-  Commercial: 1.2,
-  Office: 1.35,
-};
-
-const TEN_LOAI_HOP_DONG_HIEN_THI: Record<ContractFormData['type'], string> = {
-  Residential: 'Nhà ở',
-  Commercial: 'Kinh doanh',
-  Office: 'Văn phòng',
-};
-
-const TEN_CAN_CU_PHAP_LY_HIEN_THI: Record<ContractFormData['ownerLegalConfirmation']['legalBasisType'], string> = {
-  Owner: 'Chủ sở hữu hoặc người có quyền cho thuê',
-  AuthorizedRepresentative: 'Người được ủy quyền hợp pháp',
-  BusinessEntity: 'Pháp nhân hoặc đơn vị kinh doanh cho thuê',
-};
-
-const DANH_SACH_CAN_CU_PHAP_LY = Object.entries(TEN_CAN_CU_PHAP_LY_HIEN_THI) as Array<
-  [ContractFormData['ownerLegalConfirmation']['legalBasisType'], string]
->;
-
-function locCuDan(ds: TenantSummary[], tuKhoa: string) {
-  const q = tuKhoa.trim().toLowerCase();
-  if (!q) return ds;
-  return ds.filter((tenant) => {
-    const hoTen = tenant.fullName.toLowerCase();
-    const dienThoai = tenant.phone?.toLowerCase?.() ?? '';
-    const cccd = tenant.cccd?.toLowerCase?.() ?? '';
-    return hoTen.includes(q) || dienThoai.includes(q) || cccd.includes(q);
-  });
-}
+const homNay = new Date();
+const homNayIso = format(homNay, 'yyyy-MM-dd');
 
 export default function CreateContractWizard() {
   const navigate = useNavigate();
@@ -90,14 +38,8 @@ export default function CreateContractWizard() {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
   const presetRoomId = (location.state as { roomId?: string } | null)?.roomId ?? '';
-
   const [buoc, setBuoc] = useState(1);
-  const [tuKhoaCuDan, setTuKhoaCuDan] = useState('');
-  const [tuKhoaPhong, setTuKhoaPhong] = useState('');
   const [moThemCuDan, setMoThemCuDan] = useState(false);
-  const [phanTramGiam, setPhanTramGiam] = useState(0);
-  const [daChinhGiaThuCong, setDaChinhGiaThuCong] = useState(false);
-  const [thongBaoBuoc2, setThongBaoBuoc2] = useState('');
   const [dangTaiHoSoPhapLy, setDangTaiHoSoPhapLy] = useState(false);
 
   const form = useForm<ContractFormData>({
@@ -110,7 +52,7 @@ export default function CreateContractWizard() {
       occupantIds: [],
       type: 'Residential',
       startDate: homNayIso,
-      endDate: format(addMonths(HOM_NAY, 6), 'yyyy-MM-dd'),
+      endDate: format(addMonths(homNay, 6), 'yyyy-MM-dd'),
       rentPrice: 0,
       depositAmount: 0,
       paymentCycle: 1,
@@ -128,1468 +70,268 @@ export default function CreateContractWizard() {
         finalAcknowledgementAccepted: false,
       },
       ownerRep: {
-        fullName: 'Trần Văn Quản Lý',
-        cccd: '001092009999',
+        fullName: authUser?.fullName || 'Người quản lý',
+        cccd: '',
         role: 'Quản lý',
       },
     },
   });
 
   const {
-    register,
     watch,
     setValue,
     trigger,
     handleSubmit,
     getValues,
-    formState: { errors },
+    formState: { dirtyFields },
   } = form;
-
   const buildingId = watch('buildingId');
   const roomId = watch('roomId');
-  const tenantChinhId = watch('primaryTenantId');
-  const occupantIds = watch('occupantIds');
-  const loaiHopDong = watch('type');
-  const ngayBatDau = watch('startDate');
-  const ngayKetThuc = watch('endDate');
-  const giaThue = watch('rentPrice');
-  const tienCoc = watch('depositAmount');
-  const ngayDenHan = watch('paymentDueDay');
-  const dichVuDaChon = watch('selectedServices');
-  const utilityPolicyId = watch('utilityPolicyId');
-  const legalBasisType = watch('ownerLegalConfirmation.legalBasisType');
-  const legalBasisNote = watch('ownerLegalConfirmation.legalBasisNote');
-  const supportingDocumentUrls = watch('ownerLegalConfirmation.supportingDocumentUrls');
-  const hasLegalRentalRightsConfirmed = watch('ownerLegalConfirmation.hasLegalRentalRightsConfirmed');
-  const propertyEligibilityConfirmed = watch('ownerLegalConfirmation.propertyEligibilityConfirmed');
-  const landlordResponsibilitiesAccepted = watch('ownerLegalConfirmation.landlordResponsibilitiesAccepted');
-  const finalAcknowledgementAccepted = watch('ownerLegalConfirmation.finalAcknowledgementAccepted');
-  const canSubmitLegalStep =
-    !!legalBasisType &&
-    hasLegalRentalRightsConfirmed &&
-    propertyEligibilityConfirmed &&
-    landlordResponsibilitiesAccepted &&
-    finalAcknowledgementAccepted &&
-    (legalBasisType !== 'AuthorizedRepresentative' || (supportingDocumentUrls?.length ?? 0) > 0);
 
   const { data: buildings = [] } = useQuery({
-    queryKey: ['buildings-summary'],
+    queryKey: ['buildings-wizard'],
     queryFn: () => buildingService.getBuildings(),
   });
 
-  const { data: rooms = [] } = useQuery<Room[]>({
-    queryKey: ['rooms', buildingId],
+  useEffect(() => {
+    if (buildings.length > 0 && !buildingId) {
+      setValue('buildingId', String(buildings[0].id));
+    }
+  }, [buildings, buildingId, setValue]);
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ['rooms-available', buildingId],
     queryFn: () => roomService.getRooms({ buildingId }),
-    enabled: !!buildingId,
+    enabled: Boolean(buildingId),
   });
 
-  const { data: roomDetail } = useQuery<RoomDetail>({
-    queryKey: ['room-detail', roomId],
-    queryFn: () => roomService.getRoomDetail(roomId),
-    enabled: !!roomId,
+  const { data: roomContracts = [] } = useQuery({
+    queryKey: ['room-contracts-active', buildingId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contracts')
+        .select('room_id, contract_code, start_date, end_date, rooms!inner(building_id)')
+        .eq('rooms.building_id', Number(buildingId))
+        .in('status', ['active', 'pending_signature'])
+        .eq('is_deleted', false);
+
+      if (error) throw error;
+      return (data || []) as ThongTinHopDongPhong[];
+    },
+    enabled: Boolean(buildingId),
   });
 
-  const { data: tenants = [] } = useQuery<TenantSummary[]>({
-    queryKey: ['tenants-all'],
+  const roomContractMap = useMemo(() => {
+    const map = new Map<string, ThongTinHopDongPhong>();
+    roomContracts.forEach((contract) => map.set(String(contract.room_id), contract));
+    return map;
+  }, [roomContracts]);
+
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants-wizard'],
     queryFn: () => tenantService.getTenants(),
   });
 
-  const { data: services = [] } = useQuery<Service[]>({
-    queryKey: ['contract-services'],
-    queryFn: async () => (await getServices({ page: 1, limit: 100, isActive: true })).data,
+  const { data: servicesResult = { data: [], total: 0 } } = useQuery<{ data: Service[]; total: number }>({
+    queryKey: ['services-wizard', buildingId],
+    queryFn: () => getServices({ page: 1, limit: 200, isActive: true } satisfies ServiceFilter),
+    enabled: Boolean(buildingId),
   });
+  const services = servicesResult.data;
 
   const { data: utilityPolicies = [] } = useQuery({
-    queryKey: ['utility-policies-contract-wizard'],
-    queryFn: () => utilityAdminService.listPolicies(),
-  });
-
-  const { data: hopDongTrungPhong = [] } = useQuery<ThongTinHopDongPhong[]>({
-    queryKey: ['rooms-overlap-contracts', buildingId, ngayBatDau, ngayKetThuc, rooms.map((room) => room.id).join(',')],
-    enabled: !!buildingId && rooms.length > 0 && !!ngayBatDau && !!ngayKetThuc,
+    queryKey: ['utility-policies-wizard', buildingId],
     queryFn: async () => {
-      const roomIds = rooms.map((room) => Number(room.id)).filter(Number.isFinite);
-      if (roomIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('room_id, contract_code, start_date, end_date')
-        .in('room_id', roomIds)
-        .eq('is_deleted', false)
-        .in('status', ['active', 'pending_signature'])
-        .lte('start_date', ngayKetThuc)
-        .gte('end_date', ngayBatDau);
-
-      if (error) throw error;
-      return (data ?? []) as ThongTinHopDongPhong[];
+      const data = await utilityAdminService.listPolicies();
+      return data
+        .filter((policy) => policy.scopeType === 'system' || String(policy.scopeId ?? '') === String(buildingId))
+        .map((policy) => ({ id: policy.id, name: policy.name })) as UtilityPolicy[];
     },
+    enabled: Boolean(buildingId),
   });
-
-  const hopDongTheoPhong = useMemo(
-    () => new Map(hopDongTrungPhong.map((item) => [String(item.room_id), item])),
-    [hopDongTrungPhong],
-  );
-
-  const phongTrong = useMemo(
-    () =>
-      rooms
-        .filter((room) => !hopDongTheoPhong.has(room.id) && room.status !== 'Occupied')
-        .filter((room) => {
-          const q = tuKhoaPhong.trim().toLowerCase();
-          if (!q) return true;
-          return room.roomCode.toLowerCase().includes(q) || room.buildingName.toLowerCase().includes(q);
-        }),
-    [rooms, tuKhoaPhong, hopDongTheoPhong],
-  );
-
-  const phongDangThue = useMemo(
-    () =>
-      rooms
-        .filter((room) => hopDongTheoPhong.has(room.id) || room.status === 'Occupied')
-        .filter((room) => {
-          const q = tuKhoaPhong.trim().toLowerCase();
-          if (!q) return true;
-          return room.roomCode.toLowerCase().includes(q) || room.buildingName.toLowerCase().includes(q);
-        }),
-    [rooms, tuKhoaPhong, hopDongTheoPhong],
-  );
-
-  const nguoiChuaThue = useMemo(
-    () => locCuDan(tenants.filter((tenant) => !tenant.hasActiveContract), tuKhoaCuDan),
-    [tenants, tuKhoaCuDan],
-  );
-
-  const nguoiDangThue = useMemo(
-    () => locCuDan(tenants.filter((tenant) => tenant.hasActiveContract), tuKhoaCuDan),
-    [tenants, tuKhoaCuDan],
-  );
-
-  const tenantChinh = tenants.find((tenant) => tenant.id === tenantChinhId) ?? null;
-  const occupants = tenants.filter((tenant) => occupantIds.includes(tenant.id));
-  const tongNguoiO = tenantChinh ? occupants.length + 1 : 0;
-  const sucChuaToiDa = roomDetail?.maxOccupancy ?? 0;
-  const vuotSucChua = sucChuaToiDa > 0 && tongNguoiO > sucChuaToiDa;
-  const toaNhaDangChon =
-    (buildings.find((building: BuildingSummary) => String(building.id) === buildingId)?.buildingName as string | undefined) ?? '';
-  const phongDangChon = rooms.find((room) => room.id === roomId) ?? null;
-  const giaNiemYet = roomDetail?.baseRentPrice ?? phongDangChon?.baseRentPrice ?? 0;
-  const heSoGia = HE_SO_GIA[loaiHopDong];
-  const giaDeXuat = Math.round(giaNiemYet * heSoGia * (1 - phanTramGiam / 100));
-  const giaGiam = Math.max(0, Math.round(giaNiemYet * heSoGia - giaDeXuat));
 
   useEffect(() => {
-    if (!presetRoomId || buildingId || rooms.length === 0) return;
-    const preset = rooms.find((room) => room.id === presetRoomId);
-    if (!preset) return;
-    setValue('buildingId', preset.buildingId);
-    setValue('roomId', preset.id);
-  }, [presetRoomId, buildingId, rooms, setValue]);
+    if (!roomId || rooms.length === 0) return;
+    const selectedRoom = rooms.find((room) => room.id === roomId);
+    if (!selectedRoom) return;
+
+    const currentRentPrice = Number(getValues('rentPrice') ?? 0);
+    const currentDepositAmount = Number(getValues('depositAmount') ?? 0);
+    const shouldSyncRentPrice = !dirtyFields.rentPrice || currentRentPrice <= 0;
+    const shouldSyncDepositAmount = !dirtyFields.depositAmount || currentDepositAmount <= 0;
+
+    if (shouldSyncRentPrice) {
+      setValue('rentPrice', selectedRoom.baseRentPrice, { shouldValidate: true });
+    }
+
+    if (shouldSyncDepositAmount) {
+      setValue('depositAmount', selectedRoom.baseRentPrice, { shouldValidate: true });
+    }
+  }, [roomId, rooms, setValue, getValues, dirtyFields.rentPrice, dirtyFields.depositAmount]);
 
   useEffect(() => {
     if (!roomId) return;
-    void roomService
-      .getRoomDetail(roomId)
-      .then((room) => {
-        const giaMacDinh = room.baseRentPrice ?? 0;
-        if (!daChinhGiaThuCong) {
-          setValue('rentPrice', Math.round(giaMacDinh * HE_SO_GIA[getValues('type')]), {
-            shouldDirty: false,
-            shouldValidate: true,
-          });
-        }
-        if ((getValues('depositAmount') ?? 0) <= 0) {
-          setValue('depositAmount', giaMacDinh, {
-            shouldDirty: false,
-            shouldValidate: true,
-          });
-        }
-      })
-      .catch(() => {
-        toast.error('Không thể tải thông tin phòng');
-      });
-  }, [roomId, setValue, getValues, daChinhGiaThuCong]);
-
-  useEffect(() => {
-    if (!authUser) return;
-
-    const currentName = getValues('ownerRep.fullName');
-    const currentCccd = getValues('ownerRep.cccd');
-    const roleLabel =
-      authUser.role === 'Owner'
-        ? 'Chủ nhà / người đại diện'
-        : authUser.role === 'Staff'
-          ? 'Nhân sự vận hành'
-          : 'Người đại diện';
-
-    if (!currentName || currentName === 'Trần Văn Quản Lý') {
-      setValue('ownerRep.fullName', authUser.fullName ?? '', { shouldDirty: false });
-    }
-
-    if (currentCccd === '001092009999') {
-      setValue('ownerRep.cccd', '', { shouldDirty: false });
-    }
-
-    setValue('ownerRep.role', roleLabel, { shouldDirty: false });
-  }, [authUser, getValues, setValue]);
-
-  useEffect(() => {
-    if (!giaNiemYet || daChinhGiaThuCong) return;
-    setValue('rentPrice', giaDeXuat, {
-      shouldDirty: false,
-      shouldValidate: true,
-    });
-  }, [loaiHopDong, phanTramGiam, giaNiemYet, giaDeXuat, daChinhGiaThuCong, setValue]);
+    if (rooms.some((room) => room.id === roomId)) return;
+    setValue('roomId', '', { shouldValidate: true });
+  }, [roomId, rooms, setValue]);
 
   const taoHopDong = useMutation({
-    mutationFn: (payload: ContractFormData) => contractService.createContract(payload),
-    onSuccess: async (contract) => {
-      await queryClient.invalidateQueries({ queryKey: ['contracts'] });
-      await queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast.success(`Đã tạo hợp đồng ${contract.contractCode}`);
-      navigate(`/admin/contracts/${contract.id}`);
+    mutationFn: (data: ContractFormData) => contractService.createContract(data),
+    onSuccess: (newContract) => {
+      toast.success('Tạo hợp đồng thành công.');
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      navigate(`${ROUTES.OWNER.CONTRACTS}/${newContract.id}`);
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Không thể tạo hợp đồng');
+    onError: (error: { message?: string }) => {
+      toast.error(error.message || 'Không thể tạo hợp đồng.');
     },
   });
 
-  const chonTenantChinh = (tenantId: string) => {
-    setValue('primaryTenantId', tenantId, { shouldDirty: true, shouldValidate: true });
-    if (occupantIds.includes(tenantId)) {
-      setValue(
-        'occupantIds',
-        occupantIds.filter((id) => id !== tenantId),
-        { shouldDirty: true, shouldValidate: true },
-      );
-    }
-  };
-
-  const batTatOccupant = (tenantId: string) => {
-    if (tenantId === tenantChinhId) return;
-    const dangChon = occupantIds.includes(tenantId);
-    setValue(
-      'occupantIds',
-      dangChon ? occupantIds.filter((id) => id !== tenantId) : [...occupantIds, tenantId],
-      { shouldDirty: true, shouldValidate: true },
-    );
-  };
-
-  const datThoiHan = (thang: number) => {
-    const moc = ngayBatDau ? new Date(ngayBatDau) : HOM_NAY;
-    setValue('endDate', format(addMonths(moc, thang), 'yyyy-MM-dd'), {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  };
-
-  const apDungGiaDeXuat = () => {
-    setDaChinhGiaThuCong(false);
-    setValue('rentPrice', giaDeXuat, { shouldDirty: true, shouldValidate: true });
-    toast.success('Đã áp dụng giá thuê đề xuất');
-  };
-
-  const kiemTraTrungHopDong = async () => {
-    if (!roomId || !ngayBatDau || !ngayKetThuc) return false;
-    const { data } = await supabase
-      .from('contracts')
-      .select('contract_code')
-      .eq('room_id', Number(roomId))
-      .eq('is_deleted', false)
-      .in('status', ['active', 'pending_signature'])
-      .lte('start_date', ngayKetThuc)
-      .gte('end_date', ngayBatDau)
-      .limit(1);
-
-    if ((data?.length ?? 0) > 0) {
-      toast.error(`Phòng đã có hợp đồng hiệu lực: ${data?.[0]?.contract_code}`);
-      return true;
-    }
-    return false;
-  };
-
-  const sangBuocSau = async () => {
-    const danhSachTruong =
-      buoc === 1
-        ? ['buildingId', 'roomId', 'primaryTenantId', 'occupantIds']
-        : buoc === 2
-          ? ['type', 'startDate', 'endDate', 'rentPrice', 'depositAmount', 'paymentCycle', 'paymentDueDay']
-        : ['utilityPolicyId', 'ownerRep.fullName'];
-
-    setThongBaoBuoc2('');
-    const hopLe = await trigger(danhSachTruong as never);
-    if (!hopLe) {
-      const thongBao = layThongBaoLoiDauTien(form.formState.errors) || 'Vui lòng kiểm tra lại các trường đang nhập';
-      if (buoc === 2) setThongBaoBuoc2(thongBao);
-      toast.error(thongBao);
-      return;
-    }
-
-    if (buoc === 1 && vuotSucChua) {
-      toast.error(`Phòng này chỉ cho tối đa ${sucChuaToiDa} người ở`);
-      return;
-    }
-
-    if (buoc === 2) {
-      if (await kiemTraTrungHopDong()) {
-        setThongBaoBuoc2('Phòng đang có hợp đồng hiệu lực trùng với khoảng ngày đã chọn.');
-        return;
-      }
-      if (giaThue <= 0) {
-        setThongBaoBuoc2('Giá thuê phải lớn hơn 0.');
-        toast.error('Giá thuê phải lớn hơn 0');
-        return;
-      }
-    }
-
-    setBuoc((hienTai) => Math.min(hienTai + 1, 4));
-  };
-
-  const taoNhanhCuDan = async (payload: Parameters<typeof tenantService.createTenant>[0]) => {
-    const tenant = await tenantService.createTenant(payload);
-    await queryClient.invalidateQueries({ queryKey: ['tenants-all'] });
-    chonTenantChinh(tenant.id);
-    setMoThemCuDan(false);
-  };
-
-  const submit = (payload: ContractFormData) => {
-    taoHopDong.mutate(payload);
-  };
-
   const taiHoSoPhapLy = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0) return;
+    const files = event.target.files;
+    if (!files?.length) return;
 
+    setDangTaiHoSoPhapLy(true);
     try {
-      setDangTaiHoSoPhapLy(true);
-      const uploadedUrls = await Promise.all(
-        files.map((file) =>
-          fileService.uploadFile(file, file.name, {
-            allowedTypes: [
-              'image/jpeg',
-              'image/png',
-              'image/webp',
-              'application/pdf',
-              'application/msword',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            ],
-            maxSize: 10 * 1024 * 1024,
-            pathPrefix: 'contracts/legal-documents',
-          }),
-        ),
-      );
-
-      setValue(
-        'ownerLegalConfirmation.supportingDocumentUrls',
-        [...(supportingDocumentUrls ?? []), ...uploadedUrls],
-        { shouldDirty: true, shouldValidate: true },
-      );
-      toast.success(`Đã tải lên ${uploadedUrls.length} hồ sơ pháp lý`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể tải lên hồ sơ pháp lý');
+      const urls = await Promise.all(Array.from(files).map((file) => fileService.uploadFile(file, 'contract-supporting-docs')));
+      const currentUrls = getValues('ownerLegalConfirmation.supportingDocumentUrls') || [];
+      setValue('ownerLegalConfirmation.supportingDocumentUrls', [...currentUrls, ...urls]);
+      toast.success(`Đã tải lên ${urls.length} tài liệu.`);
+    } catch {
+      toast.error('Không thể tải tài liệu lên.');
     } finally {
       setDangTaiHoSoPhapLy(false);
-      event.target.value = '';
     }
   };
 
   const xoaHoSoPhapLy = (url: string) => {
+    const currentUrls = getValues('ownerLegalConfirmation.supportingDocumentUrls') || [];
     setValue(
       'ownerLegalConfirmation.supportingDocumentUrls',
-      (supportingDocumentUrls ?? []).filter((item) => item !== url),
-      { shouldDirty: true, shouldValidate: true },
+      currentUrls.filter((currentUrl) => currentUrl !== url)
     );
   };
 
+  const sangBuocSau = async () => {
+    let fieldsToValidate: string[] = [];
+    if (buoc === 1) fieldsToValidate = ['buildingId', 'roomId', 'primaryTenantId'];
+    if (buoc === 2) fieldsToValidate = ['startDate', 'endDate', 'rentPrice', 'depositAmount', 'paymentCycle', 'paymentDueDay'];
+    if (buoc === 3) fieldsToValidate = ['utilityPolicyId'];
+
+    const isValid = await trigger(fieldsToValidate as never);
+    if (!isValid) {
+      toast.error('Vui lòng hoàn thành các thông tin bắt buộc trước khi tiếp tục.');
+      return;
+    }
+
+    setBuoc((current) => current + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const onSubmit = (data: ContractFormData) => {
+    taoHopDong.mutate(data);
+  };
+
   return (
-    <div className="mx-auto max-w-[1380px] space-y-6 px-4 pb-10">
-      <div className={hop}>
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-8">
+      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="space-y-3">
+          <span className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+            <FileText size={14} />
+            Tạo hợp đồng mới
+          </span>
           <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">
-              Tạo hợp đồng thuê phòng
+            <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Tạo hợp đồng theo từng bước</h1>
+            <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
+              Luồng này ưu tiên sự rõ ràng: chọn đúng phòng và người thuê trước, rồi mới chốt điều khoản, dịch vụ đi kèm và xác nhận pháp lý trước khi tạo hồ sơ thật.
             </p>
-            <h1 className="text-3xl font-black text-slate-900">Khởi tạo hợp đồng mới</h1>
-            <p className="max-w-3xl text-sm leading-6 text-slate-600">
-              Màn này tách rõ người chưa thuê, người đang thuê, phòng trống và phòng đang có hợp đồng
-              để thao tác ngắn gọn hơn. Tóm tắt hợp đồng luôn cập nhật theo dữ liệu đang nhập.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-slate-700">
-            <p className="font-black text-slate-900">Hướng dẫn nhanh</p>
-            <p className="mt-2">
-              Đi lần lượt từ chọn phòng, chốt điều khoản, chọn dịch vụ đến xác nhận pháp lý. Hợp đồng chỉ được tạo khi
-              thông tin cư trú hợp lệ, không trùng thời gian thuê và phần cam kết pháp lý đã hoàn tất.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {CAC_BUOC.map((tenBuoc, index) => {
-              const dangChon = buoc === index + 1;
-              const daQua = buoc > index + 1;
-              return (
-                <div
-                  key={tenBuoc}
-                  className={`rounded-2xl px-4 py-3 text-center text-xs font-black uppercase tracking-[0.18em] ${
-                    dangChon
-                      ? 'bg-slate-900 text-white'
-                      : daQua
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {tenBuoc}
-                </div>
-              );
-            })}
           </div>
         </div>
-      </div>
+      </section>
 
-      <form onSubmit={handleSubmit(submit)} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className={`${hop} min-w-0`}>
-          {buoc === 1 && (
-            <div className="space-y-6">
-              <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
-                <div>
-                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                    Tòa nhà
-                  </label>
-                  <select {...register('buildingId')} className="input-base w-full">
-                    <option value="">Chọn tòa nhà</option>
-                    {buildings.map((building: BuildingSummary) => (
-                      <option key={building.id} value={building.id}>
-                        {building.buildingName}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.buildingId && (
-                    <p className="mt-2 text-sm font-semibold text-rose-600">{errors.buildingId.message}</p>
-                  )}
-                </div>
+      <ContractWizardProvider form={form} currentStep={buoc} onStepChange={setBuoc}>
+        <WizardStepIndicator />
 
-                <div>
-                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                    Tìm cư dân
-                  </label>
-                  <input
-                    value={tuKhoaCuDan}
-                    onChange={(event) => setTuKhoaCuDan(event.target.value)}
-                    className="input-base w-full"
-                    placeholder="Tên, số điện thoại, CCCD"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                    Tìm phòng
-                  </label>
-                  <input
-                    value={tuKhoaPhong}
-                    onChange={(event) => setTuKhoaPhong(event.target.value)}
-                    className="input-base w-full"
-                    placeholder="Mã phòng hoặc tên tòa nhà"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-6 2xl:grid-cols-2">
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <Building2 className="mt-1 text-slate-700" size={18} />
-                      <div>
-                        <h2 className="text-lg font-black text-slate-900">Chọn phòng</h2>
-                        <p className="text-sm text-slate-600">
-                          Phòng trống được chọn trực tiếp. Phòng đang thuê chỉ hiển thị để tham khảo.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-600">
-                      {phongTrong.length} phòng trống
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4">
-                    <DanhSachPhong
-                      tieuDe="Phòng trống"
-                      moTa="Có thể tạo hợp đồng ngay"
-                      rooms={phongTrong}
-                      roomId={roomId}
-                      onSelect={(id) => setValue('roomId', id, { shouldDirty: true, shouldValidate: true })}
-                      contractMap={hopDongTheoPhong}
-                    />
-                    <DanhSachPhong
-                      tieuDe="Phòng đang có người thuê"
-                      moTa="Dùng để theo dõi, không chọn trực tiếp ở đây"
-                      rooms={phongDangThue}
-                      roomId=""
-                      disabled
-                      contractMap={hopDongTheoPhong}
-                    />
-                  </div>
-
-                  {errors.roomId && (
-                    <p className="mt-3 text-sm font-semibold text-rose-600">{errors.roomId.message}</p>
-                  )}
-                </div>
-
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <Users className="mt-1 text-slate-700" size={18} />
-                      <div>
-                        <h2 className="text-lg font-black text-slate-900">Chọn cư dân</h2>
-                        <p className="text-sm text-slate-600">
-                          Chỉ chọn người đứng tên hợp đồng và người ở cùng trong nhóm chưa có hợp đồng hiện hành.
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      leftIcon={<Plus size={14} />}
-                      onClick={() => setMoThemCuDan(true)}
-                    >
-                      Thêm cư dân mới
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-4">
-                    <DanhSachCuDan
-                      tieuDe="Người chưa thuê phòng"
-                      moTa="Có thể chọn làm người đứng tên hoặc người ở cùng"
-                      tenants={nguoiChuaThue}
-                      primaryTenantId={tenantChinhId}
-                      occupantIds={occupantIds}
-                      onSelectPrimary={chonTenantChinh}
-                      onToggleOccupant={batTatOccupant}
-                    />
-                    <DanhSachCuDan
-                      tieuDe="Người đang có hợp đồng"
-                      moTa="Có thể chọn để tạo hợp đồng phòng bổ sung nếu chính sách tòa nhà cho phép"
-                      tenants={nguoiDangThue}
-                      primaryTenantId={tenantChinhId}
-                      occupantIds={occupantIds}
-                      onSelectPrimary={chonTenantChinh}
-                      onToggleOccupant={() => undefined}
-                      actionLabel="Chọn làm người đứng tên hợp đồng bổ sung"
-                    />
-                  </div>
-
-                  {errors.primaryTenantId && (
-                    <p className="mt-3 text-sm font-semibold text-rose-600">{errors.primaryTenantId.message}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {buoc === 2 && (
-            <div className="space-y-6">
-              {thongBaoBuoc2 ? (
-                <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-                  {thongBaoBuoc2}
-                </div>
+        <div className={cn('grid gap-6', buoc > 1 && 'xl:grid-cols-[minmax(0,1fr)_360px]')}>
+          <div className="min-w-0">
+            <form id="contract-wizard-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {buoc === 1 ? (
+                <RoomTenantStep
+                  buildings={buildings}
+                  rooms={rooms}
+                  tenants={tenants}
+                  roomContractMap={roomContractMap}
+                  onAddTenant={() => setMoThemCuDan(true)}
+                />
               ) : null}
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="mb-4 flex items-start gap-3">
-                    <CalendarDays className="mt-1 text-slate-700" size={18} />
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900">Thời hạn hợp đồng</h2>
-                      <p className="text-sm font-slate-600">
-                        Có gợi ý nhanh để đặt ngày kết thúc. Hệ thống kiểm tra trùng hợp đồng khi sang bước kế tiếp.
-                      </p>
-                    </div>
-                  </div>
+              {buoc === 2 ? <ContractTermsStep /> : null}
+              {buoc === 3 ? <ServicesStep services={services} utilityPolicies={utilityPolicies} /> : null}
+              {buoc === 4 ? (
+                <ReviewStep
+                  rooms={rooms}
+                  tenants={tenants}
+                  services={services}
+                  utilityPolicies={utilityPolicies}
+                  onUploadDocument={taiHoSoPhapLy}
+                  onDeleteDocument={xoaHoSoPhapLy}
+                  isUploading={dangTaiHoSoPhapLy}
+                />
+              ) : null}
+            </form>
+          </div>
 
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    {[1, 3, 6, 12].map((thang) => (
-                      <button
-                        key={thang}
-                        type="button"
-                        onClick={() => datThoiHan(thang)}
-                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-900 hover:text-slate-900"
-                      >
-                        {thang} tháng
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                        Ngày bắt đầu
-                      </label>
-                      <input type="date" {...register('startDate')} className="input-base w-full" />
-                      {errors.startDate && (
-                        <p className="mt-2 text-sm font-semibold text-rose-600">{errors.startDate.message}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                        Ngày kết thúc
-                      </label>
-                      <input type="date" {...register('endDate')} className="input-base w-full" />
-                      {errors.endDate && (
-                        <p className="mt-2 text-sm font-semibold text-rose-600">{errors.endDate.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="mb-4 flex items-start gap-3">
-                    <BadgePercent className="mt-1 text-slate-700" size={18} />
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900">Loại hợp đồng và giá đề xuất</h2>
-                      <p className="text-sm text-slate-600">
-                        Khi đổi loại hợp đồng, hệ thống gợi ý giá thuê theo giá niêm yết của phòng.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4">
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                        Loại hợp đồng
-                      </label>
-                      <select {...register('type')} className="input-base w-full">
-                        <option value="Residential">Nhà ở</option>
-                        <option value="Commercial">Kinh doanh</option>
-                        <option value="Office">Văn phòng</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                        Khuyến mãi giảm giá
-                      </label>
-                      <div className="flex gap-3">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={phanTramGiam}
-                          onChange={(event) => setPhanTramGiam(Number(event.target.value) || 0)}
-                          className="input-base w-full"
-                        />
-                        <div className="flex min-w-[84px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">
-                          %
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-slate-500">Giá thuê đề xuất</p>
-                          <p className="text-xl font-black text-slate-900">{formatVND(giaDeXuat)}</p>
-                        </div>
-                        <Button type="button" variant="outline" onClick={apDungGiaDeXuat}>
-                          Áp dụng
-                        </Button>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-600">
-                        Giá niêm yết {formatVND(giaNiemYet)} x hệ số {heSoGia} cho loại{' '}
-                        {TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]}
-                        {phanTramGiam > 0 ? `, giảm ${phanTramGiam}%` : ''}.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="mb-4 flex items-start gap-3">
-                  <CircleDollarSign className="mt-1 text-slate-700" size={18} />
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900">Điều khoản tài chính</h2>
-                    <p className="text-sm text-slate-600">
-                      Đây là số tiền snapshot tại thời điểm tạo hợp đồng, không phụ thuộc về sau vào giá phòng.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Giá thuê
-                    </label>
-                    <input
-                      type="number"
-                      {...register('rentPrice', { valueAsNumber: true })}
-                      className="input-base w-full"
-                      onChange={(event) => {
-                        setDaChinhGiaThuCong(true);
-                        setValue('rentPrice', Number(event.target.value) || 0, {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    />
-                    {errors.rentPrice && (
-                      <p className="mt-2 text-sm font-semibold text-rose-600">{errors.rentPrice.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Tiền cọc
-                    </label>
-                    <input
-                      type="number"
-                      {...register('depositAmount', { valueAsNumber: true })}
-                      className="input-base w-full"
-                    />
-                    {errors.depositAmount && (
-                      <p className="mt-2 text-sm font-semibold text-rose-600">{errors.depositAmount.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Chu kỳ thanh toán
-                    </label>
-                    <select {...register('paymentCycle', { valueAsNumber: true })} className="input-base w-full">
-                      <option value={1}>1 tháng</option>
-                      <option value={2}>2 tháng</option>
-                      <option value={3}>3 tháng</option>
-                      <option value={6}>6 tháng</option>
-                      <option value={12}>12 tháng</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Ngày đến hạn
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={31}
-                      {...register('paymentDueDay', { valueAsNumber: true })}
-                      className="input-base w-full"
-                    />
-                    {errors.paymentDueDay && (
-                      <p className="mt-2 text-sm font-semibold text-rose-600">{errors.paymentDueDay.message}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-sky-200 bg-sky-50 p-5">
-                <h3 className="text-lg font-black text-slate-900">Nguyên tắc điện nước cho dự án hiện tại</h3>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white p-4">
-                    <p className="text-sm font-black text-slate-900">Điện</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Dự án đang ở phạm vi nhỏ, chưa có công tơ tự động. Điện nên tính theo gói cố định của phòng
-                      hoặc theo chính sách nội bộ, không tính theo chỉ số công tơ.
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-white p-4">
-                    <p className="text-sm font-black text-slate-900">Nước</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Nước nên tính theo gói cơ bản cộng thêm theo số người ở thực tế. Hệ thống sẽ dùng số người ở
-                      của hợp đồng để hỗ trợ tính cho kỳ sau.
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className={cn('hidden', buoc > 1 && 'xl:block')}>
+            <div className="sticky top-6">
+              <ContractPreviewSidebar rooms={rooms} tenants={tenants} services={services} utilityPolicies={utilityPolicies} />
             </div>
-          )}
+          </div>
+        </div>
 
-          {buoc === 3 && (
-            <div className="space-y-6">
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="mb-4 flex items-start gap-3">
-                  <FileText className="mt-1 text-slate-700" size={18} />
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900">Dịch vụ tính tiền và điện nước</h2>
-                    <p className="text-sm text-slate-600">
-                      Hợp đồng chỉ chọn dịch vụ tính tiền cố định và một chính sách điện nước. Tiện ích đặt chỗ không xuất hiện ở đây.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <NhomDichVu
-                    tieuDe="Dịch vụ tính tiền"
-                    moTa="Các khoản thu cố định theo hợp đồng như internet, gửi xe, vệ sinh hoặc quản lý."
-                    services={services}
-                    selectedIds={dichVuDaChon}
-                    onToggle={(id) =>
-                      setValue(
-                        'selectedServices',
-                        dichVuDaChon.includes(id)
-                          ? dichVuDaChon.filter((serviceId) => serviceId !== id)
-                          : [...dichVuDaChon, id],
-                        { shouldDirty: true },
-                      )
-                    }
-                  />
-
-                  <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4">
-                    <div>
-                      <p className="text-sm font-black text-slate-900">Chính sách điện nước</p>
-                      <p className="text-sm text-slate-600">
-                        Điện nước được tính từ utility_policies, không suy diễn từ tên dịch vụ.
-                      </p>
-                    </div>
-
-                    <select
-                      value={utilityPolicyId}
-                      onChange={(event) =>
-                        setValue('utilityPolicyId', event.target.value, {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        })
-                      }
-                      className="input-base w-full"
-                    >
-                      <option value="">Chọn chính sách điện nước</option>
-                      {utilityPolicies.map((policy) => (
-                        <option key={policy.id} value={String(policy.id)}>
-                          {policy.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      {utilityPolicyId
-                        ? `Đã chọn ${
-                            utilityPolicies.find((policy) => String(policy.id) === utilityPolicyId)?.name ?? 'chính sách điện nước'
-                          }.`
-                        : 'Chưa chọn chính sách điện nước. Hóa đơn utility sẽ không thể chạy đúng nếu thiếu cấu hình này.'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <h2 className="text-lg font-black text-slate-900">Thông tin đại diện bên cho thuê</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Họ tên người ký
-                    </label>
-                    <input {...register('ownerRep.fullName')} className="input-base w-full" placeholder="Tự động lấy theo tài khoản" />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      CCCD người ký
-                    </label>
-                    <input {...register('ownerRep.cccd')} className="input-base w-full" placeholder="Để trống nếu không cần hiện trên hợp đồng" />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Vai trò
-                    </label>
-                    <input {...register('ownerRep.role')} className="input-base w-full bg-slate-100" readOnly />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {buoc === 4 && (
-            <div className="mb-4 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
-              <p className="font-black text-slate-900">Cách hoàn tất bước xác nhận</p>
-              <p className="mt-2">
-                Kiểm tra lại thông tin hợp đồng ở các thẻ bên dưới, sau đó chọn căn cứ pháp lý, tải hồ sơ nếu cần và
-                xác nhận đủ 4 cam kết bắt buộc. Nếu chọn <b>Người được ủy quyền hợp pháp</b>, bạn phải có ít nhất 1 hồ
-                sơ pháp lý mới được tạo hợp đồng.
-              </p>
-            </div>
-          )}
-
-          {buoc === 4 && (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <TheXemLai
-                tieuDe="Cư trú"
-                rows={[
-                  ['Người đứng tên hợp đồng', tenantChinh?.fullName ?? 'Chưa chọn'],
-                  ['Người ở cùng', occupants.length ? occupants.map((item) => item.fullName).join(', ') : 'Không có'],
-                  ['Tổng người ở', `${tongNguoiO} người`],
-                ]}
-              />
-              <TheXemLai
-                tieuDe="Phòng"
-                rows={[
-                  ['Tòa nhà', toaNhaDangChon || 'Chưa chọn'],
-                  ['Phòng', phongDangChon?.roomCode ?? 'Chưa chọn'],
-                  ['Giá niêm yết', formatVND(giaNiemYet)],
-                ]}
-              />
-              <TheXemLai
-                tieuDe="Điều khoản"
-                rows={[
-                  ['Loại hợp đồng', TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]],
-                  ['Ngày bắt đầu', ngayBatDau || 'Chưa chọn'],
-                  ['Ngày kết thúc', ngayKetThuc || 'Chưa chọn'],
-                  ['Ngày đến hạn', `Ngày ${ngayDenHan}`],
-                ]}
-              />
-              <TheXemLai
-                tieuDe="Tài chính"
-                rows={[
-                  ['Giá thuê', formatVND(giaThue || 0)],
-                  ['Tiền cọc', formatVND(tienCoc || 0)],
-                  [
-                    'Dịch vụ tính tiền',
-                    dichVuDaChon.length
-                      ? dichVuDaChon
-                          .map((id) => services.find((service) => String(service.serviceId) === id)?.serviceName ?? id)
-                          .join(', ')
-                      : 'Không chọn',
-                  ],
-                  [
-                    'Chính sách điện nước',
-                    utilityPolicyId
-                      ? utilityPolicies.find((policy) => String(policy.id) === utilityPolicyId)?.name ?? utilityPolicyId
-                      : 'Không chọn',
-                  ],
-                ]}
-              />
-            </div>
-          )}
-
-          {buoc === 4 && (
-            <div className="mt-6 rounded-[28px] border border-amber-200 bg-amber-50 p-5">
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="mt-1 text-amber-700" size={18} />
-                <div className="space-y-2">
-                  <h2 className="text-lg font-black text-slate-900">Cam kết pháp lý bên cho thuê</h2>
-                  <p className="text-sm leading-6 text-slate-700">
-                    Bước này xác nhận căn cứ pháp lý, trách nhiệm và minh bạch hồ sơ trước khi tạo hợp đồng.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Căn cứ pháp lý bên cho thuê
-                    </label>
-                    <select {...register('ownerLegalConfirmation.legalBasisType')} className="input-base w-full">
-                      {DANH_SACH_CAN_CU_PHAP_LY.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                      Ghi chú pháp lý
-                    </label>
-                    <textarea
-                      {...register('ownerLegalConfirmation.legalBasisNote')}
-                      rows={4}
-                      className="input-base min-h-[120px] w-full resize-none"
-                      placeholder="Ví dụ: sở hữu trực tiếp, được ủy quyền theo văn bản, hoặc cho thuê theo pháp nhân."
-                    />
-                    <p className="mt-2 text-xs text-slate-500">Căn cứ đã chọn: {TEN_CAN_CU_PHAP_LY_HIEN_THI[legalBasisType]}.</p>
-                    {errors.ownerLegalConfirmation?.legalBasisNote && (
-                      <p className="mt-2 text-sm font-semibold text-rose-600">
-                        {errors.ownerLegalConfirmation.legalBasisNote.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-3xl border border-dashed border-amber-300 bg-white p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-slate-900">Hồ sơ pháp lý đính kèm</p>
-                        <p className="text-sm leading-6 text-slate-600">
-                          Hỗ trợ ảnh, PDF, DOC, DOCX. Trường hợp được ủy quyền thì phải đính kèm ít nhất 1 tệp.
-                        </p>
-                      </div>
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-900 hover:text-slate-900">
-                        {dangTaiHoSoPhapLy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                        Tải hồ sơ
-                        <input
-                          type="file"
-                          multiple
-                          className="hidden"
-                          accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
-                          onChange={taiHoSoPhapLy}
-                          disabled={dangTaiHoSoPhapLy}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      {supportingDocumentUrls?.length ? (
-                        supportingDocumentUrls.map((url, index) => (
-                          <div
-                            key={`${url}-${index}`}
-                            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                          >
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="truncate text-sm font-semibold text-slate-700 hover:text-slate-900"
-                            >
-                              Hồ sơ {index + 1}
-                            </a>
-                            <Button type="button" variant="ghost" onClick={() => xoaHoSoPhapLy(url)}>
-                              Xóa
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                          Chưa có hồ sơ pháp lý nào được đính kèm.
-                        </div>
-                      )}
-                    </div>
-                    {errors.ownerLegalConfirmation?.supportingDocumentUrls && (
-                      <p className="mt-2 text-sm font-semibold text-rose-600">
-                        {errors.ownerLegalConfirmation.supportingDocumentUrls.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5">
-                  <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
-                    Xác nhận bắt buộc trước khi tạo
-                  </p>
-
-                  <CamKetCheckbox
-                    label="Bên cho thuê xác nhận có quyền cho thuê hợp pháp hoặc được ủy quyền hợp lệ."
-                    checked={hasLegalRentalRightsConfirmed}
-                    error={errors.ownerLegalConfirmation?.hasLegalRentalRightsConfirmed?.message}
-                    inputProps={register('ownerLegalConfirmation.hasLegalRentalRightsConfirmed')}
-                  />
-                  <CamKetCheckbox
-                    label="Nhà/phòng cho thuê đủ điều kiện giao dịch, không tranh chấp, không bị kê biên hoặc thu hồi theo thông tin hiện có."
-                    checked={propertyEligibilityConfirmed}
-                    error={errors.ownerLegalConfirmation?.propertyEligibilityConfirmed?.message}
-                    inputProps={register('ownerLegalConfirmation.propertyEligibilityConfirmed')}
-                  />
-                  <CamKetCheckbox
-                    label="Bên cho thuê chấp nhận trách nhiệm bàn giao, bảo trì, hỗ trợ hồ sơ cư trú và các nghĩa vụ theo hợp đồng/pháp luật áp dụng."
-                    checked={landlordResponsibilitiesAccepted}
-                    error={errors.ownerLegalConfirmation?.landlordResponsibilitiesAccepted?.message}
-                    inputProps={register('ownerLegalConfirmation.landlordResponsibilitiesAccepted')}
-                  />
-                  <CamKetCheckbox
-                    label="Tôi đồng ý lưu vết cam kết này trong hợp đồng và chịu trách nhiệm về tính chính xác của thông tin."
-                    checked={finalAcknowledgementAccepted}
-                    error={errors.ownerLegalConfirmation?.finalAcknowledgementAccepted?.message}
-                    inputProps={register('ownerLegalConfirmation.finalAcknowledgementAccepted')}
-                  />
-
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Người ký xác nhận: {getValues('ownerRep.fullName') || 'Chưa có'}.
-                    <br />
-                    Căn cứ hiện tại: {TEN_CAN_CU_PHAP_LY_HIEN_THI[legalBasisType]}.
-                    <br />
-                    Số hồ sơ đính kèm: {supportingDocumentUrls?.length ?? 0}.
-                    {legalBasisNote ? <span> Ghi chú: {legalBasisNote}</span> : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-8 flex items-center justify-between">
-            <Button
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 p-4 backdrop-blur">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3">
+            <button
               type="button"
-              variant="outline"
-              leftIcon={<ChevronLeft size={16} />}
-              onClick={() => setBuoc((hienTai) => Math.max(hienTai - 1, 1))}
+              onClick={() => setBuoc((current) => Math.max(current - 1, 1))}
               disabled={buoc === 1}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <ChevronLeft size={16} />
               Quay lại
-            </Button>
+            </button>
 
             {buoc < 4 ? (
-              <Button type="button" rightIcon={<ChevronRight size={16} />} onClick={sangBuocSau}>
-                Tiếp tục
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                leftIcon={<Check size={16} />}
-                disabled={taoHopDong.isPending || dangTaiHoSoPhapLy || !canSubmitLegalStep}
+              <button
+                type="button"
+                onClick={sangBuocSau}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-medium text-white transition hover:bg-slate-800"
               >
+                Tiếp tục
+                <ChevronRight size={16} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                form="contract-wizard-form"
+                disabled={taoHopDong.isPending || dangTaiHoSoPhapLy}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {taoHopDong.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                 {taoHopDong.isPending ? 'Đang tạo hợp đồng...' : 'Tạo hợp đồng'}
-              </Button>
+              </button>
             )}
           </div>
-        </section>
-
-        <aside className="min-w-0">
-          <div className="sticky top-6 space-y-4">
-            <div className={hop}>
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Tóm tắt hợp đồng</h3>
-              <div className="mt-4 space-y-3">
-                <DongTomTat label="Tòa nhà" value={toaNhaDangChon || 'Chưa chọn'} />
-                <DongTomTat label="Phòng" value={phongDangChon?.roomCode ?? 'Chưa chọn'} />
-                <DongTomTat label="Giá niêm yết" value={formatVND(giaNiemYet)} />
-                <DongTomTat label="Loại hợp đồng" value={TEN_LOAI_HOP_DONG_HIEN_THI[loaiHopDong]} />
-                <DongTomTat label="Khuyến mãi giảm giá" value={`${String(phanTramGiam).padStart(2, '0')} %`} />
-                <DongTomTat label="Số tiền giảm" value={formatVND(giaGiam)} />
-                <DongTomTat label="Giá thuê đang nhập" value={formatVND(giaThue || 0)} />
-                <DongTomTat label="Thời hạn hợp đồng" value={`${ngayBatDau || '---'} đến ${ngayKetThuc || '---'}`} />
-                <DongTomTat
-                  label="Sức chứa tối đa"
-                  value={sucChuaToiDa > 0 ? `${sucChuaToiDa} người` : 'Chưa cấu hình'}
-                />
-                <DongTomTat label="Người đứng tên" value={tenantChinh?.fullName ?? 'Chưa chọn'} />
-                <DongTomTat
-                  label="Người ở cùng"
-                  value={occupants.length ? occupants.map((item) => item.fullName).join(', ') : 'Không có'}
-                />
-                <DongTomTat label="Tổng người ở" value={`${tongNguoiO}`} />
-                <DongTomTat
-                  label="Dịch vụ tính tiền"
-                  value={
-                    dichVuDaChon.length
-                      ? dichVuDaChon
-                          .map((id) => services.find((service) => String(service.serviceId) === id)?.serviceName ?? id)
-                          .join(', ')
-                      : 'Không chọn'
-                  }
-                />
-                <DongTomTat
-                  label="Chính sách điện nước"
-                  value={
-                    utilityPolicyId
-                      ? utilityPolicies.find((policy) => String(policy.id) === utilityPolicyId)?.name ?? utilityPolicyId
-                      : 'Không chọn'
-                  }
-                />
-              </div>
-            </div>
-
-            <div className={hop}>
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Lưu ý nghiệp vụ</h3>
-              <div className="mt-4 space-y-3">
-                <CanhBao text="Người đứng tên hợp đồng là người chịu trách nhiệm pháp lý và tài chính." />
-                <CanhBao text="Người ở cùng chỉ là người cư trú chung, không thay thế trách nhiệm pháp lý của người đứng tên." />
-                <CanhBao text="Nếu một người đang thuê mà muốn thuê thêm phòng, nên xử lý theo chính sách hợp đồng bổ sung hoặc ngoại lệ, không gộp chung vào hợp đồng hiện tại." />
-                {vuotSucChua && <CanhBao text="Số người ở đang vượt quá sức chứa tối đa của phòng." danger />}
-              </div>
-            </div>
-          </div>
-        </aside>
-      </form>
+        </div>
+      </ContractWizardProvider>
 
       <TenantFormModal
         isOpen={moThemCuDan}
         onClose={() => setMoThemCuDan(false)}
-        onSubmit={taoNhanhCuDan}
+        onSubmit={() => {
+          queryClient.invalidateQueries({ queryKey: ['tenants-wizard'] });
+          setMoThemCuDan(false);
+          toast.success('Đã thêm khách thuê mới.');
+        }}
       />
     </div>
   );
-}
-
-function CamKetCheckbox({
-  label,
-  checked,
-  error,
-  inputProps,
-}: {
-  label: string;
-  checked: boolean;
-  error?: string;
-  inputProps: Record<string, unknown>;
-}) {
-  return (
-    <label
-      className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${
-        checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'
-      }`}
-    >
-      <input type="checkbox" className="mt-1 h-4 w-4 accent-slate-900" {...inputProps} />
-      <div className="min-w-0">
-        <p className="text-sm font-semibold leading-6 text-slate-700">{label}</p>
-        {error ? <p className="mt-2 text-sm font-semibold text-rose-600">{error}</p> : null}
-      </div>
-    </label>
-  );
-}
-
-function DanhSachPhong({
-  tieuDe,
-  moTa,
-  rooms,
-  roomId,
-  onSelect,
-  contractMap,
-  disabled = false,
-}: {
-  tieuDe: string;
-  moTa: string;
-  rooms: Room[];
-  roomId: string;
-  onSelect?: (id: string) => void;
-  contractMap?: Map<string, ThongTinHopDongPhong>;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={`rounded-3xl border p-4 ${disabled ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">{tieuDe}</p>
-      <p className="mt-1 text-sm text-slate-600">{moTa}</p>
-      <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
-        {rooms.length ? (
-          rooms.map((room) => {
-            const dangChon = room.id === roomId;
-            const hopDong = contractMap?.get(room.id);
-            return (
-              <button
-                key={room.id}
-                type="button"
-                onClick={() => onSelect?.(room.id)}
-                disabled={disabled}
-                className={`w-full rounded-3xl border px-4 py-4 text-left transition ${
-                  disabled
-                    ? 'cursor-default border-amber-200 bg-white'
-                    : dangChon
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-slate-50 hover:border-slate-900 hover:bg-white'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black">{room.roomCode}</p>
-                    <p className={`mt-1 text-sm ${disabled || dangChon ? 'text-inherit/80' : 'text-slate-600'}`}>
-                      {room.buildingName} • {formatVND(room.baseRentPrice)}
-                    </p>
-                    {hopDong ? (
-                      <p className={`mt-2 text-xs font-semibold ${dangChon ? 'text-white/85' : 'text-amber-700'}`}>
-                        Đang vướng hợp đồng {hopDong.contract_code}: {hopDong.start_date} đến {hopDong.end_date}
-                      </p>
-                    ) : null}
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${
-                      disabled
-                        ? 'bg-amber-100 text-amber-700'
-                        : dangChon
-                          ? 'bg-white text-slate-900'
-                          : 'bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {hopDong || disabled ? 'Có hợp đồng hiệu lực' : 'Có thể tạo mới'}
-                  </span>
-                </div>
-              </button>
-            );
-          })
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-            Không có dữ liệu phù hợp.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DanhSachCuDan({
-  tieuDe,
-  moTa,
-  tenants,
-  primaryTenantId,
-  occupantIds,
-  onSelectPrimary,
-  onToggleOccupant,
-  actionLabel,
-  disabled = false,
-}: {
-  tieuDe: string;
-  moTa: string;
-  tenants: TenantSummary[];
-  primaryTenantId: string;
-  occupantIds: string[];
-  onSelectPrimary: (id: string) => void;
-  onToggleOccupant: (id: string) => void;
-  actionLabel?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={`rounded-3xl border p-4 ${disabled ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">{tieuDe}</p>
-      <p className="mt-1 text-sm text-slate-600">{moTa}</p>
-      <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
-        {tenants.length ? (
-          tenants.map((tenant) => {
-            const laTenantChinh = tenant.id === primaryTenantId;
-            const laOccupant = occupantIds.includes(tenant.id);
-            return (
-              <div key={tenant.id} className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black text-slate-900">{tenant.fullName}</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {tenant.phone || 'Chưa có số điện thoại'}
-                    </p>
-                    <p className="text-xs text-slate-500">{tenant.cccd}</p>
-                  </div>
-                  {tenant.currentRoomCode ? (
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
-                      {tenant.currentRoomCode}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => onSelectPrimary(tenant.id)} disabled={disabled}>
-                    {laTenantChinh ? 'Đang là người đứng tên' : actionLabel || 'Chọn làm người đứng tên'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onToggleOccupant(tenant.id)}
-                    disabled={disabled || laTenantChinh}
-                  >
-                    {laOccupant ? 'Bỏ khỏi nhóm ở cùng' : 'Thêm vào nhóm ở cùng'}
-                  </Button>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-            Không có dữ liệu phù hợp.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function NhomDichVu({
-  tieuDe,
-  moTa,
-  services,
-  selectedIds,
-  onToggle,
-}: {
-  tieuDe: string;
-  moTa: string;
-  services: Service[];
-  selectedIds: string[];
-  onToggle: (id: string) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-sm font-black text-slate-900">{tieuDe}</p>
-        <p className="text-sm text-slate-600">{moTa}</p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        {services.length ? (
-          services.map((service) => {
-            const id = String(service.serviceId);
-            const dangChon = selectedIds.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onToggle(id)}
-                className={`rounded-3xl border px-4 py-4 text-left ${
-                  dangChon ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/80'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black text-slate-900">{service.serviceName}</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {formatVND(service.currentPrice)} / {service.unit}
-                    </p>
-                    <p className="mt-2 text-xs font-semibold text-slate-500">
-                      Cách tính: {doiCachTinh(service.billingMethod)}
-                    </p>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-[11px] font-black ${dangChon ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    {dangChon ? 'Đã chọn' : 'Chưa chọn'}
-                  </span>
-                </div>
-              </button>
-            );
-          })
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500">
-            Chưa có dữ liệu cho nhóm này.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TheXemLai({ tieuDe, rows }: { tieuDe: string; rows: [string, string][] }) {
-  return (
-    <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{tieuDe}</h3>
-      <div className="mt-4 space-y-3">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <p className="text-sm font-bold text-slate-500">{label}</p>
-            <p className="text-sm text-slate-900">{value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DongTomTat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-black text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function CanhBao({ text, danger = false }: { text: string; danger?: boolean }) {
-  return (
-    <div className={`rounded-2xl px-3 py-3 text-sm ${danger ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-700'}`}>
-      <div className="flex items-start gap-2">
-        <AlertCircle size={16} className="mt-0.5 shrink-0" />
-        <span>{text}</span>
-      </div>
-    </div>
-  );
-}
-
-function doiCachTinh(billingMethod: Service['billingMethod']) {
-  if (billingMethod === 'PerPerson') return 'Theo số người';
-  if (billingMethod === 'Usage') return 'Theo mức sử dụng';
-  if (billingMethod === 'PerM2') return 'Theo diện tích';
-  return 'Gói cố định';
-}
-
-function layThongBaoLoiDauTien(value: unknown): string | null {
-  if (!value) return null;
-  if (typeof value === 'object' && value !== null && 'message' in (value as Record<string, unknown>)) {
-    const message = (value as { message?: unknown }).message;
-    return typeof message === 'string' ? message : null;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = layThongBaoLoiDauTien(item);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (typeof value === 'object') {
-    for (const item of Object.values(value as Record<string, unknown>)) {
-      const found = layThongBaoLoiDauTien(item);
-      if (found) return found;
-    }
-  }
-  return null;
 }

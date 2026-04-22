@@ -60,7 +60,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ open, onOpenCha
         action: 'Manual Password Reset',
         entityType: 'Profiles',
         entityId: user.id,
-        details: 'Admin performed manual password reset'
+        details: 'Owner performed manual password reset'
       });
       toast.success('Mật khẩu đã được thay đổi thành công');
       onOpenChange(false);

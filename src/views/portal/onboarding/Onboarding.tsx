@@ -150,7 +150,7 @@ const Onboarding: React.FC = () => {
       title: 'Xác nhận đã nộp cọc',
       isDone: status.steps.isDepositPaid,
       icon: Briefcase,
-      actionLabel: 'Chờ Admin xác nhận',
+      actionLabel: 'Chờ chủ sở hữu xác nhận',
       disabled: true,
       onClick: () => {},
     },
@@ -297,3 +297,4 @@ const Onboarding: React.FC = () => {
 };
 
 export default Onboarding;
+

@@ -49,14 +49,12 @@ const topbarText: Record<string, string> = {
   'topbar.profile': 'Hồ sơ cá nhân',
   'topbar.accountSettings': 'Cài đặt tài khoản',
   'auth.logout': 'Đăng xuất',
-  'breadcrumbs.owner': 'Chủ sở hữu',
   'breadcrumbs.super-admin': 'Siêu quản trị',
   'breadcrumbs.dashboard': 'Tổng quan',
   'breadcrumbs.buildings': 'Tòa nhà',
   'breadcrumbs.rooms': 'Tin đăng',
   'breadcrumbs.leads': 'Đơn thuê',
   'breadcrumbs.tenants': 'Khách thuê',
-  'breadcrumbs.owners': 'Chủ sở hữu',
   'breadcrumbs.contracts': 'Hợp đồng',
   'breadcrumbs.invoices': 'Hóa đơn',
   'breadcrumbs.payments': 'Thanh toán',
@@ -240,8 +238,8 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
             {userMenuOpen && (
               <div className="animate-in slide-in-from-top-4 fade-in zoom-in absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl duration-300">
                 <header className="border-b bg-primary/5 p-4">
-                  <p className="truncate text-sm font-bold leading-none text-primary">{user?.fullName || 'Quản trị viên'}</p>
-                  <p className="mt-1 truncate text-[10px] text-muted">{user?.email || 'admin@smartstay.vn'}</p>
+                  <p className="truncate text-sm font-bold leading-none text-primary">{user?.fullName || 'Chủ sở hữu'}</p>
+                  <p className="mt-1 truncate text-[10px] text-muted">{user?.email || 'owner@smartstay.vn'}</p>
                 </header>
                 <div className="space-y-1 p-2">
                   <UserMenuItem icon={User} label={tt('topbar.profile')} />
@@ -252,8 +250,8 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
                       try {
                         await logout();
                         navigate('/login', { replace: true });
-                      } catch (error) {
-                        console.error('Lỗi đăng xuất:', error);
+                      } catch {
+                        return;
                       }
                     }}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-danger transition-all hover:bg-danger/5"
@@ -324,8 +322,9 @@ const NotificationItem = ({
   </div>
 );
 
-const UserMenuItem = ({ icon: Icon, label }: { icon: any; label: string }) => (
+const UserMenuItem = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
   <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-all hover:bg-primary/5 hover:text-primary">
     <Icon size={16} /> {label}
   </button>
 );
+

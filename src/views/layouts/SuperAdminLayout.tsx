@@ -1,5 +1,5 @@
 import React from 'react'
-import { BarChart3, Building2, LayoutDashboard, LogOut, Settings, Shield, Users } from 'lucide-react'
+import { BarChart3, Building2, LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { cn } from '@/utils'
 import useAuthStore from '@/stores/authStore'
@@ -7,7 +7,6 @@ import useAuthStore from '@/stores/authStore'
 const navItems = [
   { label: 'Dashboard', to: '/super-admin/dashboard', icon: LayoutDashboard },
   { label: 'Organizations', to: '/super-admin/organizations', icon: Building2 },
-  { label: 'Owners', to: '/super-admin/owners', icon: Users },
   { label: 'Risk & Audit', to: '/super-admin/audit', icon: Shield },
   { label: 'Platform', to: '/super-admin/settings', icon: Settings },
 ]
@@ -52,8 +51,8 @@ const SuperAdminLayout: React.FC = () => {
               try {
                 await logout()
                 navigate('/login', { replace: true })
-              } catch (error) {
-                console.error('Lỗi đăng xuất:', error)
+              } catch {
+                return;
               }
             }}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 font-bold hover:bg-white/6 transition-colors"

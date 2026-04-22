@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, RefreshCcw, Send } from 'lucide-react';
+import type { AuthError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -24,8 +25,9 @@ const ForgotPasswordPage = () => {
       if (error) throw error;
       setIsSent(true);
       toast.success('Mã đặt lại mật khẩu đã được gửi!');
-    } catch (err: any) {
-      toast.error(err?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const error = err as AuthError;
+      toast.error(error?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }

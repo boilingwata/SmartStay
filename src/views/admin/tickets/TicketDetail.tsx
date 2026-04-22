@@ -112,7 +112,7 @@ const TicketDetail = () => {
       {/* Header & Breadcrumb */}
       <div className="flex items-center justify-between">
         <button 
-          onClick={() => navigate('/admin/tickets')}
+          onClick={() => navigate('/owner/tickets')}
           className="flex items-center gap-2 text-muted hover:text-primary transition-all group"
         >
           <div className="p-2 group-hover:bg-primary/5 rounded-xl transition-all">
@@ -176,7 +176,7 @@ const TicketDetail = () => {
                        <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
                           <User size={12} /> Người báo cáo
                        </p>
-                       <Link to={`/admin/tenants/${ticket.tenantId}`} className="flex items-center gap-3 group">
+                       <Link to={`/owner/tenants/${ticket.tenantId}`} className="flex items-center gap-3 group">
                           <img src={ticket.tenantAvatar || 'https://i.pravatar.cc/150'} className="w-10 h-10 rounded-2xl object-cover border-2 border-white shadow-md" alt="" />
                           <div>
                              <p className="text-small font-black text-primary group-hover:underline">{ticket.tenantName}</p>
@@ -189,7 +189,7 @@ const TicketDetail = () => {
                        <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
                           <Home size={12} /> Vị trí
                        </p>
-                       <Link to={`/admin/rooms/${ticket.roomId}`} className="block group">
+                       <Link to={`/owner/rooms/${ticket.roomId}`} className="block group">
                           <p className="text-small font-black text-primary group-hover:underline">Phòng {ticket.roomCode}</p>
                           <p className="text-[10px] text-muted font-bold truncate">{ticket.buildingName}</p>
                        </Link>
@@ -278,7 +278,7 @@ const TicketDetail = () => {
                                 <span className="text-small font-black text-primary">{comment.authorName}</span>
                                 <span className={cn(
                                    "px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest",
-                                   comment.authorRole === 'Admin' ? "bg-primary text-white" : "bg-bg text-muted"
+                                   comment.authorRole === 'Owner' ? "bg-primary text-white" : "bg-bg text-muted"
                                 )}>{comment.authorRole}</span>
                                 <span className="text-[10px] text-muted font-bold flex items-center gap-1.5">
                                    <Clock size={12} /> {formatDistanceToNow(parseISO(comment.createdAt), { addSuffix: true, locale: vi })}
@@ -447,3 +447,4 @@ const TicketDetail = () => {
 };
 
 export default TicketDetail;
+

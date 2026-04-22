@@ -29,6 +29,7 @@ export type DbServiceCalcType = Database["smartstay"]["Enums"]["service_calc_typ
 export type DbWebhookStatus = Database["smartstay"]["Enums"]["webhook_status"]
 export type DbUtilityPolicyScope =
   Database["smartstay"]["Enums"]["utility_policy_scope"]
+export type DbHandoverType = "check_in" | "check_out" | "periodic" | "other"
 export type DbRentalApplicationStatus =
   | "draft"
   | "submitted"
@@ -1770,15 +1771,25 @@ export type Database = {
       room_assets: {
         Row: {
           asset_id: number
+          assigned_at: string | null
+          billing_end_date: string | null
+          billing_label: string | null
+          billing_notes: string | null
+          billing_start_date: string | null
+          billing_status: string
+          broken_reported_at: string | null
           condition_score: number | null
           created_at: string | null
           id: number
+          is_billable: boolean
           last_maintenance: string | null
           location_notes: string | null
           maintenance_interval_months: number | null
+          monthly_charge: number
           purchase_date: string | null
           quantity: number | null
-          room_id: number
+          removed_at: string | null
+          room_id: number | null
           serial_number: string | null
           status: Database["smartstay"]["Enums"]["asset_status"] | null
           updated_at: string | null
@@ -1786,15 +1797,25 @@ export type Database = {
         }
         Insert: {
           asset_id: number
+          assigned_at?: string | null
+          billing_end_date?: string | null
+          billing_label?: string | null
+          billing_notes?: string | null
+          billing_start_date?: string | null
+          billing_status?: string
+          broken_reported_at?: string | null
           condition_score?: number | null
           created_at?: string | null
           id?: number
+          is_billable?: boolean
           last_maintenance?: string | null
           location_notes?: string | null
           maintenance_interval_months?: number | null
+          monthly_charge?: number
           purchase_date?: string | null
           quantity?: number | null
-          room_id: number
+          removed_at?: string | null
+          room_id?: number | null
           serial_number?: string | null
           status?: Database["smartstay"]["Enums"]["asset_status"] | null
           updated_at?: string | null
@@ -1802,15 +1823,25 @@ export type Database = {
         }
         Update: {
           asset_id?: number
+          assigned_at?: string | null
+          billing_end_date?: string | null
+          billing_label?: string | null
+          billing_notes?: string | null
+          billing_start_date?: string | null
+          billing_status?: string
+          broken_reported_at?: string | null
           condition_score?: number | null
           created_at?: string | null
           id?: number
+          is_billable?: boolean
           last_maintenance?: string | null
           location_notes?: string | null
           maintenance_interval_months?: number | null
+          monthly_charge?: number
           purchase_date?: string | null
           quantity?: number | null
-          room_id?: number
+          removed_at?: string | null
+          room_id?: number | null
           serial_number?: string | null
           status?: Database["smartstay"]["Enums"]["asset_status"] | null
           updated_at?: string | null
@@ -2532,6 +2563,212 @@ export type Database = {
           },
         ]
       }
+      handover_asset_snapshots: {
+        Row: {
+          current_condition_score: number
+          handover_id: number
+          id: number
+          note: string | null
+          previous_condition_score: number | null
+          room_asset_id: number
+        }
+        Insert: {
+          current_condition_score: number
+          handover_id: number
+          id?: number
+          note?: string | null
+          previous_condition_score?: number | null
+          room_asset_id: number
+        }
+        Update: {
+          current_condition_score?: number
+          handover_id?: number
+          id?: number
+          note?: string | null
+          previous_condition_score?: number | null
+          room_asset_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_asset_snapshots_handover_id_fkey"
+            columns: ["handover_id"]
+            isOneToOne: false
+            referencedRelation: "handover_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_asset_snapshots_room_asset_id_fkey"
+            columns: ["room_asset_id"]
+            isOneToOne: false
+            referencedRelation: "room_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_checklists: {
+        Row: {
+          contract_id: number | null
+          created_at: string | null
+          handover_type: Database["smartstay"]["Enums"]["handover_type"]
+          id: number
+          manager_signature: string | null
+          notes: string | null
+          performed_at: string | null
+          performed_by: string
+          room_id: number
+          tenant_id: string | null
+          tenant_signature: string | null
+          updated_at: string | null
+          uuid: string | null
+        }
+        Insert: {
+          contract_id?: number | null
+          created_at?: string | null
+          handover_type: Database["smartstay"]["Enums"]["handover_type"]
+          id?: number
+          manager_signature?: string | null
+          notes?: string | null
+          performed_at?: string | null
+          performed_by: string
+          room_id: number
+          tenant_id?: string | null
+          tenant_signature?: string | null
+          updated_at?: string | null
+          uuid?: string | null
+        }
+        Update: {
+          contract_id?: number | null
+          created_at?: string | null
+          handover_type?: Database["smartstay"]["Enums"]["handover_type"]
+          id?: number
+          manager_signature?: string | null
+          notes?: string | null
+          performed_at?: string | null
+          performed_by?: string
+          room_id?: number
+          tenant_id?: string | null
+          tenant_signature?: string | null
+          updated_at?: string | null
+          uuid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_checklists_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_items: {
+        Row: {
+          category: string
+          handover_id: number
+          id: number
+          item_name: string
+          note: string | null
+          photo_urls: string[] | null
+          status: string
+        }
+        Insert: {
+          category: string
+          handover_id: number
+          id?: number
+          item_name: string
+          note?: string | null
+          photo_urls?: string[] | null
+          status: string
+        }
+        Update: {
+          category?: string
+          handover_id?: number
+          id?: number
+          item_name?: string
+          note?: string | null
+          photo_urls?: string[] | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_items_handover_id_fkey"
+            columns: ["handover_id"]
+            isOneToOne: false
+            referencedRelation: "handover_checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_inquiries: {
+        Row: {
+          created_at: string | null
+          id: number
+          inquirer_name: string
+          inquirer_phone: string
+          message: string | null
+          room_id: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          inquirer_name: string
+          inquirer_phone: string
+          message?: string | null
+          room_id: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          inquirer_name?: string
+          inquirer_phone?: string
+          message?: string | null
+          room_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_inquiries_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_logs: {
         Row: {
           created_at: string | null
@@ -2916,8 +3153,17 @@ export type Database = {
         | "pending_confirmation"
         | "resolved"
         | "closed"
-      user_role: "admin" | "manager" | "staff" | "landlord" | "tenant"
+      user_role:
+        | "admin"
+        | "manager"
+        | "staff"
+        | "landlord"
+        | "tenant"
+        | "owner"
+        | "super_admin"
+        | "viewer"
       utility_policy_scope: "system" | "building" | "room" | "contract"
+      handover_type: "check_in" | "check_out" | "periodic" | "other"
       webhook_status: "received" | "processing" | "success" | "failed" | "retry"
     }
     CompositeTypes: {
@@ -3114,8 +3360,9 @@ export const Constants = {
         "resolved",
         "closed",
       ],
-      user_role: ["admin", "manager", "staff", "landlord", "tenant"],
+      user_role: ["admin", "manager", "staff", "landlord", "tenant", "owner", "super_admin", "viewer"],
       utility_policy_scope: ["system", "building", "room", "contract"],
+      handover_type: ["check_in", "check_out", "periodic", "other"],
       webhook_status: ["received", "processing", "success", "failed", "retry"],
     },
   },

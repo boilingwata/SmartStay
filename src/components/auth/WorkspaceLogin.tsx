@@ -179,7 +179,7 @@ const WorkspaceLogin: React.FC<WorkspaceLoginProps> = ({
 
             <div className="mt-8 pt-8 border-t text-center text-small text-muted space-y-2">
               <Link to="/auth" className="text-primary font-bold hover:underline">Xem tất cả cổng đăng nhập</Link>
-              {!isSuperAdmin && <p>Tenant đăng nhập tại <Link to="/portal/login" className="text-secondary font-bold hover:underline">Portal</Link></p>}
+              {!isSuperAdmin && <p>Tenant đăng nhập tại <Link to="/login" className="text-secondary font-bold hover:underline">Portal</Link></p>}
             </div>
           </div>
         </div>

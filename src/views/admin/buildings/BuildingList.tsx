@@ -2,21 +2,23 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
-  Building2, MapPin, Home, Users, 
-  ArrowRight, Search, Plus, Filter,
-  MoreVertical, TrendingUp, TrendingDown,
+  Building2, MapPin, Home, 
+  ArrowRight, Search, Plus, 
+  TrendingUp,
   LayoutGrid, List, SlidersHorizontal,
   ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { buildingService } from '@/services/buildingService';
-import { BuildingSummary, BuildingType } from '@/models/Building';
-import { cn, formatPercentage } from '@/utils';
-import { Spinner } from '@/components/ui/Feedback';
-import { toast } from 'sonner';
+import { BuildingSummary } from '@/models/Building';
+import { cn } from '@/utils';
 import { useTranslation } from 'react-i18next';
 import { BuildingModal } from '@/components/buildings/BuildingModal';
 import { GridSkeleton } from '@/components/ui/StatusStates';
 import { SidePanel } from '@/components/ui/SidePanel';
+
+type BuildingSortKey = 'name' | 'totalRooms' | 'occupancyRate';
+type OccupancyTier = 'low' | 'medium' | 'high' | '';
+type CapacityScale = 'small' | 'medium' | 'large' | '';
 
 const BuildingList = () => {
   const navigate = useNavigate();
@@ -29,12 +31,11 @@ const BuildingList = () => {
   
   // Advanced Filter State
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<BuildingType | ''>('');
-  const [occupancyTier, setOccupancyTier] = useState<'low' | 'medium' | 'high' | ''>('');
-  const [capacityScale, setCapacityScale] = useState<'small' | 'medium' | 'large' | ''>('');
+  const [occupancyTier, setOccupancyTier] = useState<OccupancyTier>('');
+  const [capacityScale, setCapacityScale] = useState<CapacityScale>('');
   
   // Sort State
-  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortBy, setSortBy] = useState<BuildingSortKey>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
   // Pagination State
@@ -74,8 +75,8 @@ const BuildingList = () => {
 
     // Sorting
     result.sort((a, b) => {
-      let valA: any = a[sortBy as keyof BuildingSummary];
-      let valB: any = b[sortBy as keyof BuildingSummary];
+      let valA: string | number = a[sortBy];
+      let valB: string | number = b[sortBy];
       
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
@@ -129,10 +130,10 @@ const BuildingList = () => {
            <div className="space-y-4">
               <label className="text-[11px] font-black uppercase tracking-widest text-muted">{t('pages.buildings.filters.occupancy')}</label>
               <div className="grid gap-3">
-                 {['low', 'medium', 'high'].map((tier) => (
+                 {(['low', 'medium', 'high'] as const).map((tier) => (
                    <button
                     key={tier}
-                    onClick={() => setOccupancyTier(tier as any)}
+                    onClick={() => setOccupancyTier(tier)}
                     className={cn(
                       "flex items-center justify-between p-4 rounded-2xl border-2 transition-all group",
                       occupancyTier === tier ? "border-primary bg-primary/5 scale-[1.02]" : "border-transparent bg-slate-50 hover:bg-slate-100"
@@ -164,10 +165,10 @@ const BuildingList = () => {
                    { id: 'small', label: t('pages.buildings.filters.small'), icon: Home },
                    { id: 'medium', label: t('pages.buildings.filters.medium'), icon: Building2 },
                    { id: 'large', label: t('pages.buildings.filters.large'), icon: Building2 }
-                 ].map((cap) => (
+                 ].map((cap: { id: CapacityScale; label: string; icon: React.ElementType }) => (
                    <button
                     key={cap.id}
-                    onClick={() => setCapacityScale(cap.id as any)}
+                    onClick={() => setCapacityScale(cap.id)}
                     className={cn(
                       "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
                       capacityScale === cap.id ? "border-primary bg-primary/5" : "border-transparent bg-slate-50 hover:bg-slate-100"
@@ -323,8 +324,8 @@ const BuildingList = () => {
           {paginatedBuildings.map((building) => (
             <Link
               key={building.id}
-              to={`/admin/buildings/${building.id}`}
-              aria-label={`Xem chi tiết tòa nhà ${building.buildingName}`}
+              to={`/owner/buildings/${building.id}`}
+              aria-label={`Xem chi tiết tòa nhà ${building.name}`}
               className="group card-premium p-0 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer border-none shadow-xl shadow-primary/5 bg-white/40 backdrop-blur-md flex flex-col scale-[0.99] hover:scale-100 w-full"
             >
               {/* Hero Image */}
@@ -343,7 +344,7 @@ const BuildingList = () => {
                    </div>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent min-w-0">
-                   <h3 className="text-white text-[32px] font-black leading-[1.1] mb-2 group-hover:translate-x-1 transition-transform truncate">{building.buildingName}</h3>
+                   <h3 className="text-white text-[32px] font-black leading-[1.1] mb-2 group-hover:translate-x-1 transition-transform truncate">{building.name}</h3>
                    <p className="text-white/80 text-[12px] font-bold flex items-center gap-3 tracking-wide truncate">
                       <MapPin size={14} className="text-secondary shrink-0" /> {building.address}
                    </p>
@@ -407,7 +408,7 @@ const BuildingList = () => {
                    <tr 
                     key={building.id} 
                     className="group hover:bg-white/80 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/admin/buildings/${building.id}`)}
+                    onClick={() => navigate(`/owner/buildings/${building.id}`)}
                    >
                       <td className="px-8 py-5">
                          <div className="flex items-center gap-4">
@@ -415,7 +416,7 @@ const BuildingList = () => {
                                <img src={building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=100'} className="w-full h-full object-cover" />
                             </div>
                             <div>
-                               <p className="font-black text-[15px] text-primary leading-tight">{building.buildingName}</p>
+                               <p className="font-black text-[15px] text-primary leading-tight">{building.name}</p>
                                <p className="text-[12px] text-muted/60">{building.buildingCode}</p>
                             </div>
                          </div>

@@ -26,11 +26,11 @@ Deno.serve(async (req: Request) => {
     return errorResponse('Unauthorized', 401);
   }
 
-  // Allow admins/managers to activate on behalf of a specific profile
+  // Allow workspace operators to activate on behalf of a specific profile
   let profileId = caller.userId;
   try {
     const body = await req.json().catch(() => ({}));
-    if (body.profileId && ['admin', 'manager', 'staff'].includes(caller.role)) {
+    if (body.profileId && ['owner', 'staff', 'super_admin'].includes(caller.role)) {
       profileId = body.profileId;
     }
   } catch { /* no body is fine */ }

@@ -123,7 +123,7 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
       toast.success(`Đã tạo hóa đơn ${invoice.invoiceCode}.`);
       onCreated?.();
       onClose();
-      navigate(`/admin/invoices/${invoice.id}`);
+      navigate(`/owner/invoices/${invoice.id}`);
     },
   });
 
@@ -507,4 +507,3 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
     </div>
   );
 };
-

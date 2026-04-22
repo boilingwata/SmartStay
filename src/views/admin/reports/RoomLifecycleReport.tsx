@@ -172,7 +172,7 @@ const RoomLifecycleReport: React.FC = () => {
           subtitle={`${summary?.longestVacantRoom.days || 0} ngày`} 
           color="danger" 
           loading={isLoadingSummary} 
-          onClick={() => summary?.longestVacantRoom.roomId && navigate(`/admin/rooms/${summary.longestVacantRoom.roomId}`)}
+          onClick={() => summary?.longestVacantRoom.roomId && navigate(`/owner/rooms/${summary.longestVacantRoom.roomId}`)}
         />
         <KPICard 
           title="TB ngày ký HĐ" 
@@ -300,7 +300,7 @@ const RoomLifecycleReport: React.FC = () => {
                   prev: "---",
                   delta: 0,
                   note: `Cần đẩy mạnh marketing cho phòng đã trống ${summary?.longestVacantRoom.days || 0} ngày.`,
-                  link: `/admin/rooms/${summary?.longestVacantRoom.roomId}`
+                  link: `/owner/rooms/${summary?.longestVacantRoom.roomId}`
                 },
                 { 
                   label: "TB ngày trống trước khi thuê", 

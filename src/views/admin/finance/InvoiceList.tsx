@@ -300,7 +300,7 @@ const InvoiceList = () => {
                 const remainingAmount = getRemainingAmount(invoice);
                 const paymentEnabled = canRecordPayment(invoice);
                 const reminderEnabled = canSendReminder(invoice);
-                const goToDetail = () => navigate(`/admin/invoices/${invoice.id}`);
+                const goToDetail = () => navigate(`/owner/invoices/${invoice.id}`);
 
                 return (
                   <div

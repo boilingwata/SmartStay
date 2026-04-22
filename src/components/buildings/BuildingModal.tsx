@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { 
   Building2, MapPin, X, ShieldCheck, Image as ImageIcon, Plus
 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { buildingService } from '@/services/buildingService';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/Feedback';
+import useAuthStore from '@/stores/authStore';
 
 interface BuildingModalProps {
   isOpen: boolean;
@@ -28,22 +29,24 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
     setValue,
     control,
     reset,
-    formState: { errors, isSubmitting }
+    formState: { errors }
   } = useForm<BuildingFormData>({
     resolver: zodResolver(buildingSchema),
     defaultValues: building || {
       buildingCode: '',
-      buildingName: '',
+      name: '',
       type: 'Apartment',
       address: '',
       provinceId: '',
       districtId: '',
       wardId: '',
-      yearBuilt: new Date().getFullYear(),
+      openingDate: '',
       totalFloors: 1,
       managementPhone: '',
       managementEmail: '',
-      amenities: []
+      amenities: [],
+      electricityProvider: '',
+      waterProvider: ''
     }
   });
 
@@ -93,7 +96,11 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
   }, [wards]);
 
   const createMutation = useMutation({
-    mutationFn: (data: BuildingFormData) => buildingService.createBuilding(data),
+    mutationFn: (data: BuildingFormData) => {
+      const ownerId = useAuthStore.getState().user?.id;
+      if (!ownerId) throw new Error('Unauthorized');
+      return buildingService.createBuilding(data, ownerId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] });
       queryClient.invalidateQueries({ queryKey: ['buildings-summary'] });
@@ -142,7 +149,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={24} /></button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit as any)} className="flex-1 overflow-y-auto p-10 space-y-12 bg-slate-50/30">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-10 space-y-12 bg-slate-50/30">
            {/* 1. Photo Section */}
            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 flex flex-col md:flex-row gap-8 items-start animate-in slide-in-from-top-4 duration-500">
               <div className="relative group mx-auto md:mx-0">
@@ -199,17 +206,17 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                     {errors.buildingCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.buildingCode.message as any)}</p>}
                  </div>
                  <div className="space-y-2.5 md:col-span-2 relative">
-                    <label htmlFor="buildingName" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Tên toà nhà *</label>
+                    <label htmlFor="name" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Tên toà nhà *</label>
                     <input 
-                      id="buildingName" 
-                      {...register('buildingName')} 
+                      id="name" 
+                      {...register('name')} 
                       placeholder="VD: SmartStay Tower A"
                       className={cn(
                         "w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm",
-                        errors.buildingName && "border-danger bg-danger/5"
+                        errors.name && "border-danger bg-danger/5"
                       )} 
                     />
-                    {errors.buildingName?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.buildingName.message as any)}</p>}
+                    {errors.name?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.name.message as any)}</p>}
                  </div>
               </div>
 
@@ -233,6 +240,48 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                       id="totalFloors" 
                       type="number" 
                       {...register('totalFloors', { valueAsNumber: true })} 
+                      className="w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm"
+                    />
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="space-y-2.5">
+                    <label htmlFor="openingDate" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Ngày bàn giao</label>
+                    <input 
+                      id="openingDate" 
+                      type="date" 
+                      {...register('openingDate')} 
+                      className="w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm"
+                    />
+                 </div>
+                 <div className="space-y-2.5">
+                    <label htmlFor="description" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Mô tả ngắn</label>
+                    <input 
+                      id="description" 
+                      {...register('description')} 
+                      placeholder="VD: Toà nhà cao cấp nhất khu vực..."
+                      className="w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm"
+                    />
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="space-y-2.5">
+                    <label htmlFor="electricityProvider" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Đơn vị cấp điện</label>
+                    <input 
+                      id="electricityProvider" 
+                      {...register('electricityProvider')} 
+                      placeholder="VD: EVN Hà Nội"
+                      className="w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm"
+                    />
+                 </div>
+                 <div className="space-y-2.5">
+                    <label htmlFor="waterProvider" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Đơn vị cấp nước</label>
+                    <input 
+                      id="waterProvider" 
+                      {...register('waterProvider')} 
+                      placeholder="VD: Nước sạch Sông Đà"
                       className="w-full h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-[20px] text-slate-900 font-black focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all duration-300 shadow-inner-sm"
                     />
                  </div>

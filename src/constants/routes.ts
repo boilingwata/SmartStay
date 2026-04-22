@@ -18,23 +18,21 @@ export const ROUTES = {
     TENANTS: '/owner/tenants',
     ROOMS: '/owner/rooms',
     BUILDINGS: '/owner/buildings',
-    OWNERS: '/owner/owners',
     TICKETS: '/owner/tickets',
     REPORTS: '/owner/reports',
     SETTINGS: '/owner/settings',
   },
 
   STAFF: {
-    DASHBOARD: '/staff/dashboard',
-    MY_TICKETS: '/staff/my-tickets',
-    VISITOR_CHECKIN: '/staff/visitor-checkin',
-    AMENITY_CHECKIN: '/staff/amenity-checkin',
+    DASHBOARD: '/owner/staff/dashboard',
+    MY_TICKETS: '/owner/staff/my-tickets',
+    VISITOR_CHECKIN: '/owner/staff/visitor-checkin',
+    AMENITY_CHECKIN: '/owner/staff/amenity-checkin',
   },
 
   SUPER_ADMIN: {
     DASHBOARD: '/super-admin/dashboard',
     ORGANIZATIONS: '/super-admin/organizations',
-    OWNERS: '/super-admin/owners',
     AUDIT: '/super-admin/audit',
     SETTINGS: '/super-admin/settings',
   },

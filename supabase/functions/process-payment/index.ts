@@ -1,7 +1,7 @@
 /// <reference path="../_shared/deno-globals.d.ts" />
 
 import { handleOptions } from '../_shared/cors.ts';
-import { requireAdminRole, requireAuth } from '../_shared/auth.ts';
+import { requireWorkspaceOperator, requireAuth } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
   // --- Branch B: Approve existing payment ---
   if (isApprove(body)) {
-    const { caller, denied } = await requireAdminRole(req);
+    const { caller, denied } = await requireWorkspaceOperator(req);
     if (denied) return denied;
 
     const { existingPaymentId, paymentAttemptId } = body;

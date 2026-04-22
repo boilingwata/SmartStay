@@ -19,13 +19,13 @@ const BLDG_NAME = `[E2E] Toà Nhà ${TS}`;
 const BLDG_NAME_UPDATED = `${BLDG_NAME} UPDATED`;
 const ROOM_CODE = `P-E2E-${TS}`;
 
-test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
+test.describe.serial('Owner: Luồng tích hợp Toà nhà & Phòng', () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   // BƯỚC 1: Form tạo toà nhà: Kiểm tra validation
   // ─────────────────────────────────────────────────────────────────────────
   test('1. Tạo toà nhà: Validation khi bỏ trống', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     await expect(page.locator('.card-container').first()).toBeVisible({ timeout: 15000 });
 
     const fabButton = page.locator('button').filter({ has: page.locator('span', { hasText: 'Thêm toà nhà mới' }) });
@@ -46,7 +46,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // BƯỚC 2: Tạo toà nhà mới thành công (KHÔNG tự nhập mã)
   // ─────────────────────────────────────────────────────────────────────────
   test('2. Tạo toà nhà mới thành công (Auto Mã Toà nhà)', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     
     const fabButton = page.locator('button').filter({ has: page.locator('span', { hasText: 'Thêm toà nhà mới' }) });
     await fabButton.click();
@@ -67,7 +67,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
 
     // Management Info
     await modal.locator('input[name="managementPhone"]').fill('0901234567');
-    await modal.locator('input[name="managementEmail"]').fill('admin@e2e.test.com');
+    await modal.locator('input[name="managementEmail"]').fill('owner@e2e.test.com');
 
     // Amenities
     const gymLabel = modal.locator('label').filter({ hasText: 'Gym' }).first();
@@ -84,7 +84,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // BƯỚC 3: Test chi tiết toà nhà (Update + Báo cáo)
   // ─────────────────────────────────────────────────────────────────────────
   test('3. Chi tiết toà nhà: Kiểm tra hiển thị, Sửa thông tin & Export', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     
     // Tìm toà nhà vừa tạo
     const searchInput = page.locator('input[placeholder*="Tìm tên toà nhà"]');
@@ -127,7 +127,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // BƯỚC 4: Tạo phòng mới trong toà nhà
   // ─────────────────────────────────────────────────────────────────────────
   test('4. Tạo phòng trong toà nhà (Kèm Validation)', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     const searchInput = page.locator('input[placeholder*="Tìm tên toà nhà"]');
     await searchInput.fill(BLDG_NAME_UPDATED);
     await page.waitForTimeout(800);
@@ -163,7 +163,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // BƯỚC 5: Chi tiết phòng (Sửa giá thuê)
   // ─────────────────────────────────────────────────────────────────────────
   test('5. Chi tiết phòng: Cập nhật thông tin', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     await page.locator('input[placeholder*="Tìm tên toà nhà"]').fill(BLDG_NAME_UPDATED);
     await page.waitForTimeout(800);
     await page.locator('.card-container').filter({ hasText: BLDG_NAME_UPDATED }).first().click();
@@ -191,7 +191,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('6. Chức năng Tìm kiếm Danh sách', async ({ page }) => {
     // 6.1: Tab danh sách phòng tổng
-    await page.goto('/admin/rooms');
+    await page.goto('/owner/rooms');
     const vacantBtn = page.locator('button').filter({ hasText: /Tr[oố]ng/i }).first();
     if (await vacantBtn.count() > 0) {
       await vacantBtn.click();
@@ -200,7 +200,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
     }
 
     // 6.2: Tab danh sách toà nhà tổng
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     const searchInput = page.locator('input[placeholder*="Tìm tên toà nhà"]');
     await searchInput.fill(BLDG_NAME_UPDATED);
     await page.waitForTimeout(1000);
@@ -212,7 +212,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
   // ─────────────────────────────────────────────────────────────────────────
   test('7. Xoá phòng và toà nhà (Clean up)', async ({ page }) => {
     // 7.1 Xóa phòng
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     await page.locator('input[placeholder*="Tìm tên toà nhà"]').fill(BLDG_NAME_UPDATED);
     await page.waitForTimeout(800);
     await page.locator('.card-container').filter({ hasText: BLDG_NAME_UPDATED }).first().click();
@@ -226,7 +226,7 @@ test.describe.serial('Admin: Luồng tích hợp Toà nhà & Phòng', () => {
     await expect(page.getByText('Đã xoá phòng thành công')).toBeVisible({ timeout: 10000 });
 
     // 7.2 Xóa toà nhà
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     await page.locator('input[placeholder*="Tìm tên toà nhà"]').fill(BLDG_NAME_UPDATED);
     await page.waitForTimeout(800);
     await page.locator('.card-container').filter({ hasText: BLDG_NAME_UPDATED }).first().click();

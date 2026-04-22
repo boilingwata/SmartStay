@@ -13,7 +13,9 @@ export const roomSchema = z.object({
   hasBalcony: z.boolean().default(false),
   conditionScore: z.number().min(1).max(10),
   amenities: z.array(z.string()),
-  description: z.string().optional()
+  description: z.string().optional(),
+  status: z.enum(['Vacant', 'Occupied', 'Maintenance', 'Reserved']).default('Vacant'),
+  isListed: z.boolean().default(false),
 });
 
 export type RoomFormData = z.infer<typeof roomSchema>;

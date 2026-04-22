@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import {
-} from 'lucide-react';
-import BottomNavigation from '@/components/layout/BottomNavigation';
-
-import useAuthStore from '@/stores/authStore';
+import { Outlet } from 'react-router-dom';
 import useUIStore from '@/stores/uiStore';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
@@ -14,7 +9,6 @@ import { cn } from '@/utils';
 // --- 4.1 Admin & Staff Shared Layout ---
 export const AdminLayout = () => {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (

@@ -364,7 +364,7 @@ const TenantList = () => {
                   <tr 
                     key={tenant.id} 
                     className="group hover:bg-white transition-all cursor-pointer"
-                    onClick={() => navigate(`/admin/tenants/${tenant.id}`)}
+                    onClick={() => navigate(`/owner/tenants/${tenant.id}`)}
                   >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-5 min-w-0">
@@ -424,7 +424,7 @@ const TenantList = () => {
                        {tenant.currentRoomCode ? (
                          <div className="flex items-center gap-3">
                             <button 
-                              onClick={(e) => { e.stopPropagation(); navigate(`/admin/rooms/${tenant.currentRoomId}`); }}
+                              onClick={(e) => { e.stopPropagation(); navigate(`/owner/rooms/${tenant.currentRoomId}`); }}
                               className="px-4 py-2 bg-primary/5 text-primary text-[12px] font-black rounded-xl border border-primary/10 hover:bg-primary hover:text-white transition-all shadow-indigo-100 flex items-center gap-2"
                             >
                                <Building size={14} className="shrink-0" />
@@ -461,7 +461,7 @@ const TenantList = () => {
                        <div className="flex items-center justify-end gap-2">
                           <button 
                             className="w-11 h-11 flex items-center justify-center bg-slate-50 text-slate-400 rounded-2xl hover:bg-primary hover:text-white transition-all hover:shadow-xl hover:shadow-primary/20 scale-90 hover:scale-105"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/tenants/${tenant.id}`); }}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/owner/tenants/${tenant.id}`); }}
                           >
                              <ArrowRight size={20} />
                           </button>

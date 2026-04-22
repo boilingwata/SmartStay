@@ -13,6 +13,7 @@ interface UIState {
   setBuilding: (id: string | number | null) => void;
   toggleTheme: () => void;
   setLanguage: (lang: "vi" | "en") => void;
+  resetContext: () => void;
 }
 
 const useUIStore = create<UIState>()(
@@ -39,6 +40,7 @@ const useUIStore = create<UIState>()(
       })),
       
       setLanguage: (lang) => set({ language: lang }),
+      resetContext: () => set({ activeBuildingId: null }),
     }),
     {
       name: 'smartstay-ui-storage',

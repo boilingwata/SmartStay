@@ -7,29 +7,27 @@ import {
   Package, History, ClipboardList, Plus,
   Edit, Key, Wrench, CheckCircle2, MoreVertical,
   Star, Share2, Printer, Download, Trash2,
-  Calendar, User, Clock, Check, Copy,
+  Calendar, User, Copy,
   ArrowRight, ShieldCheck,   Layout, Wind, Refrigerator, Disc,
-  Loader2, ZoomIn, X, ChevronLeft, ChevronRight
+  Loader2, ZoomIn, X, ChevronLeft, ChevronRight, XCircle
 } from 'lucide-react';
 import { roomService } from '@/services/roomService';
 import { fileService } from '@/services/fileService';
-import { RoomDetail as RoomDetailType, RoomStatus, RoomContractSummary } from '@/models/Room';
+import { RoomDetail as RoomDetailType, RoomContractSummary } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND, formatDate } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
-import { 
-  DndContext, closestCenter, KeyboardSensor, 
-  PointerSensor, useSensor, useSensors 
-} from '@dnd-kit/core';
-import { 
-  SortableContext, sortableKeyboardCoordinates, 
-  rectSortingStrategy 
-} from '@dnd-kit/sortable';
+import { useConfirm } from '@/hooks/useConfirm';
 
-const TabItem = ({ active, children, onClick, icon: Icon }: any) => (
+const TabItem = ({ active, children, onClick, icon: Icon }: { 
+  active: boolean; 
+  children: React.ReactNode; 
+  onClick: () => void; 
+  icon: React.ElementType; 
+}) => (
   <button 
     onClick={onClick}
     className={cn(
@@ -45,6 +43,7 @@ const RoomDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssignAssetModalOpen, setIsAssignAssetModalOpen] = useState(false);
@@ -117,25 +116,27 @@ const RoomDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       toast.success('Đã xoá phòng thành công');
-      navigate('/admin/rooms');
+      navigate('/owner/rooms');
     },
     onError: (err: Error) => {
       toast.error(`Không thể xoá phòng: ${err.message}`);
     }
   });
 
-  const handleDelete = () => {
-    if (window.confirm('Bạn có chắc chắn muốn xoá phòng này không?')) {
+  const handleDelete = async () => {
+    const isConfirmed = await confirm({
+      title: 'Xoá phòng',
+      description: `Bạn có chắc chắn muốn xoá phòng ${room?.roomCode} không? Hành động này không thể hoàn tác.`,
+      confirmLabel: 'Xoá ngay',
+      cancelLabel: 'Huỷ bỏ',
+      variant: 'danger'
+    });
+
+    if (isConfirmed) {
       deleteMutation.mutate();
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   // Keep ref in sync for keyboard handler
   imageCountRef.current = room?.images?.length ?? 0;
@@ -218,7 +219,7 @@ const RoomDetail = () => {
             <>
               <button 
                 className="btn-primary flex items-center gap-2 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[11px]" 
-                onClick={() => navigate('/admin/contracts/create', { state: { roomId: room.id } })}
+                onClick={() => navigate('/owner/contracts/create', { state: { roomId: room.id } })}
               >
                 <Key size={18} /> Tạo hợp đồng mới
               </button>
@@ -230,17 +231,32 @@ const RoomDetail = () => {
           {room.status === 'Occupied' && (
             <>
               <button 
-                onClick={() => navigate(`/admin/contracts?roomId=${room.id}`)}
+                onClick={() => navigate(`/owner/contracts?roomId=${room.id}`)}
                 className="h-12 px-6 bg-primary/10 text-primary rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-primary/20 transition-all border border-primary/20 shadow-lg shadow-primary/5"
               >
                 <History size={18} /> Xem hợp đồng
               </button>
-              <button 
-                onClick={() => navigate(`/admin/rooms/${room.id}/handover`)}
-                className="h-12 px-6 bg-white border border-border/10 text-muted rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-bg transition-all hover:text-primary"
-              >
-                <ClipboardList size={18} /> Handover checklist
-              </button>
+              <div className="relative group">
+                <button 
+                  className="h-12 px-6 bg-white border border-border/10 text-muted rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-bg transition-all hover:text-primary"
+                >
+                  <ClipboardList size={18} /> Bàn giao phòng
+                </button>
+                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-border/5 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <button 
+                    onClick={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckIn' } })}
+                    className="w-full text-left px-5 py-4 text-[10px] font-black uppercase tracking-widest text-success hover:bg-success/5 transition-all flex items-center gap-3"
+                  >
+                    <CheckCircle2 size={14} /> Bàn giao Nhận (In)
+                  </button>
+                  <button 
+                    onClick={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckOut' } })}
+                    className="w-full text-left px-5 py-4 text-[10px] font-black uppercase tracking-widest text-danger border-t border-border/5 hover:bg-danger/5 transition-all flex items-center gap-3"
+                  >
+                    <XCircle size={14} /> Bàn giao Trả (Out)
+                  </button>
+                </div>
+              </div>
             </>
           )}
           {room.status === 'Maintenance' && (
@@ -281,6 +297,7 @@ const RoomDetail = () => {
           <TabItem active={activeTab === 'Images'} onClick={() => setActiveTab('Images')} icon={ImageIcon}>Hình ảnh</TabItem>
           <TabItem active={activeTab === 'Assets'} onClick={() => setActiveTab('Assets')} icon={Package}>Tài sản</TabItem>
           <TabItem active={activeTab === 'Contracts'} onClick={() => setActiveTab('Contracts')} icon={History}>Hợp đồng</TabItem>
+          <TabItem active={activeTab === 'Handover'} onClick={() => setActiveTab('Handover')} icon={ShieldCheck}>Bàn giao</TabItem>
           <TabItem active={activeTab === 'History'} onClick={() => setActiveTab('History')} icon={ClipboardList}>Lịch sử TT</TabItem>
         </div>
 
@@ -337,7 +354,9 @@ const RoomDetail = () => {
                    <div className="relative">
                       <div className="absolute top-4 left-4 text-primary opacity-10"><Copy size={48} /></div>
                       {room.description ? (
-                        <p className="text-body text-text leading-relaxed p-8 bg-white/60 rounded-[40px] border border-border/5 italic relative z-10">"{room.description}"</p>
+                        <p className="text-body text-text leading-relaxed p-8 bg-white/60 rounded-[40px] border border-border/5 italic relative z-10">
+                          &quot;{room.description}&quot;
+                        </p>
                       ) : (
                         <div className="flex flex-col items-center justify-center py-10 bg-white/40 rounded-[40px] border-2 border-dashed border-border/20">
                           <p className="text-[11px] font-black text-muted uppercase tracking-[3px]">Chưa có mô tả cho phòng này</p>
@@ -366,13 +385,13 @@ const RoomDetail = () => {
                           {room.hasBalcony ? <div className="bg-success/20 p-1.5 rounded-full"><CheckCircle2 className="text-success" size={16} /></div> : <span className="text-slate-600">---</span>}
                        </div>
                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 font-bold text-[11px] uppercase tracking-widest">Bảo trì gần nhất</span>
-                          <span className="font-mono text-secondary text-[12px]">{formatDate(room.lastMaintenanceDate || '--')}</span>
-                       </div>
-                    </div>
-                 </div>
+                           <span className="text-slate-400 font-bold text-[11px] uppercase tracking-widest">Bảo trì gần nhất</span>
+                           <span className="font-mono text-secondary text-[12px]">{formatDate(room.lastMaintenanceDate || '--')}</span>
+                        </div>
+                     </div>
+                  </div>
 
-                 <div className="p-10 bg-white/60 rounded-[48px] border border-primary/5 shadow-xl">
+                  <div className="p-10 bg-white/60 rounded-[48px] border border-primary/5 shadow-xl">
                     <h4 className="text-[10px] text-muted uppercase tracking-[3px] mb-8 border-b border-dashed border-border/20 pb-5 font-black">Cư dân hiện tại</h4>
                     {room.tenantNames && room.tenantNames.length > 0 ? (
                       <div className="space-y-6">
@@ -397,7 +416,60 @@ const RoomDetail = () => {
                         <p className="text-small text-muted italic font-black uppercase tracking-widest">Phòng đang trống</p>
                       </div>
                     )}
-                 </div>
+                  </div>
+
+                  <div className="p-10 bg-white/60 rounded-[48px] border border-primary/5 shadow-xl overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                      <Share2 size={80} className="text-primary" />
+                    </div>
+                    <h4 className="text-[10px] text-muted uppercase tracking-[3px] mb-6 font-black">Niêm yết công khai</h4>
+                    <div className="flex items-center justify-between">
+                       <div className="flex-1">
+                          <p className="text-[14px] font-black text-primary mb-1">{room.isListed ? 'Đang niêm yết' : 'Chưa niêm yết'}</p>
+                          <p className="text-[10px] text-muted leading-relaxed">Cho phép hiển thị phòng này trên Marketplace để khách tìm thuê.</p>
+                       </div>
+                       <button
+                         onClick={() => {
+                           roomService.updateRoom(room.id, { isListed: !room.isListed })
+                             .then(() => {
+                               queryClient.invalidateQueries({ queryKey: ['room', room.id] });
+                               toast.success(room.isListed ? 'Đã gỡ niêm yết' : 'Đã niêm yết phòng thành công!');
+                             })
+                             .catch((err) => toast.error(err.message));
+                         }}
+                         className={cn(
+                           "relative w-14 h-8 rounded-full p-1 transition-all duration-500 shadow-inner",
+                           room.isListed ? "bg-primary" : "bg-slate-300"
+                         )}
+                       >
+                         <div className={cn(
+                           "w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 flex items-center justify-center",
+                           room.isListed ? "translate-x-6" : "translate-x-0"
+                         )}>
+                            {room.isListed && <div className="w-1 h-1 rounded-full bg-primary" />}
+                         </div>
+                       </button>
+                    </div>
+                    
+                    {room.isListed && (
+                      <div className="mt-8 pt-8 border-t border-dashed border-border/20 animate-in fade-in slide-in-from-top-2">
+                        <button 
+                          onClick={() => {
+                            const url = `${window.location.origin}/listings/${room.id}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Đã sao chép link công khai');
+                          }}
+                          className="w-full flex items-center justify-between p-4 bg-primary/5 rounded-2xl hover:bg-primary/10 transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform"><Share2 size={14} className="text-primary" /></div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Sao chép Link Listing</span>
+                          </div>
+                          <ArrowRight size={14} className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
               </div>
             </div>
           )}
@@ -441,7 +513,7 @@ const RoomDetail = () => {
                    </div>
                    <div>
                      <p className="text-body font-black text-muted">Chưa có ảnh nào</p>
-                     <p className="text-small text-muted/70 mt-1">Nhấn "Thêm ảnh" để tải ảnh phòng lên.</p>
+                     <p className="text-small text-muted/70 mt-1">Nhấn &quot;Thêm ảnh&quot; để tải ảnh phòng lên.</p>
                    </div>
                    <button onClick={() => photoInputRef.current?.click()} className="btn-primary flex items-center gap-2 mt-2">
                      <Plus size={16} /> Thêm ảnh đầu tiên
@@ -607,10 +679,10 @@ const RoomDetail = () => {
                              </td>
                              <td className="px-8 py-6">
                                 <div className="flex flex-col gap-1.5">
-                                   <span className="text-[13px] text-text font-bold italic">"{h.reason}"</span>
+                                   <span className="text-[13px] text-text font-bold italic">&quot;{h.reason}&quot;</span>
                                    {h.contractId && (
                                      <button 
-                                       onClick={() => navigate(`/admin/contracts/${h.contractId}`)} 
+                                       onClick={() => navigate(`/owner/contracts/${h.contractId}`)} 
                                        className="w-fit px-3 py-1 bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest rounded-lg flex items-center gap-2 hover:bg-primary hover:text-white transition-all border border-primary/10"
                                      >
                                         <ClipboardList size={12} /> HD: {h.contractId}
@@ -640,7 +712,7 @@ const RoomDetail = () => {
                    <p className="text-[10px] text-muted font-bold italic">Tất cả hợp đồng đã và đang gắn với phòng này.</p>
                  </div>
                  <button
-                   onClick={() => navigate('/admin/contracts')}
+                   onClick={() => navigate('/owner/contracts')}
                    className="btn-outline-sm px-6 h-11 flex items-center gap-2 rounded-xl text-[11px] font-black uppercase tracking-widest"
                  >
                    <History size={16} /> Quản lý hợp đồng
@@ -664,7 +736,7 @@ const RoomDetail = () => {
                        </thead>
                        <tbody className="divide-y divide-border/10">
                          {room.contracts.map((c: RoomContractSummary) => (
-                           <tr key={c.id} className="group hover:bg-white/80 transition-all cursor-pointer" onClick={() => navigate(`/admin/contracts/${c.id}`)}>
+                           <tr key={c.id} className="group hover:bg-white/80 transition-all cursor-pointer" onClick={() => navigate(`/owner/contracts/${c.id}`)}>
                              <td className="px-8 py-6">
                                <p className="text-[14px] font-black text-primary font-mono tracking-tighter">{c.contractCode || `#${c.id}`}</p>
                              </td>
@@ -684,7 +756,7 @@ const RoomDetail = () => {
                              </td>
                              <td className="px-8 py-6 text-right">
                                <button
-                                 onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/${c.id}`); }}
+                                 onClick={(e) => { e.stopPropagation(); navigate(`/owner/contracts/${c.id}`); }}
                                  className="w-10 h-10 bg-bg text-muted hover:bg-white hover:text-primary hover:shadow-lg rounded-xl flex items-center justify-center transition-all ml-auto"
                                >
                                  <ArrowRight size={16} />
@@ -708,15 +780,16 @@ const RoomDetail = () => {
                    {room.status === 'Vacant' && (
                      <button
                        className="btn-primary px-8 h-12 rounded-xl text-[11px] font-black uppercase tracking-[3px]"
-                       onClick={() => navigate('/admin/contracts/create', { state: { roomId: room.id } })}
+                       onClick={() => navigate('/owner/contracts/create', { state: { roomId: room.id } })}
                      >
                        Tạo hợp đồng mới
                      </button>
                    )}
                  </div>
                )}
-             </div>
-          )}
+              </div>
+           )}
+           {activeTab === 'Handover' && <HandoverTab roomId={room.id} />}
         </div>
       </div>
 
@@ -776,5 +849,164 @@ const RoomDetail = () => {
   );
 };
 
+const HandoverTab = ({ roomId }: { roomId: string }) => {
+  const navigate = useNavigate();
+  const { data: checklists, isLoading } = useQuery({
+    queryKey: ['roomHandover', roomId],
+    queryFn: () => roomService.getRoomHandoverChecklist(roomId)
+  });
+
+  if (isLoading) return <div className="py-20 flex justify-center"><Spinner /></div>;
+
+  return (
+    <div className="space-y-10 animate-in fade-in slide-in-from-top-2 duration-700">
+      <div className="flex justify-between items-center bg-white/40 p-8 rounded-[32px] border border-primary/5">
+        <div>
+          <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Lịch sử bàn giao (Handover)</h3>
+          <p className="text-[10px] text-muted font-bold italic">Tất cả biên bản nhận/trả phòng và kiểm kê tài sản.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => navigate(`/owner/rooms/${roomId}/handover`, { state: { type: 'CheckIn' } })}
+            className="h-11 px-6 bg-success text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:shadow-lg hover:shadow-success/20 transition-all shadow-md"
+          >
+            <Plus size={16} /> Bàn giao Nhận
+          </button>
+          <button 
+            onClick={() => navigate(`/owner/rooms/${roomId}/handover`, { state: { type: 'CheckOut' } })}
+            className="h-11 px-6 bg-danger text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:shadow-lg hover:shadow-danger/20 transition-all shadow-md"
+          >
+            <Plus size={16} /> Bàn giao Trả
+          </button>
+        </div>
+      </div>
+
+      {!checklists || checklists.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
+          <div className="w-24 h-24 bg-bg rounded-[40px] flex items-center justify-center text-muted border-4 border-dashed border-border/20 group">
+            <ShieldCheck size={48} className="group-hover:scale-110 transition-transform duration-500" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-[18px] font-black text-primary uppercase tracking-[4px]">Chưa có biên bản nào</h3>
+            <p className="text-[13px] text-muted italic font-bold">Phòng này chưa thực hiện quy trình bàn giao nào.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-8">
+          {checklists.map((c) => (
+            <div key={c.id} className="card-container p-8 space-y-8 bg-white/60 border-primary/5 hover:border-primary/20 transition-all hover:shadow-2xl hover:shadow-primary/5 group">
+              <div className="flex items-center justify-between pb-6 border-b border-border/10">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg",
+                    c.handoverType === 'CheckIn' ? "bg-success" : c.handoverType === 'CheckOut' ? "bg-danger" : "bg-primary"
+                  )}>
+                    <ClipboardList size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[14px] font-black text-primary uppercase tracking-widest">
+                        {c.handoverType === 'CheckIn' ? 'Bàn giao Nhận phòng' : c.handoverType === 'CheckOut' ? 'Bàn giao Trả phòng' : 'Kiểm kê định kỳ'}
+                      </span>
+                      <span className="px-3 py-1 bg-bg text-[10px] font-mono font-bold text-muted rounded-lg">#{c.id}</span>
+                    </div>
+                    <p className="text-[11px] text-muted font-bold mt-1 flex items-center gap-2">
+                      <Calendar size={12} className="text-primary" /> {formatDate(c.date)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                   <button className="btn-outline-sm h-10 px-4 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border-border/20">
+                      <Printer size={14} /> In biên bản
+                   </button>
+                   <button className="btn-primary-sm h-10 px-4 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10">
+                      <Download size={14} /> Xuất PDF
+                   </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Hệ thống & Tiện ích</p>
+                    <div className="space-y-3">
+                       {c.sections.flatMap(s => s.items).slice(0, 5).map(it => (
+                         <div key={it.id} className="flex items-center justify-between text-[12px]">
+                            <span className="font-bold text-primary/80">{it.name}</span>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter",
+                              it.status === 'OK' ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                            )}>
+                               {it.status}
+                            </span>
+                         </div>
+                       ))}
+                       {c.sections.flatMap(s => s.items).length > 5 && (
+                         <p className="text-[10px] text-muted italic font-bold">... và {c.sections.flatMap(s => s.items).length - 5} mục khác</p>
+                       )}
+                    </div>
+                 </div>
+
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Thay đổi Tài sản</p>
+                    <div className="space-y-3">
+                       {c.assets.map(a => (
+                         <div key={a.id} className="flex items-center justify-between text-[12px]">
+                            <div className="flex flex-col">
+                               <span className="font-bold text-primary/80">{a.assetName}</span>
+                               <span className="text-[9px] text-muted font-mono">{a.assetCode}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] text-muted line-through opacity-50">{a.conditionBefore}</span>
+                               <ArrowRight size={10} className="text-muted" />
+                               <span className="px-2 py-0.5 bg-primary/5 text-primary rounded text-[10px] font-black uppercase tracking-tighter">{a.conditionAfter}</span>
+                            </div>
+                         </div>
+                       ))}
+                       {c.assets.length === 0 && <p className="text-[11px] text-muted italic">Không có tài sản nào được ghi nhận</p>}
+                    </div>
+                 </div>
+
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Chữ ký & Xác nhận</p>
+                    <div className="flex gap-4">
+                       <div className="flex-1 space-y-2">
+                          <p className="text-[9px] font-black text-muted uppercase">Bên A (Quản lý)</p>
+                          <div className="aspect-video bg-white rounded-xl border border-border/10 overflow-hidden shadow-inner">
+                             {c.witnessSignatureUrl ? (
+                               <img src={c.witnessSignatureUrl} alt="Manager Sig" className="w-full h-full object-contain p-2" />
+                             ) : (
+                               <div className="w-full h-full flex items-center justify-center text-muted/30 italic text-[10px]">Chưa ký</div>
+                             )}
+                          </div>
+                       </div>
+                       <div className="flex-1 space-y-2">
+                          <p className="text-[9px] font-black text-muted uppercase">Bên B (Cư dân)</p>
+                          <div className="aspect-video bg-white rounded-xl border border-border/10 overflow-hidden shadow-inner">
+                             {c.tenantSignatureUrl ? (
+                               <img src={c.tenantSignatureUrl} alt="Tenant Sig" className="w-full h-full object-contain p-2" />
+                             ) : (
+                               <div className="w-full h-full flex items-center justify-center text-muted/30 italic text-[10px]">Chưa ký</div>
+                             )}
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              {c.notes && (
+                <div className="p-4 bg-primary/[0.03] rounded-2xl border border-primary/5 italic text-[13px] text-primary/70 font-medium">
+                   &quot; {c.notes} &quot;
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default RoomDetail;
+
+
 

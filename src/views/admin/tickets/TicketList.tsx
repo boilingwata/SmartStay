@@ -331,7 +331,7 @@ const TicketList = () => {
                    <tr
                      key={ticket.id}
                      className="group hover:bg-slate-50/80 transition-all cursor-pointer"
-                     onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                     onClick={() => navigate(`/owner/tickets/${ticket.id}`)}
                    >
                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">

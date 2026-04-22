@@ -27,7 +27,7 @@ const portals = [
   {
     title: 'Tenant Portal',
     description: 'Thanh toán hóa đơn, gửi yêu cầu và theo dõi thông báo.',
-    href: '/portal/login',
+    href: '/login',
     className: 'from-[#0D8A8A] to-[#1B3A6B]',
     icon: Wallet,
   },

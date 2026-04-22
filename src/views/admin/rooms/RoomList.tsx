@@ -6,12 +6,13 @@ import {
   SlidersHorizontal, 
   X, ArrowUpAz, ArrowDownAz,
   MapPin, Sparkles, ArrowRight,
-  AlertCircle, ChevronRight, Navigation
+  AlertCircle, ChevronRight, Navigation,
+  Share2
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { roomService } from '@/services/roomService';
-import { Room, RoomStatus, RoomType, DirectionFacing } from '@/models/Room';
+import { Room, RoomStatus, RoomType, DirectionFacing, type RoomFilters } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, formatVND } from '@/utils';
 import useUIStore from '@/stores/uiStore';
@@ -54,6 +55,7 @@ const RoomList = () => {
   const [minArea, setMinArea] = useState<number | undefined>();
   const [maxArea, setMaxArea] = useState<number | undefined>();
   const [facing, setFacing] = useState<DirectionFacing | ''>('');
+  const [isListedFilter, setIsListedFilter] = useState<boolean | undefined>(undefined);
 
   const toggleView = (mode: 'List' | 'Grid') => {
     setViewMode(mode);
@@ -61,7 +63,7 @@ const RoomList = () => {
   };
 
   const { data: rooms, isLoading, isError, refetch } = useQuery<Room[]>({
-    queryKey: ['rooms', activeBuildingId, search, statusFilter, typeFilter, facing, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, sortBy, sortOrder],
+    queryKey: ['rooms', activeBuildingId, search, statusFilter, typeFilter, facing, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, isListedFilter, sortBy, sortOrder],
     queryFn: () => {
       const numericId = Number(activeBuildingId);
       const safeId = (activeBuildingId != null && activeBuildingId !== '' && Number.isFinite(numericId) && numericId > 0)
@@ -80,6 +82,7 @@ const RoomList = () => {
         maxFloor,
         minArea,
         maxArea,
+        isListed: isListedFilter,
         sortBy,
         sortOrder
       });
@@ -97,6 +100,7 @@ const RoomList = () => {
     setMinArea(undefined);
     setMaxArea(undefined);
     setFacing('');
+    setIsListedFilter(undefined);
     toast.success("Đã xoá bộ lọc");
   };
 
@@ -108,8 +112,9 @@ const RoomList = () => {
     if (minFloor || maxFloor) count++;
     if (minArea || maxArea) count++;
     if (facing) count++;
+    if (isListedFilter !== undefined) count++;
     return count;
-  }, [statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, facing]);
+  }, [statusFilter, typeFilter, minPrice, maxPrice, minFloor, maxFloor, minArea, maxArea, facing, isListedFilter]);
 
   const handleCreateRoom = () => {
     setSelectedRoom(null);
@@ -231,7 +236,7 @@ const RoomList = () => {
                         <select
                           className="min-w-0 flex-1 bg-transparent border-none font-black text-[11px] uppercase tracking-widest text-slate-600 focus:ring-0 cursor-pointer pr-6"
                           value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as any)}
+                          onChange={(e) => setSortBy(e.target.value as 'price' | 'area' | 'floor' | 'code')}
                         >
                            <option value="code">Mã phòng</option>
                            <option value="price">Giá thuê</option>
@@ -345,7 +350,7 @@ const RoomList = () => {
           {rooms?.map((room) => (
             <Link 
               key={room.id}
-              to={`/admin/rooms/${room.id}`}
+              to={`/owner/rooms/${room.id}`}
               aria-label={`Xem chi tiết phòng ${room.roomCode}`}
               className="group card-premium p-0 overflow-hidden hover:shadow-[0_40px_80px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-3 transition-all duration-700 cursor-pointer border-none shadow-xl shadow-slate-200/50 bg-white flex flex-col w-full max-w-full"
             >
@@ -364,6 +369,11 @@ const RoomList = () => {
                       <div className="w-fit px-3 py-1 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 text-white text-[9px] font-black uppercase tracking-widest">
                          {room.roomType}
                       </div>
+                      {room.isListed && (
+                        <div className="w-fit px-3 py-1 bg-secondary/80 backdrop-blur-md rounded-lg border border-white/20 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                          <Share2 size={10} /> Public
+                        </div>
+                      )}
                    </div>
                 </div>
 
@@ -458,7 +468,7 @@ const RoomList = () => {
                   <tr 
                     key={room.id} 
                     className="group hover:bg-primary/5 cursor-pointer transition-all h-24"
-                    onClick={() => navigate(`/admin/rooms/${room.id}`)}
+                    onClick={() => navigate(`/owner/rooms/${room.id}`)}
                   >
                     <td className="px-10 py-4">
                       <div className="flex items-center gap-4">
@@ -466,6 +476,11 @@ const RoomList = () => {
                             <img src={room.thumbnailUrl || 'https://via.placeholder.com/64'} className="w-full h-full object-cover" alt="" />
                          </div>
                          <span className="text-[16px] font-black text-slate-900 font-mono tracking-tighter uppercase">{room.roomCode}</span>
+                         {room.isListed && (
+                           <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center text-primary" title="Đang niêm yết công khai">
+                             <Share2 size={10} />
+                           </div>
+                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -594,7 +609,7 @@ const RoomList = () => {
                     {['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'].map(d => (
                        <button
                          key={d}
-                         onClick={() => setFacing(facing === d ? '' : d as any)}
+                         onClick={() => setFacing(facing === d ? '' : d as DirectionFacing)}
                          className={cn(
                             "h-12 rounded-xl text-[11px] font-bold transition-all border",
                             facing === d ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" : "bg-slate-50 border-transparent text-slate-500 hover:border-slate-200"
@@ -645,7 +660,34 @@ const RoomList = () => {
                     />
                  </div>
               </div>
-           </div>
+            </div>
+
+            {/* Listing Status */}
+            <div className="space-y-4 pt-6 border-t border-slate-100">
+               <label className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] flex items-center gap-2">
+                  <Share2 size={14} className="text-primary" /> Niêm yết công khai
+               </label>
+               <div className="flex gap-2">
+                  {[
+                    { label: 'Tất cả', value: undefined },
+                    { label: 'Đang niêm yết', value: true },
+                    { label: 'Chưa niêm yết', value: false }
+                  ].map((opt) => (
+                    <button
+                      key={String(opt.value)}
+                      onClick={() => setIsListedFilter(opt.value)}
+                      className={cn(
+                        "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border",
+                        isListedFilter === opt.value 
+                          ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
+                          : "bg-slate-50 border-transparent text-slate-500 hover:border-slate-200"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+               </div>
+            </div>
 
            {/* Amenities & Utilities */}
            <div className="space-y-4">

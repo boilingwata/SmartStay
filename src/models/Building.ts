@@ -1,35 +1,72 @@
 export type BuildingType = 'Apartment' | 'Office' | 'Mixed' | 'Shophouse';
 
+/**
+ * Database row for smartstay.buildings
+ */
+export interface BuildingDbRow {
+  id: number;
+  uuid: string;
+  name: string;
+  address: string;
+  description: string | null;
+  amenities: string[] | null; // jsonb
+  owner_id: string | null;
+  total_floors: number | null;
+  opening_date: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  electricity_provider: string | null;
+  water_provider: string | null;
+  fire_cert_expiry: string | null;
+  last_maintenance_date: string | null;
+  is_deleted: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+  // Join fields
+  rooms?: { count: number }[];
+}
+
 export interface Building {
   id: string;
-  buildingCode: string;
+  uuid: string;
+  buildingCode: string; // Calculated: B + padded ID
+  name: string;
   buildingName: string;
-  type: BuildingType;
   address: string;
-  provinceId: string;
-  districtId: string;
-  wardId: string;
-  yearBuilt: number;
+  description?: string;
+  amenities: string[];
   totalFloors: number;
-  managementPhone: string;
-  managementEmail: string;
+  openingDate?: string;
   latitude?: number;
   longitude?: number;
-  heroImageUrl?: string;
+  electricityProvider?: string;
+  waterProvider?: string;
+  fireCertExpiry?: string;
+  lastMaintenanceDate?: string;
   isDeleted: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  heroImageUrl?: string;
+
+  // UI-only transient fields for address selection
+  provinceId?: string;
+  districtId?: string;
+  wardId?: string;
+
+  // Legacy/Other
+  type?: BuildingType; // Not in DB yet, keeping for UI
+  managementPhone?: string; // Often from owner profile
+  managementEmail?: string; // Often from owner profile
 }
 
 export interface BuildingSummary extends Building {
-  totalRooms: number; // From vw_BuildingRoomCount
-  occupiedRooms: number; // From vw_BuildingOccupancy
+  totalRooms: number;
+  occupiedRooms: number;
   occupancyRate: number;
 }
 
 export interface BuildingDetail extends BuildingSummary {
-  amenities: string[];
-  description?: string;
   images: BuildingImage[];
-  ownership: BuildingOwnership[];
 }
 
 export interface BuildingImage {
@@ -39,23 +76,12 @@ export interface BuildingImage {
   sortOrder: number;
 }
 
-export interface BuildingOwnership {
-  id: string;
-  ownerId: string;
-  ownerName: string;
-  ownerAvatar?: string;
-  ownershipPercent: number; // 0 - 100
-  ownershipType: 'FullOwner' | 'CoOwner' | 'Investor';
-  startDate: string;
-  endDate?: string;
-  note?: string;
-}
-
 export interface Amenity {
   id: string;
   name: string;
   icon: string;
 }
+
 export interface BuildingFilters {
   search?: string;
   type?: BuildingType;
@@ -69,20 +95,27 @@ export interface BuildingFilters {
 }
 
 export interface CreateBuildingData {
-  buildingName: string;
-  type?: BuildingType;
+  name: string;
   address: string;
+  description?: string;
+  amenities?: string[];
+  totalFloors: number;
+  openingDate?: string;
+  latitude?: number;
+  longitude?: number;
+  electricityProvider?: string;
+  waterProvider?: string;
+  fireCertExpiry?: string;
+  lastMaintenanceDate?: string;
+
+  // Transient UI fields
   provinceId?: string;
   districtId?: string;
   wardId?: string;
-  yearBuilt?: number;
-  totalFloors: number;
-  managementPhone?: string;
-  managementEmail?: string;
-  latitude?: number;
-  longitude?: number;
-  description?: string;
-  amenities?: string[];
+
+  // UI-only
+  type?: BuildingType;
 }
 
 export type UpdateBuildingData = Partial<CreateBuildingData>;
+

@@ -56,7 +56,7 @@ export const InvoiceTab: React.FC<InvoiceTabProps> = ({ invoices }) => {
             </thead>
             <tbody className="divide-y divide-border/10">
               {displayInvoices.map((inv) => (
-                <tr key={inv.id} className="group hover:bg-white transition-all cursor-pointer" onClick={() => navigate(`/admin/invoices/${inv.id}`)}>
+                <tr key={inv.id} className="group hover:bg-white transition-all cursor-pointer" onClick={() => navigate(`/owner/invoices/${inv.id}`)}>
                   <td className="px-8 py-5">
                      <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-bg rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">

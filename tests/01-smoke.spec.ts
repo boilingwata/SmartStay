@@ -9,26 +9,26 @@ test.describe.serial('SmartStay Smoke Tests', () => {
 
   test('Critical Path: Dashboard & Navigation', async ({ page }) => {
     // 1. Dashboard
-    await page.goto('/admin/dashboard');
-    await expect(page).toHaveURL(/.*\/admin\/dashboard/);
+    await page.goto('/owner/dashboard');
+    await expect(page).toHaveURL(/.*\/owner\/dashboard/);
     await expect(page.getByText(/Tổng quan/i).first()).toBeVisible({ timeout: 10000 });
     console.log('✓ Dashboard loaded');
 
     // 2. Building List
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     await expect(page.locator('.card-container').first()).toBeVisible({ timeout: 15000 });
     const buildingCount = await page.locator('.card-container').count();
     console.log(`✓ Buildings loaded (${buildingCount} found)`);
 
     // 3. Room List
-    await page.goto('/admin/rooms');
+    await page.goto('/owner/rooms');
     await expect(page.locator('.card-container').first()).toBeVisible({ timeout: 15000 });
     const roomCount = await page.locator('.card-container').count();
     console.log(`✓ Rooms loaded (${roomCount} found)`);
   });
 
   test('UI Interaction: Modals rendering', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     
     // Mở modal thêm toà nhà
     await page.locator('button').filter({ hasText: 'Thêm toà nhà mới' }).click();
@@ -42,7 +42,7 @@ test.describe.serial('SmartStay Smoke Tests', () => {
   });
 
   test('Data Integrity: Detail Page deep link', async ({ page }) => {
-    await page.goto('/admin/buildings');
+    await page.goto('/owner/buildings');
     const firstBuilding = page.locator('.card-container').first();
     const href = await firstBuilding.getAttribute('href');
     

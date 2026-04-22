@@ -7,36 +7,29 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Home, Building2, MapPin,
-  Info, Image as ImageIcon, Users,
-  TrendingUp, TrendingDown, Phone, Mail,
-  Calendar, Layers, Maximize, Key, Plus,
+  Info, Image as ImageIcon,
+  TrendingUp, Phone, Mail,
+  Calendar, Layers, Key, Plus,
   Edit, Trash2, ExternalLink, ShieldCheck,
-  CheckCircle2, XCircle, MoreVertical,
-  Star, Share2, Printer, Download, Clock,
-  ArrowRight, Loader2, X, ChevronLeft, ChevronRight, ZoomIn,
-  DollarSign, Zap, Droplets, AlertCircle, Wallet
+  Star, Printer, Download,
+  ArrowRight, Loader2, X, ChevronLeft, ChevronRight, ZoomIn
 } from 'lucide-react';
-import { reportService } from '@/services/reportService';
-import { RevenueChart } from '@/components/data/RevenueChart';
-import { OccupancyChart } from '@/components/data/OccupancyChart';
-import { KPICard } from '@/components/data/KPICard';
+
+
 import { buildingService } from '@/services/buildingService';
 import { fileService } from '@/services/fileService';
 import { roomService } from '@/services/roomService';
-import { BuildingDetail as BuildingDetailType, BuildingImage } from '@/models/Building';
+import { BuildingDetail as BuildingDetailType } from '@/models/Building';
 import { Room } from '@/models/Room';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { cn, formatVND, formatDate } from '@/utils';
+import { cn, formatVND } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
 import { BuildingModal } from '@/components/buildings/BuildingModal';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import useUIStore from '@/stores/uiStore';
 
-// Tab Item and Component Imports
-import { OwnershipModal } from '@/components/buildings/OwnershipModal';
-
-const TabItem = ({ active, children, onClick, icon: Icon }: any) => (
+const TabItem = ({ active, children, onClick, icon: Icon }: { active: boolean; children: React.ReactNode; onClick: () => void; icon: React.ElementType }) => (
   <button 
     onClick={onClick}
     className={cn(
@@ -65,7 +58,7 @@ const BuildingRoomsTab = ({ buildingId, onAddRoom }: { buildingId: string; onAdd
             <p className="text-[11px] text-muted font-medium mt-0.5">{rooms?.length ?? 0} phòng trong tòa nhà này</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/admin/rooms')} className="btn-outline-sm flex items-center gap-2">Xem tất cả <ArrowRight size={14} /></button>
+            <button onClick={() => navigate('/owner/rooms')} className="btn-outline-sm flex items-center gap-2">Xem tất cả <ArrowRight size={14} /></button>
             <button
               onClick={onAddRoom}
               className="btn-primary-sm flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
@@ -130,151 +123,7 @@ const BuildingRoomsTab = ({ buildingId, onAddRoom }: { buildingId: string; onAdd
   );
 };
 
-const BuildingReportsTab = ({ buildingId }: { buildingId: string }) => {
-  const navigate = useNavigate();
-  const bid = Number(buildingId);
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
-  const to = now.toISOString().slice(0, 10);
 
-  const filters = { buildingIds: [bid], from, to, period: 'month' as const };
-
-  const { data: financialKPI, isLoading: isLoadingFinance } = useQuery({
-    queryKey: ['report', 'financial', 'kpi', bid],
-    queryFn: () => reportService.getFinancialKPI(filters)
-  });
-
-  const { data: occupancyKPI, isLoading: isLoadingOccupancy } = useQuery({
-    queryKey: ['report', 'occupancy', 'kpi', bid],
-    queryFn: () => reportService.getOccupancyKPI(filters)
-  });
-
-  const { data: revenueChartData, isLoading: isLoadingRevenueChart } = useQuery({
-    queryKey: ['report', 'financial', 'chart', bid],
-    queryFn: () => reportService.getFinancialChart(filters)
-  });
-
-  return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      {/* KPI Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard
-          title="Tổng doanh thu"
-          value={financialKPI?.totalRevenue ?? 0}
-          icon={DollarSign}
-          isCurrency={true}
-          color="primary"
-          loading={isLoadingFinance}
-          subtitle="6 THÁNG QUA"
-        />
-        <KPICard
-          title="Tỉ lệ thu hồi"
-          value={financialKPI?.collectionRate ?? 0}
-          icon={Wallet}
-          loading={isLoadingFinance}
-          color="success"
-          subtitle="PERCENTAGE"
-          delta={2.4} // Mock delta for visual polish
-        />
-        <KPICard
-          title="Tỉ lệ lấp đầy"
-          value={occupancyKPI?.avgOccupancyRate ?? 0}
-          icon={Users}
-          loading={isLoadingOccupancy}
-          color="secondary"
-          subtitle="CURRENT"
-        />
-        <KPICard
-          title="Phòng trống"
-          value={occupancyKPI?.vacantRooms ?? 0}
-          icon={Home}
-          loading={isLoadingOccupancy}
-          color="warning"
-          subtitle="ROOMS"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Revenue Trend Chart */}
-        <div className="lg:col-span-8 card-container p-8 bg-white/60">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Biến động doanh thu</h3>
-              <p className="text-[10px] text-muted font-bold mt-1">DỮ LIỆU TỔNG HỢP 6 THÁNG GẦN NHẤT</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-primary/5 rounded-lg">
-                <div className="w-2 h-2 rounded-full bg-primary"></div>
-                <span className="text-[10px] font-black text-primary">DOANH THU</span>
-              </div>
-            </div>
-          </div>
-          <RevenueChart 
-            data={revenueChartData?.map(d => ({ 
-              month: d.month, 
-              revenue: d.revenue, 
-              profit: Math.round(d.revenue * 0.85) 
-            })) ?? []} 
-            loading={isLoadingRevenueChart} 
-          />
-        </div>
-
-        {/* Occupancy Breakdown Shell */}
-        <div className="lg:col-span-4 card-container p-8 bg-white/60 flex flex-col items-center">
-          <div className="w-full text-center mb-8">
-            <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Cấu trúc phòng</h3>
-            <p className="text-[10px] text-muted font-bold mt-1">THEO TRẠNG THÁI HIỆN TẠI</p>
-          </div>
-          <OccupancyChart 
-            data={{
-              occupied: occupancyKPI?.occupiedRooms ?? 0,
-              vacant: occupancyKPI?.vacantRooms ?? 0,
-              maintenance: occupancyKPI?.maintenanceRooms ?? 0,
-              reserved: occupancyKPI?.reservedRooms ?? 0,
-              totalOccupancyRate: occupancyKPI?.avgOccupancyRate ?? 0
-            }} 
-            loading={isLoadingOccupancy} 
-          />
-        </div>
-      </div>
-      
-      {/* Summary Section */}
-      <div className="bg-slate-900 rounded-[40px] p-10 text-white relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-20 opacity-5 group-hover:opacity-10 transition-all pointer-events-none rotate-12">
-          <TrendingUp size={240} />
-        </div>
-        <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center">
-          <div className="flex-1 space-y-4">
-             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full mb-2">
-                <CheckCircle2 size={14} className="text-success" />
-                <span className="text-[10px] font-black tracking-widest uppercase">Báo cáo vận hành đã sẵn sàng</span>
-             </div>
-             <h3 className="text-h2 font-black tracking-tighter">Phân tích chuyên sâu toà nhà</h3>
-             <p className="text-small text-slate-400 font-medium leading-relaxed max-w-2xl">
-               Hệ thống đã thu thập đủ dữ liệu tài chính và vận hành cho toà nhà này. 
-               Bạn có thể xem chi tiết dòng tiền, lịch sử bảo trì và xu hướng lấp đầy để tối ưu hoá lợi nhuận.
-             </p>
-             <div className="flex gap-4 pt-4">
-               <button 
-                  onClick={() => window.print()}
-                  className="px-8 py-4 bg-white text-slate-900 font-black rounded-2xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
-               ><Printer size={18} /> Xuất báo cáo PDF</button>
-               <button 
-                  onClick={() => navigate(`/admin/reports?buildingIds=${bid}`)}
-                  className="px-8 py-4 bg-slate-800 text-white font-black rounded-2xl flex items-center gap-2 hover:bg-slate-700 transition-all border border-white/5"
-               ><ExternalLink size={18} /> Phân tích nâng cao</button>
-             </div>
-          </div>
-          <div className="flex flex-col items-center p-8 bg-white/5 backdrop-blur-xl rounded-[40px] border border-white/10 min-w-[200px]">
-             <TrendingUp size={48} className="text-success mb-4 animate-pulse" />
-             <div className="text-[32px] font-black">+{financialKPI?.totalRevenue ? '12.4' : '0'}%</div>
-             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Growth vs PV</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const BuildingDetail = () => {
   const { id } = useParams();
@@ -282,7 +131,6 @@ const BuildingDetail = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const setBuilding = useUIStore((s) => s.setBuilding);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
@@ -390,7 +238,7 @@ const BuildingDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] });
       toast.success('Đã xoá toà nhà thành công');
-      navigate('/admin/buildings');
+      navigate('/owner/buildings');
     },
     onError: (err: Error) => {
       toast.error(`Không thể xoá toà nhà: ${err.message}`);
@@ -406,16 +254,11 @@ const BuildingDetail = () => {
   if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
   if (!building) return <div>Toà nhà không tồn tại.</div>;
 
-  const totalOwnership = building.ownership.reduce((sum, o) => sum + o.ownershipPercent, 0);
 
   // Format month label: "2026-03" → "T3/26"
   const fmtMonth = (m: string) => {
     const [y, mo] = m.split('-');
     return `T${Number(mo)}/${y.slice(2)}`;
-  };
-
-  const onOwnershipSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['building', id] });
   };
 
   const handleExportReport = async () => {
@@ -457,11 +300,11 @@ const BuildingDetail = () => {
            <img 
               src={building.heroImageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128'} 
               className="w-16 h-16 rounded-2xl object-cover shadow-lg" 
-              alt={building.buildingName} 
+              alt={building.name} 
             />
              <div>
                 <div className="flex items-center gap-2 mb-1">
-                   <h1 className="text-[28px] font-black text-primary tracking-tighter leading-none">{building.buildingName}</h1>
+                   <h1 className="text-[28px] font-black text-primary tracking-tighter leading-none">{building.name}</h1>
                    <StatusBadge status={building.type} size="sm" />
                 </div>
                 <div className="flex items-center gap-4 text-[11px] text-muted font-black uppercase tracking-widest">
@@ -503,7 +346,6 @@ const BuildingDetail = () => {
           <TabItem active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} icon={Info}>Tổng quan</TabItem>
           <TabItem active={activeTab === 'Rooms'} onClick={() => setActiveTab('Rooms')} icon={Home}>Danh sách Phòng</TabItem>
           <TabItem active={activeTab === 'Images'} onClick={() => setActiveTab('Images')} icon={ImageIcon}>Hình ảnh</TabItem>
-          <TabItem active={activeTab === 'Ownership'} onClick={() => setActiveTab('Ownership')} icon={ShieldCheck}>Chủ sở hữu</TabItem>
           <TabItem active={activeTab === 'Reports'} onClick={() => setActiveTab('Reports')} icon={TrendingUp}>Báo cáo</TabItem>
         </div>
 
@@ -535,7 +377,7 @@ const BuildingDetail = () => {
                     <div className="grid grid-cols-2 gap-4">
                        <div className="p-5 bg-white/60 rounded-3xl border border-primary/5">
                           <p className="text-[10px] text-muted font-black uppercase tracking-tighter mb-1">Năm bàn giao</p>
-                          <p className="text-body font-black text-primary flex items-center gap-2"><Calendar size={14} className="text-accent" /> {building.yearBuilt}</p>
+                          <p className="text-body font-black text-primary flex items-center gap-2"><Calendar size={14} className="text-accent" /> {building.openingDate ? new Date(building.openingDate).getFullYear() : '---'}</p>
                        </div>
                        <div className="p-5 bg-white/60 rounded-3xl border border-primary/5">
                           <p className="text-[10px] text-muted font-black uppercase tracking-tighter mb-1">Số tầng</p>
@@ -640,10 +482,10 @@ const BuildingDetail = () => {
                     <div className="space-y-6">
                        <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center font-black">
-                            {building.buildingName.substring(0, 2).toUpperCase()}
+                            {building.name.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                             <p className="text-small font-black text-primary uppercase">Ban Quản Lý {building.buildingName}</p>
+                             <p className="text-small font-black text-primary uppercase">Ban Quản Lý {building.name}</p>
                              <p className="text-[10px] text-muted italic font-medium leading-none mt-1">Đơn vị vận hành trực tiếp</p>
                           </div>
                        </div>
@@ -666,94 +508,6 @@ const BuildingDetail = () => {
                        </div>
                     </div>
                  </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'Ownership' && (
-            <div className="space-y-8">
-              {/* 2.2.3 Ownership Section */}
-              <div className="flex justify-between items-center">
-                 <div>
-                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Chủ sở hữu & Cổ phần</h3>
-                    <p className="text-small text-muted italic mt-1 font-medium">Danh sách các cá nhân/tổ chức tham gia góp vốn đầu tư tòa nhà.</p>
-                 </div>
-                 <button 
-                   onClick={() => setIsOwnershipModalOpen(true)}
-                   className="btn-primary-sm flex items-center gap-2"
-                 >
-                    <Plus size={16} /> Gán chủ mới
-                 </button>
-              </div>
-
-              {/* Progress bar check (2.2.3 and Checklist #2) */}
-              <div className="space-y-3">
-                 <div className="flex justify-between items-center text-label font-bold uppercase tracking-widest">
-                    <span>Tổng tỉ lệ sở hữu</span>
-                    <span className={cn(totalOwnership > 100 ? "text-danger" : "text-primary")}>{totalOwnership}% / 100%</span>
-                 </div>
-                 <div className="h-4 bg-bg rounded-full overflow-hidden border border-border/20 p-0.5">
-                    <div 
-                      className={cn("h-full rounded-full transition-all duration-1000", totalOwnership > 100 ? "bg-danger shadow-lg animate-pulse" : "bg-primary shadow-[0_0_20px_rgba(27,58,107,0.3)]")} 
-                      style={{ width: `${Math.min(totalOwnership, 100)}%` }} 
-                    />
-                 </div>
-                 {totalOwnership > 100 && (
-                   <p className="text-[10px] text-danger font-black uppercase flex items-center gap-2 animate-bounce">
-                      <XCircle size={14} /> Cảnh báo: Tổng cổ phần vượt mức 100% (RULE-CHECK). Vui lòng điều chỉnh lại.
-                   </p>
-                 )}
-                 {totalOwnership < 100 && (
-                   <p className="text-[10px] text-muted font-black uppercase flex items-center gap-2 italic">
-                      Còn trống {100 - totalOwnership}% cổ phần chưa được định danh chủ sở hữu.
-                   </p>
-                 )}
-              </div>
-
-              <div className="card-container overflow-hidden p-0 border-none shadow-xl shadow-primary/5">
-                 <table className="w-full text-left">
-                    <thead className="bg-bg/50 border-b">
-                       <tr>
-                          <th className="px-6 py-4 text-label text-muted">Chủ sở hữu (Owner)</th>
-                          <th className="px-6 py-4 text-label text-muted">Tỉ lệ (%)</th>
-                          <th className="px-6 py-4 text-label text-muted text-center">Vai trò</th>
-                          <th className="px-6 py-4 text-label text-muted">Ngày bắt đầu</th>
-                          <th className="px-6 py-4 text-label text-muted">Ghi chú</th>
-                          <th className="px-6 py-4 text-label text-muted text-right">Hành động</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                       {building.ownership.map((o) => (
-                         <tr key={o.id} className="hover:bg-primary/[0.02] transition-colors">
-                            <td className="px-6 py-4">
-                               <div className="flex items-center gap-4">
-                                  <img src={o.ownerAvatar} className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt="" />
-                                  <p 
-                                    className="text-body font-black text-primary hover:underline cursor-pointer"
-                                    onClick={() => navigate('/admin/owners')} // Simplified for MVP
-                                  >
-                                    {o.ownerName}
-                                  </p>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                               <span className="text-h3 font-black text-primary">{o.ownershipPercent}%</span>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                               <StatusBadge status={o.ownershipType} size="sm" />
-                            </td>
-                            <td className="px-6 py-4">
-                               <p className="text-small font-bold text-text">{formatDate(o.startDate)}</p>
-                               <p className="text-[10px] text-muted italic">{o.endDate ? `Đến ${formatDate(o.endDate)}` : 'Vòng đời hiện tại'}</p>
-                            </td>
-                            <td className="px-6 py-4 text-small text-muted italic max-w-xs truncate">{o.note || '---'}</td>
-                            <td className="px-6 py-4 text-right">
-                               <button className="p-2 hover:bg-white rounded-xl text-muted shadow-sm border border-transparent hover:border-border/50"><MoreVertical size={18} /></button>
-                            </td>
-                         </tr>
-                       ))}
-                    </tbody>
-                 </table>
               </div>
             </div>
           )}
@@ -805,7 +559,7 @@ const BuildingDetail = () => {
                    </div>
                    <div>
                      <p className="text-body font-black text-muted">Chưa có ảnh nào</p>
-                     <p className="text-small text-muted/70 mt-1">Nhấn "Thêm ảnh" để tải ảnh tòa nhà lên.</p>
+                     <p className="text-small text-muted/70 mt-1">Nhấn &quot;Thêm ảnh&quot; để tải ảnh tòa nhà lên.</p>
                    </div>
                    <button onClick={() => photoInputRef.current?.click()} className="btn-primary flex items-center gap-2 mt-2">
                      <Plus size={16} /> Thêm ảnh đầu tiên
@@ -967,14 +721,6 @@ const BuildingDetail = () => {
         building={building}
       />
 
-      <OwnershipModal 
-        isOpen={isOwnershipModalOpen}
-        onClose={() => setIsOwnershipModalOpen(false)}
-        buildingId={id!}
-        currentOwnerships={building.ownership}
-        onSuccess={onOwnershipSuccess}
-      />
-
       <RoomModal
         isOpen={isRoomModalOpen}
         onClose={() => setIsRoomModalOpen(false)}
@@ -1052,3 +798,6 @@ const BuildingDetail = () => {
 };
 
 export default BuildingDetail;
+
+
+

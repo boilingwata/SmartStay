@@ -4,7 +4,7 @@ import usePermissionStore from '@/stores/permissionStore';
 
 export const usePermission = () => {
   const user = useAuthStore((s) => s.user);
-  const role = user?.role ?? 'Viewer';
+  const role = user?.role ?? null;
 
   const permissions = usePermissionStore((s) => s.permissions);
   const loadedForRole = usePermissionStore((s) => s.loadedForRole);

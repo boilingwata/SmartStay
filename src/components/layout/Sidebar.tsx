@@ -13,7 +13,6 @@ import {
   AlertCircle,
   BarChart2,
   Megaphone,
-  Briefcase,
   Wrench,
   Settings,
   ScrollText,
@@ -27,6 +26,7 @@ import {
   FilePlus2,
   Zap,
   UserCog,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/utils';
 import useUIStore from '@/stores/uiStore';
@@ -40,9 +40,9 @@ import { buildingService } from '@/services/buildingService';
 interface NavItem {
   labelKey: string;
   route: string;
-  icon: any;
+  icon: LucideIcon;
   permission?: string;
-  adminOnly?: boolean;
+  ownerOnly?: boolean;
   badge?: number;
 }
 
@@ -75,7 +75,6 @@ const sidebarText: Record<string, string> = {
   'sidebar.announcements': 'Thông báo nội bộ',
   'sidebar.visitorCheckin': 'Check-in Khách',
   'sidebar.amenityCheckin': 'Check-in Tiện ích',
-  'sidebar.owners': 'Chủ sở hữu',
   'sidebar.users': 'Nhân sự & Tài khoản',
   'sidebar.permissions': 'Phân quyền',
   'sidebar.systemConfig': 'Cấu hình hệ thống',
@@ -88,62 +87,61 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
   {
     groupKey: 'sidebar.overview',
     items: [
-      { labelKey: 'sidebar.dashboard', route: '/admin/dashboard', icon: LayoutDashboard },
-      { labelKey: 'sidebar.reports', route: '/admin/reports', icon: BarChart2, permission: 'report.view' },
+      { labelKey: 'sidebar.dashboard', route: '/owner/dashboard', icon: LayoutDashboard },
+      { labelKey: 'sidebar.reports', route: '/owner/reports', icon: BarChart2, permission: 'report.view' },
     ],
   },
   {
     groupKey: 'sidebar.property',
     items: [
-      { labelKey: 'sidebar.buildings', route: '/admin/buildings', icon: Building, permission: 'building.view' },
-      { labelKey: 'sidebar.rooms', route: '/admin/rooms', icon: DoorOpen, permission: 'room.view' },
-      { labelKey: 'sidebar.assets', route: '/admin/assets', icon: Package, permission: 'asset.view' },
-      { labelKey: 'sidebar.amenities', route: '/admin/amenities', icon: Waves, adminOnly: true },
+      { labelKey: 'sidebar.buildings', route: '/owner/buildings', icon: Building, permission: 'building.view' },
+      { labelKey: 'sidebar.rooms', route: '/owner/rooms', icon: DoorOpen, permission: 'room.view' },
+      { labelKey: 'sidebar.assets', route: '/owner/assets', icon: Package, permission: 'asset.view' },
+      { labelKey: 'sidebar.amenities', route: '/owner/amenities', icon: Waves, ownerOnly: true },
     ],
   },
   {
     groupKey: 'sidebar.leasing',
     items: [
-      { labelKey: 'sidebar.tenants', route: '/admin/tenants', icon: Users, permission: 'tenant.view' },
-      { labelKey: 'sidebar.leads', route: '/admin/leads', icon: FileSearch },
-      { labelKey: 'sidebar.contracts', route: '/admin/contracts', icon: FileText, permission: 'contract.view' },
-      { labelKey: 'sidebar.contractAddendums', route: '/admin/contracts/addendums', icon: FilePlus2, permission: 'contract.view' },
+      { labelKey: 'sidebar.tenants', route: '/owner/tenants', icon: Users, permission: 'tenant.view' },
+      { labelKey: 'sidebar.leads', route: '/owner/leads', icon: FileSearch },
+      { labelKey: 'sidebar.contracts', route: '/owner/contracts', icon: FileText, permission: 'contract.view' },
+      { labelKey: 'sidebar.contractAddendums', route: '/owner/contracts/addendums', icon: FilePlus2, permission: 'contract.view' },
     ],
   },
   {
     groupKey: 'sidebar.utilities_services',
     items: [
-      { labelKey: 'sidebar.utilities', route: '/admin/utility-billing', icon: Zap, adminOnly: true },
-      { labelKey: 'sidebar.billingRuns', route: '/admin/settings/billing-runs', icon: Receipt, adminOnly: true },
-      { labelKey: 'sidebar.services', route: '/admin/services', icon: Wrench, permission: 'service.manage' },
-      { labelKey: 'sidebar.utilityPolicies', route: '/admin/settings/utility-policies', icon: Settings, adminOnly: true },
-      { labelKey: 'sidebar.utilityOverrides', route: '/admin/settings/utility-overrides', icon: FileText, adminOnly: true },
+      { labelKey: 'sidebar.utilities', route: '/owner/utility-billing', icon: Zap, ownerOnly: true },
+      { labelKey: 'sidebar.billingRuns', route: '/owner/settings/billing-runs', icon: Receipt, ownerOnly: true },
+      { labelKey: 'sidebar.services', route: '/owner/services', icon: Wrench, permission: 'service.manage' },
+      { labelKey: 'sidebar.utilityPolicies', route: '/owner/settings/utility-policies', icon: Settings, ownerOnly: true },
+      { labelKey: 'sidebar.utilityOverrides', route: '/owner/settings/utility-overrides', icon: FileText, ownerOnly: true },
     ],
   },
   {
     groupKey: 'sidebar.finance',
     items: [
-      { labelKey: 'sidebar.invoices', route: '/admin/invoices', icon: Receipt, permission: 'invoice.view' },
-      { labelKey: 'sidebar.payments', route: '/admin/payments', icon: CreditCard, permission: 'payment.view' },
+      { labelKey: 'sidebar.invoices', route: '/owner/invoices', icon: Receipt, permission: 'invoice.view' },
+      { labelKey: 'sidebar.payments', route: '/owner/payments', icon: CreditCard, permission: 'payment.view' },
     ],
   },
   {
     groupKey: 'sidebar.operations',
     items: [
-      { labelKey: 'sidebar.allTickets', route: '/admin/tickets', icon: AlertCircle, permission: 'ticket.view.all' },
-      { labelKey: 'sidebar.announcements', route: '/admin/announcements', icon: Megaphone, permission: 'announcement.manage' },
-      { labelKey: 'sidebar.visitorCheckin', route: '/admin/staff/visitor-checkin', icon: UserPlus, permission: 'visitor.checkin' },
-      { labelKey: 'sidebar.amenityCheckin', route: '/admin/staff/amenity-checkin', icon: Waves, permission: 'amenity.checkin' },
+      { labelKey: 'sidebar.allTickets', route: '/owner/tickets', icon: AlertCircle, permission: 'ticket.view.all' },
+      { labelKey: 'sidebar.announcements', route: '/owner/announcements', icon: Megaphone, permission: 'announcement.manage' },
+      { labelKey: 'sidebar.visitorCheckin', route: '/owner/staff/visitor-checkin', icon: UserPlus, permission: 'visitor.checkin' },
+      { labelKey: 'sidebar.amenityCheckin', route: '/owner/staff/amenity-checkin', icon: Waves, permission: 'amenity.checkin' },
     ],
   },
   {
     groupKey: 'sidebar.settings',
     items: [
-      { labelKey: 'sidebar.owners', route: '/admin/owners', icon: Briefcase, adminOnly: true },
-      { labelKey: 'sidebar.users', route: '/admin/settings/users', icon: UserCog, adminOnly: true },
-      { labelKey: 'sidebar.permissions', route: '/admin/settings/users/permissions', icon: ShieldCheck, adminOnly: true },
-      { labelKey: 'sidebar.systemConfig', route: '/admin/settings/system', icon: Settings, adminOnly: true },
-      { labelKey: 'sidebar.auditLogs', route: '/admin/settings/audit-logs', icon: ScrollText, adminOnly: true },
+      { labelKey: 'sidebar.users', route: '/owner/settings/users', icon: UserCog, ownerOnly: true },
+      { labelKey: 'sidebar.permissions', route: '/owner/settings/users/permissions', icon: ShieldCheck, ownerOnly: true },
+      { labelKey: 'sidebar.systemConfig', route: '/owner/settings/system', icon: Settings, ownerOnly: true },
+      { labelKey: 'sidebar.auditLogs', route: '/owner/settings/audit-logs', icon: ScrollText, ownerOnly: true },
     ],
   },
 ];
@@ -167,16 +165,14 @@ export const Sidebar = () => {
   });
 
   const activeBuilding = buildings?.find((b) => String(b.id) === String(activeBuildingId));
-  const workspaceBase = user?.role === 'Staff' ? '/staff' : '/owner';
-  const isAdmin = user?.role === 'Owner' || user?.role === 'SuperAdmin';
+  const isOwner = user?.role === 'Owner' || user?.role === 'SuperAdmin';
 
   const handleLogout = async () => {
     try {
       await logout();
       toast.success('Đăng xuất thành công');
       navigate('/login', { replace: true });
-    } catch (error) {
-      console.error('Lỗi đăng xuất:', error);
+    } catch {
       toast.error('Lỗi đăng xuất');
     }
   };
@@ -219,8 +215,8 @@ export const Sidebar = () => {
       <nav className="custom-scrollbar flex-1 space-y-6 overflow-y-auto px-3 py-4">
         {navItems.map((group) => {
           const visibleItems = group.items.filter((item) => {
-            if (item.adminOnly && !isAdmin) return false;
-            if (item.permission && !can(item.permission) && !isAdmin) return false;
+            if (item.ownerOnly && !isOwner) return false;
+            if (item.permission && !can(item.permission) && !isOwner) return false;
             return true;
           });
 
@@ -236,7 +232,7 @@ export const Sidebar = () => {
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.route}
-                  to={item.route.replace('/admin', workspaceBase)}
+                  to={item.route}
                   className={({ isActive }) =>
                     cn(
                       'group relative flex items-center gap-3 rounded-xl px-4 py-3 transition-all',

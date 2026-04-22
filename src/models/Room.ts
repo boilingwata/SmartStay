@@ -17,6 +17,7 @@ export interface Room {
   tenantNames?: string[]; // For avatar stack
   contractId?: string; // If occupied
   hasMeter: boolean;
+  isListed: boolean;
 }
 
 export interface RoomDetail extends Room {
@@ -83,18 +84,20 @@ export interface RoomContractSummary {
   monthlyRent: number;
   status: import('@/models/Contract').ContractStatus;
   tenantName: string;
+  tenantId?: string;
 }
 
 export interface HandoverChecklist {
   id: string;
   roomId: string;
   roomCode: string;
-  handoverType: 'CheckIn' | 'CheckOut';
+  handoverType: 'CheckIn' | 'CheckOut' | 'Periodic' | 'Other';
   date: string;
   sections: HandoverSection[];
   assets: HandoverAsset[];
   witnessSignatureUrl?: string;
   tenantSignatureUrl?: string;
+  notes?: string;
   status: 'Draft' | 'Completed';
 }
 
@@ -133,10 +136,24 @@ export interface RoomFilters {
   minPrice?: number;
   maxPrice?: number;
   hasMeter?: boolean;
+  isListed?: boolean;
   sortBy?: 'price' | 'area' | 'floor' | 'code' | 'created_at';
   sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
+}
+
+export interface CreateHandoverData {
+  roomId: string;
+  contractId?: string;
+  tenantId?: string;
+  handoverType: HandoverChecklist['handoverType'];
+  performedBy: string; // profile_id
+  notes?: string;
+  sections: HandoverSection[];
+  assets: HandoverAsset[];
+  managerSignatureUrl?: string;
+  tenantSignatureUrl?: string;
 }
 
 export interface CreateRoomData {
@@ -152,6 +169,7 @@ export interface CreateRoomData {
   baseRentPrice: number;
   conditionScore: number;
   status?: RoomStatus;
+  isListed?: boolean;
 }
 
 export type UpdateRoomData = Partial<CreateRoomData>;

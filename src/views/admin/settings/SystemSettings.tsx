@@ -92,7 +92,7 @@ const SystemSettings: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-xs font-black text-amber-800">Chế độ Bảo trì (Maintenance Mode)</p>
-                      <p className="text-[10px] text-amber-600 font-medium">Nếu bật, chỉ Admin mới có thể đăng nhập vào hệ thống.</p>
+                      <p className="text-[10px] text-amber-600 font-medium">Nếu bật, chỉ super admin mới có thể đăng nhập vào hệ thống.</p>
                     </div>
                   </div>
                   <div className="w-12 h-6 bg-slate-200 rounded-full relative cursor-pointer">
@@ -171,7 +171,7 @@ const SystemSettings: React.FC = () => {
                 <div key={i} className="flex gap-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5" />
                   <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-700">Admin đã cập nhật SMTP</p>
+                    <p className="text-[11px] font-bold text-slate-700">Chủ sở hữu đã cập nhật SMTP</p>
                     <p className="text-[9px] text-slate-400 font-mono italic">2 giờ trước</p>
                   </div>
                 </div>

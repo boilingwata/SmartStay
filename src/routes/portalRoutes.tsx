@@ -1,9 +1,6 @@
 import { lazy } from 'react';
 import { RouteObject } from 'react-router-dom';
 
-const PortalLogin = lazy(() => import('@/views/portal/auth/PortalLogin'));
-const OtpVerification = lazy(() => import('@/views/portal/auth/OtpVerification'));
-const ForgotPassword = lazy(() => import('@/views/portal/auth/ForgotPassword'));
 const Onboarding = lazy(() => import('@/views/portal/onboarding/Onboarding'));
 const TenantDashboard = lazy(() => import('@/views/portal/dashboard/TenantDashboard'));
 const PortalInvoiceList = lazy(() => import('@/views/portal/finance/InvoiceList'));
@@ -46,12 +43,6 @@ export const portalRoutes: RouteObject[] = [
   { path: 'notifications', element: <NotificationCenter /> },
   { path: 'service-requests', element: <ServiceRequests /> },
   { path: 'documents', element: <Documents /> },
-];
-
-export const portalGuestRoutes: RouteObject[] = [
-  { path: 'login', element: <PortalLogin /> },
-  { path: 'verify-otp', element: <OtpVerification /> },
-  { path: 'forgot-password', element: <ForgotPassword /> },
 ];
 
 export { Onboarding };

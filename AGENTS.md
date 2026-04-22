@@ -93,3 +93,7 @@ Admin views are scoped to `activeBuildingId` from `uiStore`. The `buildingScoped
 - Vietnamese is the primary UI language — user-facing strings use `i18next` translations.
 - The app uses a global `AppProviders` wrapper (`src/components/layout/AppProviders.tsx`) that provides QueryClient, theme application, session expiry overlay, confirm dialog, and toast container.
 - CSS theming uses custom properties (e.g. `--primary`, `--background`) with Tailwind utilities mapping to them (e.g. `bg-primary`, `text-foreground`).
+
+### Auto-Loaded Skills
+
+- **Sketch findings for SmartStay** (design decisions, CSS patterns, visual direction) → `Skill("sketch-findings-smartstay")`

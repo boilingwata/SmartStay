@@ -42,7 +42,7 @@ export const TopUpModal = ({ tenantId, onClose }: ModalProps) => {
              </div>
              <div>
                 <h3 className="text-h3 text-primary uppercase font-black">Nạp tiền thủ công</h3>
-                <p className="text-[10px] text-muted font-bold tracking-widest uppercase">Admin / Thủ quỹ ghi nhận</p>
+                <p className="text-[10px] text-muted font-bold tracking-widest uppercase">Chủ sở hữu / Thủ quỹ ghi nhận</p>
              </div>
           </div>
 
@@ -114,7 +114,7 @@ export const DeductModal = ({ tenantId, onClose }: ModalProps) => {
              </div>
              <div>
                 <h3 className="text-h3 text-primary uppercase font-black">Khấu trừ thủ công</h3>
-                <p className="text-[10px] text-muted font-bold tracking-widest uppercase">Admin ghi nhận khấu trừ</p>
+                <p className="text-[10px] text-muted font-bold tracking-widest uppercase">Chủ sở hữu ghi nhận khấu trừ</p>
              </div>
           </div>
 
@@ -280,3 +280,4 @@ export const AutoOffsetModal = ({ tenantId, onClose }: ModalProps) => {
     </div>
   );
 };
+

@@ -8,7 +8,7 @@
  *
  * DESIGN DECISION: Permissions are statically defined because:
  *  1. No `role_permissions` table exists in the DB schema.
- *  2. The application uses a fixed role hierarchy (admin / staff / tenant / viewer).
+ *  2. The application uses a fixed canonical role hierarchy (super admin / owner / staff / tenant).
  *  3. Changing permissions requires a code deploy (intentional — prevents accidental
  *     permission escalation via a UI bug).
  *
@@ -72,7 +72,6 @@ export const ROLE_PERMISSION_CONFIG: RolePermissionConfig = {
       'room.view', 'ticket.view', 'pii.view',
       'tenant.view', 'building.view',
     ],
-    Viewer: ['contract.view', 'invoice.view', 'room.view', 'ticket.view', 'building.view'],
     Tenant: [],
   },
 };

@@ -620,12 +620,12 @@ export const ticketService = {
     return true;
   },
 
-  // Fetch all profiles with staff/admin role
+  // Fetch all profiles with staff/owner role
   getStaff: async (): Promise<{ id: string; fullName: string; avatarUrl: string | null; role: string }[]> => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, role')
-      .in('role', ['staff', 'admin'])
+      .in('role', ['staff', 'owner'])
       .eq('is_active', true)
       .order('full_name');
 

@@ -1,5 +1,6 @@
 export type ContractStatus = 'Draft' | 'Active' | 'Expired' | 'Terminated' | 'Cancelled' | 'Signed';
-export type ContractType = 'Residential' | 'Commercial' | 'Shortterm';
+export type ContractType = 'Residential' | 'Commercial' | 'Office';
+export type ContractDepositStatus = 'Pending' | 'Received' | 'PartiallyRefunded' | 'Refunded' | 'Forfeited';
 
 export interface Contract {
   id: string;
@@ -24,7 +25,7 @@ export interface ContractDetail extends Contract {
   signingDate?: string;
   depositAmount: number;
   depositStatusRaw?: string;
-  depositStatus: 'Available' | 'Deducted' | 'Refunded';
+  depositStatus: ContractDepositStatus;
   paymentDueDay: number;
   noticePeriodDays?: number;
   terminationDate?: string;

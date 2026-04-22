@@ -61,7 +61,7 @@ const ListingsPage: React.FC = () => {
     setSearch(searchParams.get('search') ?? '');
     setRoomType(searchParams.get('roomType') ?? 'all');
     setMaxPrice(searchParams.get('maxPrice') ?? '');
-  }, [urlSearch]);
+  }, [urlSearch, searchParams]);
 
   const { data: listings = [], isLoading, isError } = useQuery({
     queryKey: ['public-room-listings'],

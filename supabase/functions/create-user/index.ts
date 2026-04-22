@@ -1,20 +1,19 @@
-/// <reference path="../_shared/deno-globals.d.ts" />
-
 /**
  * create-user
  *
- * Creates a preview or application user by:
+ * Creates a workspace or tenant user by:
  *   1. Creating an auth.users row with the service role
- *   2. Upserting the matching smartstay.profiles row for tenant-side roles
- *   3. Marking platform-only roles such as super_admin in app_metadata
+ *   2. Writing trusted workspace role projection into app_metadata only
+ *   3. Upserting the matching smartstay.profiles row for non-platform users
  */
 
+import '../_shared/deno-globals.d.ts';
 import { handleOptions } from '../_shared/cors.ts';
-import { requireAdminRole } from '../_shared/auth.ts';
+import { requireWorkspaceOperator } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
-type SupportedRole = 'admin' | 'staff' | 'tenant' | 'super_admin';
+type SupportedRole = 'owner' | 'staff' | 'tenant' | 'super_admin';
 type TenantStage = 'prospect' | 'applicant' | 'resident_pending_onboarding' | 'resident_active';
 
 interface CreateUserRequest {
@@ -25,13 +24,18 @@ interface CreateUserRequest {
   phone?: string | null;
   avatarUrl?: string | null;
   role?: SupportedRole;
+  roleId?: string | null;
   isActive?: boolean;
   buildingsAccess?: Array<number | string>;
   forceChangePassword?: boolean;
   tenantStage?: TenantStage;
+  identityNumber?: string | null;
+  dateOfBirth?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
+  address?: string | null;
 }
 
-const SUPPORTED_ROLES: SupportedRole[] = ['admin', 'staff', 'tenant', 'super_admin'];
+const SUPPORTED_ROLES: SupportedRole[] = ['owner', 'staff', 'tenant', 'super_admin'];
 const SUPPORTED_TENANT_STAGES: TenantStage[] = [
   'prospect',
   'applicant',
@@ -44,21 +48,16 @@ function normalizeUsername(value: string): string {
 }
 
 function roleLabel(role: SupportedRole): 'Owner' | 'Staff' | 'Tenant' | 'SuperAdmin' {
-  if (role === 'admin') return 'Owner';
+  if (role === 'owner') return 'Owner';
   if (role === 'staff') return 'Staff';
   if (role === 'tenant') return 'Tenant';
   return 'SuperAdmin';
 }
 
-function workspaceRole(role: SupportedRole): 'owner' | 'staff' | 'tenant' | 'super_admin' {
-  if (role === 'admin') return 'owner';
-  return role;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return handleOptions();
 
-  const { denied } = await requireAdminRole(req);
+  const { denied } = await requireWorkspaceOperator(req);
   if (denied) return denied;
 
   let body: CreateUserRequest;
@@ -75,18 +74,10 @@ Deno.serve(async (req: Request) => {
   const role = body.role ?? 'staff';
   const tenantStage = body.tenantStage ?? 'prospect';
 
-  if (!fullName) {
-    return errorResponse('fullName is required', 400);
-  }
-  if (!email || !email.includes('@')) {
-    return errorResponse('A valid email is required', 400);
-  }
-  if (username.length < 3) {
-    return errorResponse('username must contain at least 3 valid characters', 400);
-  }
-  if (!SUPPORTED_ROLES.includes(role)) {
-    return errorResponse(`Unsupported role "${body.role}"`, 400);
-  }
+  if (!fullName) return errorResponse('fullName is required', 400);
+  if (!email || !email.includes('@')) return errorResponse('A valid email is required', 400);
+  if (username.length < 3) return errorResponse('username must contain at least 3 valid characters', 400);
+  if (!SUPPORTED_ROLES.includes(role)) return errorResponse(`Unsupported role "${body.role}"`, 400);
   if (!SUPPORTED_TENANT_STAGES.includes(tenantStage)) {
     return errorResponse(`Unsupported tenantStage "${body.tenantStage}"`, 400);
   }
@@ -95,27 +86,24 @@ Deno.serve(async (req: Request) => {
   }
 
   const adminClient = createAdminClient();
-  const accessRole = workspaceRole(role);
-
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     app_metadata: {
-      workspace_role: accessRole,
+      workspace_role: role,
     },
     user_metadata: {
       full_name: fullName,
       username,
-      workspace_role: accessRole,
     },
   });
 
   if (authError) {
     if (authError.message.toLowerCase().includes('already registered')) {
-      return errorResponse(`Email "${email}" đã được đăng ký. Vui lòng dùng email khác.`, 409);
+      return errorResponse(`Email "${email}" da duoc dang ky. Vui long dung email khac.`, 409);
     }
-    return errorResponse(`Tạo tài khoản thất bại: ${authError.message}`, 400);
+    return errorResponse(`Tao tai khoan that bai: ${authError.message}`, 400);
   }
 
   const userId = authData.user.id;
@@ -149,16 +137,21 @@ Deno.serve(async (req: Request) => {
       phone: body.phone?.trim() ?? null,
       avatar_url: body.avatarUrl ?? null,
       role,
+      role_id: body.roleId ?? null,
+      identity_number: body.identityNumber?.trim() ?? null,
+      date_of_birth: body.dateOfBirth ?? null,
+      gender: body.gender ?? null,
+      address: body.address?.trim() ?? null,
       is_active: body.isActive ?? true,
-      tenant_stage: role === 'tenant' ? tenantStage : 'prospect',
+      tenant_stage: role === 'tenant' ? tenantStage : null,
       preferences,
     })
-    .select('id, full_name, phone, avatar_url, role, tenant_stage, preferences, is_active, created_at')
+    .select('id, full_name, phone, avatar_url, role, role_id, identity_number, date_of_birth, gender, address, tenant_stage, preferences, is_active, created_at')
     .single();
 
   if (profileError) {
     await adminClient.auth.admin.deleteUser(userId);
-    return errorResponse(`Lưu hồ sơ thất bại: ${profileError.message}`, 500);
+    return errorResponse(`Luu ho so that bai: ${profileError.message}`, 500);
   }
 
   return successResponse({
@@ -170,11 +163,16 @@ Deno.serve(async (req: Request) => {
       phone: profileRow.phone ?? undefined,
       avatar: profileRow.avatar_url ?? undefined,
       role: roleLabel(role),
+      roleId: profileRow.role_id,
+      identityNumber: profileRow.identity_number,
+      dateOfBirth: profileRow.date_of_birth,
+      gender: profileRow.gender,
+      address: profileRow.address,
       buildingsAccess: preferences.buildings_access,
       isActive: profileRow.is_active ?? true,
       isTwoFactorEnabled: false,
       forceChangePassword: preferences.force_change_password,
-      tenantStage: profileRow.tenant_stage,
+      tenantStage: profileRow.tenant_stage ?? undefined,
       createdAt: profileRow.created_at ?? undefined,
     },
   }, 201);

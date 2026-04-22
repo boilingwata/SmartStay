@@ -25,8 +25,6 @@ const HandoverChecklist = lazy(() => import('@/views/admin/rooms/HandoverCheckli
 const AssetCatalog = lazy(() => import('@/views/admin/assets/AssetCatalog'));
 const BuildingList = lazy(() => import('@/views/admin/buildings/BuildingList'));
 const BuildingDetail = lazy(() => import('@/views/admin/buildings/BuildingDetail'));
-const OwnerList = lazy(() => import('@/views/admin/owners/OwnerList'));
-const OwnerDetail = lazy(() => import('@/views/admin/owners/OwnerDetail'));
 const TicketList = lazy(() => import('@/views/admin/tickets/TicketList'));
 const TicketDetail = lazy(() => import('@/views/admin/tickets/TicketDetail'));
 const LeadList = lazy(() => import('@/views/admin/leads/LeadList'));
@@ -57,7 +55,7 @@ const NPSReport = lazy(() => import('@/views/admin/reports/NPSReport'));
 const StaffReport = lazy(() => import('@/views/admin/reports/StaffReport'));
 const AlertsReport = lazy(() => import('@/views/admin/reports/AlertsReport'));
 
-export const adminRoutes: RouteObject[] = [
+export const ownerRoutes: RouteObject[] = [
   { path: 'dashboard', element: <MarketplaceDashboard /> },
   { path: 'invoices', element: <InvoiceList /> },
   { path: 'invoices/:id', element: <InvoiceDetail /> },
@@ -79,8 +77,6 @@ export const adminRoutes: RouteObject[] = [
   { path: 'assets', element: <AssetCatalog /> },
   { path: 'buildings', element: <BuildingList /> },
   { path: 'buildings/:id', element: <BuildingDetail /> },
-  { path: 'owners', element: <OwnerList /> },
-  { path: 'owners/:id', element: <OwnerDetail /> },
   { path: 'tickets', element: <TicketList /> },
   { path: 'tickets/:id', element: <TicketDetail /> },
   { path: 'leads', element: <LeadList /> },
@@ -138,4 +134,4 @@ export const adminRoutes: RouteObject[] = [
   { path: '', element: <Navigate to="dashboard" replace /> },
 ];
 
-export default adminRoutes;
+export default ownerRoutes;

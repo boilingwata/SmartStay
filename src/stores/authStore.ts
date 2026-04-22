@@ -6,6 +6,7 @@ import { mapRole } from '@/lib/enumMaps'
 import { setSentryUser } from '@/lib/sentry'
 import { isResidentTenantStage } from '@/lib/authRouting'
 import portalOnboardingService from '@/services/portalOnboardingService'
+import useUIStore from './uiStore'
 
 interface AuthState {
   user: User | null;
@@ -57,9 +58,16 @@ async function fetchProfile(userId: string): Promise<User | null> {
   if (error || !data) return null
 
   const role = mapRole.fromDb(data.role) as UserRoleType
-  const tenantOnboarding = role === 'Tenant' && isResidentTenantStage(data.tenant_stage)
-    ? await portalOnboardingService.getStatusForProfile(userId)
-    : null
+  let tenantOnboarding = null
+  if (role === 'Tenant' && isResidentTenantStage(data.tenant_stage)) {
+    try {
+      tenantOnboarding = await portalOnboardingService.getStatusForProfile(userId)
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[Auth] Failed to fetch onboarding status, falling back to 0%:', err)
+      tenantOnboarding = { completionPercent: 0 }
+    }
+  }
 
   return {
     id: data.id,
@@ -81,10 +89,7 @@ function resolveWorkspaceRole(sessionUser: SessionUserLike): UserRoleType | null
   const appRole = typeof sessionUser.app_metadata?.workspace_role === 'string'
     ? sessionUser.app_metadata.workspace_role
     : null
-  const userRole = typeof sessionUser.user_metadata?.workspace_role === 'string'
-    ? sessionUser.user_metadata.workspace_role
-    : null
-  const normalizedRole = (appRole ?? userRole)?.toLowerCase()
+  const normalizedRole = appRole?.toLowerCase()
 
   if (normalizedRole === 'super_admin') return 'SuperAdmin'
   if (normalizedRole === 'owner') return 'Owner'
@@ -146,6 +151,12 @@ const useAuthStore = create<AuthState>()(
           const profile = await syncSessionUser()
 
           if (profile) {
+            if (!profile.isActive) {
+              await supabase.auth.signOut()
+              set({ isLoading: false, isAuthenticated: false, user: null, role: null, authMode: null })
+              return
+            }
+
             set({
               user: profile,
               isAuthenticated: true,
@@ -171,6 +182,12 @@ const useAuthStore = create<AuthState>()(
             if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
               const refreshedProfile = await resolveAuthenticatedUser(session.user)
               if (refreshedProfile) {
+                if (!refreshedProfile.isActive) {
+                  await supabase.auth.signOut()
+                  set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
+                  return
+                }
+
                 set({
                   user: refreshedProfile,
                   isAuthenticated: true,
@@ -213,6 +230,11 @@ const useAuthStore = create<AuthState>()(
         const profile = await resolveAuthenticatedUser(data.user)
         if (!profile) throw new Error('Không tìm thấy hồ sơ người dùng')
 
+        if (!profile.isActive) {
+          await supabase.auth.signOut()
+          throw new Error('Tài khoản đã bị vô hiệu hóa')
+        }
+
         if (options?.allowedRoles && !options.allowedRoles.includes(profile.role)) {
           await supabase.auth.signOut()
           throw new Error(options.invalidRoleMessage ?? 'You are not allowed to sign in here')
@@ -235,8 +257,12 @@ const useAuthStore = create<AuthState>()(
             if (error) throw error
           }
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error('Lỗi đăng xuất từ Supabase:', error)
         } finally {
+          // Reset UI context (buildingId, etc.)
+          useUIStore.getState().resetContext()
+
           set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
           setSentryUser(null)
           localStorage.removeItem('smartstay-auth-storage')
