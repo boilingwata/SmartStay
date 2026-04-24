@@ -3,13 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
-  ArrowRight,
   Bell,
   CalendarDays,
   CheckCircle2,
-  CreditCard,
   Droplets,
-  FileText,
   Home,
   MessageSquare,
   Receipt,
@@ -432,58 +429,6 @@ export default function TenantDashboard() {
       </div>
 
       <div className="flex w-full shrink-0 flex-col gap-6 lg:w-1/3">
-        <section className="rounded-[20px] border border-teal-100 bg-white p-6 shadow-md">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-[14px] font-black uppercase tracking-widest text-slate-500">Vi cua ban</h3>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
-              <CreditCard size={20} />
-            </div>
-          </div>
-
-          {dashboardQuery.isLoading ? (
-            <div className="space-y-3">
-              <div className="h-4 w-24 rounded-full bg-slate-100 animate-pulse" />
-              <div className="h-10 w-40 rounded-2xl bg-slate-100 animate-pulse" />
-              <div className="h-14 w-full rounded-xl bg-slate-100 animate-pulse" />
-            </div>
-          ) : dashboardQuery.isError ? (
-            <DashboardSectionError message={errorMessage} onRetry={() => dashboardQuery.refetch()} />
-          ) : (
-            <>
-              <div className="mb-6 space-y-1">
-                <p className="text-[12px] font-semibold text-slate-500">So du hien tai</p>
-                <div className="flex items-baseline gap-1 break-all">
-                  <p className="text-3xl font-black tracking-tight text-slate-900">
-                    {formatCurrency(summary?.balance.currentBalance ?? 0)}
-                  </p>
-                  <span className="text-lg font-bold text-slate-400">d</span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Cap nhat luc{' '}
-                  {summary?.balance.lastUpdatedAt
-                    ? format(new Date(summary.balance.lastUpdatedAt), 'HH:mm dd/MM/yyyy')
-                    : '--'}
-                </p>
-              </div>
-
-              <div className="mb-6 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <div className="min-w-0 pr-2 flex items-center gap-2 text-slate-600">
-                  <FileText size={16} className="shrink-0" />
-                  <span className="truncate text-[13px] font-medium">Hoa don cho thanh toan</span>
-                </div>
-                <span className="shrink-0 text-[13px] font-bold text-rose-500">{summary?.pendingInvoicesCount ?? 0} muc</span>
-              </div>
-
-              <button
-                onClick={() => navigate('/portal/balance')}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0D8A8A] text-[13px] font-bold text-white shadow-lg shadow-teal-500/20 transition hover:brightness-105"
-              >
-                Xem chi tiet so du <ArrowRight size={16} />
-              </button>
-            </>
-          )}
-        </section>
-
         <section className="rounded-[20px] border border-slate-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[15px] font-black text-slate-800">Thong bao moi</h3>
