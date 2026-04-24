@@ -203,7 +203,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                         errors.buildingCode && "border-danger bg-danger/5"
                       )} 
                     />
-                    {errors.buildingCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.buildingCode.message as any)}</p>}
+                    {errors.buildingCode?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{String(errors.buildingCode.message)}</p>}
                  </div>
                  <div className="space-y-2.5 md:col-span-2 relative">
                     <label htmlFor="name" className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] ml-1">Tên toà nhà *</label>
@@ -216,7 +216,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                         errors.name && "border-danger bg-danger/5"
                       )} 
                     />
-                    {errors.name?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.name.message as any)}</p>}
+                    {errors.name?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{String(errors.name.message)}</p>}
                  </div>
               </div>
 
@@ -309,7 +309,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                       onChange={(e) => { setValue('provinceId', e.target.value); setValue('districtId', ''); setValue('wardId', ''); }}
                     >
                        <option value="">Chọn Tỉnh/Thành</option>
-                       {provinces.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                       {provinces.map((p: { id: string; name: string }) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                  </div>
                  <div className="space-y-2.5">
@@ -324,7 +324,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                       onChange={(e) => { setValue('districtId', e.target.value); setValue('wardId', ''); }}
                     >
                        <option value="">Chọn Quận/Huyện</option>
-                       {districts.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                       {districts.map((d: { id: string; name: string }) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                  </div>
                  <div className="space-y-2.5">
@@ -338,7 +338,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                       )}
                     >
                        <option value="">Chọn Phường/Xã</option>
-                       {wards.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                       {wards.map((w: { id: string; name: string }) => <option key={w.id} value={w.id}>{w.name}</option>)}
                     </select>
                  </div>
               </div>
@@ -412,7 +412,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
                         errors.managementEmail && "border-danger bg-danger/5"
                       )} 
                     />
-                    {errors.managementEmail?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{(errors.managementEmail.message as any)}</p>}
+                    {errors.managementEmail?.message && <p className="text-[10px] text-danger font-bold absolute -bottom-5 left-1">{String(errors.managementEmail.message)}</p>}
                  </div>
               </div>
            </div>
@@ -420,7 +420,7 @@ export const BuildingModal = ({ isOpen, onClose, building }: BuildingModalProps)
 
         <div className="p-8 border-t bg-bg/20 flex justify-end gap-3">
            <button onClick={onClose} className="px-8 py-3 bg-white border border-border/50 text-muted font-black uppercase tracking-widest rounded-2xl">Huỷ</button>
-           <button onClick={handleSubmit(onSubmit as any)} disabled={createMutation.isPending || updateMutation.isPending} className="px-10 py-3 bg-primary text-white font-black uppercase tracking-[3px] rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+           <button onClick={handleSubmit(onSubmit)} disabled={createMutation.isPending || updateMutation.isPending} className="px-10 py-3 bg-primary text-white font-black uppercase tracking-[3px] rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
                {(createMutation.isPending || updateMutation.isPending) ? <Spinner className="w-4 h-4 text-white" /> : (isEditing ? 'Lưu thay đổi' : 'Tạo toà nhà')}
             </button>
         </div>

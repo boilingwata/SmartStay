@@ -3,8 +3,11 @@ import { mapAssetCondition, mapAssetType, mapBillingStatusFromDb, mapBillingStat
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { Asset, AssetCondition, AssetType } from '@/models/Asset';
+import type { Database } from '@/types/supabase';
 
 type AssetRecordKind = 'asset' | 'room-asset';
+type AssetInsert = Database['smartstay']['Tables']['assets']['Insert'];
+type AssetUpdate = Database['smartstay']['Tables']['assets']['Update'];
 
 interface AssetDefinitionRow {
   id: number;
@@ -222,10 +225,10 @@ function assetDefinitionRowToAsset(row: AssetDefinitionRow): Asset {
   };
 }
 
-function buildAssetDefinitionPayload(data: Partial<Asset>, requireName = false): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
+function buildAssetDefinitionUpdatePayload(data: Partial<Asset>): AssetUpdate {
+  const payload: AssetUpdate = {};
 
-  if (requireName || data.assetName !== undefined) {
+  if (data.assetName !== undefined) {
     payload.name = data.assetName?.trim() || 'Tai san moi';
   }
   if (data.assetCode !== undefined) {
@@ -248,6 +251,18 @@ function buildAssetDefinitionPayload(data: Partial<Asset>, requireName = false):
   }
 
   return payload;
+}
+
+function buildAssetDefinitionInsertPayload(data: Partial<Asset>): AssetInsert {
+  return {
+    name: data.assetName?.trim() || 'Tai san moi',
+    category: data.type ?? null,
+    unit_cost: data.purchasePrice !== undefined ? Number(data.purchasePrice ?? 0) : null,
+    brand: data.brand?.trim() || null,
+    model: data.model?.trim() || null,
+    qr_code: data.assetCode?.trim() || null,
+    description: data.description?.trim() || null,
+  };
 }
 
 function buildRoomAssetPayload(data: Omit<Partial<Asset>, 'roomId'> & { roomId?: string | number }): Record<string, unknown> {
@@ -407,6 +422,9 @@ export const assetService = {
 
     if (params?.roomId) {
       const roomId = toNumericId(params.roomId);
+      if (roomId == null) {
+        return [];
+      }
       const rows = (await unwrap(
         supabase
           .from('room_assets')
@@ -514,7 +532,7 @@ export const assetService = {
       : ((await unwrap(
           supabase
             .from('assets')
-            .insert(buildAssetDefinitionPayload(data, true))
+            .insert(buildAssetDefinitionInsertPayload(data))
             .select(ASSET_SELECT_QUERY)
             .single(),
         )) as AssetDefinitionRow);
@@ -596,7 +614,7 @@ export const assetService = {
 
   updateAsset: async (id: string | number, data: Partial<Asset>): Promise<Asset> => {
     const record = parseRecordId(id);
-    const assetUpdate = buildAssetDefinitionPayload(data);
+    const assetUpdate = buildAssetDefinitionUpdatePayload(data);
     const roomAssetUpdate = buildRoomAssetPayload(data);
 
     if (record.kind === 'asset') {

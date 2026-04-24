@@ -160,12 +160,12 @@ const BuildingList = () => {
            <div className="space-y-4">
               <label className="text-[11px] font-black uppercase tracking-widest text-muted">{t('pages.buildings.filters.capacity')}</label>
               <div className="grid grid-cols-1 gap-3">
-                 {[
+                 {([
                    { id: '', label: t('pages.buildings.filters.allCapacities'), icon: Building2 },
                    { id: 'small', label: t('pages.buildings.filters.small'), icon: Home },
                    { id: 'medium', label: t('pages.buildings.filters.medium'), icon: Building2 },
                    { id: 'large', label: t('pages.buildings.filters.large'), icon: Building2 }
-                 ].map((cap: { id: CapacityScale; label: string; icon: React.ElementType }) => (
+                 ] as { id: CapacityScale; label: string; icon: React.ElementType }[]).map((cap) => (
                    <button
                     key={cap.id}
                     onClick={() => setCapacityScale(cap.id)}
@@ -229,11 +229,11 @@ const BuildingList = () => {
                  <ArrowUpDown size={14} /> Sắp xếp theo
               </label>
               <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-50/50 border border-slate-100 rounded-[28px] hover:border-slate-200 transition-all">
-                 {[
+                 {([
                    { id: 'name', label: t('pages.buildings.sorting.name'), icon: Building2 },
                    { id: 'totalRooms', label: t('pages.buildings.sorting.totalRooms'), icon: LayoutGrid },
                    { id: 'occupancyRate', label: t('pages.buildings.sorting.occupancyRate'), icon: TrendingUp },
-                 ].map((option) => (
+                 ] as { id: BuildingSortKey; label: string; icon: React.ElementType }[]).map((option) => (
                    <button
                     key={option.id}
                     onClick={() => {

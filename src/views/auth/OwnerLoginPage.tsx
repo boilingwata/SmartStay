@@ -12,8 +12,8 @@ const OwnerLoginPage: React.FC = () => {
       redirectWhenAuthenticated={['Owner']}
       invalidRoleMessage="Tài khoản này không thuộc cổng chủ sở hữu."
       quickLogin={{
-        email: 'owner@smartstay.vn',
-        password: 'Owner@123456',
+        email: 'admin@smartstay.vn',
+        password: 'Admin@123456',
         label: 'Chủ sở hữu hiện tại',
         helper: 'Tài khoản demo cho workspace chủ sở hữu',
       }}

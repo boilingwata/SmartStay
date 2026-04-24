@@ -18,7 +18,6 @@ const PaymentDetail = lazy(() => import('@/views/admin/finance/PaymentDetail'));
 const WebhookLogs = lazy(() => import('@/views/admin/finance/WebhookLogs'));
 const TenantList = lazy(() => import('@/views/admin/tenants/TenantList'));
 const TenantDetail = lazy(() => import('@/views/admin/tenants/TenantDetail'));
-const TenantBalance = lazy(() => import('@/views/admin/tenants/TenantBalance'));
 const RoomList = lazy(() => import('@/views/admin/rooms/RoomList'));
 const RoomDetail = lazy(() => import('@/views/admin/rooms/RoomDetail'));
 const HandoverChecklist = lazy(() => import('@/views/admin/rooms/HandoverChecklist'));
@@ -70,7 +69,6 @@ export const ownerRoutes: RouteObject[] = [
   { path: 'utility-billing', element: <UtilityHubPage /> },
   { path: 'tenants', element: <TenantList /> },
   { path: 'tenants/:id', element: <TenantDetail /> },
-  { path: 'tenants/:id/balance', element: <TenantBalance /> },
   { path: 'rooms', element: <RoomList /> },
   { path: 'rooms/:id', element: <RoomDetail /> },
   { path: 'rooms/:id/handover', element: <HandoverChecklist /> },

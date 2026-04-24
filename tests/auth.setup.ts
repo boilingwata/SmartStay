@@ -21,8 +21,8 @@ setup('authenticate as owner', async ({ page }) => {
 
   console.log('Filling login form...');
   await expect(emailInput).toBeVisible({ timeout: 15000 });
-  await emailInput.fill('owner@smartstay.vn');
-  await passwordInput.fill('Owner@123456');
+  await emailInput.fill('admin@smartstay.vn');
+  await passwordInput.fill('Admin@123456');
 
   console.log('Attempting login...');
   await submitButton.click();

@@ -12,6 +12,7 @@ const badgeVariants = cva(
         Paid: 'bg-success/10 text-success border-success/20',
         Completed: 'bg-success/10 text-success border-success/20',
         Confirmed: 'bg-success/10 text-success border-success/20',
+        Success: 'bg-success/10 text-success border-success/20',
         Resolved: 'bg-success/10 text-success border-success/20',
         Signed: 'bg-success/10 text-success border-success/20',
         
@@ -21,12 +22,16 @@ const badgeVariants = cva(
         Replaced: 'bg-accent/10 text-accent border-accent/20',
         Draft: 'bg-warning/10 text-warning border-warning/20',
         Submitted: 'bg-warning/10 text-warning border-warning/20',
+        Received: 'bg-primary/10 text-primary border-primary/20',
+        Processing: 'bg-primary/10 text-primary border-primary/20',
+        Retry: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
         Warning: 'bg-warning/10 text-warning border-warning/20',
         
         Overdue: 'bg-destructive/10 text-destructive border-destructive/20',
         Expired: 'bg-destructive/10 text-destructive border-destructive/20',
         Terminated: 'bg-destructive/10 text-destructive border-destructive/20',
         Rejected: 'bg-destructive/10 text-destructive border-destructive/20',
+        Failed: 'bg-destructive/10 text-destructive border-destructive/20',
         Critical: 'bg-destructive/10 text-destructive border-destructive/20',
         Blacklisted: 'bg-destructive/10 text-destructive border-destructive/20',
         
@@ -90,9 +95,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const statusKey = status ? `status.${status}` : '';
   const translated = statusKey ? t(statusKey) : '';
   const displayLabel = label || children || (translated !== statusKey ? translated : status || '');
+  const variantStatus = status as VariantProps<typeof badgeVariants>['status'];
 
   return (
-    <span className={cn(badgeVariants({ status: status as any, size, className }), "border")} {...props}>
+    <span className={cn(badgeVariants({ status: variantStatus, size, className }), 'border')} {...props}>
       {displayLabel}
     </span>
   );

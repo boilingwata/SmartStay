@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, BellRing, Check, ChevronRight, Copy, CreditCard, FileText, Layers, Plus } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Copy, CreditCard, FileText, Layers, Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -29,7 +29,13 @@ const getRemainingAmount = (invoice: Invoice) => Math.max(0, invoice.totalAmount
 const canRecordPayment = (invoice: Invoice) =>
   (invoice.status === 'Unpaid' || invoice.status === 'Overdue') && getRemainingAmount(invoice) > 0;
 
-const canSendReminder = (invoice: Invoice) => invoice.status === 'Unpaid' || invoice.status === 'Overdue';
+interface AdvancedInvoiceFilters {
+  minAmount?: number;
+  maxAmount?: number;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  roomCode?: string;
+}
 
 const getDueDateClassName = (invoice: Invoice) => {
   if (invoice.status === 'Overdue') return 'text-danger';
@@ -55,7 +61,7 @@ const InvoiceList = () => {
   const [filterBuildingId, setFilterBuildingId] = useState('');
   const [filterPeriod, setFilterPeriod] = useState<string>('');
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-  const [advancedFilters, setAdvancedFilters] = useState<any>({
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedInvoiceFilters>({
     minAmount: undefined,
     maxAmount: undefined,
     dueDateFrom: '',
@@ -123,11 +129,6 @@ const InvoiceList = () => {
     setCopiedInvoiceId(invoiceId);
     toast.success(t('pages.invoices.copiedCode'));
     setTimeout(() => setCopiedInvoiceId(null), 2000);
-  };
-
-  const handleSendReminder = async (invoiceId: string) => {
-    await invoiceService.sendNotification(invoiceId);
-    toast.success('Đã gửi nhắc thanh toán');
   };
 
   const handleResetFilters = () => {
@@ -299,7 +300,6 @@ const InvoiceList = () => {
               {invoices.map((invoice) => {
                 const remainingAmount = getRemainingAmount(invoice);
                 const paymentEnabled = canRecordPayment(invoice);
-                const reminderEnabled = canSendReminder(invoice);
                 const goToDetail = () => navigate(`/owner/invoices/${invoice.id}`);
 
                 return (
@@ -377,19 +377,6 @@ const InvoiceList = () => {
                     </div>
 
                     <div className="mt-5 flex flex-col gap-2 sm:flex-row xl:mt-0 xl:justify-end">
-                      {reminderEnabled && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-bold text-amber-700 shadow-sm transition-all hover:bg-amber-50 active:scale-95"
-                          onClick={async (event) => {
-                            stopRowClick(event);
-                            await handleSendReminder(invoice.id);
-                          }}
-                        >
-                          <BellRing size={15} />
-                          Nhắc nợ
-                        </button>
-                      )}
                       {paymentEnabled ? (
                         <button
                           type="button"

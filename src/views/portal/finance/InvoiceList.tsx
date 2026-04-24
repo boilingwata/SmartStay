@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, Landmark, RefreshCw, Search, Wallet } from 'lucide-react';
@@ -162,17 +162,25 @@ const InvoiceList: React.FC = () => {
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>(createInitialPaymentForm());
   const [isSimulating, setIsSimulating] = useState(false);
   const [showTransferSupportForm, setShowTransferSupportForm] = useState(false);
+  const paidInvoiceToastRef = useRef<string | null>(null);
 
   const invoicesQuery = useQuery({
     queryKey: ['portal-invoices'],
     queryFn: () => fetchInvoices(),
+    staleTime: 15_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   });
 
   const detailQuery = useQuery({
     queryKey: ['portal-invoice', selectedInvoiceId],
     queryFn: () => fetchInvoiceById(selectedInvoiceId!),
     enabled: !!selectedInvoiceId,
+    staleTime: 5_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   });
+  const selectedInvoice = detailQuery.data ?? null;
 
   const filteredInvoices = useMemo(() => {
     const filtered = filterInvoices(invoicesQuery.data ?? [], {
@@ -204,8 +212,8 @@ const InvoiceList: React.FC = () => {
   }, [dateFrom, dateTo, search, sortBy, statusFilter]);
 
   useEffect(() => {
-    setPaymentForm(createInitialPaymentForm(detailQuery.data));
-  }, [detailQuery.data?.id]);
+    setPaymentForm(createInitialPaymentForm(selectedInvoice));
+  }, [selectedInvoice]);
 
   useEffect(() => {
     setShowTransferSupportForm(false);
@@ -217,17 +225,16 @@ const InvoiceList: React.FC = () => {
     setSearchParams(next);
   };
 
-  const closeInvoice = () => {
+  const closeInvoice = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete('invoice');
     setSearchParams(next);
-  };
+  }, [searchParams, setSearchParams]);
 
   const setFormField = <K extends keyof PaymentFormState>(field: K, value: PaymentFormState[K]) => {
     setPaymentForm((current) => ({ ...current, [field]: value }));
   };
 
-  const selectedInvoice = detailQuery.data ?? null;
   const sepayTransferCode = selectedInvoice ? buildSepayTransferContent(selectedInvoice.invoiceNumber) : '';
   const sepayAmount = Number(paymentForm.amount);
   const sepayQrValue =
@@ -235,13 +242,72 @@ const InvoiceList: React.FC = () => {
       ? buildSepayQrValue(selectedInvoice.bankDetails, sepayAmount, sepayTransferCode)
       : null;
 
+  const applyInvoiceDetailToCache = useCallback(
+    (detail: PortalInvoiceDetail) => {
+      queryClient.setQueryData(['portal-invoice', detail.id], detail);
+      queryClient.setQueryData<PortalInvoice[]>(['portal-invoices'], (current) =>
+        current ? updateInvoiceListItem(current, detail) : current
+      );
+    },
+    [queryClient]
+  );
+
+  const closePaidInvoice = useCallback(
+    (detail: PortalInvoiceDetail) => {
+      applyInvoiceDetailToCache(detail);
+      setShowTransferSupportForm(false);
+      closeInvoice();
+
+      if (paidInvoiceToastRef.current !== detail.id) {
+        paidInvoiceToastRef.current = detail.id;
+        toast.success('Hóa đơn đã được xác nhận tự động');
+      }
+    },
+    [applyInvoiceDetailToCache, closeInvoice]
+  );
+
   usePortalInvoiceRealtime(selectedInvoiceId, (invoiceId) => {
-    queryClient.invalidateQueries({ queryKey: ['portal-invoice', invoiceId] });
-    queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
-    setShowTransferSupportForm(false);
-    closeInvoice();
-    toast.success('Hóa đơn đã được xác nhận tự động');
+    void fetchInvoiceById(invoiceId)
+      .then(closePaidInvoice)
+      .catch(() => {
+        void queryClient.invalidateQueries({ queryKey: ['portal-invoice', invoiceId] });
+        void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
+      });
   });
+
+  useEffect(() => {
+    if (!selectedInvoiceId || !selectedInvoice || selectedInvoice.balance <= 0 || selectedInvoice.status === 'paid') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshSelectedInvoice = async () => {
+      try {
+        const detail = await fetchInvoiceById(selectedInvoiceId);
+        if (cancelled) return;
+
+        applyInvoiceDetailToCache(detail);
+
+        if (detail.status === 'paid' || detail.balance <= 0) {
+          closePaidInvoice(detail);
+        }
+      } catch {
+        if (!cancelled) {
+          void queryClient.invalidateQueries({ queryKey: ['portal-invoice', selectedInvoiceId] });
+          void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
+        }
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSelectedInvoice, 5_000);
+    void refreshSelectedInvoice();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [applyInvoiceDetailToCache, closePaidInvoice, queryClient, selectedInvoice, selectedInvoiceId]);
 
   const simulateSepayPayment = async () => {
     if (!selectedInvoice) return;
@@ -306,10 +372,7 @@ const InvoiceList: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'Không thể gửi yêu cầu thanh toán.');
     },
     onSuccess: (detail) => {
-      queryClient.setQueryData(['portal-invoice', detail.id], detail);
-      queryClient.setQueryData<PortalInvoice[]>(['portal-invoices'], (current) =>
-        current ? updateInvoiceListItem(current, detail) : current
-      );
+      applyInvoiceDetailToCache(detail);
       queryClient.invalidateQueries({ queryKey: ['portal-invoice', detail.id] });
       queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
       setPaymentForm(createInitialPaymentForm(detail));

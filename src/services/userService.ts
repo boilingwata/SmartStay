@@ -2,7 +2,7 @@ import { User, UserRoleType } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapRole } from '@/lib/enumMaps';
-import { Database } from '@/types/supabase';
+import { Database, Json } from '@/types/supabase';
 
 type ProfileRow = Database['smartstay']['Tables']['profiles']['Row'] & {
   roles?: {
@@ -15,7 +15,7 @@ interface ProfilePreferences {
   email?: string;
   buildings_access?: (number | string)[];
   force_change_password?: boolean;
-  [key: string]: any;
+  [key: string]: Json | undefined;
 }
 
 interface CreateUserResult {
@@ -189,11 +189,11 @@ export const userService = {
     if (user.phone !== undefined) updatePayload.phone = user.phone ?? null;
     if (user.avatar !== undefined) updatePayload.avatar_url = user.avatar ?? null;
     if (user.isActive !== undefined) updatePayload.is_active = user.isActive;
-    if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as any;
+    if (user.tenantStage !== undefined) updatePayload.tenant_stage = user.tenantStage as Database['smartstay']['Tables']['profiles']['Update']['tenant_stage'];
     if (user.roleId !== undefined) updatePayload.role_id = user.roleId ?? null;
     if (user.identityNumber !== undefined) updatePayload.identity_number = user.identityNumber ?? null;
     if (user.dateOfBirth !== undefined) updatePayload.date_of_birth = user.dateOfBirth ?? null;
-    if (user.gender !== undefined) updatePayload.gender = (user.gender?.toLowerCase() ?? null) as any;
+    if (user.gender !== undefined) updatePayload.gender = (user.gender?.toLowerCase() ?? null) as Database['smartstay']['Tables']['profiles']['Update']['gender'];
     if (user.address !== undefined) updatePayload.address = user.address ?? null;
 
     const nextPreferences: ProfilePreferences = { ...currentPreferences };

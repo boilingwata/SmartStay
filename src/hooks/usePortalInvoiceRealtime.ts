@@ -7,6 +7,14 @@ type InvoiceRealtimeRow = {
   status: string | null;
 };
 
+function refreshPortalInvoices(queryClient: ReturnType<typeof useQueryClient>, selectedInvoiceId: string | null) {
+  void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
+
+  if (selectedInvoiceId) {
+    void queryClient.invalidateQueries({ queryKey: ['portal-invoice', selectedInvoiceId] });
+  }
+}
+
 export function usePortalInvoiceRealtime(
   selectedInvoiceId: string | null,
   onPaid?: (invoiceId: string) => void
@@ -33,11 +41,9 @@ export function usePortalInvoiceRealtime(
           const nextRow = payload.new as InvoiceRealtimeRow;
           const invoiceId = String(nextRow.id);
 
-          queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
+          refreshPortalInvoices(queryClient, selectedInvoiceId);
 
           if (selectedInvoiceId && selectedInvoiceId === invoiceId) {
-            queryClient.invalidateQueries({ queryKey: ['portal-invoice', selectedInvoiceId] });
-
             if (nextRow.status === 'paid' && notifiedInvoiceIdRef.current !== invoiceId) {
               notifiedInvoiceIdRef.current = invoiceId;
               onPaidRef.current?.(invoiceId);
@@ -45,10 +51,36 @@ export function usePortalInvoiceRealtime(
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          refreshPortalInvoices(queryClient, selectedInvoiceId);
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
+    };
+  }, [queryClient, selectedInvoiceId]);
+
+  useEffect(() => {
+    const refresh = () => {
+      refreshPortalInvoices(queryClient, selectedInvoiceId);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refresh();
+      }
+    };
+
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [queryClient, selectedInvoiceId]);
 }

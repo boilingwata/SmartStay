@@ -3,7 +3,6 @@ import {
   EmergencyContact, OnboardingProgress,
   TenantFeedback, NPSSurvey, ContactGroup
 } from '@/models/Tenant';
-import { TenantBalance, TenantBalanceTransaction, TransactionType } from '@/models/TenantBalance';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { mapGender } from '@/lib/enumMaps';
@@ -54,16 +53,6 @@ interface DbContractTenantJoined {
 // ---------------------------------------------------------------------------
 
 /** Map DB transaction_type → frontend TransactionType */
-function mapTransactionType(dbType: string): TransactionType {
-  const map: Record<string, TransactionType> = {
-    deposit: 'ManualTopUp',
-    deduction: 'ManualDeduct',
-    refund: 'Refund',
-    adjustment: 'Correction',
-  };
-  return map[dbType] ?? 'Other';
-}
-
 /** Derive TenantStatus from whether the tenant has an active contract. */
 function deriveTenantStatus(hasActive: boolean): TenantStatus {
   return hasActive ? 'Active' : 'CheckedOut';
@@ -322,6 +311,8 @@ export const tenantService = {
       cccdIssuedPlace: (docs?.cccd_issued_place as string) ?? '',
       nationality,
       occupation,
+      emergencyContactName: row.emergency_contact_name ?? '',
+      emergencyContactPhone: row.emergency_contact_phone ?? '',
       vehiclePlates,
       notes: (docs?.notes as string | undefined) ?? '',
     };
@@ -409,68 +400,6 @@ export const tenantService = {
       status: (inv.status ? (inv.status.charAt(0).toUpperCase() + inv.status.slice(1).replace('_', ' ')) : 'Unpaid') as any,
       contractId: String(inv.contract_id)
     }));
-  },
-
-  /**
-   * Return the current wallet balance for a tenant.
-   */
-  getTenantBalance: async (id: string): Promise<TenantBalance> => {
-    const numericId = Number(id);
-    if (!Number.isFinite(numericId)) {
-      throw new Error(`[tenantService] getTenantBalance: invalid id "${id}"`);
-    }
-
-    const row = await unwrap(
-      supabase
-        .from('tenant_balances')
-        .select('tenant_id, balance, last_updated')
-        .eq('tenant_id', numericId)
-        .single()
-    );
-
-    return {
-      tenantId: String(row.tenant_id),
-      currentBalance: row.balance ?? 0,
-      lastUpdated: row.last_updated ?? new Date().toISOString(),
-      lastUpdatedAt: row.last_updated ?? new Date().toISOString(),
-    };
-  },
-
-  /**
-   * Return the full transaction ledger for a tenant from balance_history.
-   */
-  getTenantLedger: async (id: string): Promise<TenantBalanceTransaction[]> => {
-    const numericId = Number(id);
-    if (!Number.isFinite(numericId)) {
-      throw new Error(`[tenantService] getTenantLedger: invalid id "${id}"`);
-    }
-
-    const rows = await unwrap(
-      supabase
-        .from('balance_history')
-        .select('id, tenant_id, transaction_type, amount, balance_before, balance_after, notes, invoice_id, created_by, created_at')
-        .eq('tenant_id', numericId)
-        .order('created_at', { ascending: false })
-    );
-
-    return (rows ?? []).map((r): TenantBalanceTransaction => ({
-      id: String(r.id),
-      tenantId: String(r.tenant_id),
-      type: mapTransactionType(r.transaction_type),
-      amount: r.amount,
-      balanceBefore: r.balance_before,
-      balanceAfter: r.balance_after,
-      description: r.notes ?? '',
-      relatedInvoiceId: r.invoice_id != null ? String(r.invoice_id) : undefined,
-      createdAt: r.created_at ?? new Date().toISOString(),
-    }));
-  },
-
-  /**
-   * Alias for getTenantLedger — used by some views under a different name.
-   */
-  getTenantBalanceTransactions: async (id: string): Promise<TenantBalanceTransaction[]> => {
-    return tenantService.getTenantLedger(id);
   },
 
   /**
@@ -615,6 +544,8 @@ export const tenantService = {
     nationality?: string;
     occupation?: string;
     permanentAddress?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
     vehiclePlates?: string[];
     avatarUrl?: string;
     cccdFrontUrl?: string;
@@ -674,14 +605,16 @@ export const tenantService = {
           .insert({
             full_name: data.fullName,
             phone: data.phone || null,
-            email: data.email || null,
-            id_number: normalizedIdNumber,
-            date_of_birth: data.dateOfBirth || null,
-            gender: genderMap[data.gender ?? 'Other'] ?? 'other',
-            permanent_address: data.permanentAddress || null,
-            documents: Object.keys(documentsPayload).length > 0 ? documentsPayload as unknown as import('@/types/supabase').Json : null,
-            is_deleted: false,
-          })
+          email: data.email || null,
+          id_number: normalizedIdNumber,
+          date_of_birth: data.dateOfBirth || null,
+          gender: genderMap[data.gender ?? 'Other'] ?? 'other',
+          permanent_address: data.permanentAddress || null,
+          emergency_contact_name: data.emergencyContactName?.trim() || null,
+          emergency_contact_phone: data.emergencyContactPhone?.trim() || null,
+          documents: Object.keys(documentsPayload).length > 0 ? documentsPayload as unknown as import('@/types/supabase').Json : null,
+          is_deleted: false,
+        })
           .select('id, full_name, id_number, phone, email, date_of_birth, gender, permanent_address, emergency_contact_name, emergency_contact_phone, documents')
           .single()
       ) as unknown as DbTenantRow;
@@ -728,6 +661,8 @@ export const tenantService = {
       nationality?: string;
       occupation?: string;
       permanentAddress?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
       vehiclePlates?: string[];
       avatarUrl?: string;
       cccdFrontUrl?: string;
@@ -756,6 +691,8 @@ export const tenantService = {
     if (data.dateOfBirth !== undefined) updatePayload.date_of_birth = data.dateOfBirth || null;
     if (data.gender !== undefined) updatePayload.gender = genderMap[data.gender] ?? 'other';
     if (data.permanentAddress !== undefined) updatePayload.permanent_address = data.permanentAddress || null;
+    if (data.emergencyContactName !== undefined) updatePayload.emergency_contact_name = data.emergencyContactName.trim() || null;
+    if (data.emergencyContactPhone !== undefined) updatePayload.emergency_contact_phone = data.emergencyContactPhone.trim() || null;
     if (
       data.vehiclePlates !== undefined
       || data.avatarUrl !== undefined

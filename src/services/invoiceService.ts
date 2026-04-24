@@ -1,7 +1,7 @@
 import { FunctionsHttpError, type Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import { mapInvoiceStatus, mapPaymentMethod } from '@/lib/enumMaps';
+import { mapInvoiceStatus } from '@/lib/enumMaps';
 import { normalizeInvoiceItemType, toUiInvoiceItemType } from '@/lib/invoiceItems';
 import type { DbInvoiceStatus } from '@/types/supabase';
 import { buildPolicyInvoiceDraft } from '@/services/utilityBillingService';
@@ -158,12 +158,29 @@ interface DbInvoiceItemRow {
 
 interface DbPaymentRow {
   id: number;
-  payment_code: string;
+  payment_code: string | null;
   invoice_id: number;
   amount: number;
   method: string;
+  reference_number: string | null;
+  receipt_url: string | null;
   payment_date: string;
+  status: string | null;
   notes: string | null;
+}
+
+interface DbPaymentAttemptRow {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  method: string;
+  status: string;
+  receipt_url: string | null;
+  reference_number: string | null;
+  notes: string | null;
+  rejection_reason: string | null;
+  payment_id: number | null;
+  created_at: string | null;
 }
 
 interface DbUtilitySnapshotRow {
@@ -267,14 +284,90 @@ function mapDbItemToInvoiceItem(item: DbInvoiceItemRow): InvoiceItem {
   };
 }
 
+function mapFinancePaymentMethod(method: string | null | undefined): PaymentTransaction['method'] {
+  switch ((method ?? '').toLowerCase()) {
+    case 'cash':
+    case 'tien_mat':
+      return 'Cash';
+    case 'bank_transfer':
+    case 'chuyen_khoan':
+      return 'BankTransfer';
+    case 'vnpay':
+      return 'VNPay';
+    case 'momo':
+    case 'momo_online':
+      return 'Momo';
+    case 'zalopay':
+      return 'ZaloPay';
+    default:
+      return 'Other';
+  }
+}
+
+function mapFinancePaymentStatus(status: string | null | undefined): PaymentTransaction['status'] {
+  switch (status) {
+    case 'submitted':
+      return 'Submitted';
+    case 'processing':
+      return 'Processing';
+    case 'succeeded':
+      return 'Confirmed';
+    case 'failed':
+      return 'Failed';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'rejected':
+      return 'Rejected';
+    case 'refunded':
+      return 'Refunded';
+    case 'pending':
+    default:
+      return 'Pending';
+  }
+}
+
+function splitRejectedNote(note?: string | null): { note?: string; rejectionReason?: string } {
+  const trimmed = note?.trim();
+  if (!trimmed) return {};
+  if (!trimmed.startsWith('[REJECTED]')) {
+    return { note: trimmed };
+  }
+
+  const reason = trimmed.slice('[REJECTED]'.length).trim();
+  return {
+    note: undefined,
+    rejectionReason: reason || undefined,
+  };
+}
+
 function mapDbPaymentToTransaction(payment: DbPaymentRow): PaymentTransaction {
+  const sanitized = splitRejectedNote(payment.notes);
   return {
     id: String(payment.id),
-    transactionCode: payment.payment_code,
+    transactionCode: payment.payment_code ?? payment.reference_number ?? `TT-${payment.id}`,
     paidAt: payment.payment_date,
     amount: payment.amount,
-    method: mapPaymentMethod.fromDb(payment.method) as PaymentTransaction['method'],
-    note: payment.notes ?? undefined,
+    method: mapFinancePaymentMethod(payment.method),
+    status: mapFinancePaymentStatus(payment.status),
+    evidenceUrl: payment.receipt_url ?? undefined,
+    note: sanitized.note,
+    rejectionReason: payment.status === 'rejected' ? sanitized.rejectionReason : undefined,
+    referenceNumber: payment.reference_number ?? undefined,
+  };
+}
+
+function mapDbAttemptToTransaction(attempt: DbPaymentAttemptRow): PaymentTransaction {
+  return {
+    id: `attempt-${attempt.id}`,
+    transactionCode: attempt.reference_number ?? `YC-TT-${String(attempt.id).padStart(5, '0')}`,
+    paidAt: attempt.created_at ?? new Date().toISOString(),
+    amount: attempt.amount,
+    method: mapFinancePaymentMethod(attempt.method),
+    status: mapFinancePaymentStatus(attempt.status),
+    evidenceUrl: attempt.receipt_url ?? undefined,
+    note: attempt.notes?.trim() || undefined,
+    rejectionReason: attempt.rejection_reason ?? undefined,
+    referenceNumber: attempt.reference_number ?? undefined,
   };
 }
 
@@ -466,15 +559,15 @@ async function fetchContractDraft(contractId: number): Promise<ContractDraftRow>
 async function buildInvoiceDraft(input: CreateInvoiceInput): Promise<InvoiceDraftPreview> {
   const contractId = Number(input.contractId);
   if (!Number.isFinite(contractId)) {
-    throw new Error('Hop dong khong hop le.');
+    throw new Error('Hợp đồng không hợp lệ.');
   }
 
   const contractDraft = await fetchContractDraft(contractId);
   if ((contractDraft.utility_billing_type ?? 'policy') !== 'policy') {
-    throw new Error('Hop dong nay chua duoc chuyen sang utility policy.');
+    throw new Error('Hợp đồng này chưa được chuyển sang chính sách điện nước hiện hành.');
   }
   if (!Number.isFinite(Number(contractDraft.occupants_for_billing)) || Number(contractDraft.occupants_for_billing) <= 0) {
-    throw new Error('Hop dong thieu occupants_for_billing hop le.');
+    throw new Error('Hợp đồng thiếu số người tính phí hợp lệ.');
   }
 
   const draft = await buildPolicyInvoiceDraft(input);
@@ -570,10 +663,10 @@ export const invoiceService = {
 
   previewBulkInvoices: async (input: BulkInvoiceInput): Promise<BulkInvoicePreviewRow[]> => {
     if (!/^\d{4}-\d{2}$/.test(input.monthYear)) {
-      throw new Error('Ky thanh toan khong hop le.');
+      throw new Error('Kỳ thanh toán không hợp lệ.');
     }
     if (!input.dueDate) {
-      throw new Error('Vui long chon han thanh toan.');
+      throw new Error('Vui lòng chọn hạn thanh toán.');
     }
 
     const contracts = await invoiceService.getCreateInvoiceContracts();
@@ -605,7 +698,7 @@ export const invoiceService = {
             status: 'duplicate' as const,
             canCreate: false,
             existingInvoiceCode,
-            issue: `Da co hoa don ${existingInvoiceCode} cho ky ${input.monthYear}.`,
+            issue: `Đã có hóa đơn ${existingInvoiceCode} cho kỳ ${input.monthYear}.`,
           };
         }
 
@@ -625,7 +718,7 @@ export const invoiceService = {
             status: preview.missingUtilityItems.length > 0 ? 'blocked' as const : 'ready' as const,
             canCreate: preview.missingUtilityItems.length === 0,
             issue: preview.missingUtilityItems.length > 0
-              ? `Thieu cau hinh utility cho: ${preview.missingUtilityItems.join(', ')}.`
+              ? `Thiếu cấu hình tiện ích cho: ${preview.missingUtilityItems.join(', ')}.`
               : undefined,
           };
         } catch (error) {
@@ -633,7 +726,7 @@ export const invoiceService = {
             contract,
             status: 'error' as const,
             canCreate: false,
-            issue: error instanceof Error ? error.message : 'Khong the xem truoc hoa don.',
+            issue: error instanceof Error ? error.message : 'Không thể xem trước hóa đơn.',
           };
         }
       })
@@ -671,7 +764,7 @@ export const invoiceService = {
         });
         created.push(invoice);
       } catch (error) {
-        const reason = error instanceof Error ? error.message : 'Khong the tao hoa don.';
+        const reason = error instanceof Error ? error.message : 'Không thể tạo hóa đơn.';
         const bucket = isExistingInvoiceError(reason) ? skipped : failed;
         bucket.push({ contractId, contractCode, reason });
       } finally {
@@ -727,8 +820,8 @@ export const invoiceService = {
     }
 
     const { data, error, count } = await query;
-    if (error) throw new Error(`Failed to fetch invoices: ${error.message}`);
-    if (!data) throw new Error('Failed to fetch invoices: no data returned');
+    if (error) throw new Error(`Không thể tải danh sách hóa đơn: ${error.message}`);
+    if (!data) throw new Error('Không thể tải danh sách hóa đơn.');
 
     let items = (data as unknown as DbInvoiceRow[]).map(mapDbRowToInvoice);
 
@@ -814,15 +907,28 @@ export const invoiceService = {
 
     const items: InvoiceItem[] = itemRows.map(mapDbItemToInvoiceItem);
 
-    const paymentRows = await unwrap(
-      supabase
-        .from('payments')
-        .select('id, payment_code, invoice_id, amount, method, payment_date, notes')
-        .eq('invoice_id', Number(id))
-        .order('payment_date', { ascending: false })
-    ) as unknown as DbPaymentRow[];
+    const [paymentRows, attemptRows] = await Promise.all([
+      unwrap(
+        supabase
+          .from('payments')
+          .select('id, payment_code, invoice_id, amount, method, reference_number, receipt_url, payment_date, status, notes')
+          .eq('invoice_id', Number(id))
+          .order('payment_date', { ascending: false }),
+      ) as Promise<unknown>,
+      unwrap(
+        supabase
+          .from('payment_attempts')
+          .select('id, invoice_id, amount, method, status, receipt_url, reference_number, notes, rejection_reason, payment_id, created_at')
+          .eq('invoice_id', Number(id))
+          .is('payment_id', null)
+          .order('created_at', { ascending: false }),
+      ) as Promise<unknown>,
+    ]);
 
-    const payments: PaymentTransaction[] = paymentRows.map(mapDbPaymentToTransaction);
+    const payments: PaymentTransaction[] = [
+      ...(paymentRows as DbPaymentRow[]).map(mapDbPaymentToTransaction),
+      ...(attemptRows as DbPaymentAttemptRow[]).map(mapDbAttemptToTransaction),
+    ].sort((left, right) => new Date(right.paidAt).getTime() - new Date(left.paidAt).getTime());
     const utilitySnapshot = (await unwrap(
       supabase
         .from('invoice_utility_snapshots')
@@ -943,7 +1049,7 @@ export const invoiceService = {
         },
       });
       if (error) throw new Error(error.message);
-      return { success: true, message: 'Thanh toan da duoc ghi nhan' };
+      return { success: true, message: 'Thanh toán đã được ghi nhận.' };
     }
 
     const invoiceRow = (await unwrap(
@@ -984,11 +1090,11 @@ export const invoiceService = {
         .eq('id', Number(invoiceId))
     );
 
-    return { success: true, message: 'Thanh toan da duoc ghi nhan' };
+    return { success: true, message: 'Thanh toán đã được ghi nhận.' };
   },
 
   sendNotification: async (invoiceId: string): Promise<void> => {
-    console.info(`[invoiceService] Notification sent for invoice ${invoiceId}`);
+    void invoiceId;
   },
 
   createInvoice: async (input: CreateInvoiceInput): Promise<Invoice> => {
@@ -1005,10 +1111,10 @@ export const invoiceService = {
 
     const contractDraft = await fetchContractDraft(contractId);
     if ((contractDraft.utility_billing_type ?? 'policy') !== 'policy') {
-      throw new Error('Hợp đồng này chưa được chuyển sang utility policy.');
+      throw new Error('Hợp đồng này chưa được chuyển sang chính sách điện nước hiện hành.');
     }
     if (!Number.isFinite(Number(contractDraft.occupants_for_billing)) || Number(contractDraft.occupants_for_billing) <= 0) {
-      throw new Error('Hợp đồng thiếu occupants_for_billing hợp lệ.');
+      throw new Error('Hợp đồng thiếu số người tính phí hợp lệ.');
     }
 
     const data = await invokeCreateUtilityInvoice({
@@ -1022,7 +1128,7 @@ export const invoiceService = {
 
     const invoiceId = Number((data as { invoiceId?: number | string } | null)?.invoiceId);
     if (!Number.isFinite(invoiceId)) {
-      throw new Error('Edge Function không trả về `invoiceId` hợp lệ sau khi tạo hóa đơn.');
+      throw new Error('Hệ thống tạo hóa đơn không trả về mã hóa đơn hợp lệ.');
     }
 
     const createdInvoice = (await unwrap(
@@ -1036,8 +1142,8 @@ export const invoiceService = {
     return mapDbRowToInvoice(createdInvoice);
   },
 
-  logInvoiceView: async (_invoiceId: string): Promise<void> => {
-    // no-op
+  logInvoiceView: async (invoiceId: string): Promise<void> => {
+    void invoiceId;
   },
 };
 

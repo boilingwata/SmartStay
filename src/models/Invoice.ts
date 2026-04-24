@@ -1,3 +1,5 @@
+import type { PaymentMethod, PaymentStatus } from './Payment';
+
 export type InvoiceStatus = 'Unpaid' | 'Paid' | 'Overdue' | 'Cancelled';
 export type InvoiceItemType = 'Rent' | 'Electricity' | 'Water' | 'Service' | 'Asset' | 'Discount' | 'Other';
 export type InvoiceItemTypeKey =
@@ -27,9 +29,12 @@ export interface PaymentTransaction {
   transactionCode: string;
   paidAt: string;
   amount: number;
-  method: 'Transfer' | 'Cash' | 'E-wallet';
+  method: PaymentMethod | 'Transfer' | 'E-wallet';
+  status: PaymentStatus;
   evidenceUrl?: string;
   note?: string;
+  rejectionReason?: string;
+  referenceNumber?: string;
 }
 
 export interface Invoice {

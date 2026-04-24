@@ -1,5 +1,3 @@
-import { RoomStatus } from "./Room";
-
 export type TenantStatus = 'Active' | 'CheckedOut' | 'Blacklisted';
 
 export interface Tenant {
@@ -26,6 +24,8 @@ export interface TenantProfile extends Tenant {
   nationality: string;
   occupation: string;
   permanentAddress: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
   vehiclePlates: string[]; // JSON array mapped to string[]
   notes: string;
 }

@@ -214,7 +214,7 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
                         setPage(1);
                       }}
                       className="input-base h-14 w-full pl-12"
-                      placeholder="Tìm tenant, phòng, mã hợp đồng..."
+                      placeholder="Tìm cư dân, phòng, mã hợp đồng..."
                     />
                   </div>
 

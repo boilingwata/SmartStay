@@ -4,7 +4,6 @@ import { BuildingSummary, BuildingDetail, Building, BuildingImage, BuildingFilte
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { FALLBACK_PROVINCES, FALLBACK_DISTRICTS, FALLBACK_WARDS } from '@/constants/administrative';
-import { assertNoLikelyMojibake } from '@/utils';
 
 interface ProfileRow {
   id: string;
@@ -19,6 +18,13 @@ interface ProfileRow {
     address?: string;
     email?: string;
   } | null;
+}
+
+interface LocationApiItem {
+  code: number | string;
+  name: string;
+  districts?: LocationApiItem[];
+  wards?: LocationApiItem[];
 }
 
 // --- Row-to-model transformers ---
@@ -165,7 +171,7 @@ export const buildingService = {
 
     if (buildingWithOwner?.profiles) {
       const profiles = buildingWithOwner.profiles as unknown as ProfileRow;
-      const prefs = (profiles.preferences as any) || {};
+      const prefs = profiles.preferences || {};
       detail.managementPhone = profiles.phone || '';
       detail.managementEmail = prefs.email || '';
     }
@@ -282,7 +288,7 @@ export const buildingService = {
       const res = await fetch('https://provinces.open-api.vn/api/p/');
       if (!res.ok) return FALLBACK_PROVINCES;
       const data = await res.json();
-      return data.map((p: any) => ({ id: String(p.code), name: p.name }));
+      return data.map((p: LocationApiItem) => ({ id: String(p.code), name: p.name }));
     } catch {
       return FALLBACK_PROVINCES;
     }
@@ -293,7 +299,7 @@ export const buildingService = {
       const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceId}?depth=2`);
       if (!res.ok) return FALLBACK_DISTRICTS[provinceId] || [];
       const data = await res.json();
-      return (data.districts || []).map((d: any) => ({ id: String(d.code), name: d.name }));
+      return (data.districts || []).map((d: LocationApiItem) => ({ id: String(d.code), name: d.name }));
     } catch {
       return FALLBACK_DISTRICTS[provinceId] || [];
     }
@@ -304,7 +310,7 @@ export const buildingService = {
       const res = await fetch(`https://provinces.open-api.vn/api/d/${districtId}?depth=2`);
       if (!res.ok) return FALLBACK_WARDS[districtId] || [];
       const data = await res.json();
-      return (data.wards || []).map((w: any) => ({ id: String(w.code), name: w.name }));
+      return (data.wards || []).map((w: LocationApiItem) => ({ id: String(w.code), name: w.name }));
     } catch {
       return FALLBACK_WARDS[districtId] || [];
     }
@@ -382,7 +388,7 @@ export const buildingService = {
   uploadBuildingImage: async (id: string, file: File): Promise<string> => {
     // Backend Not Yet Implemented (as requested by user)
     // For now, return a local Object URL to allow for immediate UI preview
-    console.log(`[Mock] Uploading file for building ${id}:`, file.name);
+
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(URL.createObjectURL(file));

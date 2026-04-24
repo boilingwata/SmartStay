@@ -26,6 +26,8 @@ interface DbTenantProfileRow {
   phone: string | null;
   email: string | null;
   permanent_address: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   documents: unknown | null;
   profile_id: string | null;
   profiles: { avatar_url: string | null } | null;
@@ -89,6 +91,8 @@ async function getFallbackProfile(profileId: string): Promise<PortalProfile> {
     cccdIssuedPlace: '',
     nationality: 'Việt Nam',
     occupation: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
     vehiclePlates: [],
     notes: '',
     avatar: profile.avatar_url ?? '',
@@ -119,7 +123,7 @@ export const portalProfileService = {
           .from('tenants')
           .select(`
             id, full_name, id_number, date_of_birth, gender,
-            phone, email, permanent_address, documents, profile_id,
+            phone, email, permanent_address, emergency_contact_name, emergency_contact_phone, documents, profile_id,
             profiles ( avatar_url )
           `)
           .eq('id', tenantId)
@@ -172,6 +176,8 @@ export const portalProfileService = {
         cccdIssuedPlace: '',
         nationality: 'Việt Nam',
         occupation: '',
+        emergencyContactName: row.emergency_contact_name ?? '',
+        emergencyContactPhone: row.emergency_contact_phone ?? '',
         vehiclePlates,
         notes: (docs?.notes as string | undefined) ?? '',
         avatar: avatarUrl,

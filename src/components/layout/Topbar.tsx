@@ -239,7 +239,7 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
               <div className="animate-in slide-in-from-top-4 fade-in zoom-in absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl duration-300">
                 <header className="border-b bg-primary/5 p-4">
                   <p className="truncate text-sm font-bold leading-none text-primary">{user?.fullName || 'Chủ sở hữu'}</p>
-                  <p className="mt-1 truncate text-[10px] text-muted">{user?.email || 'owner@smartstay.vn'}</p>
+                  <p className="mt-1 truncate text-[10px] text-muted">{user?.email || 'admin@smartstay.vn'}</p>
                 </header>
                 <div className="space-y-1 p-2">
                   <UserMenuItem icon={User} label={tt('topbar.profile')} />

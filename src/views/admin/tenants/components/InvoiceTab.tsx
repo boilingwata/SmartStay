@@ -1,104 +1,108 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  FileText, Download, Eye, 
-  CreditCard, Send, MoreVertical,
-  Plus
-} from 'lucide-react';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { formatVND, formatDate } from '@/utils';
+import { Eye, FileText } from 'lucide-react';
+
+import { StatusBadge, type StatusBadgeProps } from '@/components/ui/StatusBadge';
+import { formatDate, formatVND } from '@/utils';
 
 interface InvoiceTabProps {
-  invoices?: any[];
+  invoices?: Array<{
+    id: string;
+    code: string;
+    dueDate: string;
+    status: string;
+    amount: number;
+    amountPaid?: number;
+  }>;
 }
 
 export const InvoiceTab: React.FC<InvoiceTabProps> = ({ invoices }) => {
   const navigate = useNavigate();
-  
   const displayInvoices = invoices || [];
 
   if (displayInvoices.length === 0) {
     return (
-      <div className="card-container p-20 text-center space-y-4 bg-white/40 border-dashed border-2">
-        <div className="w-20 h-20 bg-bg rounded-full flex items-center justify-center text-muted mx-auto">
+      <div className="card-container space-y-4 border-2 border-dashed bg-white/40 p-20 text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-bg text-muted">
           <FileText size={40} />
         </div>
-        <h3 className="text-h3 font-black text-primary uppercase tracking-widest">Chưa có hoá đơn</h3>
-        <p className="text-small text-muted italic max-w-xs mx-auto">Cư dân này hiện chưa có phát sinh hoá đơn tài chính nào.</p>
-        <button className="btn-primary px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">+ Tạo hoá đơn đầu tiên</button>
+        <h3 className="text-h3 font-black uppercase tracking-widest text-primary">Chua co hoa don</h3>
+        <p className="mx-auto max-w-xs text-small italic text-muted">
+          Tenant nay hien chua co hoa don tai chinh nao.
+        </p>
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-10">
-      <div className="flex justify-between items-center px-2">
-         <div>
-            <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Danh sách Hoá đơn</h3>
-            <p className="text-[10px] text-muted font-bold uppercase tracking-tighter italic">Lịch sử tài chính của cư dân</p>
-         </div>
-         <button className="btn-primary px-6 py-2.5 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">
-            <Plus size={16} /> Tạo hoá đơn lẻ
-         </button>
+      <div className="px-2">
+        <h3 className="text-h3 font-black uppercase tracking-widest text-primary">Danh sach hoa don</h3>
+        <p className="text-[10px] font-bold uppercase italic tracking-tighter text-muted">
+          Read-only context tu finance module
+        </p>
       </div>
 
-      <div className="card-container p-0 overflow-hidden bg-white/40 border-none shadow-2xl shadow-primary/5">
+      <div className="card-container overflow-hidden border-none bg-white/40 p-0 shadow-2xl shadow-primary/5">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-900 border-b text-[9px] font-black uppercase text-white tracking-[3px]">
+          <table className="w-full border-collapse text-left">
+            <thead className="border-b bg-slate-900 text-[9px] font-black uppercase tracking-[3px] text-white">
               <tr>
-                <th className="px-8 py-5">Mã Hoá đơn</th>
-                <th className="px-6 py-5 border-l border-white/5">Hạn thanh toán</th>
-                <th className="px-6 py-5 border-l border-white/5">Trạng thái</th>
-                <th className="px-6 py-5 border-l border-white/5 text-right">Tổng tiền</th>
-                <th className="px-8 py-5 border-l border-white/5 text-right">Thao tác</th>
+                <th className="px-8 py-5">Ma hoa don</th>
+                <th className="border-l border-white/5 px-6 py-5">Han thanh toan</th>
+                <th className="border-l border-white/5 px-6 py-5">Trang thai</th>
+                <th className="border-l border-white/5 px-6 py-5 text-right">Tong tien</th>
+                <th className="border-l border-white/5 px-8 py-5 text-right">Thanh toan</th>
+                <th className="border-l border-white/5 px-8 py-5 text-right">Chi tiet</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/10">
-              {displayInvoices.map((inv) => (
-                <tr key={inv.id} className="group hover:bg-white transition-all cursor-pointer" onClick={() => navigate(`/owner/invoices/${inv.id}`)}>
+              {displayInvoices.map((invoice) => (
+                <tr
+                  key={invoice.id}
+                  className="group cursor-pointer transition-all hover:bg-white"
+                  onClick={() => navigate(`/owner/invoices/${invoice.id}`)}
+                >
                   <td className="px-8 py-5">
-                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-bg rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                           <FileText size={18} />
-                        </div>
-                        <span className="text-small font-black text-primary uppercase tracking-tighter">{inv.code}</span>
-                     </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg text-primary transition-transform group-hover:scale-110">
+                        <FileText size={18} />
+                      </div>
+                      <span className="text-small font-black uppercase tracking-tighter text-primary">{invoice.code}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-5">
-                     <span className="text-[12px] font-bold text-muted font-mono">{formatDate(inv.dueDate)}</span>
+                    <span className="font-mono text-[12px] font-bold text-muted">{formatDate(invoice.dueDate)}</span>
                   </td>
                   <td className="px-6 py-5">
-                     <StatusBadge status={inv.status} size="sm" />
+                    <StatusBadge status={invoice.status as StatusBadgeProps['status']} size="sm" />
                   </td>
                   <td className="px-6 py-5 text-right">
-                     <span className="text-[14px] font-black text-secondary font-mono">{formatVND(inv.amount)}</span>
+                    <span className="font-mono text-[14px] font-black text-secondary">{formatVND(invoice.amount)}</span>
                   </td>
                   <td className="px-8 py-5 text-right">
-                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
-                        <button className="p-2 hover:bg-success/10 text-success rounded-lg transition-colors" title="Gửi email"><Send size={16} /></button>
-                        <button className="p-2 hover:bg-bg text-muted rounded-lg transition-colors"><MoreVertical size={16} /></button>
-                     </div>
+                    <span className="font-mono text-[12px] font-bold text-muted">
+                      {formatVND(invoice.amountPaid ?? 0)}
+                    </span>
+                  </td>
+                  <td className="px-8 py-5 text-right">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/owner/invoices/${invoice.id}`);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg p-2 text-primary transition-colors hover:bg-primary/10"
+                      title="Xem chi tiet"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="p-8 bg-primary/5 rounded-[32px] border border-primary/10 flex items-center justify-between">
-         <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-               <CreditCard size={24} />
-            </div>
-            <div>
-               <p className="text-[10px] text-primary font-black uppercase tracking-widest leading-none mb-1">Thanh toán tự động</p>
-               <p className="text-small text-muted font-medium italic">Tiết kiệm thời gian với cổng thanh toán VNPay/App cư dân</p>
-            </div>
-         </div>
-         <button className="btn-outline px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">Thiết lập ngay</button>
       </div>
     </div>
   );

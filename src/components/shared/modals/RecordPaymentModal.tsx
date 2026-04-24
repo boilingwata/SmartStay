@@ -58,7 +58,6 @@ export const RecordPaymentModal = ({
   const [txCode, setTxCode] = useState('');
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 16));
   const [note, setNote] = useState('');
-  const [showOverpaymentDialog, setShowOverpaymentDialog] = useState(false);
   const [proofUrl, setProofUrl] = useState('');
   const [proofName, setProofName] = useState('');
   const [proofPreviewUrl, setProofPreviewUrl] = useState('');
@@ -103,16 +102,16 @@ export const RecordPaymentModal = ({
     if (activeInvoice) {
       setAmount(activeInvoice.totalAmount - activeInvoice.paidAmount);
     }
-  }, [activeInvoice?.id]);
+  }, [activeInvoice]);
 
   const remaining = activeInvoice ? activeInvoice.totalAmount - activeInvoice.paidAmount : 0;
   const balanceAfter = remaining - amount;
 
   const paymentMethods: { id: PaymentMethod; label: string; icon: React.ElementType; color: string }[] = useMemo(
     () => [
-      { id: 'BankTransfer', label: 'VietQR / Bank', icon: Landmark, color: 'text-blue-500' },
+      { id: 'BankTransfer', label: 'VietQR / Ngân hàng', icon: Landmark, color: 'text-blue-500' },
       { id: 'Cash', label: 'Tiền mặt', icon: Wallet, color: 'text-orange-500' },
-      { id: 'Momo', label: 'Momo', icon: Zap, color: 'text-pink-500' },
+      { id: 'Momo', label: 'MoMo', icon: Zap, color: 'text-pink-500' },
       { id: 'VNPay', label: 'VNPay', icon: Smartphone, color: 'text-blue-600' },
     ],
     []
@@ -179,8 +178,8 @@ export const RecordPaymentModal = ({
       return;
     }
 
-    if (amount > remaining && !showOverpaymentDialog && status === 'Confirmed') {
-      setShowOverpaymentDialog(true);
+    if (amount > remaining) {
+      toast.error('Số tiền không được vượt quá số còn nợ của hóa đơn.');
       return;
     }
 
@@ -202,15 +201,19 @@ export const RecordPaymentModal = ({
         note,
         evidenceImage: proofUrl || undefined,
       }),
-    onSuccess: () => {
-      toast.success('Đã ghi nhận thanh toán');
+    onSuccess: (createdPayment) => {
+      toast.success(
+        createdPayment.status === 'Confirmed'
+          ? 'Đã ghi nhận thanh toán.'
+          : 'Đã tạo yêu cầu thanh toán chờ duyệt.',
+      );
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payment', createdPayment.routeId] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', activeInvoice?.id] });
       queryClient.invalidateQueries({ queryKey: ['invoiceCounts'] });
       queryClient.invalidateQueries({ queryKey: ['unpaidInvoices'] });
       onClose();
-      setShowOverpaymentDialog(false);
     },
   });
 
@@ -296,7 +299,7 @@ export const RecordPaymentModal = ({
                 <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">Mã thực hiện (TxCode)</label>
                 <input
                   className="input-base w-full font-mono text-small h-12"
-                  placeholder="Mã tham chiếu ngân hàng..."
+                  placeholder="Mã tham chiếu hoặc mã giao dịch..."
                   value={txCode}
                   onChange={(e) => setTxCode(e.target.value)}
                 />
@@ -420,8 +423,8 @@ export const RecordPaymentModal = ({
                       <Zap size={20} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Thanh toán tự động</p>
-                      <p className="text-[11px] text-slate-500 font-medium leading-none">Quét mã QR để gạch nợ ngay lập tức</p>
+                      <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Chuyển khoản qua QR</p>
+                      <p className="text-[11px] text-slate-500 font-medium leading-none">Nội dung chuyển khoản dùng để webhook SePay nhận diện hóa đơn</p>
                     </div>
                   </div>
                   
@@ -442,7 +445,7 @@ export const RecordPaymentModal = ({
                   </div>
 
                   <p className="text-[9px] text-center text-slate-400 font-medium italic">
-                    * Lưu ý: Hệ thống sẽ tự động xác nhận trong 1-2 phút sau khi nhận được tiền.
+                    Hệ thống sẽ ghi nhận yêu cầu và chờ webhook hoặc người vận hành duyệt theo đúng luồng backend hiện tại.
                   </p>
                 </div>
               )}
@@ -496,12 +499,12 @@ export const RecordPaymentModal = ({
               </div>
 
               {balanceAfter < 0 && (
-                <div className="p-5 bg-blue-500/10 border border-blue-500/20 rounded-3xl flex items-start gap-3 animate-in fade-in zoom-in-95">
-                  <Info size={18} className="text-blue-400 mt-1 shrink-0" />
+                <div className="p-5 bg-warning/10 border border-warning/20 rounded-3xl flex items-start gap-3 animate-in fade-in zoom-in-95">
+                  <Info size={18} className="text-warning mt-1 shrink-0" />
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest">Ghi nhận dư thừa</p>
-                    <p className="text-[11px] text-blue-100/70 font-medium">
-                      Cư dân nộp dư <strong>{formatVND(Math.abs(balanceAfter))}</strong>. Tiền sẽ được cộng vào ví quỹ cư dân.
+                    <p className="text-[10px] font-black text-warning uppercase tracking-widest">Vượt số còn nợ</p>
+                    <p className="text-[11px] text-warning/80 font-medium">
+                      Hệ thống không cho lưu giao dịch lớn hơn số còn nợ trong phase này. Hãy điều chỉnh lại số tiền nộp.
                     </p>
                   </div>
                 </div>
@@ -535,42 +538,6 @@ export const RecordPaymentModal = ({
           </div>
         </div>
 
-        {showOverpaymentDialog && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-primary/40 backdrop-blur-xl" onClick={() => setShowOverpaymentDialog(false)} />
-            <div className="relative w-full max-w-sm bg-white rounded-[48px] shadow-2xl p-10 text-center space-y-8 animate-in zoom-in-95">
-              <div className="w-24 h-24 bg-secondary/10 text-secondary rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
-                <DollarSign size={48} />
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-h2 font-black text-primary uppercase tracking-tighter">Xác nhận nộp dư</h3>
-                <p className="text-body text-muted">
-                  Hóa đơn chỉ còn <strong>{formatVND(remaining)}</strong>. Bạn muốn xử lý phần dư{' '}
-                  <strong>{formatVND(Math.abs(balanceAfter))}</strong> như thế nào?
-                </p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => createMutation.mutate('Confirmed')}
-                  className="w-full py-5 bg-secondary hover:bg-secondary-dark text-white rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-secondary/20 transition-all"
-                >
-                  Nạp vào ví cư dân
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAmount(remaining);
-                    setShowOverpaymentDialog(false);
-                  }}
-                  className="w-full py-4 border-2 border-border hover:bg-bg rounded-[20px] font-black text-muted uppercase tracking-widest text-[11px]"
-                >
-                  Chỉ thu đúng số nợ
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

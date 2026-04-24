@@ -27,7 +27,14 @@ interface ApprovePaymentRequest {
   confirm: true;
 }
 
-type ProcessPaymentRequest = NewPaymentRequest | ApprovePaymentRequest;
+interface RejectPaymentRequest {
+  existingPaymentId?: number;
+  paymentAttemptId?: number;
+  reject: true;
+  reason: string;
+}
+
+type ProcessPaymentRequest = NewPaymentRequest | ApprovePaymentRequest | RejectPaymentRequest;
 
 async function hmacSha256(key: string, data: string): Promise<string> {
   const enc = new TextEncoder();
@@ -51,7 +58,14 @@ function isApprove(body: ProcessPaymentRequest): body is ApprovePaymentRequest {
   );
 }
 
-const VALID_METHODS = ['cash', 'bank_transfer', 'momo', 'tien_mat', 'chuyen_khoan', 'momo_online'];
+function isReject(body: ProcessPaymentRequest): body is RejectPaymentRequest {
+  return (
+    ('existingPaymentId' in body || 'paymentAttemptId' in body)
+    && (body as RejectPaymentRequest).reject === true
+  );
+}
+
+const VALID_METHODS = ['cash', 'bank_transfer', 'momo', 'zalopay', 'vnpay', 'other'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return handleOptions();
@@ -64,6 +78,103 @@ Deno.serve(async (req: Request) => {
   }
 
   const db = createAdminClient();
+
+  // --- Branch C: Reject existing payment or attempt ---
+  if (isReject(body)) {
+    const { caller, denied } = await requireWorkspaceOperator(req);
+    if (denied) return denied;
+
+    const { existingPaymentId, paymentAttemptId, reason } = body;
+    const trimmedReason = reason?.trim();
+
+    if (
+      (existingPaymentId == null || typeof existingPaymentId !== 'number')
+      && (paymentAttemptId == null || typeof paymentAttemptId !== 'number')
+    ) {
+      return errorResponse('existingPaymentId hoặc paymentAttemptId phải là số.');
+    }
+
+    if (!trimmedReason) {
+      return errorResponse('Lý do từ chối là bắt buộc.');
+    }
+
+    if (paymentAttemptId != null) {
+      const now = new Date().toISOString();
+      const { data: attempt, error: attemptError } = await db
+        .from('payment_attempts')
+        .select('id, status, payment_id')
+        .eq('id', paymentAttemptId)
+        .single();
+
+      if (attemptError) {
+        console.error('[process-payment] load payment_attempts error:', attemptError);
+        return errorResponse(attemptError.message, 500);
+      }
+
+      if (attempt.payment_id != null) {
+        return errorResponse('Yêu cầu này đã được chuyển thành thanh toán, vui lòng xử lý trên bản ghi thanh toán.', 409);
+      }
+
+      if (attempt.status === 'succeeded') {
+        return errorResponse('Yêu cầu này đã được duyệt, không thể từ chối.', 409);
+      }
+
+      const { error } = await db
+        .from('payment_attempts')
+        .update({
+          status: 'rejected',
+          rejection_reason: trimmedReason,
+          rejected_at: now,
+          rejected_by: caller!.userId,
+          updated_at: now,
+        })
+        .eq('id', paymentAttemptId)
+        .is('payment_id', null);
+
+      if (error) {
+        console.error('[process-payment] reject payment_attempt error:', error);
+        return errorResponse(error.message, 500);
+      }
+
+      return successResponse({
+        attemptId: paymentAttemptId,
+        status: 'rejected',
+      });
+    }
+
+    const { data: payment, error: paymentLoadError } = await db
+      .from('payments')
+      .select('id, status')
+      .eq('id', existingPaymentId!)
+      .single();
+
+    if (paymentLoadError) {
+      console.error('[process-payment] load payments error:', paymentLoadError);
+      return errorResponse(paymentLoadError.message, 500);
+    }
+
+    if (payment.status === 'succeeded') {
+      return errorResponse('Thanh toán này đã được xác nhận, không thể từ chối.', 409);
+    }
+
+    const { error } = await db
+      .from('payments')
+      .update({
+        status: 'rejected',
+        notes: `[REJECTED] ${trimmedReason}`,
+      })
+      .eq('id', existingPaymentId!);
+
+    if (error) {
+      console.error('[process-payment] reject payment error:', error);
+      return errorResponse(error.message, 500);
+    }
+
+    return successResponse({
+      paymentId: existingPaymentId,
+      status: 'rejected',
+    });
+  }
 
   // --- Branch B: Approve existing payment ---
   if (isApprove(body)) {
@@ -157,7 +268,7 @@ Deno.serve(async (req: Request) => {
     const { data, error } = await db.rpc('process_payment', {
       p_invoice_id: invoiceId,
       p_amount: amount,
-      p_method: 'momo_online',
+      p_method: 'momo',
       p_payment_date: paymentDate,
       p_notes: notes ?? null,
       p_receipt_url: receiptUrl ?? null,
@@ -166,7 +277,7 @@ Deno.serve(async (req: Request) => {
       p_confirmed_by: caller.userId,
       p_auto_confirm: false,
       p_idempotency_key: idempotencyKey ?? `momo:${orderId}`,
-      p_attempt_status: 'cho_xu_ly',
+      p_attempt_status: 'processing',
     });
 
     if (error) {
