@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Layers3, Plus, Save, ShieldCheck, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
+import { Calendar, Layers3, PenSquare, Plus, Save, ShieldCheck, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatUtilityMonthList, getUtilityScopeLabel } from '@/lib/utilityPresentation';
 import utilityAdminService, { type UtilityPolicyFormInput, type UtilityScopeType } from '@/services/utilityAdminService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
 import { formatDate, formatVND } from '@/utils';
@@ -29,24 +30,10 @@ function createDefaultForm(): UtilityPolicyFormInput {
   };
 }
 
-function getScopeLabel(scopeType: UtilityScopeType) {
-  switch (scopeType) {
-    case 'system':
-      return 'Toàn hệ thống';
-    case 'building':
-      return 'Theo tòa nhà';
-    case 'room':
-      return 'Theo phòng';
-    case 'contract':
-      return 'Theo hợp đồng';
-    default:
-      return scopeType;
-  }
-}
-
 export default function UtilityPoliciesPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [editingPolicyId, setEditingPolicyId] = useState<number | null>(null);
   const [form, setForm] = useState<UtilityPolicyFormInput>(createDefaultForm);
 
   const { data: policies = [], isLoading, isError, refetch } = useQuery({
@@ -67,16 +54,24 @@ export default function UtilityPoliciesPage() {
   const deviceCatalog = utilityAdminService.getDeviceAdjustmentCatalog();
   const suggestedCode = utilityAdminService.createSuggestedPolicyCode(form.scopeType, form.scopeId, form.effectiveFrom);
 
-  const createMutation = useMutation({
-    mutationFn: (payload: UtilityPolicyFormInput) => utilityAdminService.createPolicy(payload),
+  const saveMutation = useMutation({
+    mutationFn: async (payload: UtilityPolicyFormInput) => {
+      if (editingPolicyId != null) {
+        await utilityAdminService.updatePolicy(editingPolicyId, payload);
+        return editingPolicyId;
+      }
+
+      return utilityAdminService.createPolicy(payload);
+    },
     onSuccess: () => {
-      toast.success('Đã tạo chính sách điện nước mới.');
+      toast.success(editingPolicyId != null ? 'Đã cập nhật chính sách điện nước.' : 'Đã tạo chính sách điện nước mới.');
       setForm(createDefaultForm());
+      setEditingPolicyId(null);
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ['utility-policies'] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Không thể tạo chính sách điện nước.');
+      toast.error(error instanceof Error ? error.message : 'Không thể lưu chính sách điện nước.');
     },
   });
 
@@ -100,6 +95,48 @@ export default function UtilityPoliciesPage() {
     }));
   };
 
+  const resetForm = () => {
+    setForm(createDefaultForm());
+    setEditingPolicyId(null);
+  };
+
+  const openCreateForm = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const startEdit = (policyId: number) => {
+    const target = policies.find((item) => item.id === policyId);
+    if (!target) return;
+
+    setEditingPolicyId(target.id);
+    setForm({
+      code: target.code,
+      name: target.name,
+      scopeType: target.scopeType,
+      scopeId: target.scopeId,
+      description: target.description,
+      electricBaseAmount: target.electricBaseAmount,
+      waterBaseAmount: target.waterBaseAmount,
+      waterPerPersonAmount: target.waterPerPersonAmount,
+      electricHotSeasonMultiplier: target.electricHotSeasonMultiplier,
+      locationMultiplier: target.locationMultiplier,
+      seasonMonths: target.seasonMonths,
+      roundingIncrement: target.roundingIncrement,
+      minElectricFloor: target.minElectricFloor,
+      minWaterFloor: target.minWaterFloor,
+      effectiveFrom: target.effectiveFrom,
+      effectiveTo: target.effectiveTo,
+      adjustments: utilityAdminService.getDefaultDeviceAdjustments().map((item) => {
+        const currentAdjustment = target.adjustments.find((adjustment) => adjustment.deviceCode === item.deviceCode);
+        return currentAdjustment
+          ? { ...item, chargeAmount: currentAdjustment.chargeAmount, isActive: currentAdjustment.isActive }
+          : item;
+      }),
+    });
+    setShowForm(true);
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.name.trim()) {
@@ -115,9 +152,9 @@ export default function UtilityPoliciesPage() {
       return;
     }
 
-    await createMutation.mutateAsync({
+    await saveMutation.mutateAsync({
       ...form,
-      code: suggestedCode,
+      code: editingPolicyId != null ? form.code : suggestedCode,
     });
   };
 
@@ -127,19 +164,26 @@ export default function UtilityPoliciesPage() {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-amber-600">
             <Zap size={14} />
-            Utility Billing
+            Chính sách tiện ích
           </div>
           <h1 className="text-4xl font-black tracking-tight text-slate-900">Chính sách điện nước</h1>
           <p className="max-w-4xl text-sm leading-6 text-slate-500">
-            Không cần nhập mã định danh thủ công. Chỉ cần chọn phạm vi áp dụng, nhập đơn giá nền và phụ phí thiết bị.
-            Khi phòng được gắn tài sản như máy lạnh, bình nóng lạnh hoặc bếp điện, hệ thống sẽ tự cộng phụ phí thiết bị
-            vào phần điện của hóa đơn.
+            Đây là nơi khai báo mức tính nền cho điện nước. Chỉ cần chọn đúng phạm vi áp dụng, nhập mức giá nền, hệ số và
+            phụ phí thiết bị. Hệ thống sẽ dùng chính sách này cho các kỳ hóa đơn phát sinh về sau.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setShowForm((value) => !value)}
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+              setShowForm(false);
+              return;
+            }
+
+            openCreateForm();
+          }}
           className="inline-flex h-11 items-center gap-2 rounded-2xl bg-amber-500 px-5 font-black text-white transition hover:bg-amber-600"
         >
           <Plus size={16} />
@@ -147,11 +191,34 @@ export default function UtilityPoliciesPage() {
         </button>
       </div>
 
+      <div className="grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50/80 p-5 md:grid-cols-3">
+        <div className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Khi nào dùng</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Dùng khi bạn muốn thiết lập mức điện nước mặc định cho toàn hệ thống, một tòa nhà, một phòng hoặc một hợp đồng.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Cách thao tác</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            1. Chọn phạm vi áp dụng. 2. Nhập giá nền, hệ số, phụ phí. 3. Lưu chính sách. 4. Chỉ dùng ghi đè ở màn hình khác
+            nếu cần sửa riêng cho đúng một kỳ hóa đơn.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Thứ tự ưu tiên</p>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            Hệ thống luôn ưu tiên mức gần hợp đồng hơn: hợp đồng, phòng, tòa nhà, rồi đến toàn hệ thống. Ghi đè kỳ hóa đơn sẽ
+            cao hơn mọi chính sách.
+          </p>
+        </div>
+      </div>
+
       {showForm ? (
         <form onSubmit={handleSubmit} className="space-y-8 rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-black uppercase tracking-[0.2em] text-cyan-700">
             <ShieldCheck size={18} />
-            Tạo chính sách mới
+            {editingPolicyId != null ? 'Chỉnh sửa chính sách' : 'Tạo chính sách mới'}
           </div>
 
           <div className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
@@ -222,7 +289,16 @@ export default function UtilityPoliciesPage() {
                   </label>
                 </div>
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Hệ thống tự sinh mã chính sách: <span className="font-black">{suggestedCode}</span>. Người dùng không phải nhập ID kỹ thuật.
+                  {editingPolicyId != null ? (
+                    <>Mã chính sách hiện tại: <span className="font-black">{form.code}</span>. Khi chỉnh sửa, hệ thống giữ nguyên mã nội bộ đang dùng.</>
+                  ) : (
+                    <>Hệ thống tự sinh mã chính sách: <span className="font-black">{suggestedCode}</span>. Người dùng không phải nhập mã nội bộ.</>
+                  )}
+                </div>
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-600">
+                  <span className="font-black text-slate-900">Lưu ý:</span> “Phạm vi hợp đồng” ở đây là một chính sách áp riêng cho hợp đồng đó.
+                  Nếu hợp đồng đã được gắn sẵn một chính sách riêng từ nghiệp vụ hợp đồng, hệ thống vẫn ưu tiên mức gần hợp đồng trước khi lùi về
+                  phòng, tòa nhà và toàn hệ thống.
                 </div>
               </section>
 
@@ -349,13 +425,25 @@ export default function UtilityPoliciesPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-t border-slate-100 pt-5">
-            <button type="submit" disabled={createMutation.isPending} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-8 font-black text-white transition hover:bg-slate-800 disabled:opacity-60">
+          <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 md:flex-row md:items-center">
+            <button type="submit" disabled={saveMutation.isPending} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-8 font-black text-white transition hover:bg-slate-800 disabled:opacity-60">
               <Save size={18} />
-              {createMutation.isPending ? 'Đang lưu...' : 'Lưu chính sách'}
+              {saveMutation.isPending ? 'Đang lưu...' : editingPolicyId != null ? 'Lưu thay đổi' : 'Lưu chính sách'}
             </button>
+            {editingPolicyId != null ? (
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(false);
+                }}
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 px-6 font-black text-slate-600 transition hover:bg-slate-50"
+              >
+                Hủy chỉnh sửa
+              </button>
+            ) : null}
             <div className="rounded-2xl bg-amber-50 px-5 py-3 text-sm text-amber-800">
-              Thứ tự ưu tiên khi tính hóa đơn: <span className="font-black">Hợp đồng &gt; Phòng &gt; Tòa nhà &gt; Toàn hệ thống</span>
+              Chính sách chỉ áp cho các kỳ hóa đơn phát sinh sau khi lưu. Dữ liệu bản chụp công thức và lịch sử hóa đơn cũ không bị thay đổi.
             </div>
           </div>
         </form>
@@ -365,6 +453,13 @@ export default function UtilityPoliciesPage() {
         <div className="h-48 animate-pulse rounded-[28px] border border-slate-100 bg-slate-50" />
       ) : isError ? (
         <ErrorBanner message="Không tải được danh sách chính sách điện nước." onRetry={refetch} />
+      ) : policies.length === 0 ? (
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+          <p className="text-xl font-black text-slate-900">Chưa có chính sách tiện ích nào</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Hãy tạo ít nhất một chính sách toàn hệ thống để các màn hình ghi đè và đợt xuất hóa đơn có cấu hình nền để sử dụng.
+          </p>
+        </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
           {policies.map((policy) => (
@@ -374,7 +469,7 @@ export default function UtilityPoliciesPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700">
                       <Layers3 size={12} />
-                      {getScopeLabel(policy.scopeType)}
+                      {getUtilityScopeLabel(policy.scopeType)}
                     </span>
                     {policy.scopeLabel ? (
                       <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">{policy.scopeLabel}</span>
@@ -384,14 +479,25 @@ export default function UtilityPoliciesPage() {
                   <p className="text-sm text-slate-500">{policy.description || `Mã hệ thống tự tạo: ${policy.code}`}</p>
                 </div>
 
-                <button
-                  onClick={() => toggleMutation.mutate({ id: policy.id, isActive: !policy.isActive })}
-                  className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.15em] ${
-                    policy.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400'
-                  }`}
-                >
-                  {policy.isActive ? 'Đang áp dụng' : 'Tạm ngưng'}
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(policy.id)}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.15em] text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <PenSquare size={14} />
+                    Chỉnh sửa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleMutation.mutate({ id: policy.id, isActive: !policy.isActive })}
+                    className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.15em] ${
+                      policy.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400'
+                    }`}
+                  >
+                    {policy.isActive ? 'Đang áp dụng' : 'Tạm ngưng'}
+                  </button>
+                </div>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -414,7 +520,7 @@ export default function UtilityPoliciesPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">Tháng nóng: {policy.seasonMonths.join(', ')}</span>
+                <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">Tháng nóng: {formatUtilityMonthList(policy.seasonMonths)}</span>
                 <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">Hệ số vị trí: x{policy.locationMultiplier}</span>
                 <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">Làm tròn: {formatVND(policy.roundingIncrement)}</span>
               </div>

@@ -1,4 +1,5 @@
 import { buildBillableAssetLines } from '@/lib/assetBilling';
+import { formatUtilityBillingMonthCompact } from '@/lib/utilityPresentation';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import {
@@ -162,7 +163,7 @@ function toOverrideInput(row: UtilityOverrideRow | null): UtilityOverrideInput |
 
 async function fetchContractDraft(contractId: number): Promise<ContractDraftRow> {
   return (await unwrap(
-    (supabase as any)
+    supabase
       .from('contracts')
       .select(`
         id,
@@ -275,7 +276,8 @@ async function fetchDeviceAdjustments(policyId: number): Promise<UtilityDeviceAd
   }));
 }
 
-export function inferUtilityKind(_serviceName: string): 'electricity' | 'water' | null {
+export function inferUtilityKind(serviceName: string): 'electricity' | 'water' | null {
+  void serviceName;
   return null;
 }
 
@@ -289,16 +291,17 @@ export function resolveContractUtilityMode(): 'policy' | 'legacy_metered' {
 
 export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<PolicyInvoiceDraft> {
   const contractId = Number(input.contractId);
-  if (!Number.isFinite(contractId)) throw new Error('Hop dong khong hop le.');
-  if (!/^\d{4}-\d{2}$/.test(input.monthYear)) throw new Error('Ky thanh toan khong hop le.');
-  if (!input.dueDate) throw new Error('Vui long chon han thanh toan.');
+  if (!Number.isFinite(contractId)) throw new Error('Hợp đồng không hợp lệ.');
+  if (!/^\d{4}-\d{2}$/.test(input.monthYear)) throw new Error('Kỳ thanh toán không hợp lệ.');
+  if (!input.dueDate) throw new Error('Vui lòng chọn hạn thanh toán.');
 
   const contract = await fetchContractDraft(contractId);
   const policies = await fetchPolicies();
   const override = await fetchOverride(contractId, input.monthYear);
   const room = contract.rooms;
+  const billingMonthLabel = formatUtilityBillingMonthCompact(input.monthYear);
 
-  if (!room) throw new Error('Khong tim thay phong cua hop dong.');
+  if (!room) throw new Error('Không tìm thấy phòng của hợp đồng.');
 
   const pinnedPolicy =
     contract.utility_policy_id == null
@@ -315,14 +318,14 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
       });
 
   if (!policyResolution.policy) {
-    throw new Error('Thieu utility policy de tinh hoa don.');
+    throw new Error('Chưa tìm thấy chính sách tiện ích phù hợp để tính hóa đơn.');
   }
 
   const primaryTenant = contract.contract_tenants.find((item) => item.is_primary) ?? contract.contract_tenants[0];
   const tenantName = primaryTenant?.tenants?.full_name ?? '';
   const occupantsForBilling = override?.occupantsForBillingOverride ?? Number(contract.occupants_for_billing ?? 0);
   if (!Number.isFinite(occupantsForBilling) || occupantsForBilling <= 0) {
-    throw new Error('Hop dong thieu occupants_for_billing hop le.');
+    throw new Error('Hợp đồng chưa có số người tính phí hợp lệ.');
   }
 
   const deviceAdjustments = await fetchDeviceAdjustments(policyResolution.policy.id);
@@ -352,7 +355,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
 
   if (monthlyRent > 0) {
     items.push({
-      description: `Tien thue thang ${input.monthYear}`,
+      description: `Tiền thuê tháng ${billingMonthLabel}`,
       quantity: 1,
       unitPrice: monthlyRent,
       lineTotal: monthlyRent,
@@ -363,11 +366,11 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
   }
 
   for (const service of contract.contract_services ?? []) {
-    const serviceName = service.service_catalog?.name ?? `Dich vu #${service.service_catalog_id}`;
+    const serviceName = service.service_catalog?.name ?? `Dịch vụ #${service.service_catalog_id}`;
     const quantity = Math.max(1, Number(service.quantity ?? 1));
     const unitPrice = Number(service.fixed_price ?? 0);
     items.push({
-      description: `${serviceName} thang ${input.monthYear}`,
+      description: `${serviceName} tháng ${billingMonthLabel}`,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -384,9 +387,9 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
     contractStartDate: contract.start_date,
     contractEndDate: contract.end_date,
     startingSortOrder: sortOrder,
-    assets: (room.room_assets ?? []).map((asset) => ({
-      id: asset.id,
-      assetName: asset.assets?.name ?? `Tai san #${asset.id}`,
+      assets: (room.room_assets ?? []).map((asset) => ({
+        id: asset.id,
+        assetName: asset.assets?.name ?? `Tài sản #${asset.id}`,
       billingLabel: asset.billing_label,
       quantity: asset.quantity,
       monthlyCharge: asset.monthly_charge,
@@ -415,7 +418,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
   sortOrder += assetItems.length;
 
   items.push({
-    description: `Tien dien thang ${input.monthYear}`,
+    description: `Tiền điện tháng ${billingMonthLabel}`,
     quantity: 1,
     unitPrice: utilitySnapshot.electricFinalAmount,
     lineTotal: utilitySnapshot.electricFinalAmount,
@@ -425,7 +428,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
   });
 
   items.push({
-    description: `Tien nuoc thang ${input.monthYear}`,
+    description: `Tiền nước tháng ${billingMonthLabel}`,
     quantity: 1,
     unitPrice: utilitySnapshot.waterFinalAmount,
     lineTotal: utilitySnapshot.waterFinalAmount,
@@ -437,7 +440,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
   const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
   if (discountAmount > 0) {
     items.push({
-      description: input.discountReason?.trim() ? `Giam tru: ${input.discountReason.trim()}` : 'Giam tru hoa don',
+      description: input.discountReason?.trim() ? `Giảm trừ: ${input.discountReason.trim()}` : 'Giảm trừ hóa đơn',
       quantity: 1,
       unitPrice: -discountAmount,
       lineTotal: -discountAmount,
@@ -448,7 +451,7 @@ export async function buildPolicyInvoiceDraft(input: DraftInput): Promise<Policy
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  if (subtotal < 0) throw new Error('Giam tru khong the lon hon tong tien hoa don.');
+  if (subtotal < 0) throw new Error('Giảm trừ không thể lớn hơn tổng tiền hóa đơn.');
 
   return {
     contractId: String(contract.id),

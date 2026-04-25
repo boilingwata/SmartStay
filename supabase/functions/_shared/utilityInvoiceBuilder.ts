@@ -1,4 +1,4 @@
-/// <reference path="./deno-globals.d.ts" />
+import "./deno-globals.d.ts";
 
 import type { SupabaseClient } from "./supabaseAdmin.ts";
 import { buildBillableAssetLines } from "./assetBilling.ts";
@@ -111,6 +111,12 @@ interface UtilityPolicyDeviceAdjustmentRow {
   charge_amount: number | null;
 }
 
+function formatBillingMonthLabel(billingPeriod: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(billingPeriod);
+  if (!match) return billingPeriod;
+  return `${match[2]}/${match[1]}`;
+}
+
 function toPolicyInput(row: UtilityPolicyRow): UtilityPolicyInput {
   return {
     id: Number(row.id),
@@ -148,7 +154,8 @@ function toOverrideInput(row: UtilityOverrideRow | null): UtilityOverrideInput |
   };
 }
 
-export function inferUtilityKind(_serviceName: string): "electricity" | "water" | null {
+export function inferUtilityKind(serviceName: string): "electricity" | "water" | null {
+  void serviceName;
   return null;
 }
 
@@ -206,11 +213,11 @@ export async function buildUtilityInvoicePayload(
     .eq("is_deleted", false)
     .single();
 
-  if (contractError || !contract) throw new Error(contractError?.message ?? "Contract not found");
+  if (contractError || !contract) throw new Error(contractError?.message ?? 'Không tìm thấy hợp đồng cần tính tiện ích.');
 
   const typedContract = contract as unknown as ContractInvoiceRow;
   const room = typedContract.rooms;
-  if (!room) throw new Error("Room not found for this contract");
+  if (!room) throw new Error('Không tìm thấy phòng gắn với hợp đồng này.');
 
   const { data: policies, error: policyError } = await db
     .from("utility_policies")
@@ -267,7 +274,7 @@ export async function buildUtilityInvoicePayload(
         system: null,
       });
 
-  if (!resolved.policy) throw new Error("No active utility policy found for this contract");
+  if (!resolved.policy) throw new Error('Không tìm thấy chính sách tiện ích đang áp dụng cho hợp đồng này.');
 
   const { data: deviceRows, error: deviceError } = await db
     .from("utility_policy_device_adjustments")
@@ -285,7 +292,7 @@ export async function buildUtilityInvoicePayload(
   );
 
   const contractTenants = typedContract.contract_tenants ?? [];
-  const primaryTenant = contractTenants.find((item) => Boolean(item.is_primary)) ?? contractTenants[0];
+  void contractTenants;
   const override = toOverrideInput((overrideRow ?? null) as unknown as UtilityOverrideRow | null);
 
   const utilitySnapshot = computeUtilitySnapshot({
@@ -310,16 +317,17 @@ export async function buildUtilityInvoicePayload(
   });
 
   if (!Number.isFinite(utilitySnapshot.occupantsForBilling) || utilitySnapshot.occupantsForBilling <= 0) {
-    throw new Error("Contract is missing a valid occupants_for_billing value");
+    throw new Error('Hợp đồng chưa có số người tính phí hợp lệ.');
   }
 
   const items: Array<Record<string, unknown>> = [];
   let sortOrder = 1;
   const monthlyRent = Number(typedContract.monthly_rent ?? 0);
+  const billingMonthLabel = formatBillingMonthLabel(input.billingPeriod);
 
   if (monthlyRent > 0) {
     items.push({
-      description: `Tien thue thang ${input.billingPeriod}`,
+      description: `Tiền thuê tháng ${billingMonthLabel}`,
       quantity: 1,
       unitPrice: monthlyRent,
       lineTotal: monthlyRent,
@@ -329,11 +337,11 @@ export async function buildUtilityInvoicePayload(
   }
 
   for (const service of typedContract.contract_services ?? []) {
-    const serviceName = String(service.service_catalog?.name ?? `Dich vu #${service.service_catalog_id}`);
+    const serviceName = String(service.service_catalog?.name ?? `Dịch vụ #${service.service_catalog_id}`);
     const quantity = Math.max(1, Number(service.quantity ?? 1));
     const unitPrice = Number(service.fixed_price ?? 0);
     items.push({
-      description: `${serviceName} thang ${input.billingPeriod}`,
+      description: `${serviceName} tháng ${billingMonthLabel}`,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -351,7 +359,7 @@ export async function buildUtilityInvoicePayload(
     startingSortOrder: sortOrder,
     assets: (room.room_assets ?? []).map((asset) => ({
       id: asset.id,
-      assetName: asset.assets?.name ?? `Tai san #${asset.id}`,
+      assetName: asset.assets?.name ?? `Tài sản #${asset.id}`,
       billingLabel: asset.billing_label,
       quantity: asset.quantity,
       monthlyCharge: asset.monthly_charge,
@@ -379,7 +387,7 @@ export async function buildUtilityInvoicePayload(
   sortOrder += assetItems.length;
 
   items.push({
-    description: `Tien dien thang ${input.billingPeriod}`,
+    description: `Tiền điện tháng ${billingMonthLabel}`,
     quantity: 1,
     unitPrice: utilitySnapshot.electricFinalAmount,
     lineTotal: utilitySnapshot.electricFinalAmount,
@@ -388,7 +396,7 @@ export async function buildUtilityInvoicePayload(
   });
 
   items.push({
-    description: `Tien nuoc thang ${input.billingPeriod}`,
+    description: `Tiền nước tháng ${billingMonthLabel}`,
     quantity: 1,
     unitPrice: utilitySnapshot.waterFinalAmount,
     lineTotal: utilitySnapshot.waterFinalAmount,
@@ -399,7 +407,7 @@ export async function buildUtilityInvoicePayload(
   const normalizedDiscount = Math.max(0, Number(input.discountAmount ?? 0));
   if (normalizedDiscount > 0) {
     items.push({
-      description: input.discountReason?.trim() ? `Giam tru: ${input.discountReason.trim()}` : "Giam tru hoa don",
+      description: input.discountReason?.trim() ? `Giảm trừ: ${input.discountReason.trim()}` : 'Giảm trừ hóa đơn',
       quantity: 1,
       unitPrice: -normalizedDiscount,
       lineTotal: -normalizedDiscount,
@@ -409,7 +417,7 @@ export async function buildUtilityInvoicePayload(
   }
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.lineTotal ?? 0), 0);
-  if (subtotal < 0) throw new Error("Discount cannot exceed invoice subtotal");
+  if (subtotal < 0) throw new Error('Giảm trừ không thể lớn hơn tổng tiền hóa đơn.');
 
   return {
     contractId: input.contractId,

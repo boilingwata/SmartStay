@@ -15,6 +15,11 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  formatUtilityBillingPeriod,
+  formatUtilityDateTime,
+  getUtilityRunStatusLabel,
+} from '@/lib/utilityPresentation';
 import utilityAdminService from '@/services/utilityAdminService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
 import { formatDate, formatVND } from '@/utils';
@@ -84,29 +89,34 @@ function getDateGapInDays(startDate: string, endDate: string) {
 
 function getBillingRunStatusMeta(status: string) {
   switch (status.toLowerCase()) {
+    case 'draft':
+      return {
+        label: getUtilityRunStatusLabel(status),
+        className: 'bg-slate-100 text-slate-700 border-slate-200',
+      };
     case 'running':
       return {
-        label: 'Đang chạy',
+        label: getUtilityRunStatusLabel(status),
         className: 'bg-amber-100 text-amber-800 border-amber-200',
       };
     case 'completed':
       return {
-        label: 'Hoàn thành',
+        label: getUtilityRunStatusLabel(status),
         className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       };
     case 'failed':
       return {
-        label: 'Thất bại',
+        label: getUtilityRunStatusLabel(status),
         className: 'bg-rose-100 text-rose-800 border-rose-200',
       };
     case 'cancelled':
       return {
-        label: 'Đã hủy',
+        label: getUtilityRunStatusLabel(status),
         className: 'bg-slate-200 text-slate-700 border-slate-300',
       };
     default:
       return {
-        label: status,
+        label: getUtilityRunStatusLabel(status),
         className: 'bg-slate-100 text-slate-700 border-slate-200',
       };
   }
@@ -124,15 +134,15 @@ function getBillingPreviewGuidance(error: Error | null) {
   const message = error?.message ?? '';
   if (message.includes('401') || message.toLowerCase().includes('xac thuc')) {
     return [
-      'Function utility billing đang bị từ chối xác thực ở phía Supabase.',
-      'Nếu bạn vẫn đang ở trong trang admin thì đây là lỗi auth/quyền của edge function, không phải do bạn vừa chọn sai tháng hay ngày.',
-      'Màn hình này sẽ hiện thông tin chẩn đoán cụ thể thay vì chỉ báo đăng nhập lại.',
+      'Supabase đang từ chối xác thực khi gọi đợt xuất hóa đơn tiện ích.',
+      'Nếu bạn vẫn đang ở trang quản trị thì đây là lỗi quyền hoặc cấu hình hàm xử lý ở Supabase, không phải do bạn chọn sai tháng hay ngày.',
+      'Hãy kiểm tra quyền truy cập và cấu hình hàm xử lý trước khi chạy lại.',
     ];
   }
 
   return [
     'Hệ thống chưa thể kiểm tra kỳ tính tiền này.',
-    'Hãy đối chiếu tháng billing, hạn thanh toán và dữ liệu hợp đồng hóa đơn hiện có trước khi thử lại.',
+    'Hãy đối chiếu kỳ hóa đơn, hạn thanh toán và dữ liệu hợp đồng hiện có trước khi thử lại.',
   ];
 }
 
@@ -170,7 +180,9 @@ export default function BillingRunsPage() {
   const runMutation = useMutation({
     mutationFn: () => utilityAdminService.startBillingRun(billingPeriod, dueDate),
     onSuccess: async (result) => {
-      toast.success(`Kỳ ${result.billingPeriod}: Tạo ${result.createdInvoices}, Bỏ qua ${result.skippedInvoices}.`);
+      toast.success(
+        `${formatUtilityBillingPeriod(result.billingPeriod)}: đã tạo ${result.createdInvoices} hóa đơn, bỏ qua ${result.skippedInvoices} hợp đồng.`,
+      );
       setSelectedRunId(result.billingRunId ?? null);
       setActiveTab('history');
       await queryClient.invalidateQueries({ queryKey: ['billing-runs'] });
@@ -181,7 +193,7 @@ export default function BillingRunsPage() {
     },
   });
 
-  const runs = runsQuery.data ?? [];
+  const runs = useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const preview = previewQuery.data;
   const snapshots = snapshotsQuery.data ?? [];
   const currentRun = useMemo(() => runs.find((run) => run.id === selectedRunId) ?? null, [runs, selectedRunId]);
@@ -191,7 +203,6 @@ export default function BillingRunsPage() {
 
   const canSubmit = billingPeriod.length === 7 && dueDate.length === 10;
   const previewReady = preview ? isPreviewReady(preview.eligibleContracts) : false;
-  const selectedRunStatus = currentRun ? getBillingRunStatusMeta(currentRun.status) : null;
   const isDueDateBeforePeriodEnd = canSubmit && dueDate < billingPeriodBounds.end;
   const currentRunSkippedContracts = Array.isArray((currentRun?.summary as { skippedContracts?: unknown[]; ineligibleContracts?: unknown[] } | undefined)?.skippedContracts)
     ? ((currentRun?.summary as { skippedContracts?: Array<{ contractCode: string; reason: string }> }).skippedContracts ?? [])
@@ -200,6 +211,9 @@ export default function BillingRunsPage() {
       : [];
   const currentRunExistingInvoiceContracts = Array.isArray((currentRun?.summary as { existingInvoiceContracts?: unknown[] } | undefined)?.existingInvoiceContracts)
     ? ((currentRun?.summary as { existingInvoiceContracts?: Array<{ contractCode: string }> }).existingInvoiceContracts ?? [])
+    : [];
+  const currentRunFailures = Array.isArray((currentRun?.error as { failures?: unknown[] } | undefined)?.failures)
+    ? ((currentRun?.error as { failures?: Array<{ contractCode: string; message: string }> }).failures ?? [])
     : [];
 
   return (
@@ -213,10 +227,11 @@ export default function BillingRunsPage() {
               Quản lý kỳ tính tiền
             </div>
             <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white md:text-5xl">
-              Điều khiển nghiệp vụ tính tiền
+              Điều khiển đợt xuất hóa đơn tiện ích
             </h1>
             <p className="max-w-2xl text-sm font-medium leading-relaxed text-slate-300 md:text-base">
-              Kiểm tra trước khi chạy hóa đơn. Hệ thống sẽ tự tìm mức giá áp dụng và tạo hóa đơn hàng loạt cho các hợp đồng hợp lệ.
+              Luôn xem trước trước khi chạy. Hệ thống sẽ lọc đúng hợp đồng giao kỳ, đang dùng tiện ích theo chính sách, có số người tính phí hợp lệ
+              và chưa có hóa đơn của cùng kỳ.
             </p>
           </div>
 
@@ -267,6 +282,29 @@ export default function BillingRunsPage() {
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Bảng điều khiển chạy hóa đơn</h2>
                 <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
                   Hãy xem trước để biết hợp đồng nào được tạo hóa đơn, hợp đồng nào bị loại và xác nhận dữ liệu trước khi chạy thực tế.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50 p-5 lg:grid-cols-3">
+              <div className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Bước 1</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Chọn đúng kỳ hóa đơn và hạn thanh toán. Kỳ hóa đơn là tháng phát sinh tiền điện nước, không phải tháng bạn bấm chạy.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Bước 2</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Bấm <span className="font-black text-slate-900">Xem trước</span> để kiểm tra 5 điều kiện: hợp đồng còn hiệu lực, không bị xóa,
+                  giao đúng kỳ, đang dùng chế độ tính theo chính sách và có số người tính phí lớn hơn 0.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Bước 3</p>
+                <p className="mt-2 text-sm leading-6 text-emerald-900">
+                  Chỉ bấm <span className="font-black">Bắt đầu chạy hóa đơn</span> khi danh sách “Có thể tạo mới” đúng như mong muốn.
+                  Hóa đơn đã có từ trước sẽ tự bị bỏ qua.
                 </p>
               </div>
             </div>
@@ -322,9 +360,9 @@ export default function BillingRunsPage() {
               </div>
               <div className="mt-5 grid gap-4 text-sm font-medium text-slate-600 md:grid-cols-3">
                 <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
-                  <span className="block text-[10px] uppercase tracking-wider text-slate-400">Kỳ Billing</span>
-                  <span className="mt-1 block font-bold text-slate-800">{billingPeriodBounds.start} - {billingPeriodBounds.end}</span>
-                </div>
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-400">Kỳ hóa đơn</span>
+                    <span className="mt-1 block font-bold text-slate-800">{billingPeriodBounds.start} - {billingPeriodBounds.end}</span>
+                  </div>
                 <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
                   <span className="block text-[10px] uppercase tracking-wider text-slate-400">Giãn cách từ cuối kỳ</span>
                   <span className="mt-1 block font-bold text-slate-800">{Number.isFinite(dueDateGapDays) ? `${dueDateGapDays} ngày` : '-'}</span>
@@ -345,7 +383,7 @@ export default function BillingRunsPage() {
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-5 font-black text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {previewQuery.isFetching ? <Loader2 size={18} className="animate-spin" /> : <SearchCheck size={18} />}
-                {previewQuery.isFetching ? 'Đang kiểm tra...' : 'Xem Trước Quy Trình'}
+                {previewQuery.isFetching ? 'Đang kiểm tra...' : 'Xem trước đợt chạy'}
               </button>
 
               <button
@@ -354,14 +392,14 @@ export default function BillingRunsPage() {
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 font-black text-white shadow-md transition hover:bg-emerald-700 hover:shadow-lg focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {runMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-                {runMutation.isPending ? 'Đang xuất hóa đơn...' : 'Bắt Đầu Chạy Hóa Đơn'}
+                {runMutation.isPending ? 'Đang xuất hóa đơn...' : 'Bắt đầu chạy hóa đơn'}
               </button>
             </div>
 
             {previewQuery.isError && (
               <div className="mt-6 rounded-[24px] border border-rose-200 bg-rose-50 p-5">
                 <ErrorBanner
-                  message={previewQuery.error instanceof Error ? previewQuery.error.message : 'Không thể xem trước do lỗi kết nối kết máy chủ.'}
+                  message={previewQuery.error instanceof Error ? previewQuery.error.message : 'Không thể xem trước do lỗi kết nối máy chủ.'}
                   onRetry={() => previewQuery.refetch()}
                 />
                 <div className="mt-3 space-y-2 text-sm text-rose-900">
@@ -380,7 +418,7 @@ export default function BillingRunsPage() {
                 </p>
               </div>
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 hover:bg-slate-100 transition-colors">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Áp dụng màn hình này</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Đúng chế độ chính sách</p>
                 <p className="mt-3 text-3xl font-black text-emerald-600" style={numericStyle}>
                   {preview?.validContracts ?? 0}
                 </p>
@@ -402,17 +440,17 @@ export default function BillingRunsPage() {
             {preview && (
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Chẩn đoán kỳ Billing</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Chẩn đoán kỳ hóa đơn</p>
                   <p className="mt-3 text-sm font-medium text-slate-700">
                     <span className="font-bold text-slate-900">{preview.diagnostics.totalContracts}</span> hợp đồng giao kỳ, 
-                    <span className="font-bold text-slate-900 ml-1">{preview.diagnostics.validContracts}</span> hợp lệ cho utility policy.
+                    <span className="font-bold text-slate-900 ml-1">{preview.diagnostics.validContracts}</span> hợp đồng đang dùng tiện ích theo chính sách.
                   </p>
                   <p className="mt-2 bg-slate-50 p-2 rounded-lg text-xs font-medium text-slate-500">
-                    Từ {preview.diagnostics.billingPeriodStart} đến {preview.diagnostics.billingPeriodEnd}
+                    Từ {formatDate(preview.diagnostics.billingPeriodStart)} đến {formatDate(preview.diagnostics.billingPeriodEnd)}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị loại do công tơ</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị loại khỏi đợt chạy</p>
                   <p className="mt-3 text-3xl font-black text-amber-700" style={numericStyle}>
                     {preview.diagnostics.skippedContracts}
                   </p>
@@ -430,9 +468,9 @@ export default function BillingRunsPage() {
               <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Đã Tồn Tại Hóa Đơn</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Đã có hóa đơn từ trước</p>
                     <p className="mt-2 text-sm font-medium text-slate-700">
-                      Các hợp đồng sau đã xuất tiền tiện ích kỳ {preview.billingPeriod}, sẽ bị bỏ qua khi bạn nhấn chạy.
+                      Các hợp đồng sau đã có hóa đơn của {formatUtilityBillingPeriod(preview.billingPeriod)}, nên hệ thống sẽ tự bỏ qua khi bạn bấm chạy.
                     </p>
                   </div>
                   <p className="text-2xl font-black text-sky-900" style={numericStyle}>
@@ -455,7 +493,7 @@ export default function BillingRunsPage() {
             <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 to-emerald-50/30 p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Phân loại dữ liệu trước chạy</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Phân loại dữ liệu trước khi chạy</p>
                   <h3 className="mt-2 text-xl font-black text-slate-900">Chi tiết hợp đồng để xuất hóa đơn</h3>
                 </div>
                 {preview ? (
@@ -467,19 +505,19 @@ export default function BillingRunsPage() {
                     }`}
                   >
                     {previewReady ? <CheckCircle2 size={16} /> : <ShieldAlert size={16} />}
-                    {previewReady ? 'Sẵn sàng chạy' : 'Không có hợp đồng hợp lệ'}
+                    {previewReady ? 'Sẵn sàng chạy' : 'Chưa có hợp đồng đủ điều kiện'}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm">
                     <Clock3 size={16} />
-                    Vui lòng bấm Xem Trước
+                    Vui lòng bấm Xem trước
                   </span>
                 )}
               </div>
 
               <div className="mt-6 grid gap-5 lg:grid-cols-2">
                 <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Sẵn Sàng Xuất Hóa Đơn</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Có thể tạo mới</p>
                   <div className="mt-4 flex max-h-56 flex-wrap gap-2 overflow-auto">
                     {preview?.eligibleContracts.length ? (
                       preview.eligibleContracts.map((contract) => (
@@ -491,13 +529,13 @@ export default function BillingRunsPage() {
                         </span>
                       ))
                     ) : (
-                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Chưa có thông tin. Bấm "Xem Trước" để kiểm tra.</p>
+                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Chưa có thông tin. Bấm “Xem trước đợt chạy” để kiểm tra.</p>
                     )}
                   </div>
                 </div>
 
                 <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị Từ Chối (Ineligible)</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">Bị loại khỏi đợt chạy</p>
                   <div className="mt-4 max-h-56 space-y-3 overflow-auto">
                     {preview?.ineligibleContracts.length ? (
                       preview.ineligibleContracts.map((contract) => (
@@ -507,7 +545,7 @@ export default function BillingRunsPage() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Không có hợp đồng nào nằm trong sách sách từ chối.</p>
+                      <p className="text-sm font-medium text-slate-500 w-full text-center py-4 bg-slate-50 rounded-xl">Không có hợp đồng nào bị loại khỏi đợt chạy.</p>
                     )}
                   </div>
                 </div>
@@ -523,7 +561,7 @@ export default function BillingRunsPage() {
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Log Hệ Thống</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Lịch sử đợt chạy</p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-900">Danh sách các đợt đã xử lý</h2>
               </div>
               <button
@@ -548,7 +586,7 @@ export default function BillingRunsPage() {
                 <div className="rounded-[28px] border-2 border-dashed border-slate-200 bg-slate-50 p-12 text-center">
                   <Play size={48} className="mx-auto text-slate-300 mb-4" />
                   <p className="text-xl font-black text-slate-900">Chưa có đợt cập nhật nào</p>
-                  <p className="mt-2 text-sm font-medium text-slate-500 max-w-sm mx-auto">Vui lòng quay lại bảng điều khiển, thực hiện xem trước và chạy đợt tính tiền đầu tiên của bạn.</p>
+                  <p className="mt-2 text-sm font-medium text-slate-500 max-w-sm mx-auto">Hãy quay lại bảng điều khiển, xem trước dữ liệu rồi chạy đợt xuất hóa đơn tiện ích đầu tiên.</p>
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -569,9 +607,9 @@ export default function BillingRunsPage() {
                             {statusMeta.label}
                           </span>
                         </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">RUN #{run.id}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Đợt #{run.id}</p>
                         <p className="text-2xl font-black text-slate-900 mb-4" style={numericStyle}>
-                          Ky: {run.billingPeriod}
+                          {formatUtilityBillingPeriod(run.billingPeriod)}
                         </p>
                         <div className="grid grid-cols-3 gap-2 bg-white rounded-xl p-3 border border-slate-100 shadow-sm mb-4">
                           <div className="text-center">
@@ -579,7 +617,7 @@ export default function BillingRunsPage() {
                             <p className="font-black text-emerald-600">{getRunSummaryNumber(run.summary, 'createdInvoices')}</p>
                           </div>
                           <div className="text-center border-l border-r border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">Skip</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Bỏ qua</p>
                             <p className="font-black text-amber-600">{getRunSummaryNumber(run.summary, 'skippedInvoices')}</p>
                           </div>
                           <div className="text-center">
@@ -588,7 +626,7 @@ export default function BillingRunsPage() {
                           </div>
                         </div>
                         <div className="flex justify-between text-[11px] font-bold text-slate-500" style={numericStyle}>
-                          <span>Thành công: {run.completedAt ? formatDate(run.completedAt) : '--'}</span>
+                          <span>Hoàn thành: {formatUtilityDateTime(run.completedAt)}</span>
                         </div>
                       </button>
                     );
@@ -603,9 +641,9 @@ export default function BillingRunsPage() {
               <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div>
                   <h3 className="text-2xl font-black tracking-[-0.03em] text-slate-900 flex items-center gap-3">
-                    Chi tiết Run #{currentRun.id}
+                    Chi tiết đợt #{currentRun.id}
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-600" style={numericStyle}>
-                      {currentRun.billingPeriod}
+                      {formatUtilityBillingPeriod(currentRun.billingPeriod)}
                     </span>
                   </h3>
                   <p className="mt-2 text-sm font-medium text-slate-500">Kết quả chi tiết của từng hợp đồng được xem xét trong đợt chạy này.</p>
@@ -616,20 +654,20 @@ export default function BillingRunsPage() {
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:opacity-50"
                 >
                   {snapshotsQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-                  Tải lại Snapshot
+                  Tải lại chi tiết
                 </button>
               </div>
 
               {/* Failures & skips */}
-              {(currentRunSkippedContracts.length > 0 || currentRunExistingInvoiceContracts.length > 0 || (currentRun.error as any)?.failures?.length > 0) && (
+              {(currentRunSkippedContracts.length > 0 || currentRunExistingInvoiceContracts.length > 0 || currentRunFailures.length > 0) && (
                 <div className="mb-6 grid gap-4 lg:grid-cols-2">
-                  {((currentRun.error as any)?.failures ?? []).length > 0 && (
+                  {currentRunFailures.length > 0 && (
                     <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-5 col-span-full">
                       <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-rose-700">
                         <AlertTriangle size={16} /> Hợp đồng bị lỗi khi chạy
                       </div>
                       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        {((currentRun.error as any)?.failures ?? []).map((failure: any, index: number) => (
+                        {currentRunFailures.map((failure, index) => (
                           <div key={`${failure.contractCode}-${index}`} className="rounded-xl border border-rose-100 bg-white p-3 shadow-sm">
                             <p className="font-black text-rose-900">{failure.contractCode}</p>
                             <p className="text-xs font-medium text-rose-600 mt-1">{failure.message}</p>
@@ -692,13 +730,13 @@ export default function BillingRunsPage() {
                         <tr>
                           <td colSpan={7} className="px-5 py-12 text-center">
                             <Loader2 className="mx-auto text-slate-300 animate-spin mb-2" size={24} />
-                            <span className="text-slate-500 font-medium">Đang tải Snapshot dữ liệu...</span>
+                            <span className="text-slate-500 font-medium">Đang tải dữ liệu chi tiết...</span>
                           </td>
                         </tr>
                       ) : snapshots.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="px-5 py-12 text-center">
-                            <span className="text-slate-500 font-medium">Không có chi tiết snapshot nào cho đợt chạy này.</span>
+                            <span className="text-slate-500 font-medium">Không có dữ liệu chi tiết nào cho đợt chạy này.</span>
                           </td>
                         </tr>
                       ) : (
@@ -717,13 +755,13 @@ export default function BillingRunsPage() {
                             </td>
                             <td className="px-5 py-4">
                               <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
-                                {snapshot.policySourceType}
+                                {snapshot.policySourceLabel}
                               </span>
                             </td>
                             <td className="px-5 py-4">
                               <div className="flex flex-wrap gap-1">
                                 {snapshot.warnings.length === 0 ? (
-                                  <span className="text-xs text-slate-400 italic">...</span>
+                                  <span className="text-xs text-slate-400 italic">Không có</span>
                                 ) : (
                                   snapshot.warnings.map((warning) => (
                                     <span
@@ -731,7 +769,7 @@ export default function BillingRunsPage() {
                                       className="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 border border-amber-200"
                                       title={warning.message}
                                     >
-                                      {warning.code}
+                                      {warning.label}
                                     </span>
                                   ))
                                 )}
@@ -751,4 +789,3 @@ export default function BillingRunsPage() {
     </div>
   );
 }
-

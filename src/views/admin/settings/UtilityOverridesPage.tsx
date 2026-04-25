@@ -2,9 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarRange, Eraser, PenSquare, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatUtilityBillingPeriod, formatUtilityDateTime, formatUtilityMonthList } from '@/lib/utilityPresentation';
 import utilityAdminService, { type UtilityOverrideFormInput } from '@/services/utilityAdminService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
-import { formatDate, formatVND } from '@/utils';
+import { formatVND } from '@/utils';
 
 const pageFontStyle: React.CSSProperties = {
   fontFamily: '"Inter", system-ui, sans-serif',
@@ -15,6 +16,8 @@ const numericStyle: React.CSSProperties = {
   fontVariantNumeric: 'tabular-nums',
   fontFeatureSettings: '"tnum"',
 };
+
+const ALL_MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 function createDefaultForm(): UtilityOverrideFormInput {
   return {
@@ -40,7 +43,7 @@ export default function UtilityOverridesPage() {
     queryFn: () => utilityAdminService.getPolicyScopeOptions(),
   });
 
-  const contractOptions = scopeOptions?.contract ?? [];
+  const contractOptions = useMemo(() => scopeOptions?.contract ?? [], [scopeOptions]);
 
   const saveMutation = useMutation({
     mutationFn: (payload: UtilityOverrideFormInput) => utilityAdminService.upsertOverride(payload),
@@ -74,9 +77,23 @@ export default function UtilityOverridesPage() {
     () => contractOptions.find((option) => option.value === form.contractId)?.label ?? '',
     [contractOptions, form.contractId],
   );
+  const currentBillingMonth = useMemo(() => form.billingPeriod.slice(5, 7), [form.billingPeriod]);
 
   const usesElectricFinalOverride = form.electricFinalOverride != null && form.electricFinalOverride !== undefined;
   const usesWaterFinalOverride = form.waterFinalOverride != null && form.waterFinalOverride !== undefined;
+
+  const toggleSeasonMonth = (month: string) => {
+    setForm((current) => {
+      const selected = current.seasonMonthsOverride ?? [];
+      const exists = selected.includes(month);
+      return {
+        ...current,
+        seasonMonthsOverride: exists
+          ? selected.filter((item) => item !== month)
+          : [...selected, month].sort(),
+      };
+    });
+  };
 
   const startEdit = (overrideId: number) => {
     const target = overrides.find((item) => item.id === overrideId);
@@ -116,40 +133,45 @@ export default function UtilityOverridesPage() {
         </div>
         <h1 className="text-4xl font-black tracking-tight text-slate-900">Quản Lý Ngoại Lệ Tiện Ích</h1>
         <p className="max-w-3xl text-sm font-medium text-slate-500 leading-relaxed">
-          Sử dụng tính năng này khi cần đặc cách tính tiền điện/nước cho một hợp đồng trong <b>đúng một tháng duy nhất</b>. 
-          Các thông số ghi đè sẽ thay thế giá trị từ chính sách gốc (Policy) tại thời điểm chốt hóa đơn.
+          Dùng màn hình này khi bạn cần sửa riêng tiền điện nước cho <b>đúng một hợp đồng trong đúng một kỳ hóa đơn</b>.
+          Nếu nhu cầu áp dụng lâu dài, hãy quay lại màn hình chính sách thay vì ghi đè thủ công.
         </p>
 
         <div className="grid gap-4 mt-6 md:grid-cols-3">
           <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mb-1">Base Override (Cơ bản)</p>
-            <p className="text-[13px] font-medium text-slate-600 leading-snug">Chỉ thay đổi mức giá khởi điểm. Hệ thống vẫn tiếp tục áp các hệ số (vị trí, mùa nóng) và phụ thu thiết bị.</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mb-1">Ghi đè mức cơ sở</p>
+            <p className="text-[13px] font-medium text-slate-600 leading-snug">Chỉ thay đổi mức nền. Hệ thống vẫn áp dụng hệ số vị trí, mùa nóng và phụ phí thiết bị như bình thường.</p>
           </div>
           <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600 mb-1">Final Override (Tuyệt đối)</p>
-            <p className="text-[13px] font-medium text-slate-600 leading-snug">Chốt cứng số tiền phải đóng. Bỏ qua hoàn toàn mọi hệ số và công thức tính toán của tháng đó.</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-600 mb-1">Chốt số tiền tuyệt đối</p>
+            <p className="text-[13px] font-medium text-slate-600 leading-snug">Khóa cứng số tiền phải thu của tháng đó. Hệ thống sẽ bỏ qua toàn bộ công thức tính ở kỳ này.</p>
           </div>
           <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600 mb-1">Quy tắc Resolve</p>
-            <p className="text-[13px] font-medium text-slate-600 leading-snug">Khớp theo `Hợp đồng + Tháng`. Bạn có thể lập bảng ghi đè trước cả khi hệ thống tự động sinh hóa đơn (Billing Run).</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600 mb-1">Quy tắc áp dụng</p>
+            <p className="text-[13px] font-medium text-slate-600 leading-snug">Ghi đè được khớp theo cặp <b>hợp đồng + kỳ hóa đơn</b>. Khi đợt xuất hóa đơn chạy, ghi đè sẽ ưu tiên cao hơn mọi chính sách.</p>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-6 text-slate-600">
+          <span className="font-black text-slate-900">Cách thao tác:</span> 1. Chọn đúng hợp đồng và kỳ hóa đơn. 2. Chỉ nhập các trường cần sửa.
+          3. Nếu muốn giữ nguyên công thức gốc, hãy để trống. 4. Chỉ dùng “chốt số tiền tuyệt đối” khi đã xác nhận chắc số tiền phải thu.
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8 rounded-[32px] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
         <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-cyan-600 border-b border-slate-100 pb-4">
           <PenSquare size={18} />
-          {editingId ? 'Chỉnh sửa Ghi Đè' : 'Tạo Ghi Đè Mới'}
+          {editingId ? 'Chỉnh sửa ghi đè' : 'Tạo ghi đè mới'}
         </div>
 
         <div className="space-y-6 block">
           <h3 className="text-xs font-black uppercase tracking-[0.18em] text-slate-800 bg-slate-50 inline-block px-3 py-1 rounded-lg">1. Thông tin Hợp đồng & Kỳ hóa đơn</h3>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
             <label className="space-y-2 xl:col-span-2">
-              <span className="text-xs font-bold text-slate-600">Chọn Hợp đồng</span>
+              <span className="text-xs font-bold text-slate-600">Chọn hợp đồng</span>
               <p className="text-[10px] text-slate-500 mb-1">Hợp đồng sẽ được áp dụng ngoại lệ này.</p>
               <select className="input-base w-full bg-white font-bold text-slate-700" value={form.contractId || ''} onChange={(event) => setForm((current) => ({ ...current, contractId: Number(event.target.value) }))}>
-                <option value="">-- Click để chọn hợp đồng --</option>
+                <option value="">-- Bấm để chọn hợp đồng --</option>
                 {contractOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -157,15 +179,15 @@ export default function UtilityOverridesPage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-xs font-bold text-slate-600">Chu kỳ thanh toán</span>
-              <p className="text-[10px] text-slate-500 mb-1">Tháng áp dụng ghi đè. VD: 2026-04</p>
+              <span className="text-xs font-bold text-slate-600">Kỳ hóa đơn</span>
+              <p className="text-[10px] text-slate-500 mb-1">Tháng áp dụng ghi đè. Ví dụ: 2026-04</p>
               <input type="month" className="input-base w-full bg-white text-indigo-700 font-bold" style={numericStyle} value={form.billingPeriod} onChange={(event) => setForm((current) => ({ ...current, billingPeriod: event.target.value }))} />
             </label>
 
             <label className="space-y-2">
               <span className="text-xs font-bold text-slate-600">Lý do ghi đè</span>
               <p className="text-[10px] text-slate-500 mb-1">Ghi chú lại lý do để đối soát sau này.</p>
-              <input className="input-base w-full bg-white" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} placeholder="VD: Khuyến mãi tân gia tháng đầu" required />
+              <input className="input-base w-full bg-white" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Ví dụ: Hỗ trợ tháng đầu cho khách mới" required />
             </label>
           </div>
         </div>
@@ -174,49 +196,93 @@ export default function UtilityOverridesPage() {
           <h3 className="text-xs font-black uppercase tracking-[0.18em] text-slate-800 bg-slate-50 inline-block px-3 py-1 rounded-lg">2. Thông số Điện & Nước</h3>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4 rounded-2xl bg-slate-50/50 border border-slate-100 p-4">
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400 border-b border-slate-100 pb-2">Ngoại lệ Giá Cơ Bản (Base)</div>
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400 border-b border-slate-100 pb-2">Ghi đè mức cơ sở</div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Điện cơ bản mới (đ)</span>
                   <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức giá điện cơ bản. Phụ thu, prorate vẫn tính. VD: 150000</p>
-                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Theo Policy" value={form.electricBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.electricBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Nước cơ bản mới (đ)</span>
                   <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức khoán nước của phòng. Phí theo người vẫn tính. VD: 0</p>
-                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Theo Policy" value={form.waterBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.waterBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Số người ở thực tế</span>
                   <p className="text-[10px] text-slate-500 mb-1">Ghi đè số người tính phí nước cho tháng này. VD: 1</p>
-                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Tự động tính" value={form.occupantsForBillingOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, occupantsForBillingOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo hợp đồng" value={form.occupantsForBillingOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, occupantsForBillingOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Hệ số Mùa nóng mới</span>
                   <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân tháng nóng. VD: 1.0 (Bỏ mùa nóng)</p>
-                  <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Theo Policy" value={form.electricHotSeasonMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricHotSeasonMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.electricHotSeasonMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricHotSeasonMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                  <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Hệ số Vị trí mới</span>
                   <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân vị trí. VD: 1.0</p>
-                  <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Theo Policy" value={form.locationMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, locationMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.locationMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, locationMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Thiết lập mùa nóng cho kỳ này</p>
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                      Trường này chỉ dùng khi bạn muốn thay đổi cách xác định “tháng nóng” của đúng kỳ đang sửa.
+                      Nếu không chắc, hãy để trống để giữ theo chính sách gốc.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, seasonMonthsOverride: [] }))}
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50"
+                  >
+                    Giữ theo chính sách
+                  </button>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {ALL_MONTHS.map((month) => {
+                    const selected = (form.seasonMonthsOverride ?? []).includes(month);
+                    const isCurrentMonth = month === currentBillingMonth;
+                    return (
+                      <button
+                        key={month}
+                        type="button"
+                        onClick={() => toggleSeasonMonth(month)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-black tracking-[0.16em] transition ${
+                          selected
+                            ? 'border-rose-300 bg-rose-500 text-white'
+                            : isCurrentMonth
+                              ? 'border-amber-300 bg-amber-50 text-amber-800'
+                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        Th{month}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-[11px] font-medium text-slate-500">
+                  Danh sách đang chọn: <span className="font-black text-slate-700">{formatUtilityMonthList(form.seasonMonthsOverride ?? [])}</span>
+                </p>
               </div>
             </div>
 
             <div className="space-y-4 rounded-2xl bg-rose-50/30 border border-rose-100 p-4">
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-rose-500 border-b border-rose-100 pb-2">Ngoại lệ Tuyệt đối (Final)</div>
-              <p className="text-[11px] text-slate-500">Cảnh báo: Khi nhập giá trị này, giá trị Final sẽ khóa cứng, bỏ qua mọi tính toán base, hệ số bên trái.</p>
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-rose-500 border-b border-rose-100 pb-2">Chốt số tiền tuyệt đối</div>
+              <p className="text-[11px] text-slate-500">Khi nhập số tiền ở đây, hệ thống sẽ thu đúng số đó và bỏ qua toàn bộ công thức tính ở cột bên trái.</p>
               <div className="grid gap-4 sm:grid-cols-2 mt-2">
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-rose-800">Chốt TỔNG tiền ĐIỆN (đ)</span>
                   <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. VD: Miễn phí điền 0, hoặc thu đúng 200000.</p>
-                  <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Bỏ qua policy" value={form.electricFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Không chốt tay" value={form.electricFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-rose-800">Chốt TỔNG tiền NƯỚC (đ)</span>
                   <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. VD: Miễn phí điền 0, hoặc thu đúng 50000.</p>
-                  <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Bỏ qua policy" value={form.waterFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Không chốt tay" value={form.waterFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
               </div>
             </div>
@@ -227,8 +293,8 @@ export default function UtilityOverridesPage() {
           <div className="flex-1 rounded-2xl bg-amber-50 px-5 py-3 text-xs font-bold text-amber-800 leading-relaxed border border-amber-100 w-full">
             Đang cấu hình ghi đè cho: <strong className="text-slate-900 bg-white px-2 py-0.5 rounded-md border border-slate-200">{form.contractId ? selectedContractLabel : 'Chưa chọn'}</strong>
             <br />
-            {usesElectricFinalOverride || usesWaterFinalOverride ? <span className="text-rose-600">Đang bật Final Override - Các giá trị cơ sở sẽ bị bỏ qua.</span> : 'Sử dụng Base Override - Công thức định giá vẫn sẽ kích hoạt.'}
-            {' '}Mã thiết lập: [{form.contractId || 0} / {form.billingPeriod || '--'}]
+            {usesElectricFinalOverride || usesWaterFinalOverride ? <span className="text-rose-600">Đang bật chế độ chốt số tiền tuyệt đối. Các giá trị cơ sở sẽ bị bỏ qua.</span> : 'Đang dùng ghi đè mức cơ sở hoặc giữ nguyên chính sách gốc.'}
+            {' '}Kỳ đang sửa: {form.billingPeriod ? formatUtilityBillingPeriod(form.billingPeriod) : '--'}
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end">
@@ -238,7 +304,7 @@ export default function UtilityOverridesPage() {
               </button>
             )}
             <button type="submit" disabled={saveMutation.isPending} className="inline-flex h-12 w-full md:w-auto items-center justify-center gap-2 rounded-2xl bg-slate-900 px-8 font-black text-white hover:bg-slate-800 disabled:opacity-60 transition shadow-lg shadow-slate-900/20">
-              <Save size={18} /> {editingId ? 'Cập Nhật' : 'Lưu Ghi Đè'}
+              <Save size={18} /> {editingId ? 'Cập nhật' : 'Lưu ghi đè'}
             </button>
           </div>
         </div>
@@ -248,14 +314,21 @@ export default function UtilityOverridesPage() {
         <div className="h-40 animate-pulse rounded-[32px] border border-slate-100 bg-slate-50" />
       ) : isError ? (
         <ErrorBanner message="Không tải được danh sách ghi đè tiện ích." onRetry={refetch} />
+      ) : overrides.length === 0 ? (
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+          <p className="text-xl font-black text-slate-900">Chưa có ghi đè nào</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Nếu cần sửa riêng cho một kỳ hóa đơn, hãy chọn hợp đồng, nhập đúng trường cần thay đổi rồi lưu.
+          </p>
+        </div>
       ) : (
         <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
           <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_1fr_120px] gap-4 border-b border-slate-100 bg-slate-50/80 px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
             <span>Hợp đồng & Lý do</span>
-            <span>Kỳ Hóa Đơn</span>
-            <span>Tiền Điện</span>
-            <span>Tiền Nước</span>
-            <span>Kỷ Lục</span>
+            <span>Kỳ hóa đơn</span>
+            <span>Tiền điện</span>
+            <span>Tiền nước</span>
+            <span>Ngày tạo</span>
             <span className="text-center">Thao tác</span>
           </div>
           <div className="divide-y divide-slate-100">
@@ -265,34 +338,33 @@ export default function UtilityOverridesPage() {
                   <p className="font-black text-slate-900 text-base">{override.contractCode}</p>
                   <div className="flex items-center gap-2">
                      <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{override.roomCode}</span>
-                     <span className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">ID: {override.contractId}</span>
                   </div>
                   <p className="text-xs font-medium text-slate-500 mt-2 line-clamp-1" title={override.reason}>{override.reason}</p>
                 </div>
                 <div>
                   <span className="inline-flex items-center rounded-xl bg-indigo-50 px-3 py-1 font-bold text-indigo-700" style={numericStyle}>
-                    {override.billingPeriod}
+                    {formatUtilityBillingPeriod(override.billingPeriod)}
                   </span>
                 </div>
                 <div className="space-y-1" style={numericStyle}>
                   {override.electricFinalOverride != null
-                    ? <span className="inline-block rounded-md bg-rose-50 px-2 py-1 font-black text-rose-700">Final {formatVND(override.electricFinalOverride)}</span>
+                    ? <span className="inline-block rounded-md bg-rose-50 px-2 py-1 font-black text-rose-700">Chốt {formatVND(override.electricFinalOverride)}</span>
                     : override.electricBaseOverride != null
-                      ? <span className="inline-block rounded-md bg-amber-50 px-2 py-1 font-bold text-amber-700">Base {formatVND(override.electricBaseOverride)}</span>
-                      : <span className="text-slate-400 text-xs font-medium">Policy</span>}
+                      ? <span className="inline-block rounded-md bg-amber-50 px-2 py-1 font-bold text-amber-700">Cơ sở {formatVND(override.electricBaseOverride)}</span>
+                      : <span className="text-slate-400 text-xs font-medium">Theo chính sách</span>}
                 </div>
                 <div className="space-y-1" style={numericStyle}>
                   {override.waterFinalOverride != null
-                    ? <span className="inline-block rounded-md bg-rose-50 px-2 py-1 font-black text-rose-700">Final {formatVND(override.waterFinalOverride)}</span>
+                    ? <span className="inline-block rounded-md bg-rose-50 px-2 py-1 font-black text-rose-700">Chốt {formatVND(override.waterFinalOverride)}</span>
                     : override.waterBaseOverride != null
-                      ? <span className="inline-block rounded-md bg-blue-50 px-2 py-1 font-bold text-blue-700">Base {formatVND(override.waterBaseOverride)}</span>
-                      : <span className="text-slate-400 text-xs font-medium">Policy</span>}
+                      ? <span className="inline-block rounded-md bg-blue-50 px-2 py-1 font-bold text-blue-700">Cơ sở {formatVND(override.waterBaseOverride)}</span>
+                      : <span className="text-slate-400 text-xs font-medium">Theo chính sách</span>}
                 </div>
                 <div className="text-xs font-medium text-slate-400" style={numericStyle}>
                   <div className="flex items-center gap-1.5 opacity-80 mb-1">
                     <CalendarRange size={12} /> Tạo ngày
                   </div>
-                  <div className="font-bold text-slate-600">{formatDate(override.createdAt)}</div>
+                  <div className="font-bold text-slate-600">{formatUtilityDateTime(override.createdAt)}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <button

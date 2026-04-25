@@ -284,7 +284,7 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
   );
 
   if (occupiedDays <= 0) {
-    throw new Error(`Contract does not overlap billing period ${input.billingPeriod}.`);
+    throw new Error(`Hợp đồng không giao với kỳ tính tiền ${input.billingPeriod}.`);
   }
 
   const override = input.override ?? null;
@@ -342,7 +342,7 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
   if (electricRoundedAmount < input.policy.minElectricFloor && override?.electricFinalOverride == null) {
     warnings.push({
       code: 'electric_below_floor',
-      message: 'Electric rounded amount is below the minimum floor and was raised to the floor.',
+      message: 'Tiền điện sau làm tròn thấp hơn mức sàn nên hệ thống nâng lên mức sàn.',
       metadata: {
         roundedAmount: electricRoundedAmount,
         floor: input.policy.minElectricFloor,
@@ -353,7 +353,7 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
   if (waterRoundedAmount < input.policy.minWaterFloor && override?.waterFinalOverride == null) {
     warnings.push({
       code: 'water_below_floor',
-      message: 'Water rounded amount is below the minimum floor and was raised to the floor.',
+      message: 'Tiền nước sau làm tròn thấp hơn mức sàn nên hệ thống nâng lên mức sàn.',
       metadata: {
         roundedAmount: waterRoundedAmount,
         floor: input.policy.minWaterFloor,
@@ -364,21 +364,21 @@ export function computeUtilitySnapshot(input: UtilityComputationInput): UtilityS
   if (input.policySourceType === 'system') {
     warnings.push({
       code: 'policy_fallback_system',
-      message: 'Billing used the system default utility policy.',
+      message: 'Không tìm thấy chính sách ở phạm vi thấp hơn nên hệ thống dùng chính sách toàn hệ thống.',
     });
   }
 
   if (input.occupantsForBilling <= 0) {
     warnings.push({
       code: 'missing_occupants_for_billing',
-      message: 'Occupants for billing resolved to 0.',
+      message: 'Hợp đồng chưa có số người tính phí hợp lệ.',
     });
   }
 
   if (deviceCodes.length > 0 && resolvedDeviceSurcharges.length === 0) {
     warnings.push({
       code: 'device_surcharge_missing',
-      message: 'Room amenities resolved to device codes, but the policy has no matching device surcharge.',
+      message: 'Phòng có thiết bị phù hợp nhưng chính sách chưa khai báo phụ phí tương ứng.',
       metadata: { deviceCodes },
     });
   }

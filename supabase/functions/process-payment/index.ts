@@ -1,4 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../_shared/deno-globals.d.ts" />
+// eslint-disable no-console -- console.error is appropriate for Deno Edge Function server-side logging
 
 import { handleOptions } from '../_shared/cors.ts';
 import { requireWorkspaceOperator, requireAuth } from '../_shared/auth.ts';

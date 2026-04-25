@@ -15,9 +15,15 @@ import {
   LayoutDashboard,
   CheckCircle2
 } from 'lucide-react';
+import {
+  formatUtilityBillingPeriod,
+  formatUtilityDateTime,
+  getUtilityRunStatusLabel,
+  getUtilityScopeLabel,
+} from '@/lib/utilityPresentation';
 import utilityAdminService from '@/services/utilityAdminService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
-import { formatDate, formatVND } from '@/utils';
+import { formatVND } from '@/utils';
 
 const pageFontStyle: React.CSSProperties = {
   fontFamily: '"Space Grotesk", "Inter", system-ui, sans-serif',
@@ -35,45 +41,37 @@ const priorityFlow = [
     description: 'Chỉ tác động đúng một kỳ thanh toán. Dùng khi cần sửa tay cho một tháng cụ thể.',
   },
   {
-    title: '2. Policy hợp đồng',
-    description: 'Khóa riêng cho một hợp đồng, ví dụ hợp đồng thương lượng mức điện cơ bản riêng.',
+    title: '2. Chính sách hợp đồng',
+    description: 'Áp riêng cho một hợp đồng khi hợp đồng đó có mức tính điện nước khác phần còn lại.',
   },
   {
-    title: '3. Policy phòng',
+    title: '3. Chính sách phòng',
     description: 'Chuẩn của phòng đó, thường phản ánh loại phòng và thiết bị mạnh đi kèm.',
   },
   {
-    title: '4. Policy tòa nhà',
+    title: '4. Chính sách tòa nhà',
     description: 'Mặc định theo vị trí hoặc phân khúc tòa nhà.',
   },
   {
-    title: '5. Policy hệ thống',
-    description: 'Fallback cuối cùng để hệ thống vẫn tính được nếu thiếu cấu hình ở lớp dưới.',
+    title: '5. Chính sách toàn hệ thống',
+    description: 'Lớp cuối cùng để hệ thống vẫn tính được nếu thiếu cấu hình ở phạm vi thấp hơn.',
   },
 ];
 
-const sourceMap = {
-  contract: 'Hợp đồng',
-  room: 'Phòng',
-  building: 'Tòa nhà',
-  system: 'Hệ thống',
-  invoice_override: 'Ghi đè kỳ hóa đơn',
-} as const;
-
-function getRunStatusLabel(status: string) {
-  switch (status.toLowerCase()) {
-    case 'running':
-      return 'Đang chạy';
-    case 'completed':
-      return 'Hoàn thành';
-    case 'failed':
-      return 'Thất bại';
-    case 'cancelled':
-      return 'Đã hủy';
-    default:
-      return status;
-  }
-}
+const workflowCards = [
+  {
+    title: 'Khi nào dùng chính sách',
+    description: 'Dùng khi bạn muốn đặt mức điện nước nền cho nhiều kỳ hóa đơn về sau.',
+  },
+  {
+    title: 'Khi nào dùng ghi đè',
+    description: 'Dùng khi chỉ cần sửa riêng cho một hợp đồng trong đúng một kỳ hóa đơn.',
+  },
+  {
+    title: 'Khi nào chạy đợt xuất hóa đơn',
+    description: 'Chỉ chạy sau khi đã có chính sách nền, đã nhập đủ số người tính phí và đã xem trước danh sách hợp đồng đủ điều kiện.',
+  },
+] as const;
 
 export default function UtilityHubPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'docs'>('overview');
@@ -127,11 +125,11 @@ export default function UtilityHubPage() {
 
             <div className="space-y-3">
               <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-900 md:text-5xl">
-                Tổ hợp nghiệp vụ tính cước Điện & Nước.
+                Trung tâm điều phối điện nước
               </h1>
               <p className="max-w-3xl text-sm font-medium leading-relaxed text-slate-600 md:text-base">
-                Trong dự án này, <strong>Điện nước</strong> không phải tiện ích đặt chỗ (Amenity). Đây là quy trình tính phi <strong>Policy-based</strong>, 
-                được quy định bởi hệ số, phụ thu, prorate theo ngày ở và cho phép ghi đè hoàn toàn theo từng kỳ hóa đơn cụ thể.
+                Trong phạm vi dự án hiện tại, điện nước được tính theo <strong>chính sách</strong>, có thể ghi đè theo từng kỳ hóa đơn và được chốt
+                hàng loạt bằng đợt xuất hóa đơn tiện ích. Màn hình này giúp bạn hiểu đúng luồng thao tác trước khi sử dụng.
               </p>
             </div>
 
@@ -140,20 +138,20 @@ export default function UtilityHubPage() {
                 to="/owner/settings/utility-policies"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 font-black text-white shadow-md transition-all hover:bg-slate-800 hover:shadow-lg focus:ring-4 focus:ring-slate-900/20"
               >
-                Chính sách (Policies)
+                Chính sách
                 <ArrowRight size={16} />
               </Link>
               <Link
                 to="/owner/settings/utility-overrides"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-6 font-black text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
               >
-                Ghi đè (Overrides)
+                Ghi đè
               </Link>
               <Link
                 to="/owner/settings/billing-runs"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-emerald-50 px-6 font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 hover:border-emerald-300"
               >
-                Kỳ tính hóa đơn
+                Đợt xuất hóa đơn
               </Link>
             </div>
           </div>
@@ -161,9 +159,9 @@ export default function UtilityHubPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <MetricCard
               icon={Zap}
-              title="Policy điện nước"
+              title="Chính sách đang bật"
               value={String(activePolicies.length)}
-              note={`${policyBuckets.system} hệ thống • ${policyBuckets.building} tòa • ${policyBuckets.room} phòng`}
+              note={`${policyBuckets.system} toàn hệ thống • ${policyBuckets.building} tòa nhà • ${policyBuckets.room} phòng • ${policyBuckets.contract} hợp đồng`}
               accent="slate"
             />
             <MetricCard
@@ -175,16 +173,16 @@ export default function UtilityHubPage() {
             />
             <MetricCard
               icon={CalendarClock}
-              title="Kỳ hóa đơn"
-              value={latestRun?.billingPeriod ?? '--'}
-              note={latestRun ? getRunStatusLabel(latestRun.status) : 'Chưa có'}
+              title="Đợt gần nhất"
+              value={latestRun ? formatUtilityBillingPeriod(latestRun.billingPeriod) : '--'}
+              note={latestRun ? getUtilityRunStatusLabel(latestRun.status) : 'Chưa có'}
               accent="sky"
             />
             <MetricCard
               icon={ShieldAlert}
-              title="Logic lõi"
-              value="Tự động"
-              note="Không cần nhập chỉ số tay"
+              title="Nguyên tắc lõi"
+              value="Đúng scope"
+              note="Ghi đè một kỳ luôn ưu tiên cao hơn chính sách"
               accent="emerald"
             />
           </div>
@@ -213,7 +211,7 @@ export default function UtilityHubPage() {
           }`}
         >
           <BookOpen size={18} />
-          Tài Liệu & Công Thức
+          Hướng Dẫn & Công Thức
         </button>
       </div>
 
@@ -233,13 +231,22 @@ export default function UtilityHubPage() {
           {/* TAB CONTENT: TỔNG QUAN HOẠT ĐỘNG */}
           {activeTab === 'overview' && (
             <section className="animate-in fade-in slide-in-from-bottom-2 duration-500 space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                {workflowCards.map((card) => (
+                  <div key={card.title} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{card.title}</p>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">{card.description}</p>
+                  </div>
+                ))}
+              </div>
+
               <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
                 {/* ACTIVE POLICIES */}
                 <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 transition-all hover:shadow-slate-900/10">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
                       <User size={14} />
-                      Policy đang active
+                      Chính sách đang áp dụng
                     </div>
                     <Link
                       to="/owner/settings/utility-policies"
@@ -252,7 +259,7 @@ export default function UtilityHubPage() {
                   <div className="space-y-3">
                     {recentPolicies.length === 0 ? (
                       <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-500">
-                        Chưa có policy nào đang hoạt động.
+                        Chưa có chính sách nào đang hoạt động.
                       </div>
                     ) : (
                       recentPolicies.map((policy) => (
@@ -261,7 +268,7 @@ export default function UtilityHubPage() {
                             <div>
                               <p className="text-sm font-black text-slate-900">{policy.name}</p>
                               <span className="mt-1.5 inline-block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                                {sourceMap[policy.scopeType]} {policy.scopeId != null ? `#${policy.scopeId}` : ''}
+                                {getUtilityScopeLabel(policy.scopeType)} {policy.scopeLabel ? `• ${policy.scopeLabel}` : ''}
                               </span>
                             </div>
                             <div className="text-right text-xs font-bold text-slate-500 space-y-1" style={numericStyle}>
@@ -308,7 +315,7 @@ export default function UtilityHubPage() {
                             <div>
                               <p className="text-sm font-black text-rose-900">{override.contractCode}</p>
                               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 flex gap-2">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded-full">{override.billingPeriod}</span>
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-full">{formatUtilityBillingPeriod(override.billingPeriod)}</span>
                                 <span className="bg-slate-100 px-2 py-0.5 rounded-full">{override.roomCode}</span>
                               </p>
                               <p className="mt-2 text-xs leading-5 font-medium text-slate-500 line-clamp-1">{override.reason}</p>
@@ -320,7 +327,7 @@ export default function UtilityHubPage() {
                                   {override.electricFinalOverride != null
                                     ? <span className="text-rose-600 font-black">{formatVND(override.electricFinalOverride)} (Chốt)</span>
                                     : override.electricBaseOverride != null
-                                      ? `${formatVND(override.electricBaseOverride)} (Base)`
+                                      ? `${formatVND(override.electricBaseOverride)} (Cơ sở)`
                                       : '--'}
                                 </span>
                               </div>
@@ -330,7 +337,7 @@ export default function UtilityHubPage() {
                                   {override.waterFinalOverride != null
                                     ? <span className="text-rose-600 font-black">{formatVND(override.waterFinalOverride)} (Chốt)</span>
                                     : override.waterBaseOverride != null
-                                      ? `${formatVND(override.waterBaseOverride)} (Base)`
+                                      ? `${formatVND(override.waterBaseOverride)} (Cơ sở)`
                                       : '--'}
                                 </span>
                               </div>
@@ -349,7 +356,7 @@ export default function UtilityHubPage() {
                   <div>
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-600">
                       <CalendarClock size={14} />
-                      Billing run gần nhất
+                      Đợt chạy gần nhất
                     </div>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Chi tiết đợt xuất hóa đơn</h2>
                   </div>
@@ -363,10 +370,10 @@ export default function UtilityHubPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-4">
-                  <MiniMetric title="Kỳ" value={latestRun?.billingPeriod ?? '--'} />
-                  <MiniMetric title="Trạng thái" value={latestRun ? getRunStatusLabel(latestRun.status) : '--'} accent={latestRun?.status === 'completed' ? 'emerald' : 'slate'} />
-                  <MiniMetric title="Bắt đầu lúc" value={latestRun?.startedAt ? formatDate(latestRun.startedAt) : '--'} />
-                  <MiniMetric title="Hoành thành" value={latestRun?.completedAt ? formatDate(latestRun.completedAt) : '--'} />
+                  <MiniMetric title="Kỳ" value={latestRun ? formatUtilityBillingPeriod(latestRun.billingPeriod) : '--'} />
+                  <MiniMetric title="Trạng thái" value={latestRun ? getUtilityRunStatusLabel(latestRun.status) : '--'} accent={latestRun?.status === 'completed' ? 'emerald' : 'slate'} />
+                  <MiniMetric title="Bắt đầu lúc" value={latestRun?.startedAt ? formatUtilityDateTime(latestRun.startedAt) : '--'} />
+                  <MiniMetric title="Hoàn thành" value={latestRun?.completedAt ? formatUtilityDateTime(latestRun.completedAt) : '--'} />
                 </div>
 
                 <div className="mt-5 rounded-[20px] border border-slate-200 bg-white/60 backdrop-blur-sm px-5 py-4 text-sm font-medium leading-relaxed text-slate-600 shadow-sm flex items-start gap-4">
@@ -374,9 +381,9 @@ export default function UtilityHubPage() {
                     <CheckCircle2 size={20} />
                   </div>
                   <p>
-                    Một <strong>Billing Run</strong> chuẩn sẽ trải qua các bước: chọn hợp đồng đủ điều kiện $\rightarrow$ resolve đúng Policy 
-                    $\rightarrow$ tính tiền điện nước $\rightarrow$ tạo invoice item $\rightarrow$ lưu snapshot. <br/>
-                    Việc lưu snapshot giúp bạn có thể <strong>audit lại công thức</strong> đã sử dụng tại thời điểm xuất hóa đơn đó sau này.
+                    Một đợt xuất hóa đơn chuẩn sẽ đi theo 5 bước: chọn hợp đồng đủ điều kiện, xác định đúng chính sách,
+                    tính tiền điện nước, tạo các dòng hóa đơn và lưu bản chụp công thức.
+                    Bản chụp này giúp bạn đối soát lại cách tính của từng hóa đơn sau này.
                   </p>
                 </div>
               </div>
@@ -391,9 +398,9 @@ export default function UtilityHubPage() {
                 <div className="rounded-[32px] border border-slate-200 bg-white p-6 md:p-8 shadow-xl shadow-slate-900/5">
                   <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
                     <FileSpreadsheet size={14} />
-                    Kiến Trúc Hoạt Động
+                    Cách hệ thống hoạt động
                   </div>
-                  <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 mb-6">4 Lớp dữ liệu của quy trình tính tiền</h2>
+                  <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 mb-6">4 lớp dữ liệu của quy trình tính tiền</h2>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <StepCard
@@ -403,18 +410,18 @@ export default function UtilityHubPage() {
                     />
                     <StepCard
                       icon={Zap}
-                      title="2. Resolve policy"
-                      description="Hệ thống tự động rà soát từ hợp đồng xuống hệ thống lấy policy; nhận diện phụ thu & hệ số."
+                      title="2. Xác định chính sách"
+                      description="Hệ thống tự động rà soát từ hợp đồng xuống toàn hệ thống để tìm đúng mức giá, hệ số và phụ phí."
                     />
                     <StepCard
                       icon={Waves}
                       title="3. Tính điện nước"
-                      description="Điện = Base + Phụ thu thiết bị. Nước = Base + Đầu người. Luôn tự tính Prorate theo tỷ lệ ngày ở."
+                      description="Điện = mức cơ sở + phụ phí thiết bị. Nước = mức cơ sở + phần theo đầu người. Hệ thống luôn tự phân bổ theo số ngày ở thực tế."
                     />
                     <StepCard
                       icon={PenSquare}
-                      title="4. Chốt số & Audit"
-                      description="Sau khi ra bill, mọi công số, policy, hệ số được lưu vĩnh viễn bằng Snapshot bảo toàn lịch sử truy vết."
+                      title="4. Chốt số & đối soát"
+                      description="Sau khi tạo hóa đơn, hệ thống lưu bản chụp công thức để bạn có thể tra lại lịch sử tính tiền."
                     />
                   </div>
                 </div>
@@ -423,9 +430,9 @@ export default function UtilityHubPage() {
                 <div className="rounded-[32px] border border-slate-200 bg-white p-6 md:p-8 shadow-xl shadow-slate-900/5 flex flex-col">
                   <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
                     <ArrowRight size={14} />
-                    Luồng Ưu Tiên (Resolve)
+                    Luồng ưu tiên
                   </div>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900 mb-6">Policy được áp dụng theo mức độ</h2>
+                  <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900 mb-6">Mức ưu tiên khi xác định giá điện nước</h2>
 
                   <div className="space-y-3 flex-1 flex flex-col justify-center">
                     {priorityFlow.map((item, index) => (
@@ -454,7 +461,7 @@ export default function UtilityHubPage() {
                   steps={[
                     {
                       name: "Bước 1: Tính phí cơ sở (Subtotal)",
-                      desc: "Cộng Giá Điện Cơ Bản và Phụ thu của các thiết bị có trong phòng.",
+                      desc: "Cộng giá điện cơ bản và phụ thu của các thiết bị có trong phòng.",
                       example: "Ví dụ: Điện cơ bản 200,000đ + Phụ thu máy lạnh 50,000đ = 250,000đ"
                     },
                     {
@@ -463,7 +470,7 @@ export default function UtilityHubPage() {
                       example: "Ví dụ: 250,000đ × 1.15 (Hệ số mùa nóng) × 1.0 (Vị trí) = 287,500đ"
                     },
                     {
-                      name: "Bước 3: Tính theo số ngày ở thực tế (Prorate)",
+                      name: "Bước 3: Phân bổ theo số ngày ở thực tế",
                       desc: "Nhân số tiền ở Bước 2 với tỷ lệ: (Số ngày khách ở / Tổng số ngày trong tháng).",
                       example: "Ví dụ khách ở 15 ngày trong tháng 30 ngày: 287,500đ × (15 / 30) = 143,750đ"
                     },
@@ -483,16 +490,16 @@ export default function UtilityHubPage() {
                   steps={[
                     {
                       name: "Bước 1: Tính phí cơ sở theo đầu người và phòng",
-                      desc: "Cộng Giá Nước Cố Định Của Phòng với (Giá Nước / Người × Số người ở).",
+                      desc: "Cộng giá nước cố định của phòng với (giá nước / người × số người ở).",
                       example: "Ví dụ: Cố định 0đ + (50,000đ/người × 2 người) = 100,000đ"
                     },
                     {
                       name: "Bước 2: Áp dụng hệ số Vị trí",
-                      desc: "Nhân phí cơ sở với Hệ số vị trí (Thường tiền nước không có hệ số mùa nóng).",
+                      desc: "Nhân phí cơ sở với hệ số vị trí. Thông thường tiền nước không dùng hệ số mùa nóng.",
                       example: "Ví dụ: 100,000đ × 1.0 (Vị trí) = 100,000đ"
                     },
                     {
-                      name: "Bước 3: Tính theo số ngày ở thực tế (Prorate)",
+                      name: "Bước 3: Phân bổ theo số ngày ở thực tế",
                       desc: "Nhân số tiền ở Bước 2 với tỷ lệ: (Số ngày khách ở / Tổng số ngày trong tháng).",
                       example: "Ví dụ khách ở 15 ngày trong tháng 30 ngày: 100,000đ × (15 / 30) = 50,000đ"
                     },
@@ -599,7 +606,7 @@ function GuideCard({
             <h3 className="text-sm font-black text-slate-800 mb-1">{step.name}</h3>
             <p className="text-sm font-medium text-slate-600 mb-2 leading-relaxed">{step.desc}</p>
             <div className="bg-white/80 p-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700" style={numericStyle}>
-              💡 {step.example}
+              Ví dụ: {step.example}
             </div>
           </div>
         ))}
@@ -616,4 +623,3 @@ function MiniMetric({ title, value, accent = 'slate' }: { title: string; value: 
     </div>
   );
 }
-

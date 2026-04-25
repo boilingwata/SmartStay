@@ -100,8 +100,6 @@ describe('Utility Billing Logic - computeUtilitySnapshot', () => {
     expect(result.prorateRatio).toBe(ratio);
     
     const rawElectric = 270000 * 1.15 * 1.1 * ratio;
-    const roundedElectric = Math.round(rawElectric / 1000) * 1000;
-    
     expect(result.electricRawAmount).toBeCloseTo(rawElectric, 5);
     // Even if prorated below min floor, it should floor it! Wait...
     // Let's check floor: 120,000. 

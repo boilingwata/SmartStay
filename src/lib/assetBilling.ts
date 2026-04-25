@@ -63,6 +63,12 @@ function maxDate(values: Date[]): Date {
   return values.reduce((largest, current) => (current > largest ? current : largest));
 }
 
+function formatBillingMonthLabel(monthYear: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthYear);
+  if (!match) return monthYear;
+  return `${match[2]}/${match[1]}`;
+}
+
 function isAssetBillingActive(asset: BillableRoomAssetInput): boolean {
   const monthlyCharge = Number(asset.monthlyCharge ?? 0);
   const billingStatus = (asset.billingStatus ?? 'inactive') as string;
@@ -82,7 +88,7 @@ export function buildBillableAssetLines(input: {
   startingSortOrder?: number;
 }): BillableAssetInvoiceLine[] {
   if (!/^\d{4}-\d{2}$/.test(input.monthYear)) {
-    throw new Error('Billing period is invalid.');
+    throw new Error('Kỳ tính tiền không hợp lệ.');
   }
 
   const periodStart = startOfMonth(input.monthYear);
@@ -90,6 +96,7 @@ export function buildBillableAssetLines(input: {
   const contractStart = toUtcDate(input.contractStartDate);
   const contractEnd = toUtcDate(input.contractEndDate);
   const daysInPeriod = daysInclusive(periodStart, periodEnd);
+  const monthLabel = formatBillingMonthLabel(input.monthYear);
   let sortOrder = input.startingSortOrder ?? 1;
 
   return input.assets.flatMap((asset) => {
@@ -110,8 +117,8 @@ export function buildBillableAssetLines(input: {
     const descriptionBase = asset.billingLabel?.trim() || `Phụ phí thiết bị: ${asset.assetName}`;
     const description =
       activeDays === daysInPeriod
-        ? `${descriptionBase} tháng ${input.monthYear}`
-        : `${descriptionBase} tháng ${input.monthYear} (${activeDays}/${daysInPeriod} ngày)`;
+        ? `${descriptionBase} tháng ${monthLabel}`
+        : `${descriptionBase} tháng ${monthLabel} (${activeDays}/${daysInPeriod} ngày)`;
 
     return [
       {

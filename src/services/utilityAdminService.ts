@@ -1,5 +1,11 @@
 import { FunctionsHttpError } from '@supabase/functions-js';
 import type { Session } from '@supabase/supabase-js';
+import {
+  getUtilityPolicySourceLabel,
+  getUtilityScopeLabel,
+  getUtilityWarningMeta,
+  translateUtilityBackendMessage,
+} from '@/lib/utilityPresentation';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import type { Json } from '@/types/supabase';
@@ -157,8 +163,9 @@ export interface BillingRunSnapshotRecord {
   waterFinalAmount: number;
   occupantsForBilling: number;
   occupiedDays: number;
-  warnings: Array<{ code: string; message: string }>;
+  warnings: Array<{ code: string; label: string; message: string }>;
   policySourceType: string;
+  policySourceLabel: string;
   createdAt: string;
 }
 
@@ -254,6 +261,52 @@ function parseSeasonMonths(value: unknown): string[] {
     .map((item) => item.padStart(2, '0').slice(-2));
 }
 
+function normalizeReasonItems(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const typedItem = item as Record<string, unknown>;
+    if (typeof typedItem.reason !== 'string') return typedItem;
+    return {
+      ...typedItem,
+      reason: translateUtilityBackendMessage(typedItem.reason),
+    };
+  });
+}
+
+function normalizeFailureItems(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const typedItem = item as Record<string, unknown>;
+    if (typeof typedItem.message !== 'string') return typedItem;
+    return {
+      ...typedItem,
+      message: translateUtilityBackendMessage(typedItem.message),
+    };
+  });
+}
+
+function normalizeBillingRunSummary(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object') return {};
+  const summary = value as Record<string, unknown>;
+  return {
+    ...summary,
+    ineligibleContracts: normalizeReasonItems(summary.ineligibleContracts),
+    skippedContracts: normalizeReasonItems(summary.skippedContracts),
+    existingInvoiceContracts: summary.existingInvoiceContracts,
+  };
+}
+
+function normalizeBillingRunError(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object') return {};
+  const error = value as Record<string, unknown>;
+  return {
+    ...error,
+    failures: normalizeFailureItems(error.failures),
+  };
+}
+
 function isAuthErrorMessage(message: string): boolean {
   return (
     message.includes('401') ||
@@ -268,14 +321,14 @@ function isAuthErrorMessage(message: string): boolean {
 
 async function validateSession(session: Session | null): Promise<Session> {
   if (!session?.access_token) {
-    throw new Error('Khong tim thay access token de goi utility billing.');
+    throw new Error('Không tìm thấy phiên đăng nhập hợp lệ để chạy tính tiền tiện ích.');
   }
 
   const activeSession = session as Session;
 
   const { data: userData, error: userError } = await supabase.auth.getUser(activeSession.access_token);
   if (userError || !userData.user) {
-    throw new Error('Supabase Auth khong xac nhan duoc access token hien tai cho utility billing.');
+    throw new Error('Phiên đăng nhập hiện tại không còn hợp lệ để chạy tính tiền tiện ích.');
   }
 
   return activeSession;
@@ -294,7 +347,7 @@ async function requireActiveSession(): Promise<Session> {
     }
   }
 
-  throw new Error('Khong lay duoc access token hop le de goi utility billing.');
+  throw new Error('Không lấy được phiên đăng nhập hợp lệ để chạy tính tiền tiện ích.');
 }
 
 async function getEdgeFunctionMessage(error: Error): Promise<string> {
@@ -320,30 +373,28 @@ async function getEdgeFunctionMessage(error: Error): Promise<string> {
 
   if (status === 401) {
     if ((responseBodyMessage ?? '').toLowerCase().includes('unsupported jwt algorithm')) {
-      return `Utility billing bi tu choi xac thuc (401): ${responseBodyMessage}. Edge function dang bi verify_jwt o layer Supabase thay vi custom auth, can deploy lai voi verify_jwt=false.`;
+      return 'Supabase đang từ chối xác thực đợt xuất hóa đơn tiện ích. Cần kiểm tra lại cấu hình xác thực của Edge Function.';
     }
-    return responseBodyMessage
-      ? `Utility billing bi tu choi xac thuc (401): ${responseBodyMessage}`
-      : 'Utility billing bi tu choi xac thuc (401).';
+    return translateUtilityBackendMessage(responseBodyMessage ?? 'Utility billing bi tu choi xac thuc (401).');
   }
 
   if (status === 403) {
-    return responseBodyMessage
-      ? `Tai khoan hien tai khong du quyen chay utility billing (403): ${responseBodyMessage}`
-      : 'Tai khoan hien tai khong du quyen chay utility billing (403).';
+    return translateUtilityBackendMessage(
+      responseBodyMessage ?? 'Tai khoan hien tai khong du quyen chay utility billing (403).',
+    );
   }
 
   if (isAuthErrorMessage(message)) {
-    return responseBodyMessage ?? 'Utility billing tra ve loi xac thuc tu Supabase.';
+    return translateUtilityBackendMessage(responseBodyMessage ?? 'Utility billing tra ve loi xac thuc tu Supabase.');
   }
 
   if (message.includes('non-2xx')) {
-    return responseBodyMessage
-      ? `Khong the chay utility billing: ${responseBodyMessage}`
-      : 'Khong the chay utility billing vi edge function tra ve non-2xx.';
+    return translateUtilityBackendMessage(
+      responseBodyMessage ?? 'Khong the chay utility billing vi edge function tra ve non-2xx.',
+    );
   }
 
-  return responseBodyMessage ?? error.message;
+  return translateUtilityBackendMessage(responseBodyMessage ?? error.message);
 }
 
 async function invokeRunUtilityBilling<T>(payload: RunUtilityBillingPayload): Promise<T> {
@@ -362,7 +413,7 @@ async function invokeRunUtilityBilling<T>(payload: RunUtilityBillingPayload): Pr
   if (error && isAuthErrorMessage(error.message.toLowerCase())) {
     const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError || !refreshData.session?.access_token) {
-      throw new Error('Supabase Auth khong cap lai duoc access token cho utility billing.');
+      throw new Error('Không thể làm mới phiên đăng nhập để chạy tính tiền tiện ích.');
     }
 
     const refreshedSession = refreshData.session as Session;
@@ -434,7 +485,7 @@ export const utilityAdminService = {
     return policies.map((policy) => {
       const scopeLabel =
         policy.scope_type === 'system'
-          ? 'Toan he thong'
+          ? getUtilityScopeLabel('system')
           : scopeOptions[policy.scope_type].find((option) => option.value === policy.scope_id)?.label ??
             (policy.scope_id != null ? `#${policy.scope_id}` : undefined);
 
@@ -498,7 +549,9 @@ export const utilityAdminService = {
       .select('id')
       .single();
 
-    if (error || !data) throw new Error(error?.message ?? 'Failed to create utility policy');
+    if (error || !data) {
+      throw new Error(translateUtilityBackendMessage(error?.message ?? 'Failed to create utility policy'));
+    }
 
     const activeAdjustments = input.adjustments.filter((item) => item.isActive);
     if (activeAdjustments.length > 0) {
@@ -513,10 +566,62 @@ export const utilityAdminService = {
           })),
         );
 
-      if (adjustmentsError) throw new Error(adjustmentsError.message);
+      if (adjustmentsError) throw new Error(translateUtilityBackendMessage(adjustmentsError.message));
     }
 
     return data.id;
+  },
+
+  updatePolicy: async (policyId: number, input: UtilityPolicyFormInput): Promise<void> => {
+    const { error } = await supabase
+      .from('utility_policies')
+      .update({
+        name: input.name.trim(),
+        scope_type: input.scopeType,
+        scope_id: input.scopeType === 'system' ? null : input.scopeId,
+        description: input.description?.trim() || null,
+        electric_base_amount: input.electricBaseAmount,
+        water_base_amount: input.waterBaseAmount,
+        water_per_person_amount: input.waterPerPersonAmount,
+        electric_hot_season_multiplier: input.electricHotSeasonMultiplier,
+        location_multiplier: input.locationMultiplier,
+        season_months: input.seasonMonths,
+        rounding_increment: input.roundingIncrement,
+        min_electric_floor: input.minElectricFloor,
+        min_water_floor: input.minWaterFloor,
+        effective_from: input.effectiveFrom,
+        effective_to: input.effectiveTo || null,
+      })
+      .eq('id', policyId);
+
+    if (error) throw new Error(translateUtilityBackendMessage(error.message));
+
+    const { error: deleteAdjustmentsError } = await supabase
+      .from('utility_policy_device_adjustments')
+      .delete()
+      .eq('utility_policy_id', policyId);
+
+    if (deleteAdjustmentsError) {
+      throw new Error(translateUtilityBackendMessage(deleteAdjustmentsError.message));
+    }
+
+    const activeAdjustments = input.adjustments.filter((item) => item.isActive);
+    if (!activeAdjustments.length) return;
+
+    const { error: insertAdjustmentsError } = await supabase
+      .from('utility_policy_device_adjustments')
+      .insert(
+        activeAdjustments.map((item) => ({
+          utility_policy_id: policyId,
+          device_code: item.deviceCode,
+          charge_amount: item.chargeAmount,
+          is_active: true,
+        })),
+      );
+
+    if (insertAdjustmentsError) {
+      throw new Error(translateUtilityBackendMessage(insertAdjustmentsError.message));
+    }
   },
 
   setPolicyActiveStatus: async (policyId: number, isActive: boolean): Promise<void> => {
@@ -525,7 +630,7 @@ export const utilityAdminService = {
       .update({ is_active: isActive })
       .eq('id', policyId);
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(translateUtilityBackendMessage(error.message));
   },
 
   getDefaultDeviceAdjustments: (): UtilityPolicyAdjustmentForm[] =>
@@ -623,12 +728,12 @@ export const utilityAdminService = {
         { onConflict: 'contract_id,billing_period' },
       );
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(translateUtilityBackendMessage(error.message));
   },
 
   deleteOverride: async (overrideId: number): Promise<void> => {
     const { error } = await supabase.from('invoice_utility_overrides').delete().eq('id', overrideId);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(translateUtilityBackendMessage(error.message));
   },
 
   listBillingRuns: async (): Promise<BillingRunRecord[]> => {
@@ -646,8 +751,8 @@ export const utilityAdminService = {
       startedAt: row.started_at == null ? null : String(row.started_at),
       completedAt: row.completed_at == null ? null : String(row.completed_at),
       lockVersion: Number(row.lock_version ?? 0),
-      summary: (row.summary_json as Record<string, unknown> | null) ?? {},
-      error: (row.error_json as Record<string, unknown> | null) ?? {},
+      summary: normalizeBillingRunSummary(row.summary_json),
+      error: normalizeBillingRunError(row.error_json),
       createdAt: String(row.created_at),
     }));
   },
@@ -675,7 +780,12 @@ export const utilityAdminService = {
       existingInvoices: Number(payload.existingInvoices ?? 0),
       eligibleContracts: Array.isArray(payload.eligibleContracts) ? payload.eligibleContracts : [],
       existingInvoiceContracts: Array.isArray(payload.existingInvoiceContracts) ? payload.existingInvoiceContracts : [],
-      ineligibleContracts: Array.isArray(payload.ineligibleContracts) ? payload.ineligibleContracts : [],
+      ineligibleContracts: Array.isArray(payload.ineligibleContracts)
+        ? payload.ineligibleContracts.map((item) => ({
+            ...item,
+            reason: translateUtilityBackendMessage(item.reason),
+          }))
+        : [],
       diagnostics: {
         billingPeriodStart: String(payload.diagnostics?.billingPeriodStart ?? `${payload.billingPeriod}-01`),
         billingPeriodEnd: String(payload.diagnostics?.billingPeriodEnd ?? `${payload.billingPeriod}-31`),
@@ -688,13 +798,30 @@ export const utilityAdminService = {
     };
   },
 
-  startBillingRun: async (billingPeriod: string, dueDate?: string): Promise<BillingRunExecutionResult> =>
-    invokeRunUtilityBilling<BillingRunExecutionResult>({
+  startBillingRun: async (billingPeriod: string, dueDate?: string): Promise<BillingRunExecutionResult> => {
+    const payload = await invokeRunUtilityBilling<BillingRunExecutionResult>({
       trigger: 'manual',
       dryRun: false,
       billingPeriod,
       dueDate: dueDate ?? null,
-    }),
+    });
+
+    return {
+      ...payload,
+      failures: Array.isArray(payload.failures)
+        ? payload.failures.map((failure) => ({
+            ...failure,
+            message: translateUtilityBackendMessage(failure.message),
+          }))
+        : [],
+      ineligibleContracts: Array.isArray(payload.ineligibleContracts)
+        ? payload.ineligibleContracts.map((item) => ({
+            ...item,
+            reason: translateUtilityBackendMessage(item.reason),
+          }))
+        : [],
+    };
+  },
 
   listBillingRunSnapshots: async (billingRunId: number): Promise<BillingRunSnapshotRecord[]> => {
     const rows = await unwrap(
@@ -720,9 +847,13 @@ export const utilityAdminService = {
       occupantsForBilling: Number(row.occupants_for_billing ?? 0),
       occupiedDays: Number(row.occupied_days ?? 0),
       warnings: Array.isArray(row.warnings_json)
-        ? (row.warnings_json as Array<{ code: string; message: string }>)
+        ? (row.warnings_json as Array<{ code: string; message?: string }>).map((warning) => ({
+            code: warning.code,
+            ...getUtilityWarningMeta(warning.code, warning.message),
+          }))
         : [],
       policySourceType: String(row.policy_source_type ?? ''),
+      policySourceLabel: getUtilityPolicySourceLabel(String(row.policy_source_type ?? '')),
       createdAt: String(row.created_at),
     }));
   },
