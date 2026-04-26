@@ -22,6 +22,7 @@ import { PaymentTransaction } from '@/models/Payment';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Feedback';
 import { formatDate, formatVND } from '@/utils';
+import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 
 const getMethodIcon = (method: PaymentTransaction['method']) => {
   switch (method) {
@@ -43,6 +44,11 @@ const PaymentDetail = () => {
   const { data: payment, isLoading } = useQuery<PaymentTransaction>({
     queryKey: ['payment', id],
     queryFn: () => paymentService.getPaymentDetail(id!),
+  });
+
+  useAdminFinanceRealtime({
+    invoiceId: payment?.invoiceId,
+    paymentRouteId: id,
   });
 
   const { data: invoice } = useQuery({

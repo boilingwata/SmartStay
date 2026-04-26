@@ -20,7 +20,7 @@ import {
   type PortalInvoiceStatus,
 } from '@/services/portalInvoiceService';
 import type { DbPaymentMethod } from '@/types/supabase';
-import { cn, formatDate, formatVND } from '@/utils';
+import { cn, formatDate, formatDateTimeLocalValue, formatVND, toIsoFromDateTimeLocal } from '@/utils';
 
 type PaymentFormState = {
   method: DbPaymentMethod;
@@ -42,7 +42,7 @@ const createInitialPaymentForm = (invoice?: PortalInvoiceDetail | null): Payment
   transferReference: '',
   bankName: '',
   senderName: '',
-  transferredAt: new Date().toISOString().slice(0, 16),
+  transferredAt: formatDateTimeLocalValue(),
   receivedBy: '',
   transactionId: '',
   notes: '',
@@ -59,18 +59,17 @@ const getStatusChip = (status: PortalInvoiceStatus) =>
 
 const getLineItemTypeLabel = (itemType: PortalInvoiceDetail['lineItems'][number]['itemType']) =>
   ({
-    rent: 'Tien phong',
+    rent: 'Tiền phòng',
     utility_electric: 'Dien',
-    utility_water: 'Nuoc',
-    service: 'Dich vu',
-    asset: 'Tai san',
-    discount: 'Giam tru',
-    other: 'Khac',
+    utility_water: 'Nước',
+    service: 'Dịch vụ',
+    asset: 'Tài sản',
+    discount: 'Giảm trừ',
+    other: 'Khác',
   })[itemType];
 
 const toIsoString = (value: string) => {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+  return toIsoFromDateTimeLocal(value);
 };
 
 const filterInvoices = (
@@ -128,7 +127,7 @@ const InfoRow = ({
         }}
         className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-700"
       >
-        Copy
+        Sao chép
       </button>
     ) : null}
   </div>
@@ -169,7 +168,7 @@ const InvoiceList: React.FC = () => {
     queryFn: () => fetchInvoices(),
     staleTime: 15_000,
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const detailQuery = useQuery({
@@ -177,10 +176,21 @@ const InvoiceList: React.FC = () => {
     queryFn: () => fetchInvoiceById(selectedInvoiceId!),
     enabled: !!selectedInvoiceId,
     staleTime: 5_000,
+    refetchInterval: (query) => {
+      const currentInvoice = query.state.data as PortalInvoiceDetail | undefined;
+      return currentInvoice && currentInvoice.balance > 0 && currentInvoice.status !== 'paid' ? 20_000 : false;
+    },
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
   const selectedInvoice = detailQuery.data ?? null;
+  const watchedContractIds = useMemo(
+    () =>
+      (invoicesQuery.data ?? [])
+        .map((invoice) => Number(invoice.contractId))
+        .filter(Number.isInteger),
+    [invoicesQuery.data]
+  );
 
   const filteredInvoices = useMemo(() => {
     const filtered = filterInvoices(invoicesQuery.data ?? [], {
@@ -266,7 +276,7 @@ const InvoiceList: React.FC = () => {
     [applyInvoiceDetailToCache, closeInvoice]
   );
 
-  usePortalInvoiceRealtime(selectedInvoiceId, (invoiceId) => {
+  usePortalInvoiceRealtime(selectedInvoiceId, watchedContractIds, (invoiceId) => {
     void fetchInvoiceById(invoiceId)
       .then(closePaidInvoice)
       .catch(() => {
@@ -274,40 +284,6 @@ const InvoiceList: React.FC = () => {
         void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
       });
   });
-
-  useEffect(() => {
-    if (!selectedInvoiceId || !selectedInvoice || selectedInvoice.balance <= 0 || selectedInvoice.status === 'paid') {
-      return;
-    }
-
-    let cancelled = false;
-
-    const refreshSelectedInvoice = async () => {
-      try {
-        const detail = await fetchInvoiceById(selectedInvoiceId);
-        if (cancelled) return;
-
-        applyInvoiceDetailToCache(detail);
-
-        if (detail.status === 'paid' || detail.balance <= 0) {
-          closePaidInvoice(detail);
-        }
-      } catch {
-        if (!cancelled) {
-          void queryClient.invalidateQueries({ queryKey: ['portal-invoice', selectedInvoiceId] });
-          void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
-        }
-      }
-    };
-
-    const intervalId = window.setInterval(refreshSelectedInvoice, 5_000);
-    void refreshSelectedInvoice();
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [applyInvoiceDetailToCache, closePaidInvoice, queryClient, selectedInvoice, selectedInvoiceId]);
 
   const simulateSepayPayment = async () => {
     if (!selectedInvoice) return;
@@ -336,10 +312,10 @@ const InvoiceList: React.FC = () => {
 
       const result = data as { success?: boolean; reason?: string; error?: string } | null;
       if (result?.success === false) {
-        throw new Error(result.reason || result.error || 'Demo webhook failed');
+        throw new Error(result.reason || result.error || 'Mô phỏng đối soát SePay thất bại');
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Khong the mo phong thanh toan');
+      toast.error(error instanceof Error ? error.message : 'Không thể mô phỏng thanh toán');
     } finally {
       setIsSimulating(false);
     }

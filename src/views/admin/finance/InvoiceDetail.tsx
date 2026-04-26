@@ -100,7 +100,7 @@ const InvoiceDetail = () => {
   const navigate = useNavigate();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  useAdminFinanceRealtime(id);
+  useAdminFinanceRealtime({ invoiceId: id });
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetailType>({
     queryKey: ['invoice', id],

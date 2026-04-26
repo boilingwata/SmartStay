@@ -26,9 +26,37 @@ export const formatDate = (date: Date | string | number | null | undefined, form
      const d = new Date(date);
      if (isNaN(d.getTime())) return '--';
      return format(d, formatStr, { locale: vi });
-  } catch (e) {
+  } catch {
      return '--';
   }
+};
+
+/**
+ * Format a date value for <input type="datetime-local"> in local time.
+ */
+export const formatDateTimeLocalValue = (
+  date: Date | string | number | null | undefined = new Date(),
+): string => {
+  const parsed = date ? new Date(date) : new Date();
+  if (Number.isNaN(parsed.getTime())) {
+    return formatDateTimeLocalValue(new Date());
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+/**
+ * Convert a local datetime-local input value to an ISO string for storage.
+ */
+export const toIsoFromDateTimeLocal = (value: string, fallback: Date = new Date()): string => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? fallback.toISOString() : parsed.toISOString();
 };
 
 /**
@@ -55,7 +83,7 @@ export const calculateAge = (dob: string | Date | null | undefined): string => {
      if (isNaN(d.getTime())) return '--';
      const age = differenceInYears(new Date(), d);
      return `${age} tuổi`;
-  } catch (e) {
+  } catch {
      return '--';
   }
 };
@@ -69,7 +97,7 @@ export const formatRelativeTime = (date: string | Date | null | undefined): stri
      const d = new Date(date);
      if (isNaN(d.getTime())) return '--';
      return formatDistanceToNow(d, { addSuffix: true, locale: vi });
-  } catch (e) {
+  } catch {
      return '--';
   }
 };

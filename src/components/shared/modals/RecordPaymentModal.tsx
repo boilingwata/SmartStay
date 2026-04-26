@@ -22,7 +22,7 @@ import { invoiceService } from '@/services/invoiceService';
 import { paymentService } from '@/services/paymentService';
 import { fileService } from '@/services/fileService';
 import { PaymentMethod, PaymentStatus } from '@/models/Payment';
-import { cn, formatVND } from '@/utils';
+import { cn, formatDateTimeLocalValue, formatVND, toIsoFromDateTimeLocal } from '@/utils';
 import { toast } from 'sonner';
 
 interface RecordPaymentModalProps {
@@ -56,7 +56,7 @@ export const RecordPaymentModal = ({
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<PaymentMethod>('BankTransfer');
   const [txCode, setTxCode] = useState('');
-  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 16));
+  const [paidAt, setPaidAt] = useState(formatDateTimeLocalValue());
   const [note, setNote] = useState('');
   const [proofUrl, setProofUrl] = useState('');
   const [proofName, setProofName] = useState('');
@@ -91,7 +91,7 @@ export const RecordPaymentModal = ({
 
   const { data } = useQuery({
     queryKey: ['unpaidInvoices'],
-    queryFn: () => invoiceService.getInvoices(),
+    queryFn: () => invoiceService.getInvoices({ page: 1, limit: 1000 }),
     enabled: isOpen && !invoice,
   });
 
@@ -197,7 +197,7 @@ export const RecordPaymentModal = ({
         amount,
         method,
         status,
-        paidAt: new Date(paidAt).toISOString(),
+        paidAt: toIsoFromDateTimeLocal(paidAt),
         note,
         evidenceImage: proofUrl || undefined,
       }),
@@ -296,7 +296,7 @@ export const RecordPaymentModal = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">Mã thực hiện (TxCode)</label>
+                <label className="text-[10px] font-black text-muted uppercase tracking-widest ml-1">Mã giao dịch</label>
                 <input
                   className="input-base w-full font-mono text-small h-12"
                   placeholder="Mã tham chiếu hoặc mã giao dịch..."
@@ -374,7 +374,7 @@ export const RecordPaymentModal = ({
                   )}
 
                   <span className="text-[9px] text-muted font-black uppercase tracking-widest shadow-sm">
-                    {isUploadingProof ? 'Đang tải tệp lên...' : 'Thả tệp hoặc Click để chọn'}
+                    {isUploadingProof ? 'Đang tải tệp lên...' : 'Thả tệp hoặc nhấn để chọn'}
                   </span>
 
                   <span className="text-[11px] text-slate-500 font-medium text-center">
