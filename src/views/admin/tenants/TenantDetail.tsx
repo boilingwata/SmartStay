@@ -5,6 +5,16 @@ import { Edit, History, Mail, MapPin, MessageSquare, Phone } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { TenantFormModal } from '@/components/forms/TenantFormModal';
+import {
+  ContactTab,
+  ContractTab,
+  FeedbackTab,
+  InvoiceTab,
+  OnboardingTab,
+  ProfileTab,
+} from '@/components/tenants/detail';
+import MessageTenantModal from '@/components/tenants/detail/MessageTenantModal';
+import type { TenantDetailTab } from '@/components/tenants/detail/types';
 import { Spinner } from '@/components/ui/Feedback';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { usePermission } from '@/hooks/usePermission';
@@ -19,21 +29,9 @@ import notificationService from '@/services/notificationService';
 import { tenantService } from '@/services/tenantService';
 import { calculateAge, cn } from '@/utils';
 
-import {
-  ContactTab,
-  ContractTab,
-  FeedbackTab,
-  InvoiceTab,
-  OnboardingTab,
-  ProfileTab,
-} from './components';
-import MessageTenantModal from './components/MessageTenantModal';
-
-export type TabType = 'Ho so' | 'Lien he' | 'Hop dong' | 'Hoa don' | 'Phan hoi' | 'Onboarding';
-
 const DEFAULT_TENANT_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
-function isLoadingTab(tab: TabType, loadingOnboarding?: boolean) {
+function isLoadingTab(tab: TenantDetailTab, loadingOnboarding?: boolean) {
   return tab === 'Onboarding' && loadingOnboarding;
 }
 
@@ -44,7 +42,7 @@ const TenantDetail = () => {
   const { hasPermission } = usePermission();
   const canViewPII = hasPermission('tenant.view_pii');
 
-  const [activeTab, setActiveTab] = React.useState<TabType>('Ho so');
+  const [activeTab, setActiveTab] = React.useState<TenantDetailTab>('Ho so');
   const [showSensitive, setShowSensitive] = React.useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
@@ -324,7 +322,7 @@ const TenantDetail = () => {
       </div>
 
       <div className="flex flex-nowrap gap-8 overflow-x-auto border-b border-border/20 no-scrollbar">
-        {(['Ho so', 'Lien he', 'Hop dong', 'Hoa don', 'Phan hoi', 'Onboarding'] as TabType[]).map((tab) => (
+        {(['Ho so', 'Lien he', 'Hop dong', 'Hoa don', 'Phan hoi', 'Onboarding'] as TenantDetailTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

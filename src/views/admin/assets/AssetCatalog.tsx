@@ -4,9 +4,9 @@ import { Activity, Building2, Calendar, DollarSign, Edit, History, Home, Package
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { AssetModal } from '@/components/assets/AssetModal';
 import useUIStore from '@/stores/uiStore';
 import { Asset, AssetCondition, AssetType } from '@/models/Asset';
-import { AssetModal } from './AssetModal';
 import { Spinner } from '@/components/ui/Feedback';
 import { assetService } from '@/services/assetService';
 import { cn, formatDate, formatVND } from '@/utils';

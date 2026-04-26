@@ -1,7 +1,7 @@
 import StaffMyTicketsView from '@/components/tickets/StaffMyTicketsView';
 
 const StaffMyTickets = () => {
-  return <StaffMyTicketsView detailBasePath="/staff/tickets" />;
+  return <StaffMyTicketsView detailBasePath="/owner/tickets" />;
 };
 
 export default StaffMyTickets;

@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { User, UserRoleType } from '../models/User'
 import { supabase } from '@/lib/supabase'
 import { mapRole } from '@/lib/enumMaps'
 import { setSentryUser } from '@/lib/sentry'
 import { isResidentTenantStage } from '@/lib/authRouting'
 import portalOnboardingService from '@/services/portalOnboardingService'
+import type { User, UserRoleType } from '@/types'
 import useUIStore from './uiStore'
 
 interface AuthState {

@@ -1,15 +1,15 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuthStore from '@/stores/authStore';
-import { UserRoleType } from '@/models/User';
 import { Spinner } from '@/components/ui/Feedback';
+import type { UserRoleType } from '@/types';
 
 interface ProtectedRouteProps {
   requiredRole?: UserRoleType;
   allowedRoles?: UserRoleType[];
 }
 
-function getLoginPath(pathname: string): string {
+function getLoginPath(): string {
   return '/login';
 }
 
@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, allowedRo
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={getLoginPath(location.pathname)} state={{ from: location }} replace />;
+    return <Navigate to={getLoginPath()} state={{ from: location }} replace />;
   }
 
   if (requiredRole && role !== requiredRole) {

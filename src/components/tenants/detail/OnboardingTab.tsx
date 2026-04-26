@@ -3,16 +3,15 @@ import { ArrowRight, CheckCircle2, LayoutList } from 'lucide-react';
 
 import { OnboardingProgress } from '@/models/Tenant';
 import { cn } from '@/utils';
-
-import { TabType } from '../TenantDetail';
+import type { TenantDetailTab } from './types';
 
 interface OnboardingTabProps {
   onboarding: OnboardingProgress | undefined;
-  onTabChange: (tab: TabType) => void;
+  onTabChange: (tab: TenantDetailTab) => void;
 }
 
 export const OnboardingTab: React.FC<OnboardingTabProps> = ({ onboarding, onTabChange }) => {
-  const steps: Array<{ key: keyof OnboardingProgress; label: string; target: TabType | null }> = [
+  const steps: Array<{ key: keyof OnboardingProgress; label: string; target: TenantDetailTab | null }> = [
     { key: 'isPersonalInfoConfirmed', label: 'Xac nhan thong tin ca nhan', target: 'Ho so' },
     { key: 'isCCCDUploaded', label: 'Upload CCCD/Ho chieu', target: 'Ho so' },
     { key: 'isEmergencyContactAdded', label: 'Them lien he khan cap', target: 'Lien he' },

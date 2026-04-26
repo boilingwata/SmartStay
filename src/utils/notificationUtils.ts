@@ -24,6 +24,17 @@ export const NOTIFICATION_STYLE_MAP: Record<string, NotificationStyle> = {
   'default': { icon: Bell, color: 'bg-slate-50 text-slate-500 border-slate-100' }
 };
 
+export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  invoice_new: 'Hóa đơn mới',
+  invoice_due: 'Hóa đơn sắp đến hạn',
+  payment_confirmed: 'Thanh toán đã xác nhận',
+  ticket: 'Yêu cầu hỗ trợ',
+  contract_renew: 'Hợp đồng cần gia hạn',
+  announcement: 'Bản tin',
+  admin_message: 'Tin nhắn quản lý',
+  default: 'Thông báo hệ thống',
+};
+
 /**
  * Historical/variant type mapping to canonical keys
  */
@@ -73,4 +84,9 @@ export const normalizeNotificationType = (type?: string): string => {
 export const getNotificationStyle = (type?: string): NotificationStyle => {
   const normalized = normalizeNotificationType(type);
   return NOTIFICATION_STYLE_MAP[normalized] || NOTIFICATION_STYLE_MAP.default;
+};
+
+export const getNotificationTypeLabel = (type?: string): string => {
+  const normalized = normalizeNotificationType(type);
+  return NOTIFICATION_TYPE_LABELS[normalized] || NOTIFICATION_TYPE_LABELS.default;
 };

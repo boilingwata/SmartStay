@@ -1,137 +1,24 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Bell, 
-  CheckCircle2,
-  Info,
-  AlertTriangle,
-  CreditCard,
-  Ticket,
-  History,
-  Trash2,
-  ChevronRight,
-  Clock,
-  Sparkles,
-  ArrowLeft,
-  Calendar,
-  Wrench,
-  Megaphone,
-  Check
-} from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bell, CheckCircle2, ChevronRight, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 
 import notificationService from '@/services/notificationService';
 import useAuthStore from '@/stores/authStore';
-import { cn } from '@/utils';
-import { getNotificationStyle, normalizeNotificationType } from '@/utils/notificationUtils';
+import { cn, formatDate } from '@/utils';
+import { getNotificationStyle, getNotificationTypeLabel, normalizeNotificationType } from '@/utils/notificationUtils';
 
-const SwipeableNotificationItem = ({ item, onRead, onDelete }: { item: any; onRead: () => void; onDelete: () => void }) => {
-  const [offset, setOffset] = useState(0);
-  const [startX, setStartX] = useState(0);
-
-  const style = getNotificationStyle(item.type);
-  const Icon = style?.icon || Bell;
-
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setStartX(e.touches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const currentX = e.touches[0].clientX;
-    const diff = currentX - startX;
-    if (diff < 0) setOffset(diff);
-  };
-
-  const handleTouchEnd = () => {
-    if (offset < -80) {
-      setOffset(-1000);
-      setTimeout(onDelete, 300);
-    } else {
-      setOffset(0);
-    }
-  };
-
-  return (
-    <div className="relative mb-4 overflow-hidden group">
-      {/* Background Delete Action */}
-      <div className="absolute inset-0 bg-rose-500 rounded-3xl flex items-center justify-end px-8 text-white">
-        <div className="flex flex-col items-center gap-1">
-          <Trash2 size={24} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Xóa</span>
-        </div>
-      </div>
-      
-      {/* Foreground Item */}
-      <div 
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onClick={onRead}
-        style={{ transform: `translateX(${offset}px)` }}
-        className={cn(
-          "bg-white rounded-3xl p-5 shadow-sm border transition-all relative z-10 active:scale-[0.99] cursor-pointer",
-          item.isRead ? "border-slate-50 opacity-60" : "border-[#0D8A8A]/10 shadow-md shadow-[#0D8A8A]/5",
-          offset === 0 && "duration-300 ease-out"
-        )}
-      >
-        <div className="flex gap-4">
-          <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-inner transition-transform group-hover:scale-105",
-            style?.color || 'bg-slate-50 text-slate-500 border-slate-100'
-          )}>
-            <Icon size={20} />
-
-          </div>
-          
-          <div className="flex-1 space-y-1.5 min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                {format(new Date(item.createdAt), 'HH:mm • dd MMM')}
-              </span>
-              {!item.isRead && (
-                 <div className="w-2 h-2 bg-[#0D8A8A] rounded-full shadow-lg shadow-[#0D8A8A]/20 animate-pulse" />
-              )}
-            </div>
-            
-            <h4 className={cn(
-              "text-[14px] leading-snug tracking-tight line-clamp-2",
-              !item.isRead ? "font-bold text-slate-900" : "font-semibold text-slate-600"
-            )}>
-               {item.title}
-            </h4>
-            
-            <p className="text-[12px] font-medium text-slate-500 leading-relaxed line-clamp-2">
-               {item.message}
-            </p>
-          </div>
-        </div>
-
-        {/* Bottom Metadata */}
-        {!item.isRead && (
-          <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-             <div className="flex items-center gap-1.5 opacity-60">
-                <Sparkles size={12} className="text-[#0D8A8A]" />
-                <span className="text-[10px] font-bold text-[#0D8A8A] uppercase tracking-wider">SmartStay AI</span>
-             </div>
-             <ChevronRight size={14} className="text-slate-300" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+type NotificationTab = 'all' | 'unread';
 
 const NotificationCenter = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const profileId = user?.id ?? '';
-  const [activeTab, setActiveTab] = useState<'all' | 'unread'>('unread');
+  const [activeTab, setActiveTab] = useState<NotificationTab>('unread');
 
-  const { data: notifications, isLoading } = useQuery({
+  const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['portal-notifications', profileId],
     queryFn: () => notificationService.getNotifications(profileId),
     enabled: !!profileId,
@@ -141,99 +28,167 @@ const NotificationCenter = () => {
     mutationFn: (id: string) => notificationService.markAsRead(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal-notifications', profileId] });
-    }
+    },
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: () => notificationService.markAllAsRead(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal-notifications', profileId] });
-      toast.success('Đã đánh dấu tất cả đã đọc');
-    }
+      toast.success('Đã đánh dấu tất cả là đã đọc.');
+    },
   });
 
+  const handleNotificationClick = (item: (typeof notifications)[number]) => {
+    if (!item.isRead) {
+      markAsReadMutation.mutate(item.id);
+    }
 
+    if (item.link) {
+      navigate(item.link);
+      return;
+    }
 
-  const handleNotificationClick = (item: any) => {
-    if (!item.isRead) markAsReadMutation.mutate(item.id);
-    const t = normalizeNotificationType(item.type);
-    if (t === 'invoice_new' || t === 'invoice_due' || t === 'payment_confirmed') navigate('/portal/invoices');
-    else if (t === 'ticket') navigate('/portal/tickets');
-    else if (t === 'announcement') navigate('/portal/announcements');
-    else if (t === 'contract_renew') navigate('/portal/profile');
+    const normalizedType = normalizeNotificationType(item.type);
+    if (normalizedType === 'invoice_new' || normalizedType === 'invoice_due' || normalizedType === 'payment_confirmed') {
+      navigate('/portal/invoices');
+    } else if (normalizedType === 'ticket') {
+      navigate('/portal/tickets');
+    } else if (normalizedType === 'announcement') {
+      navigate('/portal/announcements');
+    } else if (normalizedType === 'contract_renew') {
+      navigate('/portal/profile');
+    }
   };
 
-  const filteredNotifications = notifications?.filter((n: any) => 
-    activeTab === 'all' ? true : !n.isRead
-  ) || [];
-
-  const unreadCount = notifications?.filter((n: any) => !n.isRead).length || 0;
+  const filteredNotifications =
+    activeTab === 'all' ? notifications : notifications.filter((item) => !item.isRead);
+  const unreadCount = notifications.filter((item) => !item.isRead).length;
 
   return (
-    <div className="min-h-full bg-transparent pb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="p-4 sm:p-5 space-y-6 w-full mx-auto pt-4">
-        {/* Header Section */}
+    <div className="min-h-full bg-transparent pb-10">
+      <div className="space-y-6 px-4 pt-4 sm:px-5">
         <div className="flex items-center justify-between px-1">
-          <div className="space-y-0.5">
-            <h2 className="text-[20px] font-bold text-slate-900 tracking-tight">Thông báo</h2>
-            <p className="text-[12px] font-medium text-slate-400">Bạn có {unreadCount} mục chưa đọc</p>
+          <div className="space-y-1">
+            <h2 className="text-[20px] font-bold tracking-tight text-slate-900">Thông báo</h2>
+            <p className="text-sm text-slate-500">Bạn có {unreadCount} thông báo chưa đọc.</p>
           </div>
-          <button 
+          <button
+            type="button"
             onClick={() => markAllReadMutation.mutate()}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-[#0D8A8A] shadow-sm shadow-slate-200/50 active:scale-90 transition-all"
-            title="Đánh dấu đã đọc tất cả"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-primary shadow-sm"
+            title="Đánh dấu tất cả là đã đọc"
           >
-             <CheckCircle2 size={20} />
+            <CheckCircle2 size={18} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 p-1.5 bg-slate-100/50 rounded-2xl border border-slate-100">
-           <button 
-             onClick={() => setActiveTab('unread')}
-             className={cn(
-               "flex-1 h-10 rounded-xl text-[12px] font-bold transition-all",
-               activeTab === 'unread' ? "bg-white text-[#0D8A8A] shadow-sm" : "text-slate-500 hover:text-slate-700"
-             )}
-           >
-              Chưa đọc {unreadCount > 0 && `(${unreadCount})`}
-           </button>
-           <button 
-             onClick={() => setActiveTab('all')}
-             className={cn(
-               "flex-1 h-10 rounded-xl text-[12px] font-bold transition-all",
-               activeTab === 'all' ? "bg-white text-[#0D8A8A] shadow-sm" : "text-slate-500 hover:text-slate-700"
-             )}
-           >
-              Tất cả
-           </button>
+        <div className="flex gap-2 rounded-2xl border border-slate-100 bg-slate-100/70 p-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('unread')}
+            className={cn(
+              'flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition',
+              activeTab === 'unread' ? 'bg-white text-primary shadow-sm' : 'text-slate-500',
+            )}
+          >
+            Chưa đọc {unreadCount > 0 ? `(${unreadCount})` : ''}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            className={cn(
+              'flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition',
+              activeTab === 'all' ? 'bg-white text-primary shadow-sm' : 'text-slate-500',
+            )}
+          >
+            Tất cả
+          </button>
         </div>
 
-        {/* Notification List */}
-        <div className="space-y-2 pt-2">
+        <div className="space-y-3">
           {isLoading ? (
-            Array(3).fill(0).map((_, i) => (
-              <div key={i} className="h-28 bg-white/50 rounded-3xl border border-slate-50 animate-pulse"></div>
+            Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-28 rounded-[28px] border border-slate-100 bg-white animate-pulse" />
             ))
           ) : filteredNotifications.length === 0 ? (
-            <div className="py-24 text-center space-y-4">
-               <div className="w-20 h-20 bg-emerald-50 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
-                 <Sparkles size={32} className="text-emerald-500 opacity-50" />
-               </div>
-               <div className="space-y-1">
-                 <p className="text-[15px] font-bold text-slate-900">Tuyệt vời!</p>
-                 <p className="text-[13px] font-medium text-slate-400">Bạn đã xem hết tất cả thông báo.</p>
-               </div>
+            <div className="py-24 text-center">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[32px] bg-emerald-50">
+                <Sparkles size={32} className="text-emerald-500/60" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">Mọi thứ đều ổn</h3>
+              <p className="mt-2 text-sm text-slate-500">Bạn đã xem hết toàn bộ thông báo trong mục này.</p>
             </div>
           ) : (
-            filteredNotifications.map((item: any) => (
-              <SwipeableNotificationItem 
-                key={item.id} 
-                item={item} 
-                onRead={() => handleNotificationClick(item)}
-                onDelete={() => markAsReadMutation.mutate(item.id)}
-              />
-            ))
+            filteredNotifications.map((item) => {
+              const style = getNotificationStyle(item.type);
+              const Icon = style.icon;
+
+              return (
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleNotificationClick(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleNotificationClick(item);
+                    }
+                  }}
+                  className={cn(
+                    'w-full rounded-[28px] border bg-white p-5 text-left shadow-sm transition active:scale-[0.99]',
+                    item.isRead ? 'border-slate-200' : 'border-primary/20 shadow-primary/5',
+                  )}
+                >
+                  <div className="flex gap-4">
+                    <div className={cn('mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border', style.color)}>
+                      <Icon size={20} />
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+                          {getNotificationTypeLabel(item.type)}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {formatDate(item.createdAt, 'HH:mm - dd/MM/yyyy')}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h3 className={cn('text-base leading-snug', item.isRead ? 'font-semibold text-slate-700' : 'font-bold text-slate-900')}>
+                          {item.title}
+                        </h3>
+                        <p className="text-sm leading-6 text-slate-500">{item.message}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                          <Bell size={14} />
+                          {item.isRead ? 'Đã đọc' : 'Nhấn để xem chi tiết'}
+                        </div>
+
+                        {!item.isRead ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              markAsReadMutation.mutate(item.id);
+                            }}
+                            className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+                          >
+                            Đánh dấu đã đọc
+                          </button>
+                        ) : (
+                          <ChevronRight size={16} className="text-slate-300" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

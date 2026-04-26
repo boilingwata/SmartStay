@@ -1,5 +1,4 @@
-import type { User } from '@/models/User';
-import type { TenantStage } from '@/types';
+import type { TenantStage, User } from '@/types';
 
 export const RESIDENT_TENANT_STAGES: TenantStage[] = ['resident_pending_onboarding', 'resident_active'];
 const INTERNAL_WORKSPACE_HOME = '/owner/dashboard';
@@ -17,6 +16,10 @@ export function getTenantHomePath(stage?: TenantStage | null): string {
 
 function isInternalWorkspaceRole(role?: User['role'] | null): boolean {
   return role === 'Owner' || role === 'Staff';
+}
+
+function normalizePortalPath(path: string): string {
+  return path.replace(/^\/tenant/, '/portal');
 }
 
 function normalizeInternalWorkspacePath(path: string): string {
@@ -68,9 +71,11 @@ export function getPostLoginRedirect(
       return normalizeInternalWorkspacePath(safePath);
     }
 
-    if (safePath.startsWith('/portal')) {
+    const normalizedPortalPath = normalizePortalPath(safePath);
+
+    if (normalizedPortalPath.startsWith('/portal')) {
       return isResidentTenantStage(user.tenantStage)
-        ? safePath
+        ? normalizedPortalPath
         : getTenantHomePath(user.tenantStage);
     }
 

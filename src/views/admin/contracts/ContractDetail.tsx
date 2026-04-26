@@ -17,19 +17,19 @@ import { CreateAddendumModal } from '@/components/contracts/modals/CreateAddendu
 import { LiquidationModal } from '@/components/contracts/modals/LiquidationModal';
 import { TransferContractModal } from '@/components/contracts/modals/TransferContractModal';
 import { ContractDateRange } from '@/components/contracts/ContractDateRange';
+import { SummaryCard } from '@/components/contracts/detail/ContractDetailSections';
 import { ContractPriceDisplay } from '@/components/contracts/ContractPriceDisplay';
 import { ContractStatusBadge } from '@/components/contracts/ContractStatusBadge';
+import { AddendumsTab } from '@/components/contracts/tabs/AddendumsTab';
+import { InvoicesTab } from '@/components/contracts/tabs/InvoicesTab';
+import { OccupantsTab } from '@/components/contracts/tabs/OccupantsTab';
+import { OverviewTab } from '@/components/contracts/tabs/OverviewTab';
+import { TransfersTab } from '@/components/contracts/tabs/TransfersTab';
 import { Spinner } from '@/components/ui/Feedback';
 import { ROUTES } from '@/constants/routes';
 import { getContractDepositStatusLabel } from '@/lib/contractPresentation';
 import { contractService } from '@/services/contractService';
 import { cn, formatDate, formatVND } from '@/utils';
-import { SummaryCard } from './ContractDetailComponents';
-import { AddendumsTab } from './tabs/AddendumsTab';
-import { InvoicesTab } from './tabs/InvoicesTab';
-import { OccupantsTab } from './tabs/OccupantsTab';
-import { OverviewTab } from './tabs/OverviewTab';
-import { TransfersTab } from './tabs/TransfersTab';
 
 const TABS = [
   { id: 'overview', label: 'Tổng quan', icon: FileText },

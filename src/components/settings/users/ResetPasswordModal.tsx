@@ -33,7 +33,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ open, onOpenCha
       });
       toast.success(`Liên kết đặt lại mật khẩu đã được gửi tới ${user.email}`);
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error('Không thể gửi email đặt lại mật khẩu');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ open, onOpenCha
       onOpenChange(false);
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
+    } catch {
       toast.error('Không thể đặt lại mật khẩu');
     } finally {
       setLoading(false);

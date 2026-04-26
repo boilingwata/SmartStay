@@ -34,8 +34,8 @@ import {
 } from "@/components/shared";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/utils";
-import ServiceDetailModal from "@/components/service/ServiceDetailModal";
-import UpdatePriceModal from "@/components/service/UpdatePriceModal";
+import ServiceDetailModal from "@/components/services/ServiceDetailModal";
+import UpdatePriceModal from "@/components/services/UpdatePriceModal";
 import { ErrorBanner } from "@/components/ui/StatusStates";
 import { QuickFilterChips } from "@/components/ui/QuickFilterChips";
 import { MobileSortDropdown } from "@/components/ui/MobileSortDropdown";
@@ -102,7 +102,7 @@ const ServiceCatalog: React.FC = () => {
   };
 
   // Unified Filter Change
-  const updateFilters = (newValues: Record<string, any>) => {
+  const updateFilters = (newValues: Record<string, string | number | boolean | null | undefined>) => {
     const params = new URLSearchParams(searchParams);
     if (!newValues.page) params.set("page", "1"); // Reset pagination on non-page changes
     

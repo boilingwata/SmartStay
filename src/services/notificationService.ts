@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Notification } from '@/types/notification';
+import type { Notification, NotificationLogItem } from '@/types/notification';
 
 interface NotificationRow {
   id: string;
@@ -11,6 +11,11 @@ interface NotificationRow {
   link: string | null;
   created_at: string;
   created_by: string | null;
+}
+
+interface NotificationLogRow extends NotificationRow {
+  recipient: { full_name: string | null } | { full_name: string | null }[] | null;
+  creator: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
 function mapRow(row: NotificationRow): Notification {
@@ -26,6 +31,27 @@ function mapRow(row: NotificationRow): Notification {
   };
 }
 
+function resolveProfileName(
+  profile: { full_name: string | null } | { full_name: string | null }[] | null | undefined,
+): string | undefined {
+  if (!profile) return undefined;
+
+  const value = Array.isArray(profile) ? profile[0] : profile;
+  const fullName = value?.full_name?.trim();
+  return fullName || undefined;
+}
+
+function mapLogRow(row: NotificationLogRow): NotificationLogItem {
+  const notification = mapRow(row);
+
+  return {
+    ...notification,
+    profileId: row.profile_id,
+    recipientName: resolveProfileName(row.recipient),
+    createdByName: resolveProfileName(row.creator),
+  };
+}
+
 let notificationsTableAvailable: boolean | null = null;
 let notificationsTableCheckPromise: Promise<boolean> | null = null;
 
@@ -35,7 +61,7 @@ function isMissingNotificationsTableError(error: { message?: string; code?: stri
   const message = (error.message || '').toLowerCase();
   return (
     error.code === 'PGRST205' ||
-    message.includes("could not find the table") ||
+    message.includes('could not find the table') ||
     message.includes('schema cache') ||
     message.includes("relation 'smartstay.notifications' does not exist") ||
     message.includes('relation "smartstay.notifications" does not exist')
@@ -47,18 +73,13 @@ async function ensureNotificationsTable(): Promise<boolean> {
   if (notificationsTableCheckPromise) return notificationsTableCheckPromise;
 
   notificationsTableCheckPromise = (async () => {
-    const client = supabase as any;
-    const { error } = await client
-      .from('notifications')
-      .select('id', { head: true, count: 'exact' })
-      .limit(1);
+    const { error } = await supabase.from('notifications').select('id', { head: true, count: 'exact' }).limit(1);
 
     notificationsTableAvailable = !error;
     if (error) {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      console.warn('[notificationService] notifications table unavailable:', error.message);
     }
 
     notificationsTableCheckPromise = null;
@@ -80,8 +101,7 @@ export const notificationService = {
   async getNotifications(profileId: string, limit = 20): Promise<Notification[]> {
     if (!(await ensureNotificationsTable())) return [];
 
-    const client = supabase as any;
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('notifications')
       .select('id, profile_id, title, message, type, is_read, link, created_at, created_by')
       .eq('profile_id', profileId)
@@ -92,18 +112,49 @@ export const notificationService = {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      console.warn('[notificationService] getNotifications:', error.message);
       return [];
     }
 
     return (data as NotificationRow[]).map(mapRow);
   },
 
+  async getNotificationLog(limit = 100): Promise<NotificationLogItem[]> {
+    if (!(await ensureNotificationsTable())) return [];
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .select(
+        `
+          id,
+          profile_id,
+          title,
+          message,
+          type,
+          is_read,
+          link,
+          created_at,
+          created_by,
+          recipient:profiles!notifications_profile_id_fkey(full_name),
+          creator:profiles!notifications_created_by_fkey(full_name)
+        `,
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      if (isMissingNotificationsTableError(error)) {
+        notificationsTableAvailable = false;
+      }
+      return [];
+    }
+
+    return (data as NotificationLogRow[]).map(mapLogRow);
+  },
+
   async getUnreadCount(profileId: string): Promise<number> {
     if (!(await ensureNotificationsTable())) return 0;
 
-    const client = supabase as any;
-    const { count, error } = await client
+    const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('profile_id', profileId)
@@ -113,7 +164,6 @@ export const notificationService = {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      console.warn('[notificationService] getUnreadCount:', error.message);
       return 0;
     }
 
@@ -123,25 +173,19 @@ export const notificationService = {
   async markAsRead(id: string): Promise<void> {
     if (!(await ensureNotificationsTable())) return;
 
-    const client = supabase as any;
-    const { error } = await client
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id);
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
 
     if (error) {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      console.warn('[notificationService] markAsRead:', error.message);
     }
   },
 
   async markAllAsRead(profileId: string): Promise<void> {
     if (!(await ensureNotificationsTable())) return;
 
-    const client = supabase as any;
-    const { error } = await client
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('profile_id', profileId)
@@ -151,7 +195,6 @@ export const notificationService = {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      console.warn('[notificationService] markAllAsRead:', error.message);
     }
   },
 
@@ -167,8 +210,7 @@ export const notificationService = {
     }
 
     const createdBy = await getCurrentProfileId();
-    const client = supabase as any;
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('notifications')
       .insert({
         profile_id: input.profileId,
@@ -185,7 +227,7 @@ export const notificationService = {
       if (isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-      throw new Error(error.message || 'Không thể gửi thông báo tới cư dân.');
+      throw new Error(error.message || 'Không thể gửi thông báo tới người nhận.');
     }
 
     return mapRow(data as NotificationRow);

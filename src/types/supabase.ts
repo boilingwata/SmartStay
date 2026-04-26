@@ -1210,6 +1210,66 @@ export type Database = {
           },
         ]
       }
+      announcements: {
+        Row: {
+          building_ids: number[]
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_pinned: boolean
+          publish_at: string | null
+          status: string
+          target_groups: string[]
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          building_ids?: number[]
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          publish_at?: string | null
+          status?: string
+          target_groups?: string[]
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          building_ids?: number[]
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          publish_at?: string | null
+          status?: string
+          target_groups?: string[]
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string

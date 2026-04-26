@@ -1,6 +1,6 @@
 import { AlertCircle, LogOut, RefreshCcw, ShieldCheck, UserPlus } from 'lucide-react';
+import { OccupantCard } from '@/components/contracts/detail/ContractDetailSections';
 import type { ContractDetail as ContractDetailModel, ContractOccupant } from '@/models/Contract';
-import { OccupantCard } from '../ContractDetailComponents';
 
 interface OccupantsTabProps {
   contract: ContractDetailModel;

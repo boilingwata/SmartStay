@@ -4,3 +4,4 @@ export * from './ContractTab';
 export * from './InvoiceTab';
 export * from './FeedbackTab';
 export * from './OnboardingTab';
+export * from './types';

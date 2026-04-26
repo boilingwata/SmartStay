@@ -1,9 +1,11 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AppProviders } from './components/layout/AppProviders';
+import AdminLayout from './components/layout/AdminLayout';
+import PortalLayout from './components/layout/PortalLayout';
+import PublicLayout from './components/layout/PublicLayout';
+import SuperAdminLayout from './components/layout/SuperAdminLayout';
 import ProtectedRoute from './routes/ProtectedRoute';
-import { AdminLayout, PublicLayout } from './views/layouts/Layouts';
-import SuperAdminLayout from './views/layouts/SuperAdminLayout';
 import { getAuthenticatedHomePath } from './lib/authRouting';
 
 // --- Lazy Load Views ---
@@ -22,7 +24,6 @@ import { ownerRoutes } from './routes/ownerRoutes';
 import { portalRoutes, Onboarding } from './routes/portalRoutes';
 import { superAdminRoutes } from './routes/superAdminRoutes';
 import PortalAuthGuard from './components/auth/PortalAuthGuard';
-import PortalLayout from './components/layout/PortalLayout';
 
 import useAuthStore from './stores/authStore';
 
@@ -158,7 +159,7 @@ const App = () => {
               <Route path="/tenant">
                 <Route element={<PortalAuthGuard />}>
                   <Route element={<PortalLayout />}>
-                    <Route index element={<Navigate to="/tenant/contracts" replace />} />
+                    <Route index element={<Navigate to="/portal/contracts" replace />} />
                     <Route path="contracts" element={<PortalContractView />} />
                   </Route>
                 </Route>

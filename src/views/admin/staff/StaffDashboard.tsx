@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { 
-  Building2, Users, Home, PieChart, 
-  DollarSign, AlertCircle, FileText, MessageSquare,
-  Plus, Calendar, RefreshCcw, ArrowRight,
-  Activity, Check, Copy, Star,
-  Clock, CheckCircle2, LayoutDashboard
+  Home, PieChart,
+  AlertCircle, FileText, MessageSquare,
+  Plus, RefreshCcw,
+  Activity, Star,
+  Clock, CheckCircle2
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn, formatDate } from '@/utils';
 import useUIStore from '@/stores/uiStore';
 import { dashboardService } from '@/services/dashboardService';
+import { ROUTES } from '@/constants/routes';
 import { KPICard } from '@/components/data/KPICard';
 import { StatusBadge } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
@@ -109,14 +110,14 @@ const StaffDashboard = () => {
         <div className="lg:col-span-2 card-container p-8 bg-white/40 backdrop-blur-md">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-h3 text-primary font-black uppercase tracking-widest">Vé yêu cầu được phân công</h3>
-            <button onClick={() => navigate('/staff/my-tickets')} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">Xem tất cả</button>
+            <button onClick={() => navigate(ROUTES.STAFF.MY_TICKETS)} className="text-[10px] font-black text-primary hover:text-secondary tracking-widest uppercase transition-colors">Xem tất cả</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {staffTickets?.map((ticket: any) => (
               <div 
                 key={ticket.id} 
                 className="flex flex-col gap-3 p-4 hover:bg-white rounded-[24px] border border-transparent hover:border-primary/10 hover:shadow-xl transition-all cursor-pointer group"
-                onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
+                onClick={() => navigate(`${ROUTES.OWNER.TICKETS}/${ticket.id}`)}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
@@ -148,7 +149,7 @@ const StaffDashboard = () => {
           <h3 className="text-h3 text-slate-400 font-black uppercase tracking-[3px] mb-8">Thao tác nhanh</h3>
           <div className="space-y-4">
             <button 
-              onClick={() => navigate('/staff/my-tickets')}
+              onClick={() => navigate(ROUTES.STAFF.MY_TICKETS)}
               className="w-full flex items-center gap-4 p-5 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-all group active:scale-95"
             >
               <div className="w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center text-white shadow-lg">

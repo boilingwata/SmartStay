@@ -1,8 +1,8 @@
 import { Calendar, DollarSign, FileText, Info, Receipt, Users } from 'lucide-react';
+import { InfoItem } from '@/components/contracts/detail/ContractDetailSections';
 import type { ContractDetail as ContractDetailModel } from '@/models/Contract';
 import { getContractDepositStatusLabel } from '@/lib/contractPresentation';
 import { formatDate, formatVND } from '@/utils';
-import { InfoItem } from '../ContractDetailComponents';
 
 interface OverviewTabProps {
   contract: ContractDetailModel;
