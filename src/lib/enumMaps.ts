@@ -84,7 +84,7 @@ const INVOICE_STATUS_TO_DB: StringRecord = {
 const TICKET_STATUS_FROM_DB: StringRecord = {
   new: 'Open',
   in_progress: 'InProgress',
-  pending_confirmation: 'InProgress',
+  pending_confirmation: 'PendingConfirmation',
   resolved: 'Resolved',
   closed: 'Closed',
 };
@@ -92,9 +92,9 @@ const TICKET_STATUS_FROM_DB: StringRecord = {
 const TICKET_STATUS_TO_DB: StringRecord = {
   Open: 'new',
   InProgress: 'in_progress',
+  PendingConfirmation: 'pending_confirmation',
   Resolved: 'resolved',
   Closed: 'closed',
-  Cancelled: 'closed',
 };
 
 const PRIORITY_FROM_DB: StringRecord = {

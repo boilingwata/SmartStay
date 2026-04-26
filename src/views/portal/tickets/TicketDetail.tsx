@@ -1,283 +1,354 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, CheckCircle2, User, Paperclip } from 'lucide-react';
-import { m, AnimatePresence } from 'framer-motion';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertCircle,
+  ArrowLeft,
+  MessageSquare,
+  Paperclip,
+  RefreshCcw,
+  Send,
+  User,
+} from 'lucide-react';
+
+import { TicketAttachmentGallery } from '@/components/tickets/TicketAttachmentGallery';
+import { EmptyState } from '@/components/ui/StatusStates';
+import { Spinner, StatusBadge } from '@/components/ui';
+import {
+  formatTicketDate,
+  formatTicketDateTime,
+  getTicketCategoryLabel,
+  getTicketPriorityLabel,
+  getTicketStatusLabel,
+  ticketQueryKeys,
+} from '@/features/tickets/ticketPresentation';
+import { supabase } from '@/lib/supabase';
 import { ticketService } from '@/services/ticketService';
 import { cn } from '@/utils';
-import { Spinner } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
-import { TicketAttachmentGallery } from '@/components/tickets/TicketAttachmentGallery';
+
+const STATUS_PANEL_STYLES: Record<string, string> = {
+  Open: 'bg-amber-50 border-amber-200',
+  InProgress: 'bg-sky-50 border-sky-200',
+  PendingConfirmation: 'bg-indigo-50 border-indigo-200',
+  Resolved: 'bg-emerald-50 border-emerald-200',
+  Closed: 'bg-slate-100 border-slate-200',
+};
 
 const TicketDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [newComment, setNewComment] = useState('');
-  const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
+  const [commentText, setCommentText] = useState('');
 
-  const { data: tenantId } = useQuery({
-    queryKey: ['current-tenant-id', 'ticket-detail'],
+  const { data: tenantId, isLoading: tenantLoading } = useQuery({
+    queryKey: ticketQueryKeys.portalCurrentTenant,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data: tenants } = await supabase
+
+      const { data: tenants, error } = await supabase
         .from('tenants')
         .select('id')
         .eq('profile_id', user.id)
         .eq('is_deleted', false)
         .limit(1);
+
+      if (error) throw error;
       return tenants?.[0]?.id ?? null;
     },
   });
 
-  const { data: ticket, isLoading: ticketLoading } = useQuery({
-    queryKey: ['portal-ticket', id, tenantId],
+  const {
+    data: ticket,
+    isLoading: ticketLoading,
+    isError: ticketError,
+    refetch: refetchTicket,
+  } = useQuery({
+    queryKey: ticketQueryKeys.portalDetail(id, tenantId),
     queryFn: () => ticketService.getTicketDetail(id!, tenantId),
-    enabled: !!id && !!tenantId,
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    enabled: !!id && tenantId != null,
   });
 
-  const { data: comments = [], isLoading: commentsLoading } = useQuery({
-    queryKey: ['portal-ticket-comments', id, tenantId],
+  const {
+    data: comments = [],
+    isLoading: commentsLoading,
+    isError: commentsError,
+    refetch: refetchComments,
+  } = useQuery({
+    queryKey: ticketQueryKeys.portalComments(id, tenantId),
     queryFn: () => ticketService.getTicketComments(id!, tenantId),
-    enabled: !!id && !!tenantId,
-    refetchInterval: 3000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    enabled: !!id && tenantId != null,
+    refetchInterval: ticket?.status === 'Closed' ? false : 15_000,
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: (content: string) => ticketService.addComment(id!, content),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portal-ticket-comments', id, tenantId] });
-      setNewComment('');
+    mutationFn: async () => {
+      const trimmed = commentText.trim();
+      if (!trimmed || !id) {
+        throw new Error('Vui lòng nhập nội dung phản hồi.');
+      }
+
+      return ticketService.addComment(id, trimmed, false);
+    },
+    onSuccess: async () => {
+      setCommentText('');
+      await queryClient.invalidateQueries({ queryKey: ticketQueryKeys.portalComments(id, tenantId) });
+      await queryClient.invalidateQueries({ queryKey: ticketQueryKeys.portalDetail(id, tenantId) });
     },
   });
 
-  const handleSend = () => {
-    if (!newComment.trim() || !id || addCommentMutation.isPending) return;
-    addCommentMutation.mutate(newComment);
-  };
+  const firstAttachments = useMemo(
+    () => comments.find((comment) => comment.attachments.length > 0)?.attachments ?? [],
+    [comments]
+  );
 
-  const isLoading = ticketLoading || commentsLoading;
-  const initialAttachments = comments.find((comment) => comment.attachments.length > 0)?.attachments ?? [];
+  const loading = tenantLoading || ticketLoading || commentsLoading;
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-transparent min-h-[80vh]">
+      <div className="flex min-h-[80vh] flex-1 flex-col items-center justify-center space-y-4 px-6">
         <Spinner size="lg" />
-        <p className="text-sm text-slate-400 font-black animate-pulse uppercase tracking-[3px]">Đang tải dữ liệu...</p>
+        <p className="text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
+          Đang tải chi tiết yêu cầu...
+        </p>
       </div>
     );
   }
 
-  if (!ticket) {
+  if (ticketError || !ticket) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 min-h-[80vh]">
-        <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center">
-          <ArrowLeft size={32} />
-        </div>
-        <p className="text-sm font-black text-slate-400 uppercase tracking-widest leading-none">Không tìm thấy yêu cầu</p>
-        <button onClick={() => navigate('/portal/tickets')} className="text-teal-600 font-black uppercase text-xs tracking-widest underline">Quay lại</button>
+      <div className="flex min-h-[80vh] flex-1 items-center justify-center px-5">
+        <EmptyState
+          icon={AlertCircle}
+          title="Không tìm thấy yêu cầu"
+          message="Yêu cầu này không còn tồn tại hoặc bạn không có quyền xem."
+          actionLabel="Quay lại danh sách"
+          onAction={() => navigate('/portal/tickets')}
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-6 duration-700 font-sans h-full bg-white relative">
-      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100 px-5 pt-8">
-        <div className="flex items-center gap-4 mb-4">
-          <button onClick={() => navigate('/portal/tickets')} className="w-10 h-10 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 active:scale-90 transition-all">
-            <ArrowLeft size={20} />
+    <div className="min-h-[100dvh] bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_40%,#f8fafc_100%)] pb-36">
+      <div className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => navigate('/portal/tickets')}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={18} />
           </button>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black text-teal-600/60 uppercase tracking-[3px] truncate">{ticket.ticketCode}</p>
-            <h1 className="text-lg font-black text-slate-900 truncate leading-none uppercase tracking-tight">{ticket.title}</h1>
-          </div>
-        </div>
 
-        <div className="flex border-t border-slate-50">
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">
+              {ticket.ticketCode}
+            </p>
+            <h1 className="truncate text-lg font-black tracking-tight text-slate-900">{ticket.title}</h1>
+          </div>
+
           <button
-            onClick={() => setActiveTab('info')}
-            className={cn(
-              'flex-1 py-4 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden',
-              activeTab === 'info' ? 'text-teal-600' : 'text-slate-400'
-            )}
+            onClick={() => {
+              refetchTicket();
+              refetchComments();
+            }}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
           >
-            <span>Tổng quan</span>
-            {activeTab === 'info' && <m.div layoutId="tab-active" className="absolute bottom-0 left-0 right-0 h-1 bg-teal-500 shadow-[0_-2px_10px_rgba(20,184,166,0.3)]" />}
-          </button>
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={cn(
-              'flex-1 py-4 text-[11px] font-black uppercase tracking-[3px] transition-all relative overflow-hidden',
-              activeTab === 'chat' ? 'text-teal-600' : 'text-slate-400'
-            )}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <span>Thảo luận</span>
-              {comments.length > 0 && <span className="bg-teal-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/20">{comments.length}</span>}
-            </div>
-            {activeTab === 'chat' && <m.div layoutId="tab-active" className="absolute bottom-0 left-0 right-0 h-1 bg-teal-500 shadow-[0_-2px_10px_rgba(20,184,166,0.3)]" />}
+            <RefreshCcw size={18} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        <div className="p-6 pb-40 max-w-[900px] mx-auto animate-in fade-in duration-500">
-          {activeTab === 'info' ? (
-            <div className="space-y-6">
-              <div className="bg-slate-50/50 p-8 rounded-[40px] border border-slate-100 space-y-8 shadow-inner relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 text-teal-500 group-hover:scale-110 transition-transform">
-                  <User size={120} strokeWidth={1} />
+      <div className="mx-auto grid w-full max-w-5xl gap-6 px-4 pt-6 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+        <section className="space-y-6">
+          <div
+            className={cn(
+              'rounded-[32px] border p-6 shadow-sm',
+              STATUS_PANEL_STYLES[ticket.status] ?? 'bg-white border-slate-200'
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-3">
+                <StatusBadge status={ticket.status} size="lg" />
+                <div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
+                  <span className="rounded-full bg-white/80 px-3 py-1 font-bold">
+                    {getTicketCategoryLabel(ticket.type)}
+                  </span>
+                  <span className="rounded-full bg-white/80 px-3 py-1 font-bold">
+                    {getTicketPriorityLabel(ticket.priority)}
+                  </span>
                 </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
-                  <div className={cn(
-                    'px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[4px] border shadow-sm',
-                    ticket.status === 'Open' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                    ticket.status === 'InProgress' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                    ticket.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                    'bg-slate-50 text-slate-500 border-slate-100'
-                  )}>
-                    {ticket.status}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-8 py-8 border-y border-slate-100 relative z-10">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phân loại</p>
-                    <p className="text-sm font-black text-slate-700 uppercase tracking-tight">{ticket.type}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Độ ưu tiên</p>
-                    <p className={cn(
-                      'text-sm font-black uppercase tracking-tight',
-                      ticket.priority === 'Critical' ? 'text-rose-600' :
-                      ticket.priority === 'High' ? 'text-orange-600' :
-                      'text-teal-600'
-                    )}>
-                      {ticket.priority}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Căn hộ</p>
-                    <p className="text-sm font-black text-slate-700">{ticket.roomCode || 'BQL'}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gửi ngày</p>
-                    <p className="text-sm font-black text-slate-700">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-4 relative z-10">
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nội dung chi tiết</p>
-                  <div className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm min-h-[120px]">
-                    <p className="text-[15px] text-slate-700 leading-relaxed font-medium tracking-tight italic">"{ticket.description}"</p>
-                  </div>
-                </div>
-                {initialAttachments.length > 0 && (
-                  <div className="relative z-10">
-                    <TicketAttachmentGallery attachments={initialAttachments} />
-                  </div>
-                )}
               </div>
 
-              <button
-                onClick={() => setActiveTab('chat')}
-                className="w-full h-16 bg-slate-900 text-white rounded-[32px] font-black shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 active:scale-95 transition-all uppercase tracking-[3px] text-xs"
-              >
-                Gửi phản hồi cho BQL
-                <Send size={18} />
-              </button>
+              <div className="text-right text-sm text-slate-600">
+                <p className="font-bold">Tạo ngày {formatTicketDate(ticket.createdAt)}</p>
+                <p className="mt-1">Cập nhật lúc {formatTicketDateTime(ticket.updatedAt)}</p>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-8 pb-32">
-              <AnimatePresence mode="popLayout">
-                {comments.map((msg, idx) => {
-                  const isStaff = ['owner', 'staff', 'super_admin'].includes(msg.authorRole?.toLowerCase());
+
+            <div className="mt-6 grid gap-4 border-t border-slate-200/70 pt-6 sm:grid-cols-2">
+              <div className="rounded-[24px] bg-white/80 p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Căn hộ</p>
+                <p className="mt-2 text-sm font-bold text-slate-800">{ticket.roomCode ? `Phòng ${ticket.roomCode}` : 'Yêu cầu chung'}</p>
+                <p className="mt-1 text-sm text-slate-500">{ticket.buildingName || 'Chưa gắn tòa nhà'}</p>
+              </div>
+
+              <div className="rounded-[24px] bg-white/80 p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Người xử lý</p>
+                <p className="mt-2 text-sm font-bold text-slate-800">
+                  {ticket.assignedToName || 'Chưa phân công'}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">{getTicketStatusLabel(ticket.status)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-slate-100 p-3 text-slate-600">
+                <MessageSquare size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Mô tả ban đầu</p>
+                <h2 className="text-lg font-black tracking-tight text-slate-900">Nội dung yêu cầu</h2>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[24px] bg-slate-50 p-5">
+              <p className="whitespace-pre-wrap text-[15px] leading-7 text-slate-700">
+                {ticket.description || 'Chưa có mô tả chi tiết.'}
+              </p>
+            </div>
+
+            {firstAttachments.length > 0 && (
+              <div className="mt-6">
+                <TicketAttachmentGallery attachments={firstAttachments} />
+              </div>
+            )}
+
+            {ticket.resolutionNote && (
+              <div className="mt-6 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-700">Ghi chú xử lý</p>
+                <p className="mt-2 whitespace-pre-wrap text-[15px] leading-7 text-emerald-900">
+                  {ticket.resolutionNote}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Trao đổi</p>
+                <h2 className="text-lg font-black tracking-tight text-slate-900">
+                  Lịch sử phản hồi ({comments.length})
+                </h2>
+              </div>
+              <StatusBadge status={ticket.status} size="sm" />
+            </div>
+
+            {commentsError ? (
+              <div className="mt-5 rounded-[24px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                Không tải được lịch sử phản hồi. Vui lòng thử lại.
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                  <MessageSquare size={22} />
+                </div>
+                <p className="mt-4 text-sm font-bold text-slate-700">Chưa có phản hồi nào</p>
+                <p className="mt-1 text-sm text-slate-500">Bạn có thể gửi thêm thông tin để ban quản lý xử lý nhanh hơn.</p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {comments.map((comment) => {
+                  const isStaffSide = ['Owner', 'Staff', 'SuperAdmin'].includes(comment.authorRole);
+
                   return (
-                    <m.div
-                      layout
-                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      key={msg.id}
-                      className={cn('flex gap-4 items-end', isStaff ? 'justify-start' : 'justify-end')}
-                    >
-                      {isStaff && (
-                        <div className="w-12 h-12 rounded-2xl bg-teal-600 flex items-center justify-center text-white shadow-xl shadow-teal-500/20 shrink-0 mb-3 grayscale-[0.5] hover:grayscale-0 transition-all">
-                          <User size={24} strokeWidth={2.5} />
-                        </div>
+                    <div
+                      key={comment.id}
+                      className={cn(
+                        'rounded-[24px] border p-4',
+                        isStaffSide ? 'border-slate-200 bg-slate-50' : 'border-teal-100 bg-teal-50/60'
                       )}
-                      <div className={cn('max-w-[80%] space-y-2', !isStaff && 'flex flex-col items-end')}>
-                        <div className={cn(
-                          'p-6 rounded-[32px] shadow-lg transform-gpu transition-all',
-                          isStaff
-                            ? 'bg-white text-slate-800 rounded-bl-none border border-slate-100 shadow-slate-200/50'
-                            : 'bg-teal-600 text-white rounded-br-none shadow-teal-600/20'
-                        )}>
-                          {isStaff && <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest mb-2 opacity-70">Ban quản lý</p>}
-	                          <p className="text-[15px] font-black leading-relaxed tracking-tight">{msg.content}</p>
-	                          {msg.attachments.length > 0 && (
-	                            <TicketAttachmentGallery attachments={msg.attachments} compact className="mt-4" />
-	                          )}
-	                        </div>
-                        <p className={cn('text-[9px] text-slate-300 font-black uppercase tracking-widest px-2', isStaff ? 'text-left' : 'text-right')}>
-                          {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(msg.createdAt).toLocaleDateString('vi-VN')}
-                        </p>
+                    >
+                      <div className="flex items-start gap-3">
+                        {comment.authorAvatar ? (
+                          <img
+                            src={comment.authorAvatar}
+                            alt={comment.authorName}
+                            className="h-10 w-10 rounded-2xl object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-400">
+                            <User size={18} />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-black text-slate-800">{comment.authorName}</span>
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                              {isStaffSide ? 'Ban quản lý' : 'Cư dân'}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {formatTicketDateTime(comment.createdAt)}
+                          </p>
+                          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-slate-700">
+                            {comment.content}
+                          </p>
+
+                          {comment.attachments.length > 0 && (
+                            <div className="mt-4">
+                              <TicketAttachmentGallery attachments={comment.attachments} compact />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </m.div>
+                    </div>
                   );
                 })}
-              </AnimatePresence>
-
-              {ticket.status === 'Resolved' && (
-                <div className="flex flex-col items-center gap-4 py-12 border-t border-slate-50">
-                  <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center border-4 border-white shadow-2xl shadow-emerald-500/10">
-                    <CheckCircle2 size={40} strokeWidth={3} />
-                  </div>
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[4px]">Vấn đề đã hoàn tất xử lý</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      {activeTab === 'chat' && ticket.status !== 'Closed' && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/95 backdrop-blur-xl border-t border-slate-100 z-50 shadow-[0_-20px_50px_rgba(0,0,0,0.02)]">
-          <div className="max-w-[900px] mx-auto flex gap-4 bg-slate-50/80 rounded-[32px] p-3 items-center border border-slate-100 shadow-inner">
-            <button className="w-12 h-12 text-slate-400 hover:text-teal-600 flex items-center justify-center transition-all active:scale-90">
-              <Paperclip size={22} />
-            </button>
-            <input
-              type="text"
-              placeholder="Gửi phản hồi cho BQL..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              disabled={addCommentMutation.isPending}
-              className="flex-1 bg-transparent px-3 py-4 border-none focus:ring-0 text-[15px] font-black text-slate-700 placeholder:text-slate-300 placeholder:uppercase placeholder:tracking-widest placeholder:text-[10px]"
-              onKeyPress={(e: React.KeyboardEvent) => e.key === 'Enter' && handleSend()}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!newComment.trim() || addCommentMutation.isPending}
-              className={cn(
-                'w-12 h-12 rounded-[20px] flex items-center justify-center shadow-2xl transition-all active:scale-90',
-                newComment.trim() && !addCommentMutation.isPending
-                  ? 'bg-teal-600 text-white shadow-teal-600/30'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              )}
-            >
-              {addCommentMutation.isPending ? <Spinner size="sm" /> : <Send size={24} strokeWidth={3} className="translate-x-0.5 -translate-y-0.5" />}
-            </button>
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-5xl items-end gap-3 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+            <Paperclip size={18} />
           </div>
+
+          <div className="flex-1">
+            <textarea
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              disabled={ticket.status === 'Closed' || addCommentMutation.isPending}
+              placeholder={
+                ticket.status === 'Closed'
+                  ? 'Yêu cầu đã đóng nên không thể gửi thêm phản hồi.'
+                  : 'Nhập phản hồi để trao đổi thêm với ban quản lý...'
+              }
+              className="min-h-[88px] w-full resize-none rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4 text-[15px] leading-7 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-primary focus:bg-white"
+            />
+          </div>
+
+          <button
+            onClick={() => addCommentMutation.mutate()}
+            disabled={!commentText.trim() || ticket.status === 'Closed' || addCommentMutation.isPending}
+            className="inline-flex h-14 shrink-0 items-center gap-2 rounded-[22px] bg-slate-900 px-5 text-sm font-black uppercase tracking-[0.16em] text-white shadow-lg shadow-slate-900/15 transition disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {addCommentMutation.isPending ? <Spinner size="sm" /> : <Send size={16} />}
+            Gửi
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

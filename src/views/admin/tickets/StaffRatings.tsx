@@ -1,213 +1,275 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Star, Clock, User, ArrowLeft, Filter, 
-  Calendar, CheckCircle2, MessageSquare,
-  TrendingUp, Award, ThumbsUp
-} from 'lucide-react';
-import { 
-  RadialBarChart, RadialBar, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell 
-} from 'recharts';
+import { ArrowLeft, CalendarDays, Star, Ticket as TicketIcon, User } from 'lucide-react';
+
+import { EmptyState } from '@/components/ui/StatusStates';
+import { Spinner } from '@/components/ui';
+import { formatTicketDateTime, ticketQueryKeys } from '@/features/tickets/ticketPresentation';
 import { ticketService } from '@/services/ticketService';
 import { cn } from '@/utils';
-import { format, parseISO } from 'date-fns';
-import { vi } from 'date-fns/locale';
 
 const StaffRatings = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  const { data: ratingsData, isLoading } = useQuery({
-    queryKey: ['staff-ratings', id],
-    queryFn: () => ticketService.getStaffRatings(id!)
+  const { data: ratingsData, isLoading, isError, refetch } = useQuery({
+    queryKey: ticketQueryKeys.staffRatings(id),
+    queryFn: () => ticketService.getStaffRatings(id!),
+    enabled: !!id,
   });
 
+  const { data: staffList = [] } = useQuery({
+    queryKey: ticketQueryKeys.staffList,
+    queryFn: () => ticketService.getStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
 
+  const filteredList = useMemo(() => {
+    const list = ratingsData?.list ?? [];
+    return list.filter((rating) => {
+      if (dateRange.start && rating.createdAt < `${dateRange.start}T00:00:00`) return false;
+      if (dateRange.end && rating.createdAt > `${dateRange.end}T23:59:59`) return false;
+      return true;
+    });
+  }, [dateRange.end, dateRange.start, ratingsData?.list]);
 
-  if (isLoading || !ratingsData) {
+  const histogram = useMemo(
+    () =>
+      [5, 4, 3, 2, 1].map((score) => ({
+        score,
+        count: filteredList.filter((rating) => rating.rating === score).length,
+      })),
+    [filteredList]
+  );
+
+  const filteredAverage = useMemo(() => {
+    if (filteredList.length === 0) return 0;
+    const sum = filteredList.reduce((total, item) => total + item.rating, 0);
+    return Number((sum / filteredList.length).toFixed(2));
+  }, [filteredList]);
+
+  const staffProfile = useMemo(() => {
+    const fromRatings = ratingsData?.list[0];
+    if (fromRatings) {
+      return {
+        fullName: fromRatings.staffName,
+        avatarUrl: fromRatings.staffAvatar,
+        role: fromRatings.staffRole,
+      };
+    }
+
+    const fromStaffList = staffList.find((staff) => staff.id === id);
+    return fromStaffList
+      ? {
+          fullName: fromStaffList.fullName,
+          avatarUrl: fromStaffList.avatarUrl,
+          role: fromStaffList.role,
+        }
+      : null;
+  }, [id, ratingsData?.list, staffList]);
+
+  if (isLoading) {
     return (
-      <div className="py-40 flex flex-col items-center justify-center gap-4">
-         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-         <p className="text-[10px] font-black uppercase tracking-[4px] text-muted">Auditing Performance...</p>
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <div className="space-y-4 text-center">
+          <Spinner size="lg" />
+          <p className="text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
+            Đang tải đánh giá nhân viên...
+          </p>
+        </div>
       </div>
     );
   }
 
-  const { average, summary, list } = ratingsData;
-
-  // Data for RadialBarChart
-  const radialData = [
-    { name: 'Rating', value: (average / 5) * 100, fill: '#EAB308' }
-  ];
-
-  // Data for Histogram
-  const histogramData = [
-    { star: '5 sao', count: summary[5], fill: '#22C55E' },
-    { star: '4 sao', count: summary[4], fill: '#84CC16' },
-    { star: '3 sao', count: summary[3], fill: '#EAB308' },
-    { star: '2 sao', count: summary[2], fill: '#F97316' },
-    { star: '1 sao', count: summary[1], fill: '#DC2626' }
-  ].reverse();
+  if (isError || !ratingsData) {
+    return (
+      <div className="rounded-[32px] border border-dashed border-slate-200 bg-white p-8">
+        <EmptyState
+          title="Không tải được dữ liệu đánh giá"
+          message="Vui lòng thử lại để kiểm tra điểm đánh giá của nhân viên này."
+          actionLabel="Tải lại"
+          onAction={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-         <button 
-           onClick={() => navigate(-1)}
-           className="flex items-center gap-3 text-muted hover:text-primary transition-all group"
-         >
-           <div className="p-2.5 group-hover:bg-primary/5 rounded-2xl transition-all">
-              <ArrowLeft size={20} />
-           </div>
-           <span className="text-small font-black uppercase tracking-widest underline decoration-transparent group-hover:decoration-primary/30 underline-offset-8">Trở lại</span>
-         </button>
+    <div className="space-y-6 pb-16">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+        >
+          <ArrowLeft size={16} />
+          Quay lại
+        </button>
 
-         <div className="flex items-center gap-4 bg-white p-2 rounded-[24px] border border-border/10 shadow-sm">
-            <div className="flex items-center gap-2 px-4 py-2 border-r border-border/10">
-               <Calendar size={16} className="text-muted" />
-               <input type="date" className="bg-transparent text-[11px] font-bold outline-none" />
-               <span className="text-muted opacity-30 mx-1">-</span>
-               <input type="date" className="bg-transparent text-[11px] font-bold outline-none" />
-            </div>
-            <button className="p-2 hover:bg-bg rounded-xl transition-all"><Filter size={18} /></button>
-         </div>
+        <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <CalendarDays size={16} className="text-slate-400" />
+          <input
+            type="date"
+            value={dateRange.start}
+            onChange={(event) => setDateRange((current) => ({ ...current, start: event.target.value }))}
+            className="bg-transparent text-sm font-medium text-slate-700 outline-none"
+          />
+          <span className="text-slate-300">đến</span>
+          <input
+            type="date"
+            value={dateRange.end}
+            onChange={(event) => setDateRange((current) => ({ ...current, end: event.target.value }))}
+            className="bg-transparent text-sm font-medium text-slate-700 outline-none"
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        {/* Left: Staff Card & KPIs */}
-        <div className="lg:col-span-4 space-y-8">
-           <div className="card-container p-10 bg-primary text-white space-y-8 relative overflow-hidden group">
-              <div className="relative z-10 flex flex-col items-center text-center">
-                 <div className="relative mb-6">
-                    <img src={list[0]?.staffAvatar || 'https://i.pravatar.cc/150'} className="w-32 h-32 rounded-[40px] object-cover border-4 border-white/20 shadow-2xl transition-transform group-hover:scale-105" alt="" />
-                    <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-success rounded-2xl flex items-center justify-center border-4 border-primary shadow-lg">
-                       <Award size={18} />
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="space-y-6">
+          <div className="rounded-[32px] border border-slate-200 bg-slate-900 p-6 text-white shadow-xl shadow-slate-900/10">
+            <div className="flex items-center gap-4">
+              {staffProfile?.avatarUrl ? (
+                <img src={staffProfile.avatarUrl} alt={staffProfile.fullName} className="h-20 w-20 rounded-[28px] object-cover" />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-white/10 text-white/70">
+                  <User size={28} />
+                </div>
+              )}
+
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/55">Đánh giá nhân viên</p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight">
+                  {staffProfile?.fullName || 'Nhân viên SmartStay'}
+                </h1>
+                <p className="mt-2 text-sm text-white/70">{staffProfile?.role || 'Nhân viên vận hành'}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/55">Điểm trung bình</p>
+                <div className="mt-3 flex items-end gap-2">
+                  <span className="text-5xl font-black tracking-tight">{filteredAverage.toFixed(2)}</span>
+                  <span className="pb-1 text-sm text-white/65">/ 5</span>
+                </div>
+                <div className="mt-3 flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={18}
+                      className={cn(
+                        star <= Math.round(filteredAverage) ? 'fill-amber-400 text-amber-400' : 'text-white/20'
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-white/55">Số lượt đánh giá</p>
+                <div className="mt-3 flex items-end gap-2">
+                  <span className="text-5xl font-black tracking-tight">{filteredList.length}</span>
+                  <span className="pb-1 text-sm text-white/65">lượt</span>
+                </div>
+                <p className="mt-3 text-sm text-white/70">
+                  Dữ liệu được lấy trực tiếp từ điểm hài lòng đã lưu trên từng ticket hoàn tất.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Phân bố số sao</p>
+            <div className="mt-5 space-y-3">
+              {histogram.map((item) => {
+                const percentage = filteredList.length > 0 ? (item.count / filteredList.length) * 100 : 0;
+                return (
+                  <div key={item.score} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm font-bold text-slate-700">
+                      <span>{item.score} sao</span>
+                      <span>{item.count} lượt</span>
                     </div>
-                 </div>
-                 <h2 className="text-h2 font-black tracking-tight mb-2">Lê Kỹ Thuật</h2>
-                 <p className="text-small text-white/60 font-black uppercase tracking-[3px]">Senior Maintenance Staff</p>
-              </div>
-
-              <div className="relative z-10 grid grid-cols-2 gap-4">
-                 <div className="bg-white/10 p-5 rounded-3xl border border-white/10 text-center">
-                    <p className="text-[10px] text-white/50 font-black uppercase tracking-widest mb-1">Total Ratings</p>
-                    <p className="text-[20px] font-black">{list.length}</p>
-                 </div>
-                 <div className="bg-white/10 p-5 rounded-3xl border border-white/10 text-center">
-                    <p className="text-[10px] text-white/50 font-black uppercase tracking-widest mb-1">Tickets Case</p>
-                    <p className="text-[20px] font-black">152</p>
-                 </div>
-              </div>
-              <Award size={200} className="absolute -top-10 -right-10 text-white/5 rotate-12" />
-           </div>
-
-           {/* Metrics Grid */}
-           <div className="grid grid-cols-1 gap-6">
-              <div className="card-container p-8 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h4 className="text-[11px] font-black uppercase tracking-[3px] text-muted">Chỉ số hài hước</h4>
-                    <TrendingUp size={16} className="text-success" />
-                 </div>
-                 <div className="flex items-end gap-3">
-                    <span className="text-[48px] font-black text-primary leading-none">{average}</span>
-                    <span className="text-h3 text-muted mb-1">/ 5.0</span>
-                 </div>
-                 <div className="flex gap-1">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} size={20} fill={s <= Math.round(average) ? "#EAB308" : "none"} className={s <= Math.round(average) ? "text-yellow-500" : "text-muted opacity-20"} />
-                    ))}
-                 </div>
-              </div>
-           </div>
-        </div>
-
-        {/* Right: Charts & Details */}
-        <div className="lg:col-span-8 space-y-10">
-           {/* Charts Row */}
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="card-container p-8 flex flex-col justify-center items-center shadow-2xl shadow-primary/5">
-                 <div className="h-48 w-full relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                       <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={15} data={radialData}>
-                          <RadialBar background dataKey="value" cornerRadius={30} />
-                       </RadialBarChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                       <p className="text-[10px] font-black text-muted uppercase tracking-widest">Efficiency</p>
-                       <p className="text-[32px] font-black text-primary">{(average/5*100).toFixed(0)}%</p>
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-amber-400 transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
                     </div>
-                 </div>
-                 <p className="text-[10px] font-black uppercase text-muted tracking-widest mt-4">Điểm trung bình hệ thống</p>
-              </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-              <div className="card-container p-8 shadow-2xl shadow-primary/5 h-[280px]">
-                 <p className="text-[11px] font-black uppercase tracking-[3px] text-muted mb-6">Phân phối xếp hạng</p>
-                 <ResponsiveContainer width="100%" height="80%">
-                    <BarChart data={histogramData} layout="vertical">
-                       <XAxis type="number" hide />
-                       <YAxis dataKey="star" type="category" width={50} axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold'}} />
-                       <Tooltip cursor={{fill: 'transparent'}} />
-                       <Bar dataKey="count" radius={[0, 10, 10, 0]}>
-                          {histogramData.map((entry, index) => (
-                             <Cell key={`cell-${index}`} fill={entry.fill} />
+        <section className="space-y-6">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Chi tiết đánh giá</p>
+                <h2 className="text-xl font-black tracking-tight text-slate-900">
+                  Các ticket đã có điểm hài lòng ({filteredList.length})
+                </h2>
+              </div>
+            </div>
+
+            {filteredList.length === 0 ? (
+              <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                  <Star size={20} />
+                </div>
+                <p className="mt-4 text-sm font-bold text-slate-700">Chưa có đánh giá phù hợp bộ lọc</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Hãy đổi khoảng ngày hoặc chờ thêm ticket được cư dân chấm điểm.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {filteredList.map((rating) => (
+                  <div key={rating.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">
+                            {rating.ticketCode}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
+                            {rating.tenantName}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              size={16}
+                              className={cn(star <= rating.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200')}
+                            />
                           ))}
-                       </Bar>
-                    </BarChart>
-                 </ResponsiveContainer>
-              </div>
-           </div>
+                        </div>
 
-           {/* Ratings List */}
-           <div className="space-y-6">
-              <h3 className="text-h3 text-primary font-black uppercase tracking-widest flex items-center gap-3">
-                 <ThumbsUp size={24} />
-                 Đánh giá chi tiết
-              </h3>
-              
-              <div className="space-y-4">
-                 {list.map((rating: any) => (
-                    <div key={rating.id} className="card-container p-8 bg-white shadow-xl shadow-primary/5 border-border/10 hover:shadow-2xl transition-all group">
-                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                          <div className="flex gap-6">
-                             <img src={`https://i.pravatar.cc/150?u=${rating.tenantId}`} className="w-14 h-14 rounded-2xl object-cover shrink-0 grayscale group-hover:grayscale-0 transition-all border-4 border-white shadow-lg" alt="" />
-                             <div className="space-y-3">
-                                <div className="flex items-center gap-3">
-                                   <span className="text-small font-black text-primary">{rating.tenantName}</span>
-                                   <span className="text-[10px] text-muted font-bold flex items-center gap-1.5"><Clock size={12} /> {format(parseISO(rating.createdAt), 'dd MMMM yyyy HH:mm', { locale: vi })}</span>
-                                </div>
-                                <div className="flex gap-1">
-                                   {[1,2,3,4,5].map(s => (
-                                     <Star key={s} size={14} fill={s <= rating.rating ? "#EAB308" : "none"} className={s <= rating.rating ? "text-yellow-500" : "text-muted opacity-20"} />
-                                   ))}
-                                </div>
-                                <p className="text-body font-medium italic text-primary leading-relaxed">"{rating.comment}"</p>
-                             </div>
-                          </div>
+                        <p className="text-[15px] leading-7 text-slate-700">
+                          {rating.comment || 'Hiện tại hệ thống chưa lưu nhận xét chi tiết riêng cho điểm đánh giá này.'}
+                        </p>
 
-                          <div className="shrink-0 flex flex-col items-end gap-3">
-                             <div className="text-right">
-                                <p className="text-[10px] font-black uppercase text-muted tracking-widest mb-1">Liên quan ticket</p>
-                                <button 
-                                  onClick={() => navigate(`/tickets/${rating.ticketId}`)}
-                                  className="text-small font-mono font-black text-primary group-hover:underline"
-                                >
-                                   #{rating.ticketCode}
-                                </button>
-                             </div>
-                             <div className="p-2 bg-success/10 text-success rounded-xl">
-                                <CheckCircle2 size={16} />
-                             </div>
-                          </div>
-                       </div>
+                        <p className="text-sm text-slate-500">{formatTicketDateTime(rating.createdAt)}</p>
+                      </div>
+
+                      <button
+                        onClick={() => navigate(`/owner/tickets/${rating.ticketId}`)}
+                        className="inline-flex items-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <TicketIcon size={16} />
+                        Mở ticket
+                      </button>
                     </div>
-                 ))}
+                  </div>
+                ))}
               </div>
-           </div>
-        </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

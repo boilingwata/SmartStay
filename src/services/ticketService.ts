@@ -1,23 +1,26 @@
+import { z } from 'zod';
+
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
-import type { DbTicketStatus, DbPriorityType, Json } from '@/types/supabase';
-import { mapTicketStatus, mapPriority, mapRole } from '@/lib/enumMaps';
-import { z } from 'zod';
+import { mapPriority, mapRole, mapTicketStatus } from '@/lib/enumMaps';
 import { fileService } from '@/services/fileService';
+import type { DbPriorityType, DbTicketStatus, Json } from '@/types/supabase';
 import {
+  expandTicketCategoryFilter,
+  getTicketReferenceDeadline,
+  isTicketReferenceOverdue,
+  normalizeTicketStatus,
+} from '@/features/tickets/ticketPresentation';
+import type {
+  StaffServiceRating,
   Ticket,
   TicketAttachment,
   TicketComment,
+  TicketPriority,
   TicketStatistics,
   TicketStatus,
-  TicketPriority,
   TicketType,
-  StaffServiceRating,
 } from '@/models/Ticket';
-
-// ---------------------------------------------------------------------------
-// Internal DB row shapes
-// ---------------------------------------------------------------------------
 
 interface DbTicketRow {
   id: number;
@@ -38,13 +41,40 @@ interface DbTicketRow {
   satisfaction_rating: number | null;
   created_at: string | null;
   updated_at: string | null;
-  rooms: {
-    room_code: string;
-    building_id: number;
-    buildings: { id: number; name: string };
-  } | null;
-  tenants: { full_name: string } | null;
-  profiles: { full_name: string; avatar_url: string | null } | null;
+  rooms:
+    | {
+        room_code: string | null;
+        building_id: number | null;
+        buildings:
+          | {
+              id: number;
+              name: string;
+            }
+          | {
+              id: number;
+              name: string;
+            }[]
+          | null;
+      }
+    | null;
+  tenants:
+    | {
+        full_name: string | null;
+      }
+    | {
+        full_name: string | null;
+      }[]
+    | null;
+  profiles:
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+      }
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+      }[]
+    | null;
 }
 
 interface DbTicketCommentRow {
@@ -55,58 +85,100 @@ interface DbTicketCommentRow {
   is_internal: boolean | null;
   attachments: unknown;
   created_at: string | null;
-  profiles: { full_name: string; avatar_url: string | null; role: string } | null;
+  profiles:
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+        role: string | null;
+      }
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+        role: string | null;
+      }[]
+    | null;
 }
 
-const optionalNumericId = z.union([z.string(), z.number(), z.null(), z.undefined()]).transform((value, ctx) => {
-  if (value == null || value === '') return null;
+interface DbStaffRatingRow {
+  id: number;
+  ticket_code: string;
+  tenant_id: number | null;
+  assigned_to: string | null;
+  satisfaction_rating: number | null;
+  resolution_notes: string | null;
+  updated_at: string | null;
+  created_at: string | null;
+  tenants:
+    | {
+        full_name: string | null;
+      }
+    | {
+        full_name: string | null;
+      }[]
+    | null;
+  profiles:
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+        role: string | null;
+      }
+    | {
+        full_name: string | null;
+        avatar_url: string | null;
+        role: string | null;
+      }[]
+    | null;
+}
 
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Expected a positive integer id',
-    });
-    return z.NEVER;
-  }
+const DB_TICKET_STATUSES = ['new', 'in_progress', 'pending_confirmation', 'resolved', 'closed'] as const;
 
-  return parsed;
-});
+const optionalNumericId = z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .transform((value, ctx) => {
+    if (value == null || value === '') return null;
 
-const optionalUuid = z.union([z.string(), z.null(), z.undefined()]).transform((value, ctx) => {
-  if (!value) return null;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Giá trị mã số không hợp lệ.',
+      });
+      return z.NEVER;
+    }
 
-  if (!z.string().uuid().safeParse(value).success) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Expected a valid UUID',
-    });
-    return z.NEVER;
-  }
+    return parsed;
+  });
 
-  return value;
-});
+const optionalUuid = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((value, ctx) => {
+    if (!value) return null;
+
+    if (!z.string().uuid().safeParse(value).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Mã người dùng không hợp lệ.',
+      });
+      return z.NEVER;
+    }
+
+    return value;
+  });
 
 const createTicketInputSchema = z.object({
   tenantId: optionalNumericId,
   roomId: optionalNumericId,
-  title: z.string().trim().min(3, 'Vui lòng nhập tiêu đề'),
+  title: z.string().trim().min(3, 'Vui lòng nhập tiêu đề yêu cầu.'),
   description: z.string().trim().max(5000).optional().default(''),
-  type: z.string().trim().min(1, 'Category is required'),
+  type: z.string().trim().min(1, 'Vui lòng chọn phân loại yêu cầu.'),
   priority: z.enum(['Critical', 'High', 'Medium', 'Low']).default('Medium'),
-  status: z.enum(['Open', 'InProgress', 'Resolved', 'Closed', 'Cancelled']).optional().default('Open'),
+  status: z.enum(['Open', 'InProgress', 'PendingConfirmation', 'Resolved', 'Closed']).optional().default('Open'),
   assignedToId: optionalUuid.optional().default(null),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketInputSchema> & {
   attachments?: File[];
 };
-
-const DB_TICKET_STATUSES = ['new', 'in_progress', 'pending_confirmation', 'resolved', 'closed'] as const;
-
-// ---------------------------------------------------------------------------
-// Select strings
-// ---------------------------------------------------------------------------
 
 const TICKET_SELECT = `
   id,
@@ -147,76 +219,78 @@ const COMMENT_SELECT = `
   profiles:author_id ( full_name, avatar_url, role )
 `.trim();
 
-// ---------------------------------------------------------------------------
-// Mappers
-// ---------------------------------------------------------------------------
+const STAFF_RATING_SELECT = `
+  id,
+  ticket_code,
+  tenant_id,
+  assigned_to,
+  satisfaction_rating,
+  resolution_notes,
+  updated_at,
+  created_at,
+  tenants ( full_name ),
+  profiles:assigned_to ( full_name, avatar_url, role )
+`.trim();
 
-// TK-01: SLA deadline is a computed client-side field — it is NOT stored in the DB.
-// Business rule: deadlines are measured from ticket creation time.
-//   Priority 'urgent' (Critical) → 24 hours
-//   Priority 'high'              → 48 hours
-//   Priority 'normal'            → 72 hours
-//   Priority 'low'               → 168 hours (7 days)
-// TO PERSIST: add `sla_deadline_at TIMESTAMPTZ` to the `tickets` table,
-// populate it via a DB trigger or service-side logic on insert,
-// and remove this computation from the frontend.
-function calcSlaDeadline(createdAt: string, priority: string | null): string {
-  const created = new Date(createdAt);
-  const hours =
-    priority === 'urgent'
-      ? 24
-      : priority === 'high'
-      ? 48
-      : priority === 'normal'
-      ? 72
-      : 168;
-  created.setHours(created.getHours() + hours);
-  return created.toISOString();
+function toArray<T>(value: T | T[] | null | undefined): T[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function firstRecord<T>(value: T | T[] | null | undefined): T | null {
+  return toArray(value)[0] ?? null;
+}
+
+function toDbTicketStatus(status: string): DbTicketStatus {
+  if (DB_TICKET_STATUSES.includes(status as DbTicketStatus)) {
+    return status as DbTicketStatus;
+  }
+
+  return mapTicketStatus.toDb(normalizeTicketStatus(status)) as DbTicketStatus;
+}
+
+function toDbPriority(priority: string): DbPriorityType {
+  return mapPriority.toDb(priority) as DbPriorityType;
 }
 
 function mapDbRowToTicket(row: DbTicketRow): Ticket {
   const createdAt = row.created_at ?? new Date().toISOString();
-  const room = row.rooms;
-  const building = room?.buildings;
-  const assignedProfile = row.profiles as unknown as { full_name: string; avatar_url: string | null } | null;
+  const room = firstRecord(row.rooms);
+  const building = firstRecord(room?.buildings ?? null);
+  const tenant = firstRecord(row.tenants);
+  const assignedProfile = firstRecord(row.profiles);
 
   return {
     id: String(row.id),
     ticketCode: row.ticket_code,
     title: row.subject,
     description: row.description ?? '',
-    type: (row.category as TicketType) ?? 'Maintenance',
+    type: row.category ?? 'Maintenance',
     priority: mapPriority.fromDb(row.priority ?? 'normal') as TicketPriority,
     status: mapTicketStatus.fromDb(row.status ?? 'new') as TicketStatus,
-
     buildingId: building?.id ? String(building.id) : '',
     buildingName: building?.name ?? '',
     roomId: row.room_id ? String(row.room_id) : undefined,
     roomCode: room?.room_code ?? undefined,
-
     tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
-    tenantName: (row.tenants as any)?.full_name ?? undefined,
-
+    tenantName: tenant?.full_name ?? undefined,
     assignedToId: row.assigned_to ?? undefined,
     assignedToName: assignedProfile?.full_name ?? undefined,
     assignedToAvatar: assignedProfile?.avatar_url ?? undefined,
-
-    slaDeadline: row.resolved_at ? row.resolved_at : (row as any).sla_deadline_at || calcSlaDeadline(createdAt, row.priority),
+    slaDeadline: getTicketReferenceDeadline(createdAt, row.priority),
     resolvedAt: row.resolved_at ?? undefined,
-
     resolutionNote: row.resolution_notes ?? undefined,
     actualCost: row.resolution_cost ?? undefined,
     staffRating: row.satisfaction_rating ?? undefined,
-
     createdAt,
     updatedAt: row.updated_at ?? createdAt,
   };
 }
 
 function mapDbCommentToTicketComment(row: DbTicketCommentRow): TicketComment {
-  const profile = row.profiles as unknown as { full_name: string; avatar_url: string | null; role: string } | null;
+  const profile = firstRecord(row.profiles);
   const attachments = Array.isArray(row.attachments)
-    ? (row.attachments as unknown[]).map((a: unknown) => a as import('@/models/Ticket').TicketAttachment)
+    ? row.attachments.map((item) => item as TicketAttachment)
     : [];
 
   return {
@@ -224,9 +298,9 @@ function mapDbCommentToTicketComment(row: DbTicketCommentRow): TicketComment {
     ticketId: String(row.ticket_id),
     content: row.content,
     authorId: row.author_id ?? '',
-    authorName: profile?.full_name ?? 'Unknown',
+    authorName: profile?.full_name ?? 'Người dùng SmartStay',
     authorAvatar: profile?.avatar_url ?? undefined,
-    authorRole: profile?.role ?? 'Nhân viên',
+    authorRole: profile?.role ? mapRole.fromDb(profile.role) : 'Staff',
     isInternal: row.is_internal ?? false,
     attachments,
     createdAt: row.created_at ?? new Date().toISOString(),
@@ -234,7 +308,7 @@ function mapDbCommentToTicketComment(row: DbTicketCommentRow): TicketComment {
 }
 
 async function uploadTicketAttachments(files: File[], uploadedBy: string): Promise<TicketAttachment[]> {
-  const uploads = await Promise.all(
+  return Promise.all(
     files.map(async (file) => {
       const fileUrl = await fileService.uploadFile(file, file.name, {
         allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
@@ -250,19 +324,45 @@ async function uploadTicketAttachments(files: File[], uploadedBy: string): Promi
         fileSize: file.size,
         uploadedBy,
         createdAt: new Date().toISOString(),
-      } satisfies TicketAttachment;
+      };
     })
   );
-
-  return uploads;
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
+function composeResolutionNotes(resolution?: {
+  notes?: string;
+  resolutionNote?: string;
+  rootCause?: string;
+}): string | null {
+  if (!resolution) return null;
+
+  const notes = resolution.notes?.trim() || resolution.resolutionNote?.trim() || '';
+  const rootCause = resolution.rootCause?.trim() || '';
+
+  if (!notes && !rootCause) return null;
+  if (!rootCause) return notes;
+  if (!notes) return `Nguyên nhân gốc: ${rootCause}`;
+
+  return `${notes}\n\nNguyên nhân gốc: ${rootCause}`;
+}
+
+function buildEmptyTicketStats(): TicketStatistics {
+  return {
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    pendingConfirmation: 0,
+    resolved: 0,
+    closed: 0,
+    active: 0,
+    slaBreached: 0,
+    avgResolutionTimeHours: 0,
+    satisfactionRate: 0,
+  };
+}
 
 export const ticketService = {
-  getTickets: async (filters?: {
+  async getTickets(filters?: {
     status?: string | string[];
     priority?: string | string[];
     assignedTo?: string;
@@ -273,49 +373,37 @@ export const ticketService = {
     type?: string | string[];
     slaBreached?: boolean;
     dateRange?: { from?: string; to?: string };
-  }): Promise<Ticket[]> => {
-    let query = supabase
-      .from('tickets')
-      .select(TICKET_SELECT)
-      .order('created_at', { ascending: false });
+  }): Promise<Ticket[]> {
+    let query = supabase.from('tickets').select(TICKET_SELECT).order('created_at', { ascending: false });
 
-    // Server-side status filter
-    if (filters?.status && filters.status !== 'All') {
-      if (Array.isArray(filters.status) && filters.status.length > 0) {
-        const dbStatuses = filters.status.map((status) => {
-          return DB_TICKET_STATUSES.includes(status as (typeof DB_TICKET_STATUSES)[number])
-            ? (status as DbTicketStatus)
-            : (mapTicketStatus.toDb(status) as DbTicketStatus);
-        });
-        query = query.in('status', dbStatuses);
-      } else if (!Array.isArray(filters.status)) {
-        const dbStatus = DB_TICKET_STATUSES.includes(filters.status as (typeof DB_TICKET_STATUSES)[number])
-          ? (filters.status as DbTicketStatus)
-          : (mapTicketStatus.toDb(filters.status) as DbTicketStatus);
-        query = query.eq('status', dbStatus);
-      }
+    const statuses =
+      filters?.status && filters.status !== 'All'
+        ? (Array.isArray(filters.status) ? filters.status : [filters.status]).filter(Boolean)
+        : [];
+
+    if (statuses.length > 0) {
+      query = query.in('status', statuses.map(toDbTicketStatus));
     }
 
-    // Server-side priority filter
-    if (filters?.priority && filters.priority !== 'All') {
-      if (Array.isArray(filters.priority) && filters.priority.length > 0) {
-        const dbPriorities = filters.priority.map(p => mapPriority.toDb(p) as DbPriorityType);
-        query = query.in('priority', dbPriorities);
-      } else if (!Array.isArray(filters.priority)) {
-        query = query.eq('priority', mapPriority.toDb(filters.priority) as DbPriorityType);
-      }
+    const priorities =
+      filters?.priority && filters.priority !== 'All'
+        ? (Array.isArray(filters.priority) ? filters.priority : [filters.priority]).filter(Boolean)
+        : [];
+
+    if (priorities.length > 0) {
+      query = query.in('priority', priorities.map(toDbPriority));
     }
 
-    // Server-side type (category) filter
-    if (filters?.type && filters.type !== 'All') {
-      if (Array.isArray(filters.type) && filters.type.length > 0) {
-        query = query.in('category', filters.type);
-      } else if (!Array.isArray(filters.type)) {
-        query = query.eq('category', filters.type);
-      }
+    const requestedTypes =
+      filters?.type && filters.type !== 'All'
+        ? (Array.isArray(filters.type) ? filters.type : [filters.type]).filter(Boolean)
+        : [];
+
+    if (requestedTypes.length > 0) {
+      const categoryValues = [...new Set(requestedTypes.flatMap((value) => expandTicketCategoryFilter(value as TicketType)))];
+      query = query.in('category', categoryValues);
     }
 
-    // Server-side assignedTo filter
     if (filters?.assignedTo && filters.assignedTo !== 'All') {
       query = query.eq('assigned_to', filters.assignedTo);
     }
@@ -324,15 +412,14 @@ export const ticketService = {
       query = query.eq('tenant_id', Number(filters.tenantId));
     }
 
-    // Server-side roomId filter
     if (filters?.roomId != null && filters.roomId !== '') {
       query = query.eq('room_id', Number(filters.roomId));
     }
 
-    // Server-side Date Range filter
     if (filters?.dateRange?.from) {
       query = query.gte('created_at', filters.dateRange.from);
     }
+
     if (filters?.dateRange?.to) {
       query = query.lte('created_at', filters.dateRange.to);
     }
@@ -340,52 +427,44 @@ export const ticketService = {
     const rows = (await unwrap(query)) as unknown as DbTicketRow[];
     let tickets = rows.map(mapDbRowToTicket);
 
-    // Building filter: applied in-memory (Supabase nested filter is complex for this schema)
     if (filters?.buildingId != null && filters.buildingId !== '') {
       const targetBuildingId = String(filters.buildingId);
-      tickets = tickets.filter((t) => t.buildingId === targetBuildingId);
+      tickets = tickets.filter((ticket) => ticket.buildingId === targetBuildingId);
     }
 
-    // Client-side text search
     if (filters?.search) {
-      const s = filters.search.toLowerCase();
-      tickets = tickets.filter(
-        (t) =>
-          t.ticketCode.toLowerCase().includes(s) ||
-          t.title.toLowerCase().includes(s) ||
-          (t.tenantName ?? '').toLowerCase().includes(s)
-      );
+      const keyword = filters.search.toLowerCase();
+      tickets = tickets.filter((ticket) => {
+        return (
+          ticket.ticketCode.toLowerCase().includes(keyword) ||
+          ticket.title.toLowerCase().includes(keyword) ||
+          (ticket.tenantName ?? '').toLowerCase().includes(keyword) ||
+          (ticket.roomCode ?? '').toLowerCase().includes(keyword)
+        );
+      });
     }
 
-    // SLA breach filter: applied in-memory
-    if (filters?.slaBreached !== undefined) {
-      const now = new Date();
-      tickets = tickets.filter((t) => {
-        const deadline = new Date(t.slaDeadline ?? '');
-        const isBreached = !isNaN(deadline.getTime()) && now > deadline && t.status !== 'Resolved' && t.status !== 'Closed';
-        return filters.slaBreached ? isBreached : !isBreached;
+    if (filters?.slaBreached === true) {
+      tickets = tickets.filter((ticket) => {
+        return isTicketReferenceOverdue(ticket);
       });
     }
 
     return tickets;
   },
 
-  getTicketDetail: async (id: string, tenantId?: string | number | null): Promise<Ticket> => {
-    let query = supabase
-      .from('tickets')
-      .select(TICKET_SELECT)
-      .eq('id', Number(id));
+  async getTicketDetail(id: string, tenantId?: string | number | null): Promise<Ticket> {
+    let query = supabase.from('tickets').select(TICKET_SELECT).eq('id', Number(id));
 
     if (tenantId != null && tenantId !== '') {
       query = query.eq('tenant_id', Number(tenantId));
     }
 
     const row = (await unwrap(query.single())) as unknown as DbTicketRow;
-
     return mapDbRowToTicket(row);
   },
 
-  getTicketComments: async (ticketId: string, tenantId?: string | number | null): Promise<TicketComment[]> => {
+  async getTicketComments(ticketId: string, tenantId?: string | number | null): Promise<TicketComment[]> {
     if (tenantId != null && tenantId !== '') {
       await unwrap(
         supabase
@@ -408,15 +487,27 @@ export const ticketService = {
     return rows.map(mapDbCommentToTicketComment);
   },
 
-  getTicketStatistics: async (filters?: { buildingId?: string | number | null }): Promise<TicketStatistics> => {
-    // 10 CRITICAL DATABASE RULES -- RULE-02: Use views for counts? 
-    // Actually, for stats we want status/priority distribution, so we fetch records.
-    let query = supabase
-      .from('tickets')
-      .select('status, resolved_at, created_at, satisfaction_rating, priority, rooms!inner(building_id)');
+  async getTicketStatistics(filters?: { buildingId?: string | number | null }): Promise<TicketStatistics> {
+    let roomIds: number[] | null = null;
 
     if (filters?.buildingId != null && filters.buildingId !== '') {
-      query = query.eq('rooms.building_id', Number(filters.buildingId));
+      const roomRows = (await unwrap(
+        supabase
+          .from('rooms')
+          .select('id')
+          .eq('building_id', Number(filters.buildingId))
+          .eq('is_deleted', false)
+      )) as unknown as { id: number }[];
+
+      roomIds = roomRows.map((row) => row.id);
+      if (roomIds.length === 0) {
+        return buildEmptyTicketStats();
+      }
+    }
+
+    let query = supabase.from('tickets').select('status, resolved_at, created_at, satisfaction_rating, priority, room_id');
+    if (roomIds) {
+      query = query.in('room_id', roomIds);
     }
 
     const rows = (await unwrap(query)) as unknown as {
@@ -425,62 +516,66 @@ export const ticketService = {
       created_at: string | null;
       satisfaction_rating: number | null;
       priority: string | null;
-      rooms: { building_id: number };
+      room_id: number | null;
     }[];
 
-    const total = rows.length;
-    let open = 0, inProgress = 0, resolved = 0, cancelled = 0, slaBreached = 0;
-    let resolutionHoursSum = 0, resolutionCount = 0;
-    let ratingSum = 0, ratingCount = 0;
+    const stats = buildEmptyTicketStats();
+    stats.total = rows.length;
 
-    const now = new Date();
+    let resolutionHoursSum = 0;
+    let resolutionCount = 0;
+    let ratingSum = 0;
+    let ratingCount = 0;
 
-    for (const r of rows) {
-      const fe = mapTicketStatus.fromDb(r.status ?? 'new') as TicketStatus;
-      if (fe === 'Open') open++;
-      else if (fe === 'InProgress') inProgress++;
-      else if (fe === 'Resolved') resolved++;
-      else if (fe === 'Cancelled') cancelled++;
+    for (const row of rows) {
+      const status = mapTicketStatus.fromDb(row.status ?? 'new') as TicketStatus;
 
-      if (r.resolved_at && r.created_at) {
-        const hours =
-          (new Date(r.resolved_at).getTime() - new Date(r.created_at).getTime()) /
-          3600000;
-        resolutionHoursSum += hours;
-        resolutionCount++;
+      if (status === 'Open') stats.open += 1;
+      else if (status === 'InProgress') stats.inProgress += 1;
+      else if (status === 'PendingConfirmation') stats.pendingConfirmation += 1;
+      else if (status === 'Resolved') stats.resolved += 1;
+      else if (status === 'Closed') stats.closed += 1;
+
+      if (status === 'Open' || status === 'InProgress' || status === 'PendingConfirmation') {
+        stats.active += 1;
+
+        if (
+          row.created_at &&
+          isTicketReferenceOverdue({
+            slaDeadline: getTicketReferenceDeadline(row.created_at, row.priority),
+            status,
+          })
+        ) {
+          stats.slaBreached += 1;
+        }
       }
 
-      // SLA breach: open/in-progress tickets past their deadline
-      if (fe === 'Open' || fe === 'InProgress') {
-        const deadline = new Date(calcSlaDeadline(r.created_at ?? '', r.priority));
-        if (now > deadline) slaBreached++;
+      if (row.created_at && row.resolved_at) {
+        resolutionHoursSum +=
+          (new Date(row.resolved_at).getTime() - new Date(row.created_at).getTime()) / 3_600_000;
+        resolutionCount += 1;
       }
 
-      if (r.satisfaction_rating != null) {
-        ratingSum += r.satisfaction_rating;
-        ratingCount++;
+      if (row.satisfaction_rating != null) {
+        ratingSum += row.satisfaction_rating;
+        ratingCount += 1;
       }
     }
 
-    return {
-      total,
-      open,
-      inProgress,
-      resolved,
-      cancelled,
-      slaBreached,
-      avgResolutionTimeHours:
-        resolutionCount > 0 ? Math.round(resolutionHoursSum / resolutionCount) : 0,
-      satisfactionRate: ratingCount > 0 ? ratingSum / ratingCount : 0,
-    };
+    stats.avgResolutionTimeHours = resolutionCount > 0 ? Math.round(resolutionHoursSum / resolutionCount) : 0;
+    stats.satisfactionRate = ratingCount > 0 ? ratingSum / ratingCount : 0;
+
+    return stats;
   },
 
-  createTicket: async (ticket: CreateTicketInput): Promise<Ticket> => {
+  async createTicket(ticket: CreateTicketInput): Promise<Ticket> {
     const parsedTicket = createTicketInputSchema.parse(ticket);
     const attachments = Array.isArray(ticket.attachments) ? ticket.attachments : [];
-    const { data: auth } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!auth.user) {
+    if (!user) {
       throw new Error('Bạn cần đăng nhập lại trước khi gửi yêu cầu.');
     }
 
@@ -492,8 +587,8 @@ export const ticketService = {
         subject: parsedTicket.title,
         description: parsedTicket.description || null,
         category: parsedTicket.type,
-        priority: mapPriority.toDb(parsedTicket.priority) as DbPriorityType,
-        status: mapTicketStatus.toDb(parsedTicket.status || 'Open') as DbTicketStatus,
+        priority: toDbPriority(parsedTicket.priority),
+        status: toDbTicketStatus(parsedTicket.status ?? 'Open'),
         assigned_to: parsedTicket.assignedToId,
       })
       .select('id')
@@ -501,47 +596,34 @@ export const ticketService = {
 
     if (insertError) {
       if (insertError.message.toLowerCase().includes('row-level security')) {
-        throw new Error('Tài khoản hiện tại không có quyền tạo ticket cho hồ sơ cư dân này.');
+        throw new Error('Tài khoản hiện tại không có quyền tạo yêu cầu cho hồ sơ cư dân này.');
       }
 
       throw new Error(insertError.message);
     }
 
     if (attachments.length > 0 || parsedTicket.description.trim()) {
-      const uploadedAttachments = attachments.length > 0
-        ? await uploadTicketAttachments(attachments, auth.user.id)
-        : [];
+      const uploadedAttachments = attachments.length > 0 ? await uploadTicketAttachments(attachments, user.id) : [];
 
       await unwrap(
-        supabase
-          .from('ticket_comments')
-          .insert({
-            ticket_id: newRow.id,
-            author_id: auth.user.id,
-            content: parsedTicket.description.trim() || 'Đính kèm hình ảnh mô tả ban đầu.',
-            is_internal: false,
-            attachments: uploadedAttachments as unknown as Json,
-          })
+        supabase.from('ticket_comments').insert({
+          ticket_id: newRow.id,
+          author_id: user.id,
+          content: parsedTicket.description.trim() || 'Đính kèm hình ảnh mô tả ban đầu.',
+          is_internal: false,
+          attachments: uploadedAttachments as unknown as Json,
+        })
       );
     }
 
     return ticketService.getTicketDetail(String(newRow.id));
   },
 
-  updateTicketStatus: async (id: string, status: TicketStatus): Promise<boolean> => {
-    await unwrap(
-      supabase
-        .from('tickets')
-        .update({
-          status: mapTicketStatus.toDb(status) as import('@/types/supabase').DbTicketStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', Number(id))
-    );
-    return true;
+  async updateTicketStatus(id: string, status: TicketStatus): Promise<boolean> {
+    return ticketService.updateStatus(id, status);
   },
 
-  updateStatus: async (
+  async updateStatus(
     id: string,
     status: TicketStatus,
     resolution?: {
@@ -551,50 +633,51 @@ export const ticketService = {
       cost?: number;
       rating?: number;
     }
-  ): Promise<boolean> => {
+  ): Promise<boolean> {
     const updates: Record<string, unknown> = {
-      status: mapTicketStatus.toDb(status) as DbTicketStatus,
+      status: toDbTicketStatus(status),
       updated_at: new Date().toISOString(),
     };
 
     if (status === 'Resolved' || status === 'Closed') {
       updates.resolved_at = new Date().toISOString();
+    } else {
+      updates.resolved_at = null;
     }
 
-    const notesText = resolution?.notes ?? resolution?.resolutionNote;
-    if (notesText) {
-      updates.resolution_notes = notesText;
+    const resolutionNotes = composeResolutionNotes(resolution);
+    if (resolutionNotes) {
+      updates.resolution_notes = resolutionNotes;
     }
+
     if (resolution?.cost != null) {
       updates.resolution_cost = resolution.cost;
     }
+
     if (resolution?.rating != null) {
       updates.satisfaction_rating = resolution.rating;
     }
 
-    await unwrap(
-      supabase
-        .from('tickets')
-        .update(updates as Record<string, unknown>)
-        .eq('id', Number(id))
-    );
+    await unwrap(supabase.from('tickets').update(updates).eq('id', Number(id)));
     return true;
   },
 
-  addComment: async (
+  async addComment(
     ticketId: string,
     content: string,
     isInternal: boolean = false,
     attachments: TicketAttachment[] = []
-  ): Promise<TicketComment> => {
-    const { data: user } = await supabase.auth.getUser();
+  ): Promise<TicketComment> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const row = (await unwrap(
       supabase
         .from('ticket_comments')
         .insert({
           ticket_id: Number(ticketId),
-          author_id: user.user?.id ?? null,
+          author_id: user?.id ?? null,
           content,
           is_internal: isInternal,
           attachments: attachments as unknown as Json,
@@ -606,8 +689,7 @@ export const ticketService = {
     return mapDbCommentToTicketComment(row);
   },
 
-  // B40 FIX: Assign ticket to a staff user by their UUID
-  assignTicket: async (ticketId: string, assigneeId: string | null): Promise<boolean> => {
+  async assignTicket(ticketId: string, assigneeId: string | null): Promise<boolean> {
     await unwrap(
       supabase
         .from('tickets')
@@ -617,11 +699,11 @@ export const ticketService = {
         })
         .eq('id', Number(ticketId))
     );
+
     return true;
   },
 
-  // Fetch all profiles with staff/owner role
-  getStaff: async (): Promise<{ id: string; fullName: string; avatarUrl: string | null; role: string }[]> => {
+  async getStaff(): Promise<{ id: string; fullName: string; avatarUrl: string | null; role: string }[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, role')
@@ -631,18 +713,69 @@ export const ticketService = {
 
     if (error) throw error;
 
-    return data.map(d => ({
-      id: d.id,
-      fullName: d.full_name,
-      avatarUrl: d.avatar_url,
-      role: mapRole.fromDb(d.role),
+    return data.map((profile) => ({
+      id: profile.id,
+      fullName: profile.full_name,
+      avatarUrl: profile.avatar_url,
+      role: mapRole.fromDb(profile.role),
     }));
   },
 
-  getStaffRatings: async (
-    _staffId: string
-  ): Promise<{ average: number; summary: Record<number, number>; list: StaffServiceRating[] }> => {
-    return { average: 0, summary: {}, list: [] };
+  async getStaffRatings(
+    staffId: string
+  ): Promise<{ average: number; summary: Record<number, number>; list: StaffServiceRating[] }> {
+    const rows = (await unwrap(
+      supabase
+        .from('tickets')
+        .select(STAFF_RATING_SELECT)
+        .eq('assigned_to', staffId)
+        .not('satisfaction_rating', 'is', null)
+        .order('updated_at', { ascending: false })
+    )) as unknown as DbStaffRatingRow[];
+
+    const summary: Record<number, number> = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+
+    let total = 0;
+    let count = 0;
+
+    const list = rows
+      .filter((row) => row.satisfaction_rating != null)
+      .map((row) => {
+        const staffProfile = firstRecord(row.profiles);
+        const tenant = firstRecord(row.tenants);
+        const rating = Number(row.satisfaction_rating ?? 0);
+
+        summary[rating] = (summary[rating] ?? 0) + 1;
+        total += rating;
+        count += 1;
+
+        return {
+          id: String(row.id),
+          staffId: row.assigned_to ?? staffId,
+          staffName: staffProfile?.full_name ?? 'Nhân viên SmartStay',
+          staffAvatar: staffProfile?.avatar_url ?? undefined,
+          staffRole: staffProfile?.role ? mapRole.fromDb(staffProfile.role) : 'Staff',
+          rating,
+          comment: undefined,
+          tenantId: row.tenant_id ? String(row.tenant_id) : '',
+          tenantName: tenant?.full_name ?? 'Cư dân SmartStay',
+          ticketId: String(row.id),
+          ticketCode: row.ticket_code,
+          createdAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
+        } satisfies StaffServiceRating;
+      });
+
+    return {
+      average: count > 0 ? Number((total / count).toFixed(2)) : 0,
+      summary,
+      list,
+    };
   },
 };
 

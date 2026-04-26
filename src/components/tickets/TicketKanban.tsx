@@ -1,147 +1,159 @@
 import React from 'react';
-import { 
-  DndContext, 
-  DragOverlay, 
-  closestCorners, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  KeyboardSensor,
+  closestCorners,
+  defaultDropAnimationSideEffects,
+  useSensor,
   useSensors,
-  DragStartEvent,
-  DragOverEvent,
-  DragEndEvent,
-  defaultDropAnimationSideEffects
+  type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
-import { 
-  arrayMove, 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { TicketSummary, TicketStatus, TicketPriority } from '@/models/Ticket';
-import { Clock, User, AlertCircle } from 'lucide-react';
+import { Clock, User } from 'lucide-react';
+
+import {
+  getTicketPriorityLabel,
+  getTicketStatusLabel,
+  isTicketReferenceOverdue,
+} from '@/features/tickets/ticketPresentation';
+import type { TicketPriority, TicketStatus, TicketSummary } from '@/models/Ticket';
 import { cn } from '@/utils';
-import { parseISO, differenceInSeconds } from 'date-fns';
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
   Critical: 'bg-[#DC2626]',
   High: 'bg-[#F97316]',
   Medium: 'bg-[#EAB308]',
-  Low: 'bg-[#22C55E]'
+  Low: 'bg-[#22C55E]',
 };
 
+const DEFAULT_COLUMNS: TicketStatus[] = ['Open', 'InProgress', 'PendingConfirmation', 'Resolved', 'Closed'];
 
-// TicketKanbanProps is defined below near the main component
+const KanbanCard = ({
+  ticket,
+  isOverlay = false,
+  onOpen,
+}: {
+  ticket: TicketSummary;
+  isOverlay?: boolean;
+  onOpen?: (id: string) => void;
+}) => {
+  const overdue = isTicketReferenceOverdue(ticket);
 
-const KanbanCard = ({ ticket, isOverlay = false }: { ticket: TicketSummary, isOverlay?: boolean }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
-    data: { type: 'Ticket', ticket }
+    data: { type: 'ticket', ticket },
   });
 
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1
+    opacity: isDragging ? 0.35 : 1,
   };
-
-  const [now, setNow] = React.useState(new Date());
-  React.useEffect(() => {
-    if (ticket.status === 'Resolved' || ticket.status === 'Closed') return;
-    const interval = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, [ticket.status]);
-
-  const diff = differenceInSeconds(parseISO(ticket.slaDeadline), now);
-  const isBreached = diff <= 0;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      data-ticket-id={ticket.id}
       {...attributes}
       {...listeners}
+      onDoubleClick={() => onOpen?.(ticket.id)}
       className={cn(
-        "group relative bg-white p-5 rounded-2xl border border-border/10 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-grab active:cursor-grabbing",
-        isOverlay && "shadow-2xl ring-2 ring-primary/20 scale-105 active:cursor-grabbing",
-        isBreached && "border-danger/10"
+        'rounded-2xl border bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
+        overdue ? 'border-red-200' : 'border-slate-200',
+        isOverlay && 'scale-[1.02] shadow-xl ring-2 ring-primary/20'
       )}
     >
-      <div className="flex justify-between items-start mb-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-           <div className={cn("w-2 h-2 rounded-full", PRIORITY_COLORS[ticket.priority])} />
-           <span className="text-[10px] font-mono font-black text-primary tracking-tighter">{ticket.ticketCode}</span>
+          <span className={cn('h-2.5 w-2.5 rounded-full', PRIORITY_COLORS[ticket.priority])} />
+          <span className="font-mono text-[11px] font-black text-primary">{ticket.ticketCode}</span>
         </div>
-        {!isBreached ? (
-           <div className="px-2 py-0.5 bg-bg rounded-lg text-muted">
-              <Clock size={10} />
-           </div>
-        ) : (
-           <div className="px-2 py-0.5 bg-danger/10 text-danger rounded-lg animate-pulse">
-              <Clock size={10} />
-           </div>
-        )}
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+          {getTicketPriorityLabel(ticket.priority)}
+        </span>
       </div>
 
-      <h4 className="text-small font-bold text-primary mb-5 line-clamp-2 leading-tight group-hover:text-primary-hover">{ticket.title}</h4>
+      <h4 className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{ticket.title}</h4>
 
-      <div className="flex items-center justify-between pt-4 border-t border-border/5">
-         <div className="flex items-center gap-2">
+      <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between gap-3 text-[11px]">
+          <div className="flex min-w-0 items-center gap-2 text-slate-500">
             {ticket.assignedToAvatar ? (
-               <img src={ticket.assignedToAvatar} className="w-6 h-6 rounded-lg object-cover border border-border/10" alt="" />
+              <img src={ticket.assignedToAvatar} className="h-6 w-6 rounded-lg object-cover" alt="" />
             ) : (
-               <div className="w-6 h-6 rounded-lg bg-bg flex items-center justify-center text-muted">
-                  <User size={12} />
-               </div>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                <User size={12} />
+              </span>
             )}
-            <span className="text-[10px] font-bold text-muted truncate max-w-[80px]">
-               {ticket.assignedToName || 'Unassigned'}
-            </span>
-         </div>
-         
-         <div className={cn(
-            "text-[9px] font-black uppercase tracking-widest",
-            isBreached ? "text-danger" : "text-muted"
-         )}>
-            SLA: {isBreached ? 'BREACH' : 'OK'}
-         </div>
+            <span className="truncate font-medium">{ticket.assignedToName || 'Chưa phân công'}</span>
+          </div>
+
+          <div
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold',
+              overdue ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
+            )}
+          >
+            <Clock size={10} />
+            <span>{overdue ? 'Quá hạn tham chiếu' : 'Trong hạn tham chiếu'}</span>
+          </div>
+        </div>
+
+        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          {getTicketStatusLabel(ticket.status)}
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen?.(ticket.id);
+          }}
+          className="inline-flex rounded-full border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition hover:bg-slate-50"
+        >
+          Xem chi tiết
+        </button>
       </div>
     </div>
   );
 };
 
-const KanbanColumn = ({ status, tickets, id }: { status: TicketStatus, tickets: TicketSummary[], id: string }) => {
+const KanbanColumn = ({
+  status,
+  tickets,
+  onOpen,
+}: {
+  status: TicketStatus;
+  tickets: TicketSummary[];
+  onOpen: (id: string) => void;
+}) => {
   const { setNodeRef } = useSortable({
-     id,
-     data: { type: 'Column', status }
+    id: status,
+    data: { type: 'column', status },
   });
 
   return (
-    <div className="flex-1 min-w-[300px] flex flex-col h-full bg-bg/10 rounded-[40px] border border-border/5 p-4 lg:p-6 overflow-hidden">
-      <div className="flex justify-between items-center mb-6 px-2">
-         <div className="flex items-center gap-3">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-primary">{status}</h3>
-            <span className="bg-white/50 text-[10px] font-black text-primary px-2.5 py-0.5 rounded-full border border-border/10">
-               {tickets.length}
-            </span>
-         </div>
+    <div className="flex min-w-[300px] flex-1 flex-col rounded-[32px] border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3 px-2">
+        <h3 className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-700">
+          {getTicketStatusLabel(status)}
+        </h3>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500">
+          {tickets.length}
+        </span>
       </div>
 
-      <div ref={setNodeRef} className="flex-1 overflow-y-auto space-y-4 custom-scrollbar px-1 pb-4 min-h-[300px]">
-         <SortableContext items={tickets.map(t => t.id)} strategy={verticalListSortingStrategy}>
-            {tickets.map(ticket => (
-               <KanbanCard key={ticket.id} ticket={ticket} />
-            ))}
-         </SortableContext>
+      <div ref={setNodeRef} className="min-h-[220px] flex-1 space-y-3 overflow-y-auto pb-2">
+        <SortableContext items={tickets.map((ticket) => ticket.id)} strategy={verticalListSortingStrategy}>
+          {tickets.map((ticket) => (
+            <KanbanCard key={ticket.id} ticket={ticket} onOpen={onOpen} />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );
@@ -154,11 +166,11 @@ interface TicketKanbanProps {
   columns?: TicketStatus[];
 }
 
-export const TicketKanban = ({ 
-  tickets, 
-  onStatusChange, 
+export const TicketKanban = ({
+  tickets,
+  onStatusChange,
   onTicketClick,
-  columns = ['Open', 'InProgress', 'Resolved', 'Closed']
+  columns = DEFAULT_COLUMNS,
 }: TicketKanbanProps) => {
   const [activeTicket, setActiveTicket] = React.useState<TicketSummary | null>(null);
   const sensors = useSensors(
@@ -167,29 +179,25 @@ export const TicketKanban = ({
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const ticket = tickets.find(t => t.id === active.id);
+    const ticket = tickets.find((item) => item.id === event.active.id);
     if (ticket) setActiveTicket(ticket);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveTicket(null);
-    const { active, over } = event;
-    if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+    if (!overId) return;
 
-    // Is it dragging over a column?
     if (columns.includes(overId as TicketStatus)) {
-       onStatusChange(activeId, overId as TicketStatus);
-       return;
+      onStatusChange(activeId, overId as TicketStatus);
+      return;
     }
 
-    // Is it dragging over another ticket?
-    const overTicket = tickets.find(t => t.id === overId);
+    const overTicket = tickets.find((ticket) => ticket.id === overId);
     if (overTicket && overTicket.status !== activeTicket?.status) {
-       onStatusChange(activeId, overTicket.status);
+      onStatusChange(activeId, overTicket.status);
     }
   };
 
@@ -200,23 +208,25 @@ export const TicketKanban = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-6 overflow-x-auto no-scrollbar pb-8 min-h-[70vh] items-start">
-        {columns.map(status => (
-           <KanbanColumn 
-             key={status} 
-             id={status}
-             status={status} 
-             tickets={tickets.filter(t => t.status === status)}
-           />
+      <div className="flex min-h-[70vh] items-start gap-5 overflow-x-auto pb-6">
+        {columns.map((status) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            tickets={tickets.filter((ticket) => ticket.status === status)}
+            onOpen={onTicketClick}
+          />
         ))}
       </div>
 
-      <DragOverlay dropAnimation={{
+      <DragOverlay
+        dropAnimation={{
           sideEffects: defaultDropAnimationSideEffects({
-            styles: { active: { opacity: '0.5' } }
-          })
-      }}>
-        {activeTicket ? <KanbanCard ticket={activeTicket} isOverlay /> : null}
+            styles: { active: { opacity: '0.5' } },
+          }),
+        }}
+      >
+        {activeTicket ? <KanbanCard ticket={activeTicket} isOverlay onOpen={onTicketClick} /> : null}
       </DragOverlay>
     </DndContext>
   );

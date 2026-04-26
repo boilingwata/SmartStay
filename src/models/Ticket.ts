@@ -1,8 +1,20 @@
-export type TicketStatus = 'Open' | 'InProgress' | 'Resolved' | 'Closed' | 'Cancelled';
+export type TicketStatus =
+  | 'Open'
+  | 'InProgress'
+  | 'PendingConfirmation'
+  | 'Resolved'
+  | 'Closed';
 
 export type TicketPriority = 'Critical' | 'High' | 'Medium' | 'Low';
 
-export type TicketType = 'Maintenance' | 'Complaint' | 'ServiceRequest' | 'Inquiry' | 'Emergency';
+export type TicketType =
+  | 'Maintenance'
+  | 'Complaint'
+  | 'ServiceRequest'
+  | 'Inquiry'
+  | 'Emergency';
+
+export type TicketCategoryValue = TicketType | (string & {});
 
 export interface TicketTimelineItem {
   id: string;
@@ -44,37 +56,33 @@ export interface Ticket {
   ticketCode: string;
   title: string;
   description: string;
-  type: TicketType;
+  type: TicketCategoryValue;
   priority: TicketPriority;
   status: TicketStatus;
-  
+
   buildingId: string;
   buildingName: string;
   roomId?: string;
   roomCode?: string;
-  
+
   tenantId?: string;
   tenantName?: string;
   tenantAvatar?: string;
-  
+
   assignedToId?: string;
   assignedToName?: string;
   assignedToAvatar?: string;
-  
-  slaDeadline: string;
+
+  // Computed reference deadline from created_at + priority.
+  // This is a UI hint only because the live schema does not persist SLA.
+  slaDeadline?: string;
   resolvedAt?: string;
-  closedAt?: string;
-  
+
   resolutionNote?: string;
-  rootCause?: string;
-  cancellationReason?: string;
-  
-  estimatedCost?: number;
   actualCost?: number;
-  
+
   staffRating?: number;
-  staffComment?: string;
-  
+
   createdAt: string;
   updatedAt: string;
 }
@@ -84,12 +92,12 @@ export interface TicketSummary {
   ticketCode: string;
   title: string;
   priority: TicketPriority;
-  type: TicketType;
+  type: TicketCategoryValue;
   status: TicketStatus;
   roomName?: string;
   assignedToName?: string;
   assignedToAvatar?: string;
-  slaDeadline: string;
+  slaDeadline?: string;
   createdAt: string;
 }
 
@@ -99,7 +107,7 @@ export interface StaffServiceRating {
   staffName: string;
   staffAvatar?: string;
   staffRole: string;
-  rating: number; // 1-5
+  rating: number;
   comment?: string;
   tenantId: string;
   tenantName: string;
@@ -112,8 +120,10 @@ export interface TicketStatistics {
   total: number;
   open: number;
   inProgress: number;
+  pendingConfirmation: number;
   resolved: number;
-  cancelled: number;
+  closed: number;
+  active: number;
   slaBreached: number;
   avgResolutionTimeHours: number;
   satisfactionRate: number;
