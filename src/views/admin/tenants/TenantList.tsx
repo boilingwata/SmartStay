@@ -32,15 +32,16 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { TenantFormModal } from '@/components/forms/TenantFormModal';
 import { SelectAsync } from '@/components/ui/SelectAsync';
 import { SidePanel } from '@/components/ui/SidePanel';
-import useUIStore from '@/stores/uiStore';
+// uiStore không còn được dùng cho building filter ở trang này
 
 type TenantFormSubmitData = Parameters<React.ComponentProps<typeof TenantFormModal>['onSubmit']>[0];
 
 const TenantList = () => {
   const navigate = useNavigate();
   const { hasPermission } = usePermission();
-  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
-  const setBuilding = useUIStore((s) => s.setBuilding);
+  // Dùng local state cho building filter của trang này
+  // Không bind vào global activeBuildingId để tránh bị filter ngầm từ trang khác
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | number | null>(null);
   const canViewPII = hasPermission('owner.view_pii') || hasPermission('tenant.view_pii');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,12 +55,12 @@ const TenantList = () => {
   const [showSensitive, setShowSensitive] = useState<string[]>([]);
 
   const { data: tenants, isLoading, isError, refetch } = useQuery<TenantSummary[]>({
-    queryKey: ['tenants', debouncedSearch, statusFilter, activeBuildingId, hasActiveContract, onboardingComplete],
+    queryKey: ['tenants', debouncedSearch, statusFilter, selectedBuildingId, hasActiveContract, onboardingComplete],
     queryFn: () =>
       tenantService.getTenants({
         search: debouncedSearch,
         status: statusFilter,
-        buildingId: activeBuildingId || undefined,
+        buildingId: selectedBuildingId || undefined,
         hasActiveContract,
         onboardingComplete,
       }),
@@ -110,7 +111,7 @@ const TenantList = () => {
       const data = await tenantService.getTenants({
         search: debouncedSearch,
         status: statusFilter,
-        buildingId: activeBuildingId || undefined,
+        buildingId: selectedBuildingId || undefined,
       });
 
       const csv = [
@@ -283,12 +284,12 @@ const TenantList = () => {
         <div className="flex w-full flex-col items-end gap-6 lg:flex-row">
           <div className="w-full shrink-0 lg:w-[320px]">
             <SelectAsync
-              label="Tòa nhà đang chọn"
+              label="Tòa nhà"
               placeholder="Tất cả tòa nhà"
               icon={Building}
-              value={activeBuildingId}
-              onChange={setBuilding}
-              onClear={() => setBuilding(null)}
+              value={selectedBuildingId}
+              onChange={setSelectedBuildingId}
+              onClear={() => setSelectedBuildingId(null)}
               loadOptions={async (searchQuery) => {
                 const buildings = await buildingService.getBuildings({ search: searchQuery });
                 return buildings.map((building) => ({ label: building.buildingName, value: building.id }));
