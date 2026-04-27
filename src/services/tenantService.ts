@@ -155,7 +155,7 @@ export const tenantService = {
     const contractLinks = await unwrap(
       supabase
         .from('contract_tenants')
-        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code, building_id))')
+        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms!contracts_room_id_fkey(id, room_code, building_id))')
     ) as unknown as DbContractTenantJoined[];
 
     // Build a lookup: tenantId → list of contract links
@@ -271,7 +271,7 @@ export const tenantService = {
     const contractLinks = await unwrap(
       supabase
         .from('contract_tenants')
-        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms(id, room_code))')
+        .select('tenant_id, is_primary, contracts(id, status, is_deleted, room_id, rooms!contracts_room_id_fkey(id, room_code))')
         .eq('tenant_id', numericId)
     ) as unknown as DbContractTenantJoined[];
 

@@ -130,7 +130,7 @@ test-results*.json
 *-results*.json
 junit.xml
 lint_output*.txt
-
+test_supabase*.mjs
 # Local planning / audit notes
 *-REPORT.md
 *-CONTEXT.md
