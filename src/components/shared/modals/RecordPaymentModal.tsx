@@ -121,11 +121,14 @@ export const RecordPaymentModal = ({
     if (method !== 'BankTransfer' || !activeInvoice) return '';
     const bankAcc = import.meta.env.VITE_BANK_ACCOUNT_NUMBER?.trim();
     const bankCode = import.meta.env.VITE_BANK_CODE?.trim();
-    if (!bankAcc || !bankCode || amount <= 0) return '';
+    const accountName = import.meta.env.VITE_BANK_ACCOUNT_NAME?.trim() ?? '';
+    if (!bankAcc || !bankCode) return '';
 
-    // SS<InvoiceID> is the standard format for our SePay webhook
-    const description = `SS${activeInvoice.id}`;
-    return `https://qr.sepay.vn/api/generate?acc=${bankAcc}&bank=${bankCode}&amount=${amount}&des=${description}&template=compact2`;
+    // SS<InvoiceCode> format for SePay webhook auto-detection
+    const description = encodeURIComponent(`SS${activeInvoice.invoiceCode ?? activeInvoice.id}`);
+    const encodedName = encodeURIComponent(accountName);
+    // VietQR official API — returns PNG directly, no CORS issues
+    return `https://img.vietqr.io/image/${bankCode}-${bankAcc}-compact2.png?amount=${amount}&addInfo=${description}&accountName=${encodedName}`;
   }, [method, activeInvoice, amount]);
 
   const handleProofUpload = async (file: File) => {
@@ -433,14 +436,25 @@ export const RecordPaymentModal = ({
                     <img 
                       src={qrUrl} 
                       alt="Mã VietQR thanh toán" 
-                      className="relative w-48 h-48 object-contain bg-white p-2 rounded-2xl shadow-xl shadow-blue-500/10 border-4 border-white" 
+                      className="relative w-48 h-48 object-contain bg-white p-2 rounded-2xl shadow-xl shadow-blue-500/10 border-4 border-white"
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        el.style.display = 'none';
+                        const parent = el.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = 'w-48 h-48 flex items-center justify-center bg-blue-50 rounded-2xl border-2 border-blue-200 text-center p-4';
+                          fallback.innerHTML = '<p class="text-xs text-blue-400 font-medium">Không thể tải QR.<br/>Vui lòng quét trực tiếp<br/>từ app ngân hàng.</p>';
+                          parent.appendChild(fallback);
+                        }
+                      }}
                     />
                   </div>
 
                   <div className="w-full space-y-2">
                     <div className="flex justify-between items-center p-3 bg-white/80 rounded-xl border border-blue-100">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung chuyển khoản</span>
-                      <span className="text-xs font-black text-blue-600 font-mono">SS{activeInvoice?.id}</span>
+                      <span className="text-xs font-black text-blue-600 font-mono select-all">SS{activeInvoice?.invoiceCode ?? activeInvoice?.id}</span>
                     </div>
                   </div>
 

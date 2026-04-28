@@ -461,6 +461,47 @@ const InvoiceDetail = () => {
                   Chưa có thông tin tài khoản nhận tiền trong cấu hình hiện tại của dự án.
                 </div>
               )}
+
+              {/* QR Chuyển khoản SePay */}
+              {(() => {
+                const bankAcc = import.meta.env.VITE_BANK_ACCOUNT_NUMBER?.trim();
+                const bankCode = import.meta.env.VITE_BANK_CODE?.trim();
+                const accountName = import.meta.env.VITE_BANK_ACCOUNT_NAME?.trim() ?? '';
+                const vietQRUrl = bankAcc && bankCode
+                  ? `https://img.vietqr.io/image/${bankCode}-${bankAcc}-compact2.png?amount=${remainingAmount}&addInfo=${encodeURIComponent('SS' + invoice.invoiceCode)}&accountName=${encodeURIComponent(accountName)}`
+                  : null;
+
+                return (
+                  <div className="rounded-3xl border border-blue-200/60 bg-blue-50/30 p-5 space-y-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-500">Chuyển khoản qua QR</p>
+
+                    {/* QR image */}
+                    <div className="flex justify-center">
+                      {vietQRUrl ? (
+                        <img
+                          src={vietQRUrl}
+                          alt="Mã QR VietQR SePay"
+                          className="w-52 h-52 object-contain bg-white rounded-2xl shadow-lg border-4 border-white p-1"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-52 h-52 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 text-center p-4">
+                          <p className="text-xs text-blue-400 font-medium">Chưa cấu hình<br/>thông tin ngân hàng.<br/>Kiểm tra <code>.env.local</code></p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nội dung chuyển khoản */}
+                    <div className="rounded-2xl border border-blue-200/60 bg-white/80 p-4 text-center space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted">Nội dung chuyển khoản</p>
+                      <p className="text-xl font-black text-blue-600 tracking-widest select-all font-mono">SS{invoice.invoiceCode}</p>
+                      <p className="text-[11px] text-muted">Hệ thống SePay sẽ tự động nhận diện hóa đơn qua mã này</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </section>
 
             <section className="rounded-3xl border border-info/20 bg-info/5 p-6">

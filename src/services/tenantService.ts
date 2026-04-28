@@ -703,14 +703,19 @@ export const tenantService = {
       || data.nationality !== undefined
       || data.occupation !== undefined
     ) {
-      const existingRow = await unwrap(
-        supabase
-          .from('tenants')
-          .select('documents')
-          .eq('id', numericId)
-          .single()
-      ) as unknown as { documents: Record<string, unknown> | null };
-      const nextDocuments = { ...(existingRow.documents ?? {}) } as Record<string, unknown>;
+      const { data: existingData } = await supabase
+        .from('tenants')
+        .select('documents')
+        .eq('id', numericId)
+        .single();
+
+      const rawDocs = existingData?.documents;
+      
+      // Safety: only spread if it's a plain object (not null, not array)
+      const nextDocuments = (rawDocs && typeof rawDocs === 'object' && !Array.isArray(rawDocs))
+        ? { ...(rawDocs as Record<string, unknown>) }
+        : {};
+
       if (data.vehiclePlates !== undefined) {
         nextDocuments.vehicle_plates = data.vehiclePlates;
       }
@@ -746,9 +751,21 @@ export const tenantService = {
       }
       updatePayload.documents = Object.keys(nextDocuments).length > 0 ? nextDocuments : null;
     }
-    await unwrap(
-      supabase.from('tenants').update(updatePayload).eq('id', numericId)
-    );
+
+    const { data: updatedRows, error: updateError } = await supabase
+      .from('tenants')
+      .update(updatePayload)
+      .eq('id', numericId)
+      .select('id');
+
+    if (updateError) {
+      console.error('[tenantService] Update error:', updateError);
+      throw updateError;
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new Error(`[tenantService] updateTenant: No rows updated for ID ${numericId}. Check RLS policies or if tenant exists.`);
+    }
   },
 
   // -------------------------------------------------------------------------
