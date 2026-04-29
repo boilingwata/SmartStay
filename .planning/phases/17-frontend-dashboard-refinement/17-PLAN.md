@@ -10,6 +10,7 @@ depends_on:
   - .planning/sketches/004-operations-dashboard-modules/SKETCH.md
   - .planning/sketches/004-operations-dashboard-modules/README.md
   - .planning/sketches/MANIFEST.md
+  - .planning/phases/17-frontend-dashboard-refinement/17-REVIEWS.md
 autonomous: true
 requirements_addressed:
   - frontend-dashboard-production-ui
@@ -77,6 +78,7 @@ Planned
 - `Sketch 004 - SKETCH.md`: dùng Variant A "Bảng vận hành" làm pattern chính cho list pages; chỉ mượn Variant B cho `UtilityHubPage`, Variant C cho workflow nhiều bước như `CreateContractWizard` hoặc chạy utility billing.
 - `Sketch 004 - README.md`: dùng các rule về layout desktop/tablet/mobile, spacing, table behavior, card/grid behavior, CTA và dangerous actions.
 - `MANIFEST.md`: dùng hướng thiết kế SmartStay là dashboard vận hành dày thông tin nhưng rõ thứ bậc, ít trang trí, thao tác nhanh.
+- `17-REVIEWS.md`: bổ sung các điểm review còn thiếu: chia Wave 3 thành checkpoint nhỏ hơn, thêm route/evidence verification, khóa blast radius khi sửa `DataTable.tsx`, thêm raw-token grep bắt buộc, và giữ đúng design system SmartStay khi giảm độ trang trí.
 - Code scan hiện tại: xác nhận các file chính tồn tại và ghi nhận các dấu hiệu như `max-w-7xl`, `max-w-[1440px]`, `rounded-[32px]`, `text-4xl`, `min-w-full`, `pending_payment`, `policy`, text không dấu trong các module thuộc scope.
 
 ## Quyết định thiết kế đã chốt
@@ -99,6 +101,14 @@ Chọn **Sketch 004 Variant A - Bảng vận hành** làm mặc định cho các
 - Variant B chỉ dùng nhẹ cho hub cấp cao như `UtilityHubPage`, nơi cần gom nhóm "Tài chính", "Hợp đồng", "Vận hành", "Tiện ích".
 - Variant C chỉ dùng cho workflow nhiều bước hoặc cần kiểm tra dữ liệu: `CreateContractWizard`, chạy utility billing, tạo phụ lục phức tạp nếu đã có flow tương ứng.
 - Không biến tất cả list page thành command center hoặc split workspace.
+
+## Cập nhật theo review
+
+- Wave 3 phải execute theo checkpoint nhỏ, không làm toàn bộ domain cùng lúc trong một nhịp không có kiểm soát.
+- Verification phải ghi evidence theo route thực tế, view cần mở, breakpoint đã kiểm tra, kết quả và ghi chú lỗi còn lại.
+- Nếu sửa `DataTable.tsx`, bắt buộc audit consumers bằng `rg "<DataTable"` trước và sau; default rendering không đổi nếu consumer không truyền cấu hình min-width mới.
+- Raw technical tokens phải được grep bắt buộc sau execute, không chỉ kiểm tra thủ công.
+- Khi giảm radius, shadow, gradient hoặc hero styling, không thay design system toàn cục; chỉ chỉnh các page/component trong scope và giữ tone SmartStay hiện tại: restrained, sạch, ít màu, surface trắng/xám nhạt, border rõ nhẹ.
 
 <objective>
 Hoàn thiện frontend các module vận hành trong phase 17 theo chuẩn dashboard SaaS production: đơn giản, rõ, dễ scan, tiếng Việt chuẩn, fluid width hợp lý, không vỡ layout ở 390-1920px, bảng nhiều cột có scroll ngang kiểm soát, và các trạng thái/loading/empty/error đủ rõ cho người dùng không rành công nghệ.
@@ -204,6 +214,14 @@ Hoàn thiện frontend các module vận hành trong phase 17 theo chuẩn dashb
 - Row actions: một hành động rõ nhất + menu phụ nếu nhiều lựa chọn.
 - Dangerous actions: tách khu vực/menu riêng, màu destructive, có confirm dialog, không đặt sát CTA chính.
 
+## Design system guardrails
+
+- Dùng component và token hiện có của SmartStay trước: shadcn-style primitives, Tailwind theme variables, existing badges, buttons, inputs, dialogs.
+- Không tạo palette mới cho từng module; giữ nền restrained, surface trắng/xám nhạt, border nhẹ, màu trạng thái dùng đúng nghĩa nghiệp vụ.
+- Giảm `rounded-[28px+]`, shadow lớn, gradient và hero-scale typography trong scope nhưng không rewrite toàn bộ design system.
+- Không thêm decorative illustration, hero marketing, card lồng card hoặc animation không phục vụ thao tác.
+- Nếu một pattern hiện tại đang dùng tốt và đúng tone SmartStay, chỉ chỉnh spacing/responsive/copy thay vì redesign mạnh.
+
 </layout_contracts>
 
 <wave_plan>
@@ -272,13 +290,33 @@ Mục tiêu: chốt nền layout để các module bên dưới không tự bó 
 
 Mục tiêu: đưa các module về pattern vận hành thực dụng, ưu tiên scan nhanh và thao tác ít đoán.
 
+### Checkpoints bắt buộc trong Wave 3
+
+Wave 3 không được execute như một khối lớn duy nhất. Executor phải đi theo các checkpoint dưới đây và ghi pass/fail ngắn sau mỗi checkpoint:
+
+1. **3A - Shared table contract**
+   - Scope: `DataTable.tsx`, table wrappers/common classes, không đổi visual behavior mặc định cho consumer ngoài scope.
+   - Gate: `rg "<DataTable"` trước và sau; nếu thêm prop như `minWidthClassName`, prop phải optional và default output giữ nguyên.
+
+2. **3B - Finance + utility**
+   - Scope: invoices, payments, record payment modal, utility hub, billing runs, utility policies, utility overrides.
+   - Gate: finance/utility tables có `overflow-x-auto` + min-width; không còn raw `pending_payment` hoặc utility warning code trên UI.
+
+3. **3C - Contracts + tenants**
+   - Scope: contracts, addendums, contract wizard, tenant list/detail/tabs/forms.
+   - Gate: Variant A dùng cho list, Variant C chỉ giữ ở wizard/flow nhiều bước; tenant tabs usable ở `1024`, `768`, `390`.
+
+4. **3D - Assets + amenities + services + tickets**
+   - Scope: asset catalog/modal, amenity management/check-in, service catalog/modals, tickets/staff tickets/kanban/form.
+   - Gate: không còn wording `policy` sai ngữ cảnh ở amenities; service catalog không còn kiểu marketing; ticket labels/fallbacks tiếng Việt.
+
 ### Tasks
 
 1. Shared table contract
    - Files: `src/components/shared/DataTable.tsx`, target tables trong scope.
    - Action: thêm hoặc tận dụng prop/class để truyền min-width; áp dụng wrapper `overflow-x-auto` + table min-width cụ thể.
-   - Verify: `AssetCatalog`, `PaymentList`, `TicketList`, `BillingRunsPage`, invoice/payment/tenant/detail child tables không ép cột.
-   - Acceptance: mọi bảng nhiều cột có scroll ngang nội bộ và action cell usable.
+   - Verify: `rg "<DataTable"` trước/sau, `AssetCatalog`, `PaymentList`, `TicketList`, `BillingRunsPage`, invoice/payment/tenant/detail child tables không ép cột.
+   - Acceptance: mọi bảng nhiều cột có scroll ngang nội bộ và action cell usable; consumer không truyền cấu hình mới vẫn render như cũ.
 
 2. Assets và amenities
    - Files: `AssetCatalog.tsx`, `AssetModal.tsx`, `AmenityManagementPage.tsx`, `AmenityCheckin.tsx`.
@@ -403,7 +441,8 @@ Mục tiêu: khóa chất lượng trước khi kết thúc phase.
 
 4. Copy and raw-value verification
    - Action: grep và manual scan các raw strings đã biết.
-   - Acceptance: không còn `pending_payment`, raw policy/status/category/type lộ ra UI trong scope.
+   - Raw tokens bắt buộc kiểm tra: `pending_payment`, `partially_paid`, `in_progress`, `billing_runs`, `utility_policy`, `room_asset_auto`, `AssetAssignment`, `RoomAssetAuto`, `RentChange`, `Khong the`, `Xac nhan`, `Da xong`, `Theo doi`.
+   - Acceptance: không còn raw policy/status/category/type lộ ra UI trong scope; nếu token vẫn còn trong code hợp lệ ở service/model/test, summary phải ghi rõ không phải user-facing.
 
 5. Regression smoke
    - Action: mở list/detail/modal chính của từng nhóm domain.
@@ -448,19 +487,30 @@ Mức rủi ro bảo mật dự kiến: thấp đến trung bình. Verification 
 
 ### Module verification
 
-- `assets`: list, modal thêm/sửa, trạng thái, master vs room assignment label.
-- `amenities`: quản lý tiện ích, staff check-in nếu bị ảnh hưởng, status/policy wording.
-- `tenants`: list, detail tabs, form/modal, onboarding text.
-- `contracts`: list, detail, wizard, tabs, dangerous actions.
-- `addendums`: list, modal tạo/sửa nếu có, type/status labels.
-- `utility-billing`: hub, run setup/review nếu có, warnings.
-- `billing-runs`: run history, progress, snapshot/detail table.
-- `services`: catalog, detail modal, update price modal, price history.
-- `utility-policies`: list/form/status/source labels.
-- `utility-overrides`: list/form/scope labels.
-- `invoices`: list, detail, create/bulk modals, status and utility snapshot labels.
-- `payments`: list, detail, record payment modal.
-- `tickets`: list, detail, kanban, staff my tickets, ticket form modal.
+- `assets` - `/owner/assets`: list, modal thêm/sửa, trạng thái, master vs room assignment label.
+- `amenities` - `/owner/amenities`, `/owner/staff/amenity-checkin`: quản lý tiện ích, staff check-in nếu bị ảnh hưởng, status/policy wording.
+- `tenants` - `/owner/tenants`, `/owner/tenants/:id`: list, detail tabs, form/modal, onboarding text.
+- `contracts` - `/owner/contracts`, `/owner/contracts/:id`, `/owner/contracts/create`: list, detail, wizard, tabs, dangerous actions.
+- `addendums` - `/owner/contracts/addendums`: list, modal tạo/sửa nếu có, type/status labels.
+- `utility-billing` - `/owner/utility-billing`: hub, run setup/review nếu có, warnings.
+- `billing-runs` - `/owner/settings/billing-runs`: run history, progress, snapshot/detail table.
+- `services` - `/owner/services`: catalog, detail modal, update price modal, price history.
+- `utility-policies` - `/owner/settings/utility-policies`: list/form/status/source labels.
+- `utility-overrides` - `/owner/settings/utility-overrides`: list/form/scope labels.
+- `invoices` - `/owner/invoices`, `/owner/invoices/:id`: list, detail, create/bulk modals, status and utility snapshot labels.
+- `payments` - `/owner/payments`, `/owner/payments/:id`: list, detail, record payment modal.
+- `tickets` - `/owner/tickets`, `/owner/tickets/:id`, `/owner/staff/my-tickets`: list, detail, kanban, staff my tickets, ticket form modal.
+
+### Evidence format bắt buộc khi execute
+
+Executor phải ghi lại evidence tối thiểu theo mẫu này trong summary hoặc verification note:
+
+| Route | View/modal | Breakpoints checked | Result | Notes |
+|---|---|---|---|---|
+| `/owner/assets` | List + asset modal | `1920`, `1366`, `1024`, `768`, `390` | Pass/Fail | Lỗi còn lại hoặc "Không có" |
+| `/owner/invoices` | List + create/bulk modal | `1920`, `1366`, `1024`, `768`, `390` | Pass/Fail | Lỗi còn lại hoặc "Không có" |
+
+Nếu route nào không verify được bằng browser/dev server, summary phải ghi rõ lý do và phạm vi chưa kiểm chứng. Không được kết luận pass chung nếu thiếu evidence cho module chính.
 
 ### Commands
 
@@ -501,7 +551,10 @@ Mức rủi ro bảo mật dự kiến: thấp đến trung bình. Verification 
 - Variant A từ Sketch 004 được áp dụng làm pattern chính cho list pages; Variant B/C chỉ dùng đúng chỗ đã chốt.
 - Các page wrappers hẹp trong scope được gỡ hoặc nới theo shell `max-w-[1760px]`.
 - Shared table contract hoặc equivalent được áp dụng nhất quán.
+- Nếu `DataTable.tsx` được sửa, default rendering của consumers ngoài scope không đổi và đã audit bằng `rg "<DataTable"`.
 - Các lỗi text đã biết từ research được xử lý.
+- Raw-token grep bắt buộc đã chạy; mọi token còn lại được giải thích là không user-facing hoặc được đưa vào follow-up.
+- Verification summary có route/evidence matrix cho các module chính, bao gồm các route không verify được nếu có.
 - UI không vỡ ở mobile/tablet/laptop/desktop/màn lớn theo 8 breakpoint.
 - Không thêm landing page, marketing layout, business flow mới, schema Supabase mới hoặc refactor kiến trúc rộng ngoài scope.
 - Build/lint pass và kết quả responsive/manual verification được ghi lại trong summary khi execute phase.
