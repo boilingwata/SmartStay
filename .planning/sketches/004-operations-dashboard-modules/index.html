@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sketch 004 - SmartStay Operations Dashboard Modules</title>
+  <link id="theme-link" rel="stylesheet" href="../themes/default.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--color-text);
+      background: #f6f8fb;
+      font-family: var(--font-sans, "DM Sans", "Segoe UI", sans-serif);
+      padding-top: 64px;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .variant-nav {
+      position: fixed;
+      inset: 0 0 auto;
+      z-index: 40;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.94);
+      border-bottom: 1px solid #dbe3ec;
+      backdrop-filter: blur(16px);
+      overflow-x: auto;
+    }
+    .variant-tab {
+      border: 1px solid #d8e1ea;
+      background: #fff;
+      color: #526173;
+      border-radius: 8px;
+      padding: 10px 12px;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all .15s ease;
+    }
+    .variant-tab:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .variant-tab.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(15,109,99,.18);
+    }
+    .variant { display: none; padding: 16px; }
+    .variant.active { display: block; }
+    .viewport-shell {
+      width: min(100%, var(--viewport-width, 100%));
+      margin: 0 auto 84px;
+      transition: width .2s ease;
+    }
+    .app-shell {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      min-height: calc(100vh - 96px);
+      border: 1px solid #dbe3ec;
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+      box-shadow: 0 18px 42px rgba(16,32,51,.08);
+    }
+    .side {
+      min-width: 0;
+      background: #122033;
+      color: rgba(255,255,255,.86);
+      padding: 16px 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      margin-bottom: 14px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #0f6d63;
+      color: #fff;
+    }
+    .side-label {
+      padding: 12px 10px 6px;
+      color: rgba(255,255,255,.48);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .side-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      transition: all .15s ease;
+    }
+    .side-item:hover, .side-item.active { background: rgba(255,255,255,.1); }
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: #f7f9fc;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px clamp(16px, 2vw, 28px);
+      border-bottom: 1px solid #e3e9f0;
+      background: rgba(255,255,255,.92);
+    }
+    .topbar h1 {
+      margin: 2px 0 0;
+      font-size: clamp(22px, 2vw, 30px);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .breadcrumb { color: #66778a; font-size: 12px; font-weight: 700; }
+    .top-actions, .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .content {
+      min-width: 0;
+      width: 100%;
+      max-width: 1760px;
+      margin: 0 auto;
+      padding: clamp(14px, 1.8vw, 28px);
+    }
+    .content.full { max-width: none; }
+    .notice {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid #cfe1db;
+      border-radius: 8px;
+      background: #f0fbf7;
+      color: #23574f;
+      font-size: 13px;
+    }
+    .btn {
+      min-height: 38px;
+      border: 1px solid #d8e1ea;
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: #fff;
+      color: #1d2b3a;
+      font-weight: 800;
+      transition: all .15s ease;
+    }
+    .btn:hover { border-color: #aebdca; transform: translateY(-1px); }
+    .btn.primary {
+      border-color: var(--color-primary);
+      background: var(--color-primary);
+      color: #fff;
+    }
+    .btn.danger {
+      border-color: #f0c5bf;
+      background: #fff7f5;
+      color: #a33023;
+    }
+    .btn.subtle { background: #f8fafc; }
+    .btn.icon { width: 38px; padding: 0; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .metric {
+      min-width: 0;
+      border: 1px solid #e1e8f0;
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+    }
+    .metric span { color: #66778a; font-size: 12px; font-weight: 800; }
+    .metric strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 24px;
+      line-height: 1.05;
+    }
+    .metric small { display: block; margin-top: 4px; color: #66778a; }
+    .layout-a {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 12px;
+      align-items: start;
+    }
+    .panel {
+      min-width: 0;
+      border: 1px solid #e1e8f0;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid #e6edf4;
+    }
+    .panel-header h2, .panel-header h3 { margin: 0; font-size: 17px; }
+    .filters {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(130px, 170px)) auto;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid #e6edf4;
+    }
+    .field {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+    .field label {
+      color: #66778a;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .field input, .field select {
+      width: 100%;
+      min-width: 0;
+      min-height: 38px;
+      border: 1px solid #d8e1ea;
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px 10px;
+      color: #1d2b3a;
+    }
+    .segment {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 12px;
+      border-bottom: 1px solid #e6edf4;
+    }
+    .segment button {
+      border: 1px solid #d8e1ea;
+      border-radius: 999px;
+      background: #fff;
+      padding: 7px 10px;
+      color: #526173;
+      font-size: 13px;
+      font-weight: 800;
+      transition: all .15s ease;
+    }
+    .segment button.active { background: #eaf7f4; border-color: #9fd1c7; color: #0b5a52; }
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1080px;
+    }
+    th, td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #edf2f7;
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+    th {
+      color: #64758a;
+      background: #f8fafc;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    td strong { display: block; }
+    td small { display: block; color: #66778a; margin-top: 3px; }
+    .nowrap { white-space: nowrap; }
+    .truncate {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .badge.green { background: #e8f7ef; color: #17633a; }
+    .badge.amber { background: #fff4df; color: #925b12; }
+    .badge.red { background: #fff0ed; color: #a33023; }
+    .badge.blue { background: #eaf1ff; color: #1f56a6; }
+    .badge.gray { background: #eef2f6; color: #526173; }
+    .rail {
+      position: sticky;
+      top: 78px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+    .rail-card {
+      border: 1px solid #e1e8f0;
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+    }
+    .rail-card h3 { margin: 0 0 10px; font-size: 15px; }
+    .todo {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid #edf2f7;
+    }
+    .todo:first-of-type { border-top: 0; padding-top: 0; }
+    .todo p { margin: 0; font-weight: 800; }
+    .todo small { display: block; margin-top: 3px; color: #66778a; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .module-card {
+      min-width: 0;
+      border: 1px solid #e1e8f0;
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+    .module-card h3 { margin: 0; font-size: 17px; }
+    .module-card p { margin: 0; color: #66778a; line-height: 1.45; }
+    .mini-list {
+      display: grid;
+      gap: 8px;
+    }
+    .mini-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(280px, .9fr) minmax(0, 1.5fr) 320px;
+      gap: 12px;
+      align-items: start;
+    }
+    .step-list {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+    }
+    .step {
+      border: 1px solid #e1e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+    .step.active { border-color: #8fc7bd; background: #f1fbf8; }
+    .step b { display: block; margin-bottom: 4px; }
+    .step span { color: #66778a; font-size: 13px; }
+    .danger-zone {
+      border: 1px solid #f0c5bf;
+      background: #fff8f7;
+    }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 78px;
+      z-index: 50;
+      display: none;
+      max-width: min(360px, calc(100vw - 32px));
+      border: 1px solid #cfe1db;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 42px rgba(16,32,51,.16);
+      padding: 12px 14px;
+      color: #173c36;
+      font-weight: 800;
+    }
+    .toast.show { display: block; animation: rise .18s ease; }
+    @keyframes rise { from { transform: translateY(8px); opacity: .5; } to { transform: translateY(0); opacity: 1; } }
+    .sketch-tools {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      z-index: 60;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      max-width: calc(100vw - 24px);
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(0,0,0,.76);
+      color: #fff;
+      font-size: 12px;
+      opacity: .45;
+      transition: opacity .2s ease;
+    }
+    .sketch-tools:hover { opacity: 1; }
+    .sketch-tools button, .sketch-tools select {
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    .sketch-tools option { color: #111; }
+    .annotation .panel, .annotation .module-card, .annotation .metric, .annotation .rail-card {
+      outline: 1px dashed rgba(15,109,99,.45);
+      outline-offset: 2px;
+    }
+    @media (max-width: 1280px) {
+      .layout-a { grid-template-columns: minmax(0, 1fr); }
+      .rail { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .workspace { grid-template-columns: 280px minmax(0, 1fr); }
+      .workspace .rail { grid-column: 1 / -1; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1024px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .side {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        align-items: center;
+      }
+      .brand, .side-label { display: none; }
+      .side-item { width: auto; white-space: nowrap; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filters .field:first-child { grid-column: 1 / -1; }
+      .workspace { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .variant { padding: 10px; }
+      .topbar { align-items: stretch; flex-direction: column; }
+      .top-actions { justify-content: flex-start; }
+      .content { padding: 12px; }
+      .metrics, .cards, .rail { grid-template-columns: 1fr; }
+      .filters { grid-template-columns: 1fr; }
+      .btn { width: 100%; justify-content: center; }
+      .inline-actions .btn { width: auto; }
+      table { min-width: 980px; }
+    }
+    @media (max-width: 430px) {
+      .app-shell { border-radius: 0; border-left: 0; border-right: 0; }
+      .variant { padding-left: 0; padding-right: 0; }
+      .topbar h1 { font-size: 22px; }
+      .metric strong { font-size: 21px; }
+      .panel-header { align-items: stretch; flex-direction: column; }
+      .segment { overflow-x: auto; flex-wrap: nowrap; }
+      .segment button { white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="variant-nav" aria-label="Chọn biến thể">
+    <button class="variant-tab active" onclick="showVariant('a', this)">A: Bảng vận hành ★ Khuyến nghị</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Command center theo nhóm</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Split workspace</button>
+  </nav>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <section id="variant-a" class="variant active">
+    <div class="viewport-shell">
+      <div class="app-shell">
+        <aside class="side">
+          <div class="brand"><span class="brand-mark">S</span> SmartStay</div>
+          <div class="side-label">Vận hành</div>
+          <button class="side-item active">Tổng quan module</button>
+          <button class="side-item">Hợp đồng</button>
+          <button class="side-item">Hóa đơn</button>
+          <button class="side-item">Thanh toán</button>
+          <button class="side-item">Yêu cầu hỗ trợ</button>
+          <div class="side-label">Thiết lập</div>
+          <button class="side-item">Dịch vụ</button>
+          <button class="side-item">Tiện ích</button>
+        </aside>
+        <main class="main">
+          <header class="topbar">
+            <div>
+              <div class="breadcrumb">Chủ nhà / Vận hành</div>
+              <h1>Bảng điều phối vận hành</h1>
+            </div>
+            <div class="top-actions">
+              <button class="btn subtle" onclick="showToast('Đã làm mới dữ liệu hiển thị')">Làm mới</button>
+              <button class="btn primary" onclick="showToast('Mở biểu mẫu tạo hóa đơn mới')">Tạo hóa đơn</button>
+            </div>
+          </header>
+          <div class="content">
+            <div class="notice">
+              <b>Hướng khuyến nghị:</b>
+              Dùng một khung bảng vận hành chung cho `assets`, `tenants`, `contracts`, `addendums`, `invoices`, `payments`, `tickets`, `billing-runs`.
+            </div>
+            <section class="metrics" aria-label="Chỉ số nhanh">
+              <div class="metric"><span>Cần xử lý hôm nay</span><strong>18</strong><small>7 hóa đơn, 5 ticket, 6 phụ lục</small></div>
+              <div class="metric"><span>Quá hạn</span><strong>9</strong><small>Ưu tiên kiểm tra trước</small></div>
+              <div class="metric"><span>Đang chờ xác nhận</span><strong>24</strong><small>Thanh toán và hợp đồng</small></div>
+              <div class="metric"><span>Đã hoàn tất tuần này</span><strong>126</strong><small>Tăng 14% so với tuần trước</small></div>
+            </section>
+
+            <div class="layout-a">
+              <section class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Danh sách nghiệp vụ</h2>
+                    <small>Thông tin chính nằm trong bảng, thông tin phụ đưa sang rail hoặc detail.</small>
+                  </div>
+                  <div class="inline-actions">
+                    <button class="btn subtle" onclick="showToast('Đã xuất danh sách mẫu')">Xuất file</button>
+                    <button class="btn primary" onclick="showToast('Mở thao tác chính của module hiện tại')">Thao tác chính</button>
+                  </div>
+                </div>
+                <div class="filters">
+                  <div class="field">
+                    <label for="search-a">Tìm kiếm</label>
+                    <input id="search-a" oninput="filterRows(this.value)" placeholder="Tên cư dân, mã hóa đơn, mã phòng..." />
+                  </div>
+                  <div class="field">
+                    <label>Module</label>
+                    <select><option>Hóa đơn</option><option>Hợp đồng</option><option>Yêu cầu hỗ trợ</option><option>Tài sản</option></select>
+                  </div>
+                  <div class="field">
+                    <label>Trạng thái</label>
+                    <select><option>Tất cả</option><option>Cần xử lý</option><option>Đang xử lý</option><option>Hoàn tất</option></select>
+                  </div>
+                  <div class="field">
+                    <label>Tòa nhà</label>
+                    <select><option>Tất cả tòa nhà</option><option>Orchid A</option><option>Lotus B</option></select>
+                  </div>
+                  <div class="field">
+                    <label>Kỳ</label>
+                    <select><option>Tháng 04/2026</option><option>Tháng 03/2026</option></select>
+                  </div>
+                  <div class="field">
+                    <label>&nbsp;</label>
+                    <button class="btn subtle" onclick="showToast('Đã áp dụng bộ lọc')">Lọc</button>
+                  </div>
+                </div>
+                <div class="segment">
+                  <button class="active">Tất cả</button>
+                  <button>Cần xử lý</button>
+                  <button>Quá hạn</button>
+                  <button>Chờ xác nhận</button>
+                  <button>Đã hoàn tất</button>
+                </div>
+                <div class="table-wrap">
+                  <table aria-label="Danh sách nghiệp vụ">
+                    <thead>
+                      <tr>
+                        <th>Mã</th>
+                        <th>Đối tượng</th>
+                        <th>Module</th>
+                        <th>Trạng thái</th>
+                        <th>Ưu tiên</th>
+                        <th>Số tiền / Giá trị</th>
+                        <th>Người phụ trách</th>
+                        <th>Cập nhật</th>
+                        <th class="nowrap">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ops-rows">
+                      <tr>
+                        <td><strong>HD-0426-118</strong><small>Tháng 04/2026</small></td>
+                        <td><strong>Nguyễn Thị Lan</strong><small class="truncate">Phòng A1205, Orchid A</small></td>
+                        <td>Hóa đơn</td>
+                        <td><span class="badge amber">Chờ thanh toán</span></td>
+                        <td><span class="badge red">Quá hạn</span></td>
+                        <td class="nowrap">4.850.000 đ</td>
+                        <td>Thu ngân</td>
+                        <td>29/04/2026 09:20</td>
+                        <td class="inline-actions"><button class="btn subtle" onclick="showToast('Mở chi tiết hóa đơn')">Xem</button><button class="btn primary" onclick="showToast('Ghi nhận thanh toán')">Thu tiền</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>PL-203</strong><small>Phụ lục hợp đồng</small></td>
+                        <td><strong>Hợp đồng HD-889</strong><small class="truncate">Điều chỉnh giá thuê từ 01/05/2026</small></td>
+                        <td>Phụ lục</td>
+                        <td><span class="badge blue">Chờ ký</span></td>
+                        <td><span class="badge amber">Cần theo dõi</span></td>
+                        <td class="nowrap">+500.000 đ/tháng</td>
+                        <td>Quản lý tòa</td>
+                        <td>28/04/2026 16:40</td>
+                        <td class="inline-actions"><button class="btn subtle" onclick="showToast('Mở phụ lục')">Xem</button><button class="btn primary" onclick="showToast('Chuẩn bị gửi ký')">Gửi ký</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>YC-771</strong><small>Yêu cầu cư dân</small></td>
+                        <td><strong>Máy lạnh không lạnh</strong><small class="truncate">Phòng B0708, Lotus B</small></td>
+                        <td>Yêu cầu hỗ trợ</td>
+                        <td><span class="badge blue">Đang xử lý</span></td>
+                        <td><span class="badge red">Cao</span></td>
+                        <td class="nowrap">Dự kiến 350.000 đ</td>
+                        <td>Kỹ thuật</td>
+                        <td>29/04/2026 10:05</td>
+                        <td class="inline-actions"><button class="btn subtle" onclick="showToast('Mở yêu cầu')">Xem</button><button class="btn primary" onclick="showToast('Cập nhật tiến độ')">Cập nhật</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>TS-554</strong><small>Tài sản phòng</small></td>
+                        <td><strong>Tủ lạnh Electrolux</strong><small class="truncate">Đang gán tại phòng A0901</small></td>
+                        <td>Tài sản</td>
+                        <td><span class="badge green">Đang sử dụng</span></td>
+                        <td><span class="badge gray">Bình thường</span></td>
+                        <td class="nowrap">120.000 đ/tháng</td>
+                        <td>Vận hành</td>
+                        <td>27/04/2026 14:12</td>
+                        <td class="inline-actions"><button class="btn subtle" onclick="showToast('Mở tài sản')">Xem</button><button class="btn" onclick="showToast('Mở lịch sử giá')">Lịch sử</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <aside class="rail">
+                <div class="rail-card">
+                  <h3>Việc cần ưu tiên</h3>
+                  <div class="todo"><div><p>9 hóa đơn quá hạn</p><small>Ưu tiên gọi nhắc hoặc ghi nhận thanh toán</small></div><span class="badge red">Gấp</span></div>
+                  <div class="todo"><div><p>3 đợt tính tiền có cảnh báo</p><small>Kiểm tra chính sách và ghi đè</small></div><span class="badge amber">Kiểm tra</span></div>
+                  <div class="todo"><div><p>5 ticket chưa có người phụ trách</p><small>Gán nhân sự trước cuối ngày</small></div><span class="badge blue">Phân công</span></div>
+                </div>
+                <div class="rail-card">
+                  <h3>Quy tắc áp dụng vào code thật</h3>
+                  <div class="mini-list">
+                    <div class="mini-row"><span>Bảng dài</span><b>overflow-x-auto</b></div>
+                    <div class="mini-row"><span>Main content</span><b>flex-1 min-w-0</b></div>
+                    <div class="mini-row"><span>CTA chính</span><b>1 nút nổi bật</b></div>
+                    <div class="mini-row"><span>Nguy hiểm</span><b>tách khỏi toolbar</b></div>
+                  </div>
+                </div>
+                <div class="rail-card danger-zone">
+                  <h3>Vùng thao tác nguy hiểm</h3>
+                  <p style="margin-top:0;color:#66778a">Không đặt xóa/hủy/chấm dứt cạnh CTA chính. Đưa vào detail hoặc menu riêng có xác nhận.</p>
+                  <button class="btn danger" onclick="confirmDanger()">Hủy nghiệp vụ</button>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <section id="variant-b" class="variant">
+    <div class="viewport-shell">
+      <div class="app-shell">
+        <aside class="side">
+          <div class="brand"><span class="brand-mark">S</span> SmartStay</div>
+          <div class="side-label">Nhóm module</div>
+          <button class="side-item active">Tài chính</button>
+          <button class="side-item">Hợp đồng</button>
+          <button class="side-item">Cư dân</button>
+          <button class="side-item">Vận hành</button>
+          <button class="side-item">Tiện ích</button>
+        </aside>
+        <main class="main">
+          <header class="topbar">
+            <div>
+              <div class="breadcrumb">Chủ nhà / Command center</div>
+              <h1>Trung tâm điều phối theo nhóm</h1>
+            </div>
+            <div class="top-actions">
+              <button class="btn subtle" onclick="showToast('Lưu bộ lọc nhóm module')">Lưu bộ lọc</button>
+              <button class="btn primary" onclick="showToast('Mở tác vụ nhanh')">Tác vụ nhanh</button>
+            </div>
+          </header>
+          <div class="content full">
+            <div class="notice"><b>Ý tưởng:</b> gom module thành các cụm nghiệp vụ lớn. Dễ định hướng, nhưng rủi ro làm người dùng phải qua thêm một lớp trước khi tới bảng thật.</div>
+            <section class="cards">
+              <article class="module-card">
+                <div class="inline-actions" style="justify-content:space-between">
+                  <h3>Tài chính</h3><span class="badge red">9 quá hạn</span>
+                </div>
+                <p>Hóa đơn, thanh toán, ghi nhận thu tiền và lịch sử giao dịch.</p>
+                <div class="mini-list">
+                  <div class="mini-row"><span>Hóa đơn chờ thu</span><b>42</b></div>
+                  <div class="mini-row"><span>Đã thanh toán hôm nay</span><b>18</b></div>
+                  <div class="mini-row"><span>Cần đối soát</span><b>6</b></div>
+                </div>
+                <button class="btn primary" onclick="showToast('Đi tới danh sách hóa đơn')">Mở hóa đơn</button>
+              </article>
+              <article class="module-card">
+                <div class="inline-actions" style="justify-content:space-between">
+                  <h3>Hợp đồng</h3><span class="badge amber">12 chờ ký</span>
+                </div>
+                <p>Hợp đồng, phụ lục, điều chỉnh giá, chuyển phòng và dịch vụ đi kèm.</p>
+                <div class="mini-list">
+                  <div class="mini-row"><span>Sắp hết hạn</span><b>8</b></div>
+                  <div class="mini-row"><span>Phụ lục nháp</span><b>5</b></div>
+                  <div class="mini-row"><span>Chuyển phòng</span><b>2</b></div>
+                </div>
+                <button class="btn primary" onclick="showToast('Đi tới danh sách hợp đồng')">Mở hợp đồng</button>
+              </article>
+              <article class="module-card">
+                <div class="inline-actions" style="justify-content:space-between">
+                  <h3>Cư dân</h3><span class="badge blue">24 hồ sơ</span>
+                </div>
+                <p>Hồ sơ cư dân, liên hệ, phòng đang thuê, onboarding và lịch sử liên quan.</p>
+                <div class="mini-list">
+                  <div class="mini-row"><span>Hồ sơ thiếu CCCD</span><b>7</b></div>
+                  <div class="mini-row"><span>Chưa kích hoạt portal</span><b>11</b></div>
+                  <div class="mini-row"><span>Đang ở</span><b>138</b></div>
+                </div>
+                <button class="btn primary" onclick="showToast('Đi tới danh sách cư dân')">Mở cư dân</button>
+              </article>
+              <article class="module-card">
+                <div class="inline-actions" style="justify-content:space-between">
+                  <h3>Vận hành</h3><span class="badge amber">5 cần gán</span>
+                </div>
+                <p>Tài sản, tiện ích, dịch vụ, check-in tiện ích và yêu cầu hỗ trợ.</p>
+                <div class="mini-list">
+                  <div class="mini-row"><span>Ticket chưa gán</span><b>5</b></div>
+                  <div class="mini-row"><span>Tài sản cần kiểm kê</span><b>16</b></div>
+                  <div class="mini-row"><span>Dịch vụ đổi giá</span><b>3</b></div>
+                </div>
+                <button class="btn primary" onclick="showToast('Đi tới vận hành')">Mở vận hành</button>
+              </article>
+              <article class="module-card">
+                <div class="inline-actions" style="justify-content:space-between">
+                  <h3>Tiện ích</h3><span class="badge red">3 cảnh báo</span>
+                </div>
+                <p>Chính sách điện nước, ghi đè, đợt chạy hóa đơn và cảnh báo tính tiền.</p>
+                <div class="mini-list">
+                  <div class="mini-row"><span>Đợt chạy lỗi</span><b>1</b></div>
+                  <div class="mini-row"><span>Ghi đè tháng này</span><b>14</b></div>
+                  <div class="mini-row"><span>Chính sách đang áp dụng</span><b>6</b></div>
+                </div>
+                <button class="btn primary" onclick="showToast('Đi tới tính tiền tiện ích')">Mở tiện ích</button>
+              </article>
+              <article class="module-card danger-zone">
+                <h3>Không nên bê nguyên vào code</h3>
+                <p>Biến thể này phù hợp làm hub cấp cao. Nếu áp dụng cho mọi module sẽ tạo thêm bước trung gian và làm chậm thao tác hằng ngày.</p>
+                <button class="btn danger" onclick="showToast('Chỉ dùng làm ý tưởng hub, không dùng làm pattern chính')">Đánh dấu không dùng chính</button>
+              </article>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <section id="variant-c" class="variant">
+    <div class="viewport-shell">
+      <div class="app-shell">
+        <aside class="side">
+          <div class="brand"><span class="brand-mark">S</span> SmartStay</div>
+          <div class="side-label">Luồng nhiều bước</div>
+          <button class="side-item active">Tạo hợp đồng</button>
+          <button class="side-item">Chạy hóa đơn</button>
+          <button class="side-item">Cập nhật chính sách</button>
+          <button class="side-item">Xử lý ticket</button>
+        </aside>
+        <main class="main">
+          <header class="topbar">
+            <div>
+              <div class="breadcrumb">Chủ nhà / Luồng nghiệp vụ</div>
+              <h1>Không gian xử lý theo bước</h1>
+            </div>
+            <div class="top-actions">
+              <button class="btn subtle" onclick="showToast('Đã lưu nháp')">Lưu nháp</button>
+              <button class="btn primary" onclick="showToast('Kiểm tra dữ liệu trước khi tiếp tục')">Tiếp tục</button>
+            </div>
+          </header>
+          <div class="content">
+            <div class="notice"><b>Ý tưởng mượn từ sketch hợp đồng:</b> dùng cho màn detail hoặc luồng nhiều bước, không dùng thay thế mọi danh sách.</div>
+            <div class="workspace">
+              <section class="panel">
+                <div class="panel-header"><h2>Các bước</h2></div>
+                <div class="step-list">
+                  <button class="step active" onclick="showToast('Đang ở bước chọn ngữ cảnh')"><b>1. Chọn ngữ cảnh</b><span>Tòa nhà, phòng, cư dân hoặc hợp đồng</span></button>
+                  <button class="step" onclick="showToast('Chuyển sang bước nhập thông tin')"><b>2. Nhập thông tin</b><span>Khoản tiền, chính sách, tài sản, dịch vụ</span></button>
+                  <button class="step" onclick="showToast('Chuyển sang bước kiểm tra')"><b>3. Kiểm tra</b><span>Cảnh báo, thiếu dữ liệu, xung đột</span></button>
+                  <button class="step" onclick="showToast('Chuyển sang bước xác nhận')"><b>4. Xác nhận</b><span>Hoàn tất hoặc gửi cho người liên quan</span></button>
+                </div>
+              </section>
+              <section class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Chọn hợp đồng để chạy tiện ích</h2>
+                    <small>Danh sách vẫn là bảng, nhưng bị giới hạn bởi ngữ cảnh đã chọn.</small>
+                  </div>
+                </div>
+                <div class="filters">
+                  <div class="field"><label>Tìm kiếm</label><input placeholder="Mã hợp đồng, phòng, cư dân..." /></div>
+                  <div class="field"><label>Tòa nhà</label><select><option>Orchid A</option><option>Lotus B</option></select></div>
+                  <div class="field"><label>Kỳ tính tiền</label><select><option>04/2026</option><option>03/2026</option></select></div>
+                  <div class="field"><label>&nbsp;</label><button class="btn subtle" onclick="showToast('Đã lọc hợp đồng')">Lọc</button></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Hợp đồng</th><th>Phòng</th><th>Cư dân chính</th><th>Chính sách</th><th>Cảnh báo</th><th>Chọn</th></tr></thead>
+                    <tbody>
+                      <tr><td><strong>HD-889</strong><small>Đang hiệu lực</small></td><td>A1205</td><td>Nguyễn Thị Lan</td><td>Điện nước theo người ở</td><td><span class="badge amber">Thiếu số nước</span></td><td><button class="btn primary" onclick="showToast('Đã chọn HD-889')">Chọn</button></td></tr>
+                      <tr><td><strong>HD-901</strong><small>Đang hiệu lực</small></td><td>A1207</td><td>Trần Minh Đức</td><td>Chính sách tòa nhà</td><td><span class="badge green">Đủ dữ liệu</span></td><td><button class="btn primary" onclick="showToast('Đã chọn HD-901')">Chọn</button></td></tr>
+                      <tr><td><strong>HD-914</strong><small>Sắp hết hạn</small></td><td>A1301</td><td>Lê Hoàng An</td><td>Ghi đè tháng 04</td><td><span class="badge blue">Có ghi đè</span></td><td><button class="btn primary" onclick="showToast('Đã chọn HD-914')">Chọn</button></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <aside class="rail">
+                <div class="rail-card">
+                  <h3>Tóm tắt đang chọn</h3>
+                  <div class="mini-list">
+                    <div class="mini-row"><span>Tòa nhà</span><b>Orchid A</b></div>
+                    <div class="mini-row"><span>Kỳ</span><b>04/2026</b></div>
+                    <div class="mini-row"><span>Hợp đồng chọn</span><b>0</b></div>
+                    <div class="mini-row"><span>Cảnh báo</span><b>1</b></div>
+                  </div>
+                </div>
+                <div class="rail-card">
+                  <h3>Nên áp dụng</h3>
+                  <p style="color:#66778a">Dùng cho `contracts/create`, utility billing run, modal/detail phức tạp hoặc màn cần kiểm tra dữ liệu trước khi xác nhận.</p>
+                </div>
+                <div class="rail-card danger-zone">
+                  <h3>Không nên áp dụng</h3>
+                  <p style="color:#66778a">Không dùng split workspace cho list đơn giản như danh sách dịch vụ hoặc thanh toán vì sẽ giảm mật độ quét.</p>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <div class="sketch-tools" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.45'">
+    <span>Viewport</span>
+    <button onclick="setViewport('390px')">390</button>
+    <button onclick="setViewport('768px')">768</button>
+    <button onclick="setViewport('1280px')">1280</button>
+    <button onclick="setViewport('100%')">Full</button>
+    <select onchange="document.querySelector('#theme-link').href='../themes/'+this.value">
+      <option value="default.css">Default</option>
+    </select>
+    <button onclick="toggleAnnotations()">Ghi chú</button>
+  </div>
+
+  <script>
+    function showVariant(id, btn) {
+      document.querySelectorAll('.variant').forEach((variant) => variant.classList.remove('active'));
+      document.querySelectorAll('.variant-tab').forEach((tab) => tab.classList.remove('active'));
+      document.getElementById('variant-' + id).classList.add('active');
+      btn.classList.add('active');
+      showToast('Đang xem biến thể ' + id.toUpperCase());
+    }
+
+    function setViewport(width) {
+      document.documentElement.style.setProperty('--viewport-width', width);
+      showToast('Đã chuyển khung xem sang ' + width);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function toggleAnnotations() {
+      document.body.classList.toggle('annotation');
+      showToast(document.body.classList.contains('annotation') ? 'Đã bật ghi chú khung layout' : 'Đã tắt ghi chú khung layout');
+    }
+
+    function confirmDanger() {
+      const ok = window.confirm('Thao tác nguy hiểm phải có xác nhận riêng. Bạn có muốn tiếp tục trong bản sketch?');
+      showToast(ok ? 'Đã xác nhận thao tác nguy hiểm trong sketch' : 'Đã hủy thao tác nguy hiểm');
+    }
+
+    function filterRows(value) {
+      const q = value.trim().toLowerCase();
+      document.querySelectorAll('#ops-rows tr').forEach((row) => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
