@@ -314,8 +314,9 @@ export const BulkInvoiceModal = ({ isOpen, onClose, onCreated }: BulkInvoiceModa
                 </div>
               </div>
 
-              <div className="border rounded-2xl overflow-hidden">
-                <table className="w-full text-left text-small">
+              <div className="overflow-hidden rounded-2xl border">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-small">
                   <thead className="bg-bg/50 border-b">
                     <tr>
                       <th className="px-4 py-3">
@@ -367,6 +368,7 @@ export const BulkInvoiceModal = ({ isOpen, onClose, onCreated }: BulkInvoiceModa
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

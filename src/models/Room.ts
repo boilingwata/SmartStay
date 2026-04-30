@@ -1,5 +1,5 @@
 export type RoomStatus = 'Vacant' | 'Occupied' | 'Maintenance' | 'Reserved';
-export type RoomType = 'Studio' | '1BR' | '2BR' | '3BR' | 'Penthouse' | 'Commercial';
+export type RoomType = 'Studio' | '1BR' | '2BR' | '3BR' | 'Penthouse' | 'Commercial' | 'Dormitory';
 export type Furnishing = 'Unfurnished' | 'SemiFurnished' | 'FullyFurnished';
 export type DirectionFacing = 'N' | 'S' | 'E' | 'W' | 'NE' | 'NW' | 'SE' | 'SW';
 

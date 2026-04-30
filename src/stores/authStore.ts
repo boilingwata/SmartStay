@@ -173,30 +173,40 @@ const useAuthStore = create<AuthState>()(
           const { unsubscribeAuth } = get()
           if (unsubscribeAuth) unsubscribeAuth()
 
-          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
               set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
               return
             }
 
             if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-              const refreshedProfile = await resolveAuthenticatedUser(session.user)
-              if (refreshedProfile) {
-                if (!refreshedProfile.isActive) {
-                  await supabase.auth.signOut()
-                  set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
-                  return
-                }
+              // QUAN TRỌNG: KHÔNG ĐƯỢC await ở đây!
+              // Supabase Auth (gotrue) sẽ await tất cả listener. Nếu ta await một DB query ở đây,
+              // DB query đó lại chờ Auth cấp token => Gây ra DEADLOCK (treo vĩnh viễn) khi tab ngủ dậy.
+              // Giải pháp: Fire-and-forget (chạy ngầm).
+              void (async () => {
+                try {
+                  const refreshedProfile = await resolveAuthenticatedUser(session.user)
+                  if (refreshedProfile) {
+                    if (!refreshedProfile.isActive) {
+                      await supabase.auth.signOut()
+                      set({ user: null, isAuthenticated: false, role: null, sessionExpired: false, authMode: null })
+                      return
+                    }
 
-                set({
-                  user: refreshedProfile,
-                  isAuthenticated: true,
-                  role: refreshedProfile.role,
-                  sessionExpired: false,
-                  authMode: 'supabase',
-                })
-                setSentryUser({ id: refreshedProfile.id, email: refreshedProfile.email, role: refreshedProfile.role })
-              }
+                    set({
+                      user: refreshedProfile,
+                      isAuthenticated: true,
+                      role: refreshedProfile.role,
+                      sessionExpired: false,
+                      authMode: 'supabase',
+                    })
+                    setSentryUser({ id: refreshedProfile.id, email: refreshedProfile.email, role: refreshedProfile.role })
+                  }
+                } catch (error) {
+                  console.error('[Auth] Failed to resolve user after auth state change:', error)
+                }
+              })()
             }
           })
 

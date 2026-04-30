@@ -7,10 +7,8 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { portalAmenityService, type PortalAmenityItem } from "@/services/portalAmenityService";
 import { BottomSheet } from "@/components/portal/BottomSheet";
-import { SafeImage } from "@/components/ui";
-import { Spinner } from "@/components/ui";
+import { SafeImage, Spinner } from "@/components/ui";
 import { cn, formatVND } from "@/utils";
-
 const AmenityList: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -18,12 +16,10 @@ const AmenityList: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
-
   const { data: amenities = [], isLoading } = useQuery({
     queryKey: ["portal-amenities"],
     queryFn: () => portalAmenityService.getAmenities(),
   });
-
   const bookingMutation = useMutation({
     mutationFn: (data: { amenityId: number; date: string; timeSlot: string }) => portalAmenityService.createBooking(data),
     onSuccess: () => {
@@ -39,13 +35,11 @@ const AmenityList: React.FC = () => {
       toast.error(`Không thể đặt tiện ích: ${error.message}`);
     },
   });
-
   const resetBookingState = () => {
     setSelectedAmenity(null);
     setSelectedTimeSlot(null);
     setBookingStep(1);
   };
-
   const next7Days = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i)), []);
   const timeSlots = useMemo(
     () =>
@@ -57,7 +51,6 @@ const AmenityList: React.FC = () => {
       }),
     [selectedDate],
   );
-
   const getIcon = (name: string) => {
     const normalized = name.toLowerCase();
     if (normalized.includes("bơi")) return Waves;
@@ -66,7 +59,6 @@ const AmenityList: React.FC = () => {
     if (normalized.includes("cà phê") || normalized.includes("coffee")) return Coffee;
     return MapPin;
   };
-
   const getImageUrl = (name: string) => {
     const normalized = name.toLowerCase();
     if (normalized.includes("bơi")) return "https://images.unsplash.com/photo-1540553016722-983e48a2cd10?q=80&w=800&auto=format&fit=crop";
@@ -74,53 +66,47 @@ const AmenityList: React.FC = () => {
     if (normalized.includes("bbq")) return "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?q=80&w=800&auto=format&fit=crop";
     return "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop";
   };
-
   const handleBook = () => {
     if (!selectedTimeSlot || !selectedAmenity) return;
     const endHour = parseInt(selectedTimeSlot.split(":")[0] ?? "0", 10) + 1;
     const endTime = `${String(endHour).padStart(2, "0")}:00`;
-
     bookingMutation.mutate({
       amenityId: selectedAmenity.amenityId,
       date: format(selectedDate, "yyyy-MM-dd"),
       timeSlot: `${selectedTimeSlot} - ${endTime}`,
     });
   };
-
   if (isLoading) {
     return (
       <div className="flex min-h-[80vh] flex-col items-center justify-center space-y-4 px-6">
         <Spinner size="lg" />
-        <p className="text-sm font-black uppercase tracking-[3px] text-slate-400">Đang tải tiện ích đặt chỗ...</p>
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground animate-pulse">Đang tải tiện ích...</p>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-32 bg-background">
       <div className="space-y-8 p-5 pt-6">
-        <div className="flex items-center justify-between pr-2">
+        <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-teal-600/60">Dành cho cư dân</p>
-            <h2 className="text-2xl font-black leading-none tracking-tight text-slate-800">Tiện ích đặt chỗ</h2>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-primary/70">Dịch vụ cư dân</p>
+            <h2 className="text-3xl font-extrabold leading-none tracking-tight text-foreground">Tiện ích</h2>
           </div>
           <button
             onClick={() => navigate("/portal/amenities/my-bookings")}
-            className="flex h-12 items-center justify-center rounded-2xl border border-teal-100 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-teal-600 shadow-lg shadow-teal-600/5"
+            className="flex h-10 items-center justify-center rounded-full bg-primary/10 px-5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 active:scale-95"
           >
-            Lịch đặt của tôi
+            Lịch của tôi
           </button>
         </div>
-
-        <div className="flex items-center justify-between px-1">
-          <h3 className="border-l-4 border-teal-500 pl-3 text-[12px] font-black uppercase tracking-[3px] text-slate-400">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <h3 className="text-sm font-semibold tracking-wide text-foreground">
             Danh sách tiện ích
           </h3>
-          <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-[11px] font-black tabular-nums text-slate-400 shadow-sm">
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold tabular-nums text-muted-foreground">
             {amenities.length}
           </span>
         </div>
-
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {amenities.map((item) => (
             <div
@@ -130,43 +116,40 @@ const AmenityList: React.FC = () => {
                 setBookingStep(1);
                 setSelectedTimeSlot(null);
               }}
-              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[32px] border border-white shadow-xl shadow-slate-900/5 transition-all hover:scale-[1.02]"
+              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[24px] bg-muted shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
             >
               <SafeImage
                 src={getImageUrl(item.amenityName)}
                 alt={item.amenityName}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent" />
-              <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-emerald-500/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300" />
+              <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
                 Sẵn sàng
               </div>
               <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-6 text-white">
                 <div className="space-y-1">
-                  <h4 className="text-lg font-black uppercase tracking-tight">{item.amenityName}</h4>
+                  <h4 className="text-xl font-bold tracking-tight text-white">{item.amenityName}</h4>
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-base font-black tracking-tighter text-teal-300">
+                    <span className="text-sm font-semibold text-white/90">
                       {item.bookingPrice > 0 ? formatVND(item.bookingPrice) : "Miễn phí"}
                     </span>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/50">/ lượt</span>
                   </div>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/30 bg-white/20 text-white transition-all group-hover:border-teal-400 group-hover:bg-teal-500">
-                  <ArrowRight size={18} strokeWidth={3} />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm text-white transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+                  <ArrowRight size={18} strokeWidth={2.5} className="transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
             </div>
           ))}
         </div>
-
         {amenities.length === 0 && (
-          <div className="space-y-4 rounded-[48px] border-2 border-dashed border-slate-200 bg-white/40 py-24 text-center shadow-inner">
-            <AlertCircle size={48} className="mx-auto text-slate-300" />
-            <p className="text-xs font-black uppercase tracking-[4px] italic text-slate-400">Chưa có tiện ích khả dụng</p>
+          <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-muted/50 py-24 text-center">
+            <AlertCircle size={48} className="text-muted-foreground/50 mb-4" />
+            <p className="text-sm font-medium tracking-wide text-muted-foreground">Chưa có tiện ích khả dụng</p>
           </div>
         )}
       </div>
-
       <BottomSheet
         isOpen={!!selectedAmenity}
         onClose={resetBookingState}
@@ -174,12 +157,12 @@ const AmenityList: React.FC = () => {
         height="h-auto"
       >
         {selectedAmenity && (
-          <div className="mx-auto max-w-md space-y-8 px-1 pb-8 pt-4">
+          <div className="mx-auto max-w-md space-y-8 px-2 pb-8 pt-2">
             {bookingStep === 1 && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-7 gap-3">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="grid grid-cols-7 gap-2">
                   {next7Days.map((date, index) => (
-                    <div key={`label-${index}`} className="mb-1 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <div key={`label-${index}`} className="mb-2 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       {format(date, "EEEEEE", { locale: vi })}
                     </div>
                   ))}
@@ -193,27 +176,27 @@ const AmenityList: React.FC = () => {
                           setBookingStep(2);
                         }}
                         className={cn(
-                          "relative aspect-square rounded-[22px] border bg-white text-slate-700 shadow-sm transition-all hover:border-teal-200 hover:bg-teal-50",
-                          isToday && "ring-2 ring-teal-500 ring-offset-4",
+                          "relative flex aspect-square items-center justify-center rounded-2xl border transition-all duration-200",
+                          isToday 
+                            ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
+                            : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted font-medium"
                         )}
                       >
-                        <span className="text-[17px] font-black tracking-tighter">{format(date, "d")}</span>
+                        <span className="text-lg">{format(date, "d")}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             )}
-
             {bookingStep === 2 && (
-              <div className="space-y-8">
-                <div className="flex items-center justify-between rounded-[20px] border border-teal-100/50 bg-teal-50/50 p-4">
-                  <p className="text-[11px] font-black text-teal-800">Ngày {format(selectedDate, "dd/MM/yyyy")}</p>
-                  <button onClick={() => setBookingStep(1)} className="text-[10px] font-black text-teal-600 underline underline-offset-4">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center justify-between rounded-2xl bg-muted/50 p-4 border border-border">
+                  <p className="text-sm font-semibold text-foreground">Ngày {format(selectedDate, "dd/MM/yyyy")}</p>
+                  <button onClick={() => setBookingStep(1)} className="text-xs font-medium text-primary hover:underline">
                     Đổi ngày
                   </button>
                 </div>
-
                 <div className="grid grid-cols-3 gap-3">
                   {timeSlots.map((slot) => (
                     <button
@@ -221,77 +204,73 @@ const AmenityList: React.FC = () => {
                       disabled={!slot.available}
                       onClick={() => setSelectedTimeSlot(slot.time)}
                       className={cn(
-                        "rounded-[20px] border py-4 font-mono text-[15px] font-black tracking-tighter shadow-sm transition-all",
+                        "rounded-xl border py-3 text-sm font-medium tracking-tight transition-all duration-200",
                         !slot.available
-                          ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-50"
+                          ? "cursor-not-allowed border-transparent bg-muted text-muted-foreground/40"
                           : selectedTimeSlot === slot.time
-                            ? "scale-[1.05] border-teal-600 bg-teal-600 text-white shadow-xl shadow-teal-600/20"
-                            : "border-slate-100 bg-white text-slate-600 hover:border-teal-200 hover:bg-teal-50/10",
+                            ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]"
+                            : "border-border bg-background text-foreground hover:border-primary/30"
                       )}
                     >
                       {slot.time}
                     </button>
                   ))}
                 </div>
-
                 <button
                   onClick={() => setBookingStep(3)}
                   disabled={!selectedTimeSlot}
                   className={cn(
-                    "flex h-16 w-full items-center justify-center gap-3 rounded-[24px] text-[11px] font-black uppercase tracking-[3px] shadow-xl",
-                    selectedTimeSlot ? "bg-slate-900 text-white" : "cursor-not-allowed bg-slate-100 text-slate-300",
+                    "flex h-14 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all duration-300",
+                    selectedTimeSlot 
+                      ? "bg-foreground text-background shadow-lg hover:scale-[1.02]" 
+                      : "cursor-not-allowed bg-muted text-muted-foreground"
                   )}
                 >
-                  Tiếp tục xác nhận
-                  <ArrowRight size={18} strokeWidth={3} />
+                  Tiếp tục
+                  <ArrowRight size={16} strokeWidth={2.5} />
                 </button>
               </div>
             )}
-
             {bookingStep === 3 && (
-              <div className="space-y-8">
-                <div className="relative space-y-6 overflow-hidden rounded-[32px] border border-slate-100 bg-slate-50 p-8 shadow-inner">
-                  <div className="flex items-center gap-5">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] border border-slate-100 bg-white text-teal-600 shadow-xl shadow-teal-600/5">
-                      {React.createElement(getIcon(selectedAmenity.amenityName), { size: 36, strokeWidth: 2.5 })}
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      {React.createElement(getIcon(selectedAmenity.amenityName), { size: 28, strokeWidth: 2 })}
                     </div>
                     <div>
-                      <h4 className="text-xl font-black uppercase tracking-tight text-slate-900">{selectedAmenity.amenityName}</h4>
-                      <p className="mt-2 inline-block rounded-md bg-teal-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-teal-600">
-                        Xác nhận chi tiết
-                      </p>
+                      <h4 className="text-lg font-bold text-foreground">{selectedAmenity.amenityName}</h4>
+                      <p className="text-xs font-medium text-muted-foreground mt-1">Xác nhận chi tiết đặt chỗ</p>
                     </div>
                   </div>
-
-                  <div className="space-y-4 border-t border-slate-200/50 pt-4">
+                  <div className="mt-6 space-y-3 border-t border-border pt-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Thời gian</span>
-                      <span className="font-mono text-[15px] font-black tracking-tighter text-slate-800">
+                      <span className="text-xs font-medium text-muted-foreground">Thời gian</span>
+                      <span className="font-mono text-sm font-semibold text-foreground">
                         {selectedTimeSlot} • {format(selectedDate, "dd/MM/yyyy")}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Phí đặt chỗ</span>
-                      <span className="text-[18px] font-black tracking-tighter text-teal-600">
+                      <span className="text-xs font-medium text-muted-foreground">Phí đặt chỗ</span>
+                      <span className="text-base font-bold text-primary">
                         {selectedAmenity.bookingPrice > 0 ? formatVND(selectedAmenity.bookingPrice) : "Miễn phí"}
                       </span>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-4">
+                <div className="flex gap-3">
                   <button
                     onClick={() => setBookingStep(2)}
-                    className="h-16 flex-1 rounded-[24px] border border-slate-200 bg-white text-[11px] font-black uppercase tracking-widest text-slate-400"
+                    className="h-14 flex-[1] rounded-xl border border-border bg-background text-sm font-semibold text-foreground transition-colors hover:bg-muted"
                   >
                     Quay lại
                   </button>
                   <button
                     onClick={handleBook}
                     disabled={bookingMutation.isPending}
-                    className="h-16 flex-[2] rounded-[24px] bg-teal-600 text-[11px] font-black uppercase tracking-[3px] text-white shadow-2xl shadow-teal-600/30"
+                    className="h-14 flex-[2] rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-transform active:scale-[0.98] disabled:opacity-70"
                   >
-                    {bookingMutation.isPending ? "Đang xác thực..." : "Xác nhận đặt ngay"}
+                    {bookingMutation.isPending ? "Đang xử lý..." : "Xác nhận đặt"}
                   </button>
                 </div>
               </div>
@@ -302,5 +281,4 @@ const AmenityList: React.FC = () => {
     </div>
   );
 };
-
 export default AmenityList;

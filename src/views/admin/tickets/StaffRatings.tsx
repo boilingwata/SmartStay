@@ -173,7 +173,7 @@ const StaffRatings = () => {
                   <span className="pb-1 text-sm text-white/65">lượt</span>
                 </div>
                 <p className="mt-3 text-sm text-white/70">
-                  Dữ liệu được lấy trực tiếp từ điểm hài lòng đã lưu trên từng ticket hoàn tất.
+                  Dữ liệu được lấy trực tiếp từ điểm hài lòng đã lưu trên từng yêu cầu đã hoàn tất.
                 </p>
               </div>
             </div>
@@ -209,7 +209,7 @@ const StaffRatings = () => {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Chi tiết đánh giá</p>
                 <h2 className="text-xl font-black tracking-tight text-slate-900">
-                  Các ticket đã có điểm hài lòng ({filteredList.length})
+                  Các yêu cầu đã có điểm hài lòng ({filteredList.length})
                 </h2>
               </div>
             </div>
@@ -221,7 +221,7 @@ const StaffRatings = () => {
                 </div>
                 <p className="mt-4 text-sm font-bold text-slate-700">Chưa có đánh giá phù hợp bộ lọc</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Hãy đổi khoảng ngày hoặc chờ thêm ticket được cư dân chấm điểm.
+                  Hãy đổi khoảng ngày hoặc chờ thêm yêu cầu được cư dân chấm điểm.
                 </p>
               </div>
             ) : (
@@ -261,7 +261,7 @@ const StaffRatings = () => {
                         className="inline-flex items-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                       >
                         <TicketIcon size={16} />
-                        Mở ticket
+                        Mở yêu cầu
                       </button>
                     </div>
                   </div>

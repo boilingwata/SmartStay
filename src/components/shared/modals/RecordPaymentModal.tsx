@@ -124,7 +124,7 @@ export const RecordPaymentModal = ({
     const accountName = import.meta.env.VITE_BANK_ACCOUNT_NAME?.trim() ?? '';
     if (!bankAcc || !bankCode) return '';
 
-    // SS<InvoiceCode> format for SePay webhook auto-detection
+    // Mã nội dung chuyển khoản giúp hệ thống tự đối soát giao dịch.
     const description = encodeURIComponent(`SS${activeInvoice.invoiceCode ?? activeInvoice.id}`);
     const encodedName = encodeURIComponent(accountName);
     // VietQR official API — returns PNG directly, no CORS issues
@@ -427,7 +427,7 @@ export const RecordPaymentModal = ({
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Chuyển khoản qua QR</p>
-                      <p className="text-[11px] text-slate-500 font-medium leading-none">Nội dung chuyển khoản dùng để webhook SePay nhận diện hóa đơn</p>
+                      <p className="text-[11px] text-slate-500 font-medium leading-none">Nội dung chuyển khoản giúp SePay nhận diện hóa đơn tự động</p>
                     </div>
                   </div>
                   
@@ -459,7 +459,7 @@ export const RecordPaymentModal = ({
                   </div>
 
                   <p className="text-[9px] text-center text-slate-400 font-medium italic">
-                    Hệ thống sẽ ghi nhận yêu cầu và chờ webhook hoặc người vận hành duyệt theo đúng luồng backend hiện tại.
+                    Hệ thống sẽ ghi nhận yêu cầu và chờ kết nối thanh toán tự động hoặc người vận hành duyệt theo đúng quy trình hiện tại.
                   </p>
                 </div>
               )}
@@ -518,7 +518,7 @@ export const RecordPaymentModal = ({
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-warning uppercase tracking-widest">Vượt số còn nợ</p>
                     <p className="text-[11px] text-warning/80 font-medium">
-                      Hệ thống không cho lưu giao dịch lớn hơn số còn nợ trong phase này. Hãy điều chỉnh lại số tiền nộp.
+                      Hệ thống không cho lưu giao dịch lớn hơn số còn nợ. Hãy điều chỉnh lại số tiền nộp.
                     </p>
                   </div>
                 </div>

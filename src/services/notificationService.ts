@@ -73,17 +73,21 @@ async function ensureNotificationsTable(): Promise<boolean> {
   if (notificationsTableCheckPromise) return notificationsTableCheckPromise;
 
   notificationsTableCheckPromise = (async () => {
-    const { error } = await supabase.from('notifications').select('id', { head: true, count: 'exact' }).limit(1);
+    try {
+      const { error } = await supabase.from('notifications').select('id', { head: true, count: 'exact' }).limit(1);
 
-    notificationsTableAvailable = !error;
-    if (error) {
-      if (isMissingNotificationsTableError(error)) {
+      notificationsTableAvailable = !error;
+      if (error && isMissingNotificationsTableError(error)) {
         notificationsTableAvailable = false;
       }
-    }
 
-    notificationsTableCheckPromise = null;
-    return notificationsTableAvailable;
+      return notificationsTableAvailable;
+    } catch {
+      notificationsTableAvailable = null;
+      return false;
+    } finally {
+      notificationsTableCheckPromise = null;
+    }
   })();
 
   return notificationsTableCheckPromise;

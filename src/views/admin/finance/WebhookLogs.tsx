@@ -66,8 +66,8 @@ const WebhookLogs = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-display text-primary">Nhật ký webhook</h1>
-          <p className="text-muted">Theo dõi tín hiệu thanh toán từ backend và kiểm tra trạng thái xử lý thực tế.</p>
+          <h1 className="text-display text-primary">Nhật ký kết nối thanh toán</h1>
+          <p className="text-muted">Theo dõi tín hiệu thanh toán tự động và kiểm tra trạng thái xử lý thực tế.</p>
         </div>
 
         <button type="button" className="btn-outline self-start" onClick={() => queryClient.invalidateQueries({ queryKey: ['webhookLogs'] })}>
@@ -113,14 +113,14 @@ const WebhookLogs = () => {
 
       {isError && (
         <ErrorBanner
-          message="Không tải được nhật ký webhook. Vui lòng thử lại."
+          message="Không tải được nhật ký kết nối thanh toán. Vui lòng thử lại."
           onRetry={() => refetch()}
         />
       )}
 
       <div className="card-container overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full min-w-[1120px] text-left">
             <thead className="bg-bg/40">
               <tr>
                 <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Kênh</th>
@@ -130,7 +130,7 @@ const WebhookLogs = () => {
                 <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Nhận lúc</th>
                 <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Xử lý lúc</th>
                 <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Lỗi</th>
-                <th className="px-6 py-4 text-right text-[11px] font-black uppercase tracking-wider text-muted">Payload</th>
+                <th className="px-6 py-4 text-right text-[11px] font-black uppercase tracking-wider text-muted">Dữ liệu nhận</th>
               </tr>
             </thead>
 
@@ -146,8 +146,8 @@ const WebhookLogs = () => {
                   <td colSpan={8} className="py-16">
                     <EmptyState
                       icon={Activity}
-                      title="Chưa có webhook nào"
-                      message="Hiện chưa có bản ghi webhook trong phạm vi dữ liệu đang xem."
+                      title="Chưa có tín hiệu thanh toán nào"
+                      message="Hiện chưa có bản ghi kết nối thanh toán trong phạm vi dữ liệu đang xem."
                     />
                   </td>
                 </tr>
@@ -191,8 +191,8 @@ const WebhookLogs = () => {
         <div className="flex items-start gap-3">
           <AlertCircle size={20} className="mt-0.5 shrink-0 text-info" />
           <div className="space-y-1 text-sm text-info/80">
-            <p className="font-bold text-info">Phase này chỉ theo dõi webhook theo dữ liệu thật.</p>
-            <p>Chức năng chạy lại webhook chưa có backend an toàn trong phạm vi hiện tại nên đã được ẩn để tránh thao tác giả làm sai lệch vận hành.</p>
+            <p className="font-bold text-info">Màn hình này chỉ theo dõi tín hiệu thanh toán theo dữ liệu thật.</p>
+            <p>Chức năng chạy lại tín hiệu chưa có luồng xử lý an toàn trong phạm vi hiện tại nên đã được ẩn để tránh thao tác giả làm sai lệch vận hành.</p>
           </div>
         </div>
       </div>
@@ -204,7 +204,7 @@ const WebhookLogs = () => {
             <div className="flex items-center justify-between border-b border-white/10 px-8 py-6 text-white">
               <div className="flex items-center gap-3">
                 <Server size={22} className="text-success" />
-                <h3 className="text-h3">Payload webhook</h3>
+                <h3 className="text-h3">Dữ liệu kết nối thanh toán</h3>
               </div>
               <button type="button" className="rounded-full p-2 transition-all hover:bg-white/10" onClick={() => setSelectedPayload(null)}>
                 <X size={18} />
@@ -221,7 +221,7 @@ const WebhookLogs = () => {
                 className="btn-primary bg-success hover:bg-success/90"
                 onClick={() => {
                   navigator.clipboard.writeText(selectedPayload);
-                  toast.success('Đã sao chép payload.');
+                  toast.success('Đã sao chép dữ liệu kết nối.');
                 }}
               >
                 <Copy size={16} />

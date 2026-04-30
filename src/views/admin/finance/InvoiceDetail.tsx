@@ -19,12 +19,18 @@ import {
 } from 'lucide-react';
 import { invoiceService } from '@/services/invoiceService';
 import { paymentService } from '@/services/paymentService';
+import utilityAdminService from '@/services/utilityAdminService';
 import { InvoiceDetail as InvoiceDetailType } from '@/models/Invoice';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatDate, formatVND } from '@/utils';
 import { Spinner } from '@/components/ui/Feedback';
 import { RecordPaymentModal } from '@/components/shared/modals/RecordPaymentModal';
 import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
+import { getUtilityWarningMeta } from '@/lib/utilityPresentation';
+
+const UTILITY_DEVICE_LABELS = new Map(
+  utilityAdminService.getDeviceAdjustmentCatalog().map((item) => [item.code, item.label]),
+);
 
 const getInvoicePeriodLabel = (period?: string) => {
   if (!period) return '--';
@@ -76,8 +82,13 @@ const getPolicySourceLabel = (value?: string) => {
     case 'global':
       return 'Mặc định hệ thống';
     default:
-      return value || '--';
+      return value ? 'Chưa xác định' : '--';
   }
+};
+
+const getDeviceSurchargeLabel = (deviceCode?: string | null) => {
+  if (!deviceCode) return 'Thiết bị khác';
+  return UTILITY_DEVICE_LABELS.get(deviceCode) ?? 'Thiết bị khác';
 };
 
 const getInvoiceItemIcon = (type: InvoiceDetailType['items'][number]['type']) => {
@@ -223,7 +234,8 @@ const InvoiceDetail = () => {
               </div>
 
               <div className="overflow-hidden rounded-3xl border border-border/50">
-                <table className="w-full text-left">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left">
                   <thead className="bg-bg/40">
                     <tr>
                       <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Khoản thu</th>
@@ -281,13 +293,14 @@ const InvoiceDetail = () => {
                     </tr>
                   </tfoot>
                 </table>
+                </div>
               </div>
             </section>
 
             {invoice.utilitySnapshot ? (
               <section className="card-container space-y-6 p-8">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted">Snapshot tiện ích</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted">Bản chốt tiền điện nước</p>
                   <h2 className="mt-2 text-h3 text-primary">Công thức đã chốt tại thời điểm lập hóa đơn</h2>
                 </div>
 
@@ -306,7 +319,7 @@ const InvoiceDetail = () => {
                     <p className="text-sm font-bold text-primary">Quy tắc làm tròn</p>
                     <div className="mt-4 space-y-2 text-sm text-muted">
                       <p>Bước làm tròn: <span className="font-bold text-primary">{formatVND(invoice.utilitySnapshot.roundingIncrement)}</span></p>
-                      <p>Mã policy: <span className="font-bold text-primary">{invoice.utilitySnapshot.resolvedPolicyId ?? '--'}</span></p>
+                      <p>Mã chính sách: <span className="font-bold text-primary">{invoice.utilitySnapshot.resolvedPolicyId ?? '--'}</span></p>
                     </div>
                   </div>
                 </div>
@@ -352,7 +365,7 @@ const InvoiceDetail = () => {
                           key={`${item.deviceCode}-${item.chargeAmount}`}
                           className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white"
                         >
-                          {item.deviceCode}: {formatVND(item.chargeAmount)}
+                          {getDeviceSurchargeLabel(item.deviceCode)}: {formatVND(item.chargeAmount)}
                         </span>
                       ))}
                     </div>
@@ -361,13 +374,16 @@ const InvoiceDetail = () => {
 
                 {invoice.utilitySnapshot.warnings.length > 0 && (
                   <div className="rounded-3xl border border-warning/20 bg-warning/5 p-5">
-                    <p className="text-sm font-bold text-warning">Cảnh báo snapshot</p>
+                    <p className="text-sm font-bold text-warning">Cảnh báo khi chốt công thức</p>
                     <div className="mt-4 space-y-2 text-sm text-muted">
-                      {invoice.utilitySnapshot.warnings.map((warning) => (
-                        <p key={`${warning.code}-${warning.message}`}>
-                          <span className="font-bold text-primary">{warning.code}</span>: {warning.message}
-                        </p>
-                      ))}
+                      {invoice.utilitySnapshot.warnings.map((warning) => {
+                        const warningMeta = getUtilityWarningMeta(warning.code, warning.message);
+                        return (
+                          <p key={`${warning.code}-${warning.message}`}>
+                            <span className="font-bold text-primary">{warningMeta.label}</span>: {warningMeta.message}
+                          </p>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -377,9 +393,9 @@ const InvoiceDetail = () => {
                 <div className="flex items-start gap-3">
                   <AlertCircle size={20} className="mt-0.5 shrink-0 text-warning" />
                   <div className="space-y-1">
-                    <p className="font-bold text-warning">Hóa đơn này chưa có snapshot tiện ích.</p>
+                    <p className="font-bold text-warning">Hóa đơn này chưa có bản chốt tiền điện nước.</p>
                     <p className="text-sm text-warning/80">
-                      Đây là dữ liệu cũ trước khi snapshot trở thành bắt buộc. Màn hình chỉ hiển thị số tiền đã chốt, không tự tính lại theo policy hiện tại.
+                      Đây là dữ liệu cũ trước khi bản chốt công thức trở thành bắt buộc. Màn hình chỉ hiển thị số tiền đã chốt, không tự tính lại theo chính sách hiện tại.
                     </p>
                   </div>
                 </div>
@@ -509,7 +525,7 @@ const InvoiceDetail = () => {
                 <History size={20} className="mt-0.5 shrink-0 text-info" />
                 <div className="space-y-1 text-sm text-info/80">
                   <p className="font-bold text-info">Ghi chú vận hành</p>
-                  <p>Màn hình này chỉ hiển thị dữ liệu đã chốt trong schema hiện tại. Các thao tác xuất PDF, gửi lại thông báo và thanh toán online chưa được backend hỗ trợ ổn định nên đã được ẩn khỏi phase này.</p>
+                  <p>Màn hình này chỉ hiển thị dữ liệu đã chốt trong cấu trúc hiện tại. Các thao tác xuất tệp, gửi lại thông báo và thanh toán trực tuyến chưa được luồng xử lý hỗ trợ ổn định nên đã được ẩn khỏi phạm vi hiện tại.</p>
                 </div>
               </div>
             </section>

@@ -4,11 +4,11 @@ import { formatVND } from "@/utils/index";
 export { formatVND };
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
-  FixedService: "Dich vu tinh tien",
-  Utility: "Dien nuoc",
-  Management: "Dich vu tinh tien",
-  Amenity: "Tien ich dat cho",
-  Optional: "Dich vu tinh tien",
+  FixedService: "Dịch vụ tính tiền",
+  Utility: "Điện nước",
+  Management: "Dịch vụ quản lý",
+  Amenity: "Tiện ích đặt chỗ",
+  Optional: "Dịch vụ tùy chọn",
 };
 
 export const SERVICE_TYPE_COLORS: Record<ServiceType, string> = {
@@ -20,12 +20,12 @@ export const SERVICE_TYPE_COLORS: Record<ServiceType, string> = {
 };
 
 export const BILLING_METHOD_LABELS: Record<BillingMethod, string> = {
-  Fixed: "Co dinh",
-  PerPerson: "Theo nguoi",
-  PerRoom: "Theo phong",
-  PerUnit: "Theo so luong",
-  PerM2: "Theo m2",
-  Usage: "Theo su dung",
+  Fixed: "Cố định",
+  PerPerson: "Theo người",
+  PerRoom: "Theo phòng",
+  PerUnit: "Theo số lượng",
+  PerM2: "Theo m²",
+  Usage: "Theo sử dụng",
 };
 
 export const calcPriceChangePct = (oldPrice: number, newPrice: number): number => {

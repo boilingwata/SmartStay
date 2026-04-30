@@ -50,7 +50,7 @@ export const Select = ({
 
   return (
     <div ref={containerRef} className={cn("space-y-2.5 w-full relative", className)}>
-      {label && <label className="text-[11px] text-slate-500 font-black uppercase tracking-[2px] ml-1">{label}</label>}
+      {label && <label className="text-[11px] text-muted font-black uppercase tracking-[2px] ml-1">{label}</label>}
       
       <div className="relative">
         <button
@@ -58,23 +58,23 @@ export const Select = ({
           disabled={disabled}
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "h-14 px-6 bg-slate-50/50 border border-slate-200 rounded-2xl flex items-center justify-between transition-all w-full font-bold text-slate-900",
-            "hover:bg-white hover:border-primary/30 active:scale-[0.99]",
-            isOpen && "bg-white border-primary shadow-xl shadow-primary/10 ring-4 ring-primary/5",
-            disabled && "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed shadow-none active:scale-100"
+            "h-14 px-6 bg-background border border-border rounded-2xl flex items-center justify-between transition w-full font-bold text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20",
+            "hover:bg-card hover:border-primary/30 active:scale-[0.99]",
+            isOpen && "bg-card border-primary shadow-xl shadow-primary/10 ring-4 ring-primary/5",
+            disabled && "bg-muted/30 text-muted border-border cursor-not-allowed shadow-none active:scale-100"
           )}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            {Icon && <Icon size={18} className={cn("shrink-0", isOpen ? "text-primary/70" : "text-slate-400")} />}
-            <span className={cn("text-[14px] font-bold truncate", !selectedOption && "text-slate-400 font-medium italic")}>
+            {Icon && <Icon size={18} className={cn("shrink-0", isOpen ? "text-primary/70" : "text-muted")} />}
+            <span className={cn("text-[14px] font-bold truncate", !selectedOption && "text-muted font-medium italic")}>
               {selectedOption ? selectedOption.label : placeholder}
             </span>
           </div>
-          <ChevronDown size={18} className={cn("transition-transform duration-500", isOpen ? "rotate-180 text-primary" : "text-slate-400")} />
+          <ChevronDown size={18} className={cn("transition-transform duration-500", isOpen ? "rotate-180 text-primary" : "text-muted")} />
         </button>
 
         {isOpen && (
-          <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-[100] bg-white rounded-[24px] border border-slate-100 shadow-[0_20px_50px_rgba(30,58,138,0.15)] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
+          <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-[100] bg-background rounded-[24px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
              <div className="p-2 max-h-60 overflow-y-auto custom-scrollbar">
                 {options.map((opt) => (
                    <button
@@ -85,10 +85,10 @@ export const Select = ({
                         setIsOpen(false);
                      }}
                      className={cn(
-                       "w-full flex items-center justify-between px-4 py-3 rounded-[16px] text-[13px] font-bold transition-all",
-                       value === opt.value 
-                        ? "bg-primary text-white shadow-lg shadow-blue-900/20" 
-                        : "text-slate-600 hover:bg-slate-50 hover:text-primary"
+                       "w-full flex items-center justify-between px-4 py-3 rounded-[16px] text-[13px] font-bold transition focus-visible:outline-none focus-visible:bg-muted",
+                       value === opt.value
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "text-foreground hover:bg-muted hover:text-primary"
                      )}
                    >
                       <div className="flex items-center gap-3">

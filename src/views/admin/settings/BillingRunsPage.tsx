@@ -132,7 +132,7 @@ function isPreviewReady(eligibleContracts: Array<{ contractId: number; contractC
 
 function getBillingPreviewGuidance(error: Error | null) {
   const message = error?.message ?? '';
-  if (message.includes('401') || message.toLowerCase().includes('xac thuc')) {
+  if (message.includes('401') || message.toLowerCase().includes('xac thuc') || message.toLowerCase().includes('xác thực')) {
     return [
       'Supabase đang từ chối xác thực khi gọi đợt xuất hóa đơn tiện ích.',
       'Nếu bạn vẫn đang ở trang quản trị thì đây là lỗi quyền hoặc cấu hình hàm xử lý ở Supabase, không phải do bạn chọn sai tháng hay ngày.',
@@ -217,7 +217,7 @@ export default function BillingRunsPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-5 py-8 pb-20 md:px-6" style={pageFontStyle}>
+    <div className="w-full min-w-0 space-y-8 pb-20" style={pageFontStyle}>
       {/* HEADER SECTION */}
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(135deg,_#0f172a_0%,_#111827_45%,_#1f2937_100%)] p-8 text-white shadow-2xl shadow-slate-900/10 transition-all duration-500 hover:shadow-slate-900/20">
         <div className="grid gap-8 xl:grid-cols-[1fr_auto]">
@@ -257,7 +257,7 @@ export default function BillingRunsPage() {
           }`}
         >
           <LayoutDashboard size={18} />
-          Bảng Điều Khiển
+          Bảng điều khiển
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -268,7 +268,7 @@ export default function BillingRunsPage() {
           }`}
         >
           <History size={18} />
-          Lịch Sử & Chi Tiết
+          Lịch sử và chi tiết
         </button>
       </div>
 
@@ -713,15 +713,15 @@ export default function BillingRunsPage() {
               {/* Table details */}
               <div className="overflow-hidden rounded-[24px] border border-slate-200 shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
+                  <table className="w-full min-w-[1120px] divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr className="text-left text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        <th className="px-5 py-4">Mã Hợp Đồng</th>
+                        <th className="px-5 py-4">Mã hợp đồng</th>
                         <th className="px-5 py-4 text-center">Phòng</th>
-                        <th className="px-5 py-4 text-right">Tiền Điện</th>
-                        <th className="px-5 py-4 text-right">Tiền Nước</th>
+                        <th className="px-5 py-4 text-right">Tiền điện</th>
+                        <th className="px-5 py-4 text-right">Tiền nước</th>
                         <th className="px-5 py-4 text-center">Người (Thực tế)</th>
-                        <th className="px-5 py-4">Khoản Áp Dụng</th>
+                        <th className="px-5 py-4">Khoản áp dụng</th>
                         <th className="px-5 py-4">Lưu ý</th>
                       </tr>
                     </thead>

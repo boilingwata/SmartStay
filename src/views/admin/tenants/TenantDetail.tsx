@@ -31,6 +31,15 @@ import { calculateAge, cn } from '@/utils';
 
 const DEFAULT_TENANT_AVATAR_URL = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
+const TENANT_TAB_LABELS: Record<TenantDetailTab, string> = {
+  'Ho so': 'Hồ sơ',
+  'Lien he': 'Liên hệ',
+  'Hop dong': 'Hợp đồng',
+  'Hoa don': 'Hóa đơn',
+  'Phan hoi': 'Phản hồi',
+  Onboarding: 'Hoàn tất hồ sơ',
+};
+
 function isLoadingTab(tab: TenantDetailTab, loadingOnboarding?: boolean) {
   return tab === 'Onboarding' && loadingOnboarding;
 }
@@ -149,10 +158,10 @@ const TenantDetail = () => {
         cccdIssuedPlace: data.cccdIssuedPlace,
       });
       await refreshTenantViews();
-      toast.success(`Da cap nhat ho so cu dan ${data.fullName}.`);
+      toast.success(`Đã cập nhật hồ sơ cư dân ${data.fullName}.`);
       setIsEditModalOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Khong the cap nhat thong tin cu dan.');
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật thông tin cư dân.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -165,9 +174,9 @@ const TenantDetail = () => {
     try {
       await tenantService.updateTenant(id, { vehiclePlates });
       await refreshTenantViews();
-      toast.success('Da cap nhat danh sach phuong tien.');
+      toast.success('Đã cập nhật danh sách phương tiện.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Khong the cap nhat phuong tien.');
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật phương tiện.');
       throw error;
     } finally {
       setIsSavingVehicles(false);
@@ -176,7 +185,7 @@ const TenantDetail = () => {
 
   const handleSendMessage = async ({ title, message }: { title: string; message: string }) => {
     if (!profile?.profileId) {
-      toast.error('Cu dan nay chua co tai khoan portal de nhan tin nhan.');
+      toast.error('Cư dân này chưa có tài khoản cổng cư dân để nhận tin nhắn.');
       return;
     }
 
@@ -189,10 +198,10 @@ const TenantDetail = () => {
         type: 'admin_message',
         link: '/portal/notifications',
       });
-      toast.success(`Da gui tin nhan toi ${profile.fullName}.`);
+      toast.success(`Đã gửi tin nhắn tới ${profile.fullName}.`);
       setIsMessageModalOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Khong the gui tin nhan cho cu dan.');
+      toast.error(error instanceof Error ? error.message : 'Không thể gửi tin nhắn cho cư dân.');
     } finally {
       setIsSendingMessage(false);
     }
@@ -203,7 +212,7 @@ const TenantDetail = () => {
       <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
         <Spinner />
         <p className="animate-pulse text-label font-bold uppercase tracking-[3px] text-muted">
-          Dang tai ho so cu dan...
+          Đang tải hồ sơ cư dân...
         </p>
       </div>
     );
@@ -257,7 +266,7 @@ const TenantDetail = () => {
             alt={profile.fullName}
           />
           <div className="absolute inset-0 flex items-center justify-center rounded-[40px] bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Anh ho so</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Ảnh hồ sơ</span>
           </div>
         </div>
 
@@ -270,11 +279,11 @@ const TenantDetail = () => {
             </span>
             {profile.hasPortalAccount ? (
               <span className="rounded-full border border-success/15 bg-success/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-success">
-                Co tai khoan portal
+                Có tài khoản cư dân
               </span>
             ) : (
               <span className="rounded-full border border-muted/20 bg-muted/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted">
-                Chua co portal
+                Chưa có tài khoản cư dân
               </span>
             )}
           </div>
@@ -286,18 +295,18 @@ const TenantDetail = () => {
             </span>
             <span className="flex items-center gap-2">
               <Mail size={14} className="text-primary" />
-              {profile.email || 'N/A'}
+              {profile.email || 'Chưa có email'}
             </span>
             <span className="flex items-center gap-2">
               <MapPin size={14} className="text-primary" />
-              {profile.currentRoomCode || 'Chua nhan phong'}
+              {profile.currentRoomCode || 'Chưa nhận phòng'}
             </span>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button className="btn-outline-sm flex items-center gap-2" onClick={() => navigate(-1)}>
-            Quay lai
+            Quay lại
           </button>
           <button
             className={cn(
@@ -306,17 +315,17 @@ const TenantDetail = () => {
             )}
             onClick={() => setIsMessageModalOpen(true)}
             disabled={!profile.hasPortalAccount}
-            title={profile.hasPortalAccount ? 'Gui tin nhan noi bo' : 'Cu dan chua co tai khoan portal'}
+            title={profile.hasPortalAccount ? 'Gửi tin nhắn nội bộ' : 'Cư dân chưa có tài khoản cổng cư dân'}
           >
             <MessageSquare size={16} />
-            Gui tin nhan
+            Gửi tin nhắn
           </button>
           <button
             className="btn-primary flex items-center gap-2 px-6 shadow-xl shadow-primary/20"
             onClick={() => setIsEditModalOpen(true)}
           >
             <Edit size={16} />
-            Chinh sua
+            Chỉnh sửa
           </button>
         </div>
       </div>
@@ -331,7 +340,7 @@ const TenantDetail = () => {
               activeTab === tab ? 'text-primary opacity-100' : 'text-muted opacity-50 hover:opacity-80',
             )}
           >
-            {tab}
+            {TENANT_TAB_LABELS[tab]}
             {activeTab === tab ? (
               <div className="absolute bottom-0 left-0 right-0 h-1 rounded-full bg-primary animate-in slide-in-from-bottom-1" />
             ) : null}
@@ -362,8 +371,8 @@ const TenantDetail = () => {
               <History size={40} className="animate-spin-slow" />
             </div>
             <div className="max-w-md space-y-2">
-              <h3 className="text-h3 font-black uppercase tracking-[4px] text-primary">Du lieu {activeTab}</h3>
-              <p className="text-small font-medium italic text-muted">Thong tin dang duoc dong bo tu SmartStay.</p>
+              <h3 className="text-h3 font-black uppercase tracking-[4px] text-primary">Dữ liệu {TENANT_TAB_LABELS[activeTab]}</h3>
+              <p className="text-small font-medium italic text-muted">Thông tin đang được đồng bộ từ SmartStay.</p>
             </div>
           </div>
         ) : null}

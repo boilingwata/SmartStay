@@ -103,7 +103,7 @@ const InvoiceList = () => {
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
 
-  const { data: counts } = useQuery<Record<InvoiceStatus | 'All', number>>({
+  const { data: counts } = useQuery<Record<InvoiceStatus | 'All', number> & { overdueAmount: number }>({
     queryKey: ['invoiceCounts'],
     queryFn: () => invoiceService.getInvoiceCounts(),
   });
@@ -113,8 +113,8 @@ const InvoiceList = () => {
     queryFn: () => buildingService.getBuildings(),
   });
 
-  const overdueInvoices = invoices.filter((invoice) => invoice.status === 'Overdue');
-  const totalOverdueAmount = overdueInvoices.reduce((sum, invoice) => sum + getRemainingAmount(invoice), 0);
+  const globalOverdueCount = counts?.Overdue || 0;
+  const globalOverdueAmount = counts?.overdueAmount || 0;
 
   const tabs: { id: InvoiceStatus | 'All'; labelKey: string }[] = [
     { id: 'All', labelKey: 'pages.invoices.tabs.all' },
@@ -172,7 +172,7 @@ const InvoiceList = () => {
         </div>
       </div>
 
-      {overdueInvoices.length > 0 && (
+      {globalOverdueCount > 0 && activeTab !== 'Overdue' && (
         <div className="sticky top-4 z-20 flex flex-col items-center justify-between gap-4 overflow-hidden rounded-[2rem] border border-destructive/20 bg-white/40 p-4 shadow-xl backdrop-blur-xl animate-in slide-in-from-top duration-500 sm:flex-row">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-danger/5 to-transparent" />
           <div className="relative z-10 flex items-center gap-4">
@@ -181,10 +181,10 @@ const InvoiceList = () => {
             </div>
             <div>
               <p className="font-serif text-lg font-bold leading-none text-danger">
-                {overdueInvoices.length} {t('pages.invoices.overdueBannerTitle') || 'hóa đơn quá hạn'}
+                {globalOverdueCount} {t('pages.invoices.overdueBannerTitle') || 'hóa đơn quá hạn'}
               </p>
               <p className="text-sm font-medium text-danger/80">
-                {t('pages.invoices.overdueTotal') || 'Tổng nợ'}: <span className="font-bold">{formatVND(totalOverdueAmount)}</span>
+                {t('pages.invoices.overdueTotal') || 'Tổng nợ'}: <span className="font-bold">{formatVND(globalOverdueAmount)}</span>
               </p>
             </div>
           </div>

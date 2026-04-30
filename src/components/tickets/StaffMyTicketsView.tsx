@@ -81,10 +81,10 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
       await queryClient.invalidateQueries({ queryKey: ['ticket', 'owner'] });
       await queryClient.invalidateQueries({ queryKey: ['ticket', 'portal'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Đã cập nhật trạng thái ticket.');
+      toast.success('Đã cập nhật trạng thái yêu cầu.');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Không thể cập nhật trạng thái ticket.');
+      toast.error(error.message || 'Không thể cập nhật trạng thái yêu cầu.');
     },
   });
 
@@ -136,7 +136,7 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
       <div className="rounded-[32px] border border-dashed border-slate-200 bg-white p-8">
         <EmptyState
           title="Không xác định được người dùng"
-          message="Vui lòng đăng nhập lại để xem ticket được giao cho bạn."
+          message="Vui lòng đăng nhập lại để xem yêu cầu được giao cho bạn."
         />
       </div>
     );
@@ -147,10 +147,10 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
       <div className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Ticket được giao</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Ticket của tôi</h1>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Yêu cầu được giao</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Yêu cầu của tôi</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Theo dõi các ticket đang phụ trách, cập nhật tiến độ và chuyển trạng thái đúng với phạm vi vận hành hiện tại.
+              Theo dõi các yêu cầu đang phụ trách, cập nhật tiến độ và chuyển trạng thái đúng với phạm vi vận hành hiện tại.
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm theo mã ticket, tiêu đề hoặc phòng..."
+                placeholder="Tìm theo mã yêu cầu, tiêu đề hoặc phòng..."
                 className="h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none transition focus:border-primary focus:bg-white"
               />
             </div>
@@ -230,7 +230,7 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
                 )}
               >
                 <LayoutGrid size={16} />
-                Kanban
+                Bảng xử lý
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -248,22 +248,22 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
 
         {isError ? (
           <div className="rounded-[32px] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-            Không tải được ticket được giao cho bạn. Vui lòng thử lại.
+            Không tải được yêu cầu được giao cho bạn. Vui lòng thử lại.
           </div>
         ) : isLoading ? (
           <div className="flex min-h-[320px] items-center justify-center">
             <div className="space-y-4 text-center">
               <Spinner size="lg" />
               <p className="text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
-                Đang tải ticket...
+                Đang tải yêu cầu...
               </p>
             </div>
           </div>
         ) : tickets.length === 0 ? (
           <div className="rounded-[32px] border border-dashed border-slate-200 bg-white p-8">
             <EmptyState
-              title="Không có ticket phù hợp"
-              message="Danh sách hiện không có ticket nào khớp với bộ lọc đang chọn."
+              title="Không có yêu cầu phù hợp"
+              message="Danh sách hiện không có yêu cầu nào khớp với bộ lọc đang chọn."
             />
           </div>
         ) : viewMode === 'kanban' ? (
@@ -282,10 +282,10 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
         ) : (
           <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left">
+              <table className="w-full min-w-[960px] text-left">
                 <thead className="bg-slate-50">
                   <tr className="border-b border-slate-200">
-                    <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Ticket</th>
+                    <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Yêu cầu</th>
                     <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Loại</th>
                     <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Trạng thái</th>
                     <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Thời gian</th>
@@ -409,7 +409,7 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
       >
         <div className="space-y-5">
           <p className="text-sm text-slate-500">
-            Ticket sẽ chuyển sang trạng thái “Đã xử lý”. Vui lòng ghi rõ kết quả xử lý để đối soát sau này.
+            Yêu cầu sẽ chuyển sang trạng thái “Đã xử lý”. Vui lòng ghi rõ kết quả xử lý để đối soát sau này.
           </p>
 
           <div className="space-y-2">
@@ -420,7 +420,7 @@ export const StaffMyTicketsView = ({ detailBasePath }: StaffMyTicketsViewProps) 
                 setResolveForm((current) => ({ ...current, resolutionNote: event.target.value }))
               }
               className="min-h-[160px] w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 text-[15px] leading-7 text-slate-700 outline-none transition focus:border-primary focus:bg-white"
-              placeholder="Mô tả cách đã xử lý ticket này..."
+              placeholder="Mô tả cách đã xử lý yêu cầu này..."
             />
           </div>
 

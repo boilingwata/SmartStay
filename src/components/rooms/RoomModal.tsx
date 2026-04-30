@@ -1,21 +1,27 @@
 import React, { useEffect, useMemo } from 'react';
 import { Building2, Check, Home, Layers3, Maximize, Sparkles, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm, useWatch, Resolver } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { roomService } from '@/services/roomService';
-import { buildingService } from '@/services/buildingService';
-import { roomSchema, RoomFormData } from '@/schemas/roomSchema';
-import { Room, RoomDetail } from '@/models/Room';
-import { deriveRoomType } from '@/lib/propertyBusiness';
-import { cn } from '@/utils';
 import { toast } from 'sonner';
+
 import { Spinner } from '@/components/ui/Feedback';
+import {
+  DIRECTION_LABELS,
+  ROOM_AMENITY_OPTIONS,
+  getRoomTypeLabel,
+} from '@/lib/propertyLabels';
+import { deriveRoomType } from '@/lib/propertyBusiness';
+import { Room, RoomDetail } from '@/models/Room';
+import { roomSchema, RoomFormData } from '@/schemas/roomSchema';
+import { buildingService } from '@/services/buildingService';
+import { roomService } from '@/services/roomService';
 import useUIStore from '@/stores/uiStore';
+import { cn } from '@/utils';
 
 const getDefaults = (activeBuildingId?: string | number | null): RoomFormData => ({
   roomCode: '',
-  buildingId: activeBuildingId ? activeBuildingId.toString() : '',
+  buildingId: activeBuildingId ? String(activeBuildingId) : '',
   floorNumber: 1,
   roomType: 'Studio',
   areaSqm: 25,
@@ -31,8 +37,11 @@ const getDefaults = (activeBuildingId?: string | number | null): RoomFormData =>
   isListed: false,
 });
 
+const lockedRoomTypes = new Set(['Commercial', 'Dormitory']);
+
 const mapRoomToFormData = (room: Room | RoomDetail | null, defaults: RoomFormData): RoomFormData => {
   if (!room) return defaults;
+
   return {
     roomCode: room.roomCode ?? defaults.roomCode,
     buildingId: room.buildingId != null ? String(room.buildingId) : defaults.buildingId,
@@ -61,71 +70,67 @@ interface RoomModalProps {
 }
 
 export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, onSuccess }: RoomModalProps) => {
-  const isEditing = !!room;
+  const isEditing = Boolean(room);
   const queryClient = useQueryClient();
   const activeBuildingId = useUIStore((state) => state.activeBuildingId);
 
   const resolvedBuildingId =
     propBuildingId != null ? String(propBuildingId) : activeBuildingId != null ? String(activeBuildingId) : '';
 
-  const { data: buildings, isLoading: isLoadingBuildings } = useQuery({
+  const { data: buildings = [], isLoading: isLoadingBuildings } = useQuery({
     queryKey: ['buildings-summary'],
     queryFn: () => buildingService.getBuildings(),
   });
 
   const defaultValues = useMemo(() => getDefaults(resolvedBuildingId || activeBuildingId), [resolvedBuildingId, activeBuildingId]);
 
-  const { register, handleSubmit, setValue, control, reset, watch, formState: { errors } } = useForm<RoomFormData>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<RoomFormData>({
     resolver: zodResolver(roomSchema) as unknown as Resolver<RoomFormData>,
     defaultValues: mapRoomToFormData(room || null, defaultValues),
   });
 
-  const buildingSelectRef = React.useRef(false);
-  useEffect(() => {
-    if (isOpen && !buildingSelectRef.current && !resolvedBuildingId && buildings && buildings.length > 0) {
-      setValue('buildingId', String(buildings[0].id));
-      buildingSelectRef.current = true;
-    }
-    if (!isOpen) buildingSelectRef.current = false;
-  }, [isOpen, resolvedBuildingId, buildings, setValue]);
-
   const selectedAmenities = useWatch({ control, name: 'amenities' }) || [];
   const currentCondition = useWatch({ control, name: 'conditionScore' }) || 8;
-  const hasBalcony = useWatch({ control, name: 'hasBalcony' }) || false;
+  const currentStatus = useWatch({ control, name: 'status' }) || 'Vacant';
+  const isListed = useWatch({ control, name: 'isListed' }) || false;
   const areaSqm = useWatch({ control, name: 'areaSqm' }) || 0;
-  const derivedRoomType = useMemo(() => deriveRoomType(areaSqm), [areaSqm]);
+  const hasBalcony = useWatch({ control, name: 'hasBalcony' }) || false;
+  const lockedRoomType = room?.roomType && lockedRoomTypes.has(room.roomType) ? room.roomType : null;
+  const derivedRoomType = useMemo(() => lockedRoomType ?? deriveRoomType(areaSqm), [areaSqm, lockedRoomType]);
 
   useEffect(() => {
     if (isOpen) {
       reset(mapRoomToFormData(room || null, defaultValues));
     }
-  }, [room, isOpen, reset, defaultValues]);
-
-  const currentStatus = watch('status');
-  const isAvailableForListing = currentStatus === 'Vacant';
-  const isListed = watch('isListed');
-
-  // Auto-uncheck isListed if status is not Vacant
-  useEffect(() => {
-    if (!isAvailableForListing && isListed) {
-      setValue('isListed', false);
-    }
-  }, [isAvailableForListing, isListed, setValue]);
+  }, [defaultValues, isOpen, reset, room]);
 
   useEffect(() => {
     setValue('roomType', deriveRoomType(areaSqm), { shouldDirty: true, shouldValidate: true });
   }, [areaSqm, setValue]);
+
+  useEffect(() => {
+    if (currentStatus !== 'Vacant' && isListed) {
+      setValue('isListed', false, { shouldDirty: true });
+    }
+  }, [currentStatus, isListed, setValue]);
 
   const createMutation = useMutation({
     mutationFn: (data: RoomFormData) => roomService.createRoom(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       onSuccess?.();
-      toast.success('Đã tạo phòng mới thành công');
+      toast.success('Đã tạo phòng mới.');
       onClose();
     },
     onError: (error: Error) => {
-      toast.error(`Tạo phòng thất bại: ${error.message}`);
+      toast.error(`Không thể tạo phòng: ${error.message}`);
     },
   });
 
@@ -135,296 +140,334 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       if (room?.id) queryClient.invalidateQueries({ queryKey: ['room', room.id] });
       onSuccess?.();
-      toast.success('Đã cập nhật thông tin phòng');
+      toast.success('Đã cập nhật phòng.');
       onClose();
     },
     onError: (error: Error) => {
-      toast.error(`Cập nhật phòng thất bại: ${error.message}`);
+      toast.error(`Không thể cập nhật phòng: ${error.message}`);
     },
   });
 
   const onSubmit = (data: RoomFormData) => {
     const payload = {
       ...data,
-      roomType: deriveRoomType(data.areaSqm),
+      roomType: lockedRoomType ?? deriveRoomType(data.areaSqm),
     };
 
-    if (isEditing) updateMutation.mutate(payload);
-    else createMutation.mutate(payload);
-  };
+    if (isEditing) {
+      updateMutation.mutate(payload);
+      return;
+    }
 
-  const amenityList = [
-    { id: 'WiFi', label: 'Wi-Fi miễn phí' },
-    { id: 'Window', label: 'Cửa sổ thoáng' },
-    { id: 'PrivateBathroom', label: 'WC riêng' },
-    { id: 'KitchenCabinet', label: 'Tủ bếp cơ bản' },
-    { id: 'Parking', label: 'Chỗ để xe' },
-    { id: 'Security', label: 'An ninh tòa nhà' },
-  ];
+    createMutation.mutate(payload);
+  };
 
   if (!isOpen) return null;
 
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const canList = currentStatus === 'Vacant';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-md">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[36px] bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b bg-primary p-8 text-white">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
-              <Home size={24} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-border bg-card shadow-2xl">
+        <div className="flex items-start justify-between border-b border-border px-6 py-5 sm:px-8">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Home size={22} />
             </div>
-            <div>
-              <h2 className="text-xl font-black uppercase tracking-widest">{isEditing ? 'Sửa thông tin phòng' : 'Thêm phòng mới'}</h2>
-              <p className="text-xs text-white/70">Loại phòng tự suy ra từ diện tích, nội thất suy ra từ tài sản</p>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-foreground">
+                {isEditing ? 'Cập nhật phòng' : 'Thêm phòng'}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Ưu tiên vận hành đơn giản: loại phòng tự suy ra từ diện tích, nội thất lấy từ tài sản đã gán.
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 transition hover:bg-white/10">
-            <X size={24} />
+          <button
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-muted transition hover:bg-primary/5 hover:text-primary"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto bg-slate-50/40 p-8">
-          <div className="grid gap-8 xl:grid-cols-[1.25fr_0.75fr]">
-            <div className="space-y-8">
-              <section className="space-y-8 rounded-[28px] border border-slate-100 bg-white p-8 shadow-sm">
+        <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+          <input type="hidden" {...register('roomType')} value={derivedRoomType} />
+          <input type="hidden" {...register('furnishing')} value="Unfurnished" />
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+            <div className="min-w-0 space-y-6">
+              <section className="space-y-5 rounded-3xl border border-border bg-background/60 p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/10 bg-primary/5 text-primary">
-                    <Building2 size={20} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Building2 size={18} />
                   </div>
-                  <h3 className="text-base font-black uppercase tracking-[0.2em] text-primary">Thông tin cơ bản</h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Thông tin cơ bản</h3>
+                    <p className="text-xs text-muted">Các trường bắt buộc để quản lý và điều hướng phòng.</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                  <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Tòa nhà</label>
-                    <select {...register('buildingId')} disabled={isEditing} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-100 px-6 font-black text-slate-500 opacity-60 shadow-sm">
-                      {isLoadingBuildings ? (
-                        <option value="">Đang tải...</option>
-                      ) : (
-                        <>
-                          <option value="">-- Chọn tòa nhà --</option>
-                          {buildings?.map((building) => (
-                            <option key={building.id} value={String(building.id)}>
-                              {building.buildingCode} - {building.buildingName}
-                            </option>
-                          ))}
-                        </>
-                      )}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Tòa nhà</label>
+                    <select
+                      {...register('buildingId')}
+                      disabled={isEditing}
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10 disabled:bg-muted/20 disabled:text-muted"
+                    >
+                      {isLoadingBuildings ? <option value="">Đang tải...</option> : null}
+                      {!isLoadingBuildings ? <option value="">Chọn tòa nhà</option> : null}
+                      {buildings.map((building) => (
+                        <option key={building.id} value={String(building.id)}>
+                          {building.buildingCode} - {building.buildingName}
+                        </option>
+                      ))}
                     </select>
+                    {errors.buildingId?.message ? <p className="text-xs text-danger">{String(errors.buildingId.message)}</p> : null}
                   </div>
 
-                  <div className="relative space-y-2.5">
-                    <label htmlFor="roomCode" className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Mã phòng *</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Mã phòng</label>
                     <input
-                      id="roomCode"
                       {...register('roomCode')}
-                      placeholder="VD: A-101"
+                      placeholder="Ví dụ: A-101"
                       className={cn(
-                        'h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all placeholder:text-slate-300 focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10',
-                        errors.roomCode && 'border-danger bg-danger/5',
+                        'h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10',
+                        errors.roomCode && 'border-danger focus:border-danger',
                       )}
                     />
-                    {errors.roomCode?.message ? <p className="absolute -bottom-5 left-1 text-[10px] font-bold text-danger">{String(errors.roomCode.message)}</p> : null}
+                    {errors.roomCode?.message ? <p className="text-xs text-danger">{String(errors.roomCode.message)}</p> : null}
                   </div>
 
-                  <div className="space-y-2.5">
-                    <label htmlFor="floorNumber" className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Tầng số</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Tầng</label>
                     <input
-                      id="floorNumber"
                       type="number"
+                      min={0}
                       {...register('floorNumber', { valueAsNumber: true })}
-                      className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10"
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Diện tích</label>
+                    <div className="relative">
+                      <Maximize className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} />
+                      <input
+                        type="number"
+                        min={1}
+                        step="0.1"
+                        {...register('areaSqm', { valueAsNumber: true })}
+                        className="h-12 w-full rounded-2xl border border-border bg-card pl-11 pr-12 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+                      />
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">m²</span>
+                    </div>
                   </div>
                 </div>
               </section>
 
-              <section className="space-y-8 rounded-[28px] border border-slate-100 bg-white p-8 shadow-sm">
+              <section className="space-y-5 rounded-3xl border border-border bg-background/60 p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-secondary/10 bg-secondary/5 text-secondary">
-                    <Maximize size={20} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Sparkles size={18} />
                   </div>
-                  <h3 className="text-base font-black uppercase tracking-[0.2em] text-primary">Diện tích và vận hành</h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Vận hành và cho thuê</h3>
+                    <p className="text-xs text-muted">Giữ label ngắn, ưu tiên quét nhanh theo đúng cách dùng thực tế.</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-                  <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Diện tích (m²)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      {...register('areaSqm', { valueAsNumber: true })}
-                      className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10"
-                    />
-                  </div>
-
-                  <div className="col-span-2 space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Loại phòng tự suy ra</label>
-                    <div className="flex h-14 items-center justify-between rounded-[20px] border border-slate-200 bg-slate-50/70 px-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium text-foreground">Loại phòng tự suy ra</label>
+                    <div className="flex h-12 items-center justify-between rounded-2xl border border-border bg-card px-4">
                       <div>
-                        <p className="text-sm font-black text-slate-900">{derivedRoomType}</p>
-                        <p className="text-xs text-slate-500">Phòng nhỏ, vừa hay lớn sẽ chạy theo diện tích</p>
+                        <p className="text-sm font-medium text-foreground">{getRoomTypeLabel(derivedRoomType)}</p>
+                        <p className="text-xs text-muted">
+                          {lockedRoomType
+                            ? 'Phòng đặc thù giữ nguyên loại đang lưu để không lệch dữ liệu.'
+                            : 'Tự tính theo diện tích để tránh lệch logic lọc và hiển thị.'}
+                        </p>
                       </div>
                       <Sparkles size={18} className="text-primary" />
                     </div>
                   </div>
 
-                  <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Hướng phòng</label>
-                    <select {...register('directionFacing')} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10">
-                      <option value="S">Nam (S)</option>
-                      <option value="N">Bắc (N)</option>
-                      <option value="E">Đông (E)</option>
-                      <option value="W">Tây (W)</option>
-                      <option value="NE">Đông Bắc (NE)</option>
-                      <option value="NW">Tây Bắc (NW)</option>
-                      <option value="SE">Đông Nam (SE)</option>
-                      <option value="SW">Tây Nam (SW)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Sức chứa tối đa</label>
-                    <input type="number" {...register('maxOccupancy', { valueAsNumber: true })} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10" />
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Giá thuê niêm yết</label>
-                    <input type="number" {...register('baseRentPrice', { valueAsNumber: true })} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10" />
-                  </div>
-
-                  <div className="col-span-2 space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Chất lượng ({currentCondition}/10)</label>
-                    <div className="flex h-14 items-center gap-6 rounded-[20px] border border-slate-100 bg-slate-50/50 px-6 shadow-inner-sm">
-                      <input type="range" min="1" max="10" step="1" {...register('conditionScore', { valueAsNumber: true })} className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-slate-200 accent-primary shadow-inner" />
-                      <span className="w-8 text-center text-2xl font-black text-primary">{currentCondition}</span>
-                    </div>
-                  </div>
-
-                   <div className="space-y-2.5">
-                    <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Trạng thái phòng</label>
-                    <select {...register('status')} className="h-14 w-full rounded-[20px] border border-slate-200 bg-slate-50/50 px-6 font-black text-slate-900 shadow-inner-sm transition-all focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10">
-                      <option value="Vacant">Trống (Vacant)</option>
-                      <option value="Occupied">Đang ở (Occupied)</option>
-                      <option value="Maintenance">Sửa chữa (Maintenance)</option>
-                      <option value="Reserved">Đặt chỗ (Reserved)</option>
-                    </select>
-                  </div>
-
-
-
-                  <div className="flex flex-col justify-end space-y-4">
-                    <label className="group ml-1 flex cursor-pointer items-center gap-3 pb-4">
-                      <div className={cn('relative w-12 rounded-full p-1 transition-all', hasBalcony ? 'bg-primary' : 'bg-slate-300')}>
-                        <div className={cn('h-4 w-4 rounded-full bg-white shadow-sm transition-all', hasBalcony ? 'ml-6' : 'ml-0')} />
-                        <input type="checkbox" className="sr-only" {...register('hasBalcony')} />
-                      </div>
-                      <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 transition-colors group-hover:text-primary">Có ban công</span>
-                    </label>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-8 rounded-[28px] border border-slate-100 bg-white p-8 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/10 bg-accent/5 text-accent">
-                    <Check size={20} />
-                  </div>
-                  <h3 className="text-base font-black uppercase tracking-[0.2em] text-primary">Tiện ích miễn phí của phòng</h3>
-                </div>
-
-                <p className="text-sm leading-6 text-slate-500">
-                  Chỉ chọn các tiện ích đi kèm không tính tiền riêng. Thiết bị như máy lạnh, máy giặt, tủ lạnh phải quản lý ở phần tài sản để còn tính phí, theo dõi hỏng hóc và thêm phụ lục khi cần.
-                </p>
-
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                  {amenityList.map((item) => (
-                    <label
-                      key={item.id}
-                      className={cn(
-                        'group flex min-h-[96px] cursor-pointer flex-col items-start justify-between rounded-[24px] border-2 p-5 transition-all',
-                        selectedAmenities.includes(item.id)
-                          ? 'border-primary bg-primary/[0.03] text-primary shadow-md'
-                          : 'border-slate-100 bg-slate-50/60 text-slate-500 hover:border-slate-200',
-                      )}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Hướng phòng</label>
+                    <select
+                      {...register('directionFacing')}
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
                     >
+                      {Object.entries(DIRECTION_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Sức chứa tối đa</label>
+                    <input
+                      type="number"
+                      min={1}
+                      {...register('maxOccupancy', { valueAsNumber: true })}
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Giá thuê niêm yết</label>
+                    <input
+                      type="number"
+                      min={0}
+                      {...register('baseRentPrice', { valueAsNumber: true })}
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Trạng thái phòng</label>
+                    <select
+                      {...register('status')}
+                      className="h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+                    >
+                      <option value="Vacant">Phòng trống</option>
+                      <option value="Occupied">Đang ở</option>
+                      <option value="Maintenance">Bảo trì</option>
+                      <option value="Reserved">Đã giữ chỗ</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium text-foreground">Chất lượng hiện trạng ({currentCondition}/10)</label>
+                    <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3">
                       <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={selectedAmenities.includes(item.id)}
-                        onChange={(event) => {
-                          const current = [...selectedAmenities];
-                          if (event.target.checked) current.push(item.id);
-                          else {
-                            const index = current.indexOf(item.id);
-                            if (index > -1) current.splice(index, 1);
-                          }
-                          setValue('amenities', current);
-                        }}
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        {...register('conditionScore', { valueAsNumber: true })}
+                        className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-muted/30 accent-primary"
                       />
-                      <Layers3 size={18} className="mb-3" />
-                      <span className="text-sm font-black leading-snug">{item.label}</span>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="space-y-2.5">
-                  <label className="ml-1 text-[11px] font-black uppercase tracking-[2px] text-slate-500">Mô tả chi tiết</label>
-                  <textarea
-                    {...register('description')}
-                    className="min-h-[160px] w-full rounded-[28px] border border-slate-200 bg-slate-50/50 px-6 py-5 font-black text-slate-900 shadow-inner-sm transition-all placeholder:text-slate-300 focus:border-primary/30 focus:bg-white focus:ring-4 focus:ring-primary/10"
-                    placeholder="Mô tả thêm về phòng, quy định riêng, điểm nổi bật..."
-                  />
-                </div>
-              </section>
-            </div>
-
-            <aside className="space-y-6">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Niêm yết công khai</p>
-                <div className="mt-4 space-y-4">
-                  <label className={cn(
-                    "group flex items-center justify-between rounded-2xl p-4 transition-all",
-                    isAvailableForListing ? "cursor-pointer bg-slate-50 hover:bg-primary/5" : "cursor-not-allowed bg-slate-100 opacity-60"
-                  )}>
-                    <div>
-                      <p className="text-sm font-black text-slate-900">Hiển thị trên website</p>
-                      <p className="text-xs text-slate-500">
-                        {isAvailableForListing 
-                          ? "Người lạ có thể xem và đặt phòng" 
-                          : "Chỉ phòng Trống (Vacant) mới có thể niêm yết"}
-                      </p>
+                      <span className="w-8 text-center text-lg font-semibold text-foreground">{currentCondition}</span>
                     </div>
-                    <div className={cn(
-                      'relative w-12 rounded-full p-1 transition-all', 
-                      isListed ? 'bg-primary' : 'bg-slate-300',
-                      !isAvailableForListing && 'grayscale'
-                    )}>
-                      <div className={cn('h-4 w-4 rounded-full bg-white shadow-sm transition-all', isListed ? 'ml-6' : 'ml-0')} />
-                      <input 
-                        type="checkbox" 
-                        className="sr-only" 
-                        {...register('isListed')} 
-                        disabled={!isAvailableForListing}
-                      />
+                  </div>
+
+                  <label className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 md:col-span-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Có ban công</p>
+                      <p className="text-xs text-muted">Dùng cho mô tả phòng và tiêu chí tìm kiếm cơ bản.</p>
+                    </div>
+                    <div className={cn('relative h-6 w-11 rounded-full transition', hasBalcony ? 'bg-primary' : 'bg-muted/35')}>
+                      <div className={cn('absolute top-1 h-4 w-4 rounded-full bg-white transition', hasBalcony ? 'left-6' : 'left-1')} />
+                      <input type="checkbox" className="sr-only" {...register('hasBalcony')} />
                     </div>
                   </label>
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Tóm tắt vận hành</p>
-                <div className="mt-4 space-y-4 text-sm text-slate-600">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="font-black text-slate-900">Loại phòng</p>
-                    <p className="mt-1">{derivedRoomType} từ diện tích {areaSqm || 0} m²</p>
+              <section className="space-y-5 rounded-3xl border border-border bg-background/60 p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Layers3 size={18} />
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="font-black text-slate-900">Nội thất</p>
-                    <p className="mt-1">Không nhập tay. Hệ thống tự suy ra từ tài sản đang gắn vào phòng.</p>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Tiện ích miễn phí và ghi chú</h3>
+                    <p className="text-xs text-muted">Thiết bị tính phí nên quản lý ở phần tài sản để đồng bộ hợp đồng và hóa đơn.</p>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="font-black text-slate-900">Thiết bị tính tiền</p>
-                    <p className="mt-1">Gắn ở phần tài sản để hợp đồng và hóa đơn tự cộng đúng phần điện hoặc tiền thuê tài sản.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {ROOM_AMENITY_OPTIONS.map((item) => {
+                    const checked = selectedAmenities.includes(item.id);
+
+                    return (
+                      <label
+                        key={item.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition',
+                          checked
+                            ? 'border-primary/35 bg-primary/6 text-primary'
+                            : 'border-border bg-card text-foreground hover:border-primary/20',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                          checked={checked}
+                          onChange={(event) => {
+                            const next = [...selectedAmenities];
+                            if (event.target.checked) {
+                              next.push(item.id);
+                            } else {
+                              const index = next.indexOf(item.id);
+                              if (index >= 0) next.splice(index, 1);
+                            }
+                            setValue('amenities', next, { shouldDirty: true, shouldValidate: true });
+                          }}
+                        />
+                        <span className="min-w-0 truncate">{item.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Ghi chú nội bộ</label>
+                  <textarea
+                    {...register('description')}
+                    rows={5}
+                    placeholder="Ghi nhanh các lưu ý vận hành, đặc điểm nổi bật hoặc quy định riêng của phòng."
+                    className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+                  />
+                </div>
+              </section>
+            </div>
+
+            <aside className="min-w-0 space-y-6">
+              <section className="rounded-3xl border border-border bg-background/60 p-5">
+                <p className="text-sm font-bold text-foreground">Niêm yết công khai</p>
+                <p className="mt-1 text-sm text-muted">
+                  Chỉ phòng trống mới được phép hiển thị cho khách xem thuê.
+                </p>
+
+                <label className={cn(
+                  'mt-4 flex items-center justify-between rounded-2xl border px-4 py-3 transition',
+                  canList ? 'border-border bg-card' : 'border-border bg-muted/20 opacity-70',
+                )}>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Hiển thị trên website</p>
+                    <p className="text-xs text-muted">{canList ? 'Cho phép khách xem thông tin phòng.' : 'Cần chuyển phòng về trạng thái trống trước.'}</p>
+                  </div>
+                  <div className={cn('relative h-6 w-11 rounded-full transition', isListed ? 'bg-primary' : 'bg-muted/35')}>
+                    <div className={cn('absolute top-1 h-4 w-4 rounded-full bg-white transition', isListed ? 'left-6' : 'left-1')} />
+                    <input type="checkbox" className="sr-only" {...register('isListed')} disabled={!canList} />
+                  </div>
+                </label>
+              </section>
+
+              <section className="rounded-3xl border border-border bg-background/60 p-5">
+                <p className="text-sm font-bold text-foreground">Ghi chú logic</p>
+                <div className="mt-3 space-y-3 text-sm text-muted">
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="font-medium text-foreground">Loại phòng</p>
+                    <p className="mt-1">
+                      {lockedRoomType
+                        ? `${getRoomTypeLabel(derivedRoomType)} đang được giữ theo loại phòng đặc thù hiện có.`
+                        : `${getRoomTypeLabel(derivedRoomType)} đang được suy ra từ ${areaSqm || 0} m².`}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="font-medium text-foreground">Nội thất</p>
+                    <p className="mt-1">Không nhập tay ở đây. Hệ thống sẽ tự đọc từ tài sản đã gán cho phòng.</p>
+                  </div>
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="font-medium text-foreground">Thiết bị tính phí</p>
+                    <p className="mt-1">Máy lạnh, tủ lạnh, máy giặt nên quản lý ở phần tài sản để không lệch hợp đồng và hóa đơn.</p>
                   </div>
                 </div>
               </section>
@@ -432,12 +475,22 @@ export const RoomModal = ({ isOpen, onClose, room, buildingId: propBuildingId, o
           </div>
         </form>
 
-        <div className="flex justify-end gap-3 border-t bg-bg/20 p-8">
-          <button onClick={onClose} className="rounded-2xl border border-border/50 bg-white px-8 py-3 font-black uppercase tracking-widest text-muted transition-all hover:bg-white/80">
-            Hủy bỏ
+        <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4 sm:px-8">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-border px-5 text-sm font-medium text-muted transition hover:bg-background hover:text-foreground"
+          >
+            Hủy
           </button>
-          <button onClick={handleSubmit(onSubmit)} disabled={createMutation.isPending || updateMutation.isPending} className="rounded-2xl bg-primary px-10 py-3 font-black uppercase tracking-[3px] text-white shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            {createMutation.isPending || updateMutation.isPending ? <Spinner className="h-4 w-4 text-white" /> : isEditing ? 'Lưu thay đổi' : 'Tạo phòng'}
+          <button
+            type="submit"
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="inline-flex h-11 min-w-[124px] items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? <Spinner className="h-4 w-4 text-white" /> : <Check size={16} />}
+            {isEditing ? 'Lưu thay đổi' : 'Tạo phòng'}
           </button>
         </div>
       </div>

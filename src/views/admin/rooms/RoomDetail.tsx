@@ -1,60 +1,78 @@
-import React, { useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, Home, Building2, MapPin, Maximize,
-  Info, Image as ImageIcon, Zap, Droplets,
-  Package, History, ClipboardList, Plus,
-  Edit, Key, Wrench, CheckCircle2, MoreVertical,
-  Star, Share2, Printer, Download, Trash2,
-  Calendar, User, Copy,
-  ArrowRight, ShieldCheck,   Layout, Wind, Refrigerator, Disc,
-  Loader2, ZoomIn, X, ChevronLeft, ChevronRight, XCircle
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Copy,
+  ExternalLink,
+  History,
+  Image as ImageIcon,
+  Layers3,
+  Loader2,
+  MapPin,
+  Package,
+  PencilLine,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  Wrench,
+  X,
 } from 'lucide-react';
-import { roomService } from '@/services/roomService';
-import { fileService } from '@/services/fileService';
-import { RoomDetail as RoomDetailType, RoomContractSummary } from '@/models/Room';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { cn, formatVND, formatDate } from '@/utils';
-import { Spinner } from '@/components/ui/Feedback';
 import { toast } from 'sonner';
-import { RoomModal } from '@/components/rooms/RoomModal';
-import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
-import { useConfirm } from '@/hooks/useConfirm';
 
-const TabItem = ({ active, children, onClick, icon: Icon }: { 
-  active: boolean; 
-  children: React.ReactNode; 
-  onClick: () => void; 
-  icon: React.ElementType; 
-}) => (
-  <button 
-    onClick={onClick}
-    className={cn(
-      "flex items-center gap-2 px-6 py-4 text-[10px] font-black uppercase tracking-[2px] border-b-2 transition-all",
-      active ? "border-primary text-primary bg-primary/[0.02]" : "border-transparent text-muted hover:text-text hover:bg-bg/50"
-    )}
-  >
-    <Icon size={14} /> {children}
-  </button>
-);
+import { AssignAssetModal } from '@/components/rooms/AssignAssetModal';
+import { RoomModal } from '@/components/rooms/RoomModal';
+import { Spinner } from '@/components/ui/Feedback';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import {
+  getAssetConditionLabel,
+  getAssetTypeLabel,
+  getDirectionLabel,
+  getFurnishingLabel,
+  getHandoverTypeLabel,
+  getRoomAmenityLabel,
+  getRoomStatusLabel,
+  getRoomTypeLabel,
+} from '@/lib/propertyLabels';
+import { RoomContractSummary, RoomDetail as RoomDetailType } from '@/models/Room';
+import { fileService } from '@/services/fileService';
+import { roomService } from '@/services/roomService';
+import { cn, formatDate, formatVND } from '@/utils';
+
+const tabs = [
+  { id: 'overview', label: 'Tổng quan' },
+  { id: 'images', label: 'Hình ảnh' },
+  { id: 'assets', label: 'Tài sản' },
+  { id: 'contracts', label: 'Hợp đồng' },
+  { id: 'handover', label: 'Bàn giao' },
+  { id: 'history', label: 'Lịch sử trạng thái' },
+] as const;
+
+type RoomTab = (typeof tabs)[number]['id'];
 
 const RoomDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState('Overview');
+
+  const [activeTab, setActiveTab] = useState<RoomTab>('overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssignAssetModalOpen, setIsAssignAssetModalOpen] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingCount, setUploadingCount] = useState(0);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const imageCountRef = useRef(0);
 
   const { data: room, isLoading } = useQuery<RoomDetailType>({
     queryKey: ['room', id],
-    queryFn: () => roomService.getRoomDetail(id!)
+    queryFn: () => roomService.getRoomDetail(id!),
+    enabled: Boolean(id),
   });
 
   const uploadImageMutation = useMutation({
@@ -62,22 +80,22 @@ const RoomDetail = () => {
       setUploadingCount(files.length);
       const isFirst = (room?.images?.length ?? 0) === 0;
       const results = await Promise.allSettled(
-        files.map(async (file, i) => {
+        files.map(async (file, index) => {
           const url = await fileService.uploadFile(file, file.name);
-          return roomService.addRoomImage(id!, url, isFirst && i === 0);
-        })
+          return roomService.addRoomImage(id!, url, isFirst && index === 0);
+        }),
       );
       setUploadingCount(0);
-      const failed = results.filter(r => r.status === 'rejected').length;
-      if (failed > 0) throw new Error(`${failed} ảnh tải lên thất bại`);
+      const failed = results.filter((result) => result.status === 'rejected').length;
+      if (failed > 0) throw new Error(`${failed} ảnh tải lên thất bại.`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['room', id] });
-      toast.success('Đã tải ảnh lên thành công!');
+      toast.success('Đã tải ảnh lên.');
     },
-    onError: (err: Error) => {
+    onError: (error: Error) => {
       setUploadingCount(0);
-      toast.error(err.message);
+      toast.error(error.message);
     },
   });
 
@@ -87,7 +105,7 @@ const RoomDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['room', id] });
       toast.success('Đã xóa ảnh.');
     },
-    onError: () => toast.error('Xóa ảnh thất bại.'),
+    onError: () => toast.error('Không thể xóa ảnh.'),
   });
 
   const setMainImageMutation = useMutation({
@@ -96,749 +114,329 @@ const RoomDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['room', id] });
       toast.success('Đã đặt ảnh đại diện.');
     },
-    onError: () => toast.error('Cập nhật ảnh đại diện thất bại.'),
-  });
-
-  const completeMaintenance = useMutation({
-    mutationFn: () => roomService.updateRoom(id!, { status: 'Vacant' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['room', id] });
-      queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast.success('Hoàn thành bảo trì — Phòng đã chuyển sang trạng thái Trống');
-    },
-    onError: (err: Error) => {
-      toast.error(`Không thể cập nhật trạng thái: ${err.message}`);
-    }
+    onError: () => toast.error('Không thể cập nhật ảnh đại diện.'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => roomService.deleteRoom(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast.success('Đã xoá phòng thành công');
+      toast.success('Đã xóa phòng.');
       navigate('/owner/rooms');
     },
-    onError: (err: Error) => {
-      toast.error(`Không thể xoá phòng: ${err.message}`);
-    }
+    onError: (error: Error) => {
+      toast.error(`Không thể xóa phòng: ${error.message}`);
+    },
   });
 
-  const handleDelete = async () => {
-    const isConfirmed = await confirm({
-      title: 'Xoá phòng',
-      description: `Bạn có chắc chắn muốn xoá phòng ${room?.roomCode} không? Hành động này không thể hoàn tác.`,
-      confirmLabel: 'Xoá ngay',
-      cancelLabel: 'Huỷ bỏ',
-      variant: 'danger'
-    });
+  const completeMaintenanceMutation = useMutation({
+    mutationFn: () => roomService.updateRoom(id!, { status: 'Vacant' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success('Đã hoàn tất bảo trì và chuyển phòng về trạng thái trống.');
+    },
+    onError: (error: Error) => {
+      toast.error(`Không thể cập nhật trạng thái phòng: ${error.message}`);
+    },
+  });
 
-    if (isConfirmed) {
+  const toggleListingMutation = useMutation({
+    mutationFn: (nextValue: boolean) => roomService.updateRoom(id!, { isListed: nextValue }),
+    onSuccess: (_, nextValue) => {
+      queryClient.invalidateQueries({ queryKey: ['room', id] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast.success(nextValue ? 'Đã bật niêm yết công khai.' : 'Đã tắt niêm yết công khai.');
+    },
+    onError: (error: Error) => {
+      toast.error(`Không thể cập nhật niêm yết: ${error.message}`);
+    },
+  });
+
+  useEffect(() => {
+    imageCountRef.current = room?.images.length ?? 0;
+  }, [room?.images.length]);
+
+  useEffect(() => {
+    if (previewIndex === null) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const imageCount = imageCountRef.current;
+      if (event.key === 'Escape') setPreviewIndex(null);
+      if (event.key === 'ArrowRight') setPreviewIndex((index) => (index !== null ? (index + 1) % imageCount : null));
+      if (event.key === 'ArrowLeft') setPreviewIndex((index) => (index !== null ? (index - 1 + imageCount) % imageCount : null));
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewIndex]);
+
+  const handleDelete = () => {
+    if (window.confirm(`Xóa phòng ${room?.roomCode}? Hành động này sẽ ẩn phòng khỏi hệ thống.`)) {
       deleteMutation.mutate();
     }
   };
 
-
-  // Keep ref in sync for keyboard handler
-  imageCountRef.current = room?.images?.length ?? 0;
-
-  // Keyboard navigation for image lightbox
-  React.useEffect(() => {
-    if (previewIndex === null) return;
-    const handler = (e: KeyboardEvent) => {
-      const len = imageCountRef.current;
-      if (e.key === 'Escape') setPreviewIndex(null);
-      if (e.key === 'ArrowRight') setPreviewIndex(i => i !== null ? (i + 1) % len : null);
-      if (e.key === 'ArrowLeft') setPreviewIndex(i => i !== null ? (i - 1 + len) % len : null);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [previewIndex]);
-
-  if (isLoading) return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
-  if (!room) return <div>Room not found.</div>;
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(room.roomCode);
-    toast.success('Mã phòng đã được sao chép');
+  const handleCopyCode = async () => {
+    if (!room) return;
+    await navigator.clipboard.writeText(room.roomCode);
+    toast.success('Đã sao chép mã phòng.');
   };
 
-  const renderStars = (score: number) => {
-    return Array.from({ length: 5 }).map((_, i) => (
-      <Star 
-        key={i} 
-        size={14} 
-        className={cn(
-          "fill-current",
-          i < Math.floor(score / 2) ? "text-warning" : "text-bg"
-        )} 
-      />
-    ));
-  };
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
 
-  const getAmenityIcon = (amenity: string) => {
-    switch (amenity) {
-      case 'WiFi': return <Layout size={20} className="text-primary" />;
-      case 'AirConditioner': return <Wind size={20} className="text-primary" />;
-      case 'HotWater': return <Droplets size={20} className="text-primary" />;
-      case 'Fridge': return <Refrigerator size={20} className="text-primary" />;
-      case 'Washer': return <Disc size={20} className="text-primary" />;
-      case 'Balcony': return <Maximize size={20} className="text-primary" />;
-      case 'Furniture': return <Package size={20} className="text-primary" />;
-      default: return <Plus size={20} className="text-primary" />;
-    }
-  };
+  if (!room) {
+    return (
+      <div className="rounded-[28px] border border-dashed border-border bg-card px-6 py-14 text-center">
+        <h2 className="text-lg font-semibold text-foreground">Không tìm thấy phòng</h2>
+        <p className="mt-2 text-sm text-muted">Phòng có thể đã bị xóa hoặc bạn không còn quyền xem bản ghi này.</p>
+      </div>
+    );
+  }
+
+  const canList = room.status === 'Vacant';
+  const canToggleListing = room.isListed || canList;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* 1.2.1 Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/10">
-        <div className="flex items-center gap-6">
-          <button onClick={() => navigate(-1)} className="p-3 hover:bg-bg rounded-2xl transition-all shadow-sm border border-border/10 bg-white group">
-            <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+    <div className="space-y-6 pb-10">
+      <div className="flex flex-col gap-4 rounded-[28px] border border-border bg-card p-5 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-muted transition hover:text-foreground"
+          >
+            <ArrowLeft size={18} />
           </button>
-          <div>
-            <div className="flex items-center gap-4 mb-2">
-               <div className="flex items-center gap-2 group cursor-pointer" onClick={handleCopyCode}>
-                 <h1 className="text-[40px] font-black text-primary tracking-tighter leading-none font-mono uppercase">{room.roomCode}</h1>
-                 <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity bg-bg rounded-lg">
-                    <Copy size={14} className="text-muted" />
-                 </div>
-               </div>
-               <StatusBadge status={room.status} size="lg" className="shadow-2xl shadow-primary/10" />
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleCopyCode}
+                className="inline-flex items-center gap-2 text-left text-2xl font-bold tracking-tight text-foreground transition hover:text-primary sm:text-3xl"
+              >
+                <span>{room.roomCode}</span>
+                <Copy size={16} />
+              </button>
+              <StatusBadge status={room.status} label={getRoomStatusLabel(room.status)} size="sm" />
             </div>
-            <div className="flex items-center gap-4 text-[10px] text-muted font-black uppercase tracking-[3px]">
-               <span className="flex items-center gap-1.5"><Building2 size={12} className="text-primary" /> {room.buildingName}</span>
-               <span className="flex items-center gap-1.5"><MapPin size={12} className="text-primary" /> Tầng {room.floorNumber}</span>
-               <span className="flex items-center gap-1.5"><Maximize size={12} className="text-primary" /> {room.areaSqm} m2</span>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">
+              <span className="inline-flex items-center gap-2">
+                <Building2 size={14} />
+                {room.buildingName}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <MapPin size={14} />
+                Tầng {room.floorNumber}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Layers3 size={14} />
+                {room.areaSqm} m²
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {room.status === 'Vacant' && (
-            <>
-              <button 
-                className="btn-primary flex items-center gap-2 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[11px]" 
-                onClick={() => navigate('/owner/contracts/create', { state: { roomId: room.id } })}
-              >
-                <Key size={18} /> Tạo hợp đồng mới
-              </button>
-              <button className="h-12 px-6 bg-white border border-border/10 text-muted rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-bg transition-all hover:text-primary group">
-                 <Wrench size={18} className="group-hover:rotate-45 transition-transform" /> Đặt bảo trì
-              </button>
-            </>
-          )}
-          {room.status === 'Occupied' && (
-            <>
-              <button 
-                onClick={() => navigate(`/owner/contracts?roomId=${room.id}`)}
-                className="h-12 px-6 bg-primary/10 text-primary rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-primary/20 transition-all border border-primary/20 shadow-lg shadow-primary/5"
-              >
-                <History size={18} /> Xem hợp đồng
-              </button>
-              <div className="relative group">
-                <button 
-                  className="h-12 px-6 bg-white border border-border/10 text-muted rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-bg transition-all hover:text-primary"
-                >
-                  <ClipboardList size={18} /> Bàn giao phòng
-                </button>
-                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-border/5 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <button 
-                    onClick={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckIn' } })}
-                    className="w-full text-left px-5 py-4 text-[10px] font-black uppercase tracking-widest text-success hover:bg-success/5 transition-all flex items-center gap-3"
-                  >
-                    <CheckCircle2 size={14} /> Bàn giao Nhận (In)
-                  </button>
-                  <button 
-                    onClick={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckOut' } })}
-                    className="w-full text-left px-5 py-4 text-[10px] font-black uppercase tracking-widest text-danger border-t border-border/5 hover:bg-danger/5 transition-all flex items-center gap-3"
-                  >
-                    <XCircle size={14} /> Bàn giao Trả (Out)
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          {room.status === 'Maintenance' && (
-            <button 
-              onClick={() => completeMaintenance.mutate()}
-              disabled={completeMaintenance.isPending}
-              className="btn-primary flex items-center gap-2 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[11px] disabled:opacity-50"
+        <div className="flex flex-wrap items-center gap-2">
+          {room.status === 'Vacant' ? (
+            <button
+              onClick={() => navigate('/owner/contracts/create', { state: { roomId: room.id } })}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90"
             >
-              {completeMaintenance.isPending ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <CheckCircle2 size={18} />
-              )}
-              Hoàn thành bảo trì
+              <Plus size={15} />
+              Tạo hợp đồng
             </button>
-          )}
-          <button 
+          ) : null}
+
+          {room.contracts.length > 0 ? (
+            <button
+              onClick={() => setActiveTab('contracts')}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background"
+            >
+              <History size={15} />
+              Xem hợp đồng
+            </button>
+          ) : null}
+
+          {room.status === 'Maintenance' ? (
+            <button
+              onClick={() => completeMaintenanceMutation.mutate()}
+              disabled={completeMaintenanceMutation.isPending}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background disabled:opacity-60"
+            >
+              {completeMaintenanceMutation.isPending ? <Spinner size="sm" /> : <Wrench size={15} />}
+              Hoàn tất bảo trì
+            </button>
+          ) : null}
+
+          <button
             onClick={() => setIsModalOpen(true)}
-            className="w-12 h-12 bg-white border border-border/10 rounded-xl text-muted hover:text-primary hover:shadow-xl transition-all flex items-center justify-center"
-            title="Sửa thông tin"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background"
           >
-             <Edit size={20} />
+            <PencilLine size={15} />
+            Chỉnh sửa
           </button>
-          <button 
+          <button
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
-            className="w-12 h-12 bg-white border border-danger/20 rounded-xl text-danger hover:bg-danger/5 hover:shadow-xl transition-all flex items-center justify-center disabled:opacity-50"
-            title="Xoá phòng"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-danger/25 px-4 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
           >
-             {deleteMutation.isPending ? <Spinner size="sm" /> : <Trash2 size={20} />}
+            {deleteMutation.isPending ? <Spinner size="sm" /> : <Trash2 size={15} />}
+            Xóa
           </button>
         </div>
       </div>
 
-      <div className="bg-white/40 backdrop-blur-md rounded-[40px] overflow-hidden shadow-2xl shadow-primary/5 border border-white/50">
-        <div className="flex flex-wrap border-b border-border/5 bg-bg/20 px-4">
-          <TabItem active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} icon={Info}>Tổng quan</TabItem>
-          <TabItem active={activeTab === 'Images'} onClick={() => setActiveTab('Images')} icon={ImageIcon}>Hình ảnh</TabItem>
-          <TabItem active={activeTab === 'Assets'} onClick={() => setActiveTab('Assets')} icon={Package}>Tài sản</TabItem>
-          <TabItem active={activeTab === 'Contracts'} onClick={() => setActiveTab('Contracts')} icon={History}>Hợp đồng</TabItem>
-          <TabItem active={activeTab === 'Handover'} onClick={() => setActiveTab('Handover')} icon={ShieldCheck}>Bàn giao</TabItem>
-          <TabItem active={activeTab === 'History'} onClick={() => setActiveTab('History')} icon={ClipboardList}>Lịch sử TT</TabItem>
+      <div className="rounded-[28px] border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-4 py-3 sm:hidden">
+          <select
+            value={activeTab}
+            onChange={(event) => setActiveTab(event.target.value as RoomTab)}
+            className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm text-foreground outline-none transition focus:border-primary/35 focus:ring-4 focus:ring-primary/10"
+          >
+            {tabs.map((tab) => (
+              <option key={tab.id} value={tab.id}>
+                {tab.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="p-10 animate-in fade-in slide-in-from-top-2 duration-700">
-          {activeTab === 'Overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              <div className="lg:col-span-8 space-y-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {[
-                    { label: 'Diện tích', value: `${room.areaSqm} m2`, icon: Maximize },
-                    { label: 'Giá thuê CB', value: formatVND(room.baseRentPrice), icon: Key },
-                    { label: 'Loại phòng', value: room.roomType, icon: Layout },
-                    { label: 'Số người tối đa', value: room.maxOccupancy, icon: User },
-                    { label: 'Hướng nhà', value: room.directionFacing, icon: MapPin },
-                    { label: 'Nội thất', value: room.furnishing === 'FullyFurnished' ? 'Đầy đủ' : room.furnishing === 'SemiFurnished' ? 'Cơ bản' : 'Không nội thất', icon: Package },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-5 p-6 bg-white/60 rounded-[32px] border border-primary/5 hover:border-primary/20 transition-all hover:shadow-xl hover:shadow-primary/5 group">
-                       <div className="w-14 h-14 bg-bg text-primary rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                          <item.icon size={24} />
-                       </div>
-                       <div>
-                          <p className="text-[10px] text-muted font-black uppercase tracking-[2px]">{item.label}</p>
-                          <p className="text-[16px] font-black text-primary font-mono">{item.value}</p>
-                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-8">
-                   <h3 className="text-[12px] text-primary font-black uppercase tracking-[4px] border-l-4 border-primary pl-4">Tiện ích căn hộ</h3>
-                   {(room.amenityDetails ?? []).length > 0 ? (
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                       {(room.amenityDetails ?? []).map((amenity, i) => (
-                         <div key={i} className="flex flex-col items-center justify-center p-8 bg-white/40 rounded-[40px] border border-transparent hover:border-primary/10 hover:bg-white transition-all group hover:shadow-2xl hover:shadow-primary/10">
-                            <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-inner">
-                               {getAmenityIcon(amenity.code)}
-                            </div>
-                            <span className="text-[10px] font-black text-primary uppercase tracking-[2px]">{amenity.label}</span>
-                         </div>
-                       ))}
-                     </div>
-                   ) : (
-                     <div className="flex flex-col items-center justify-center py-12 bg-white/40 rounded-[40px] border-2 border-dashed border-border/20">
-                       <div className="w-16 h-16 bg-bg rounded-[24px] flex items-center justify-center mb-4 text-muted">
-                         <Package size={28} />
-                       </div>
-                       <p className="text-[11px] font-black text-muted uppercase tracking-[3px]">Chưa có tiện ích nào được ghi nhận</p>
-                     </div>
-                   )}
-                </div>
-
-                <div className="space-y-6">
-                   <h3 className="text-[12px] text-primary font-black uppercase tracking-[4px] border-l-4 border-primary pl-4">Mô tả chi tiết</h3>
-                   <div className="relative">
-                      <div className="absolute top-4 left-4 text-primary opacity-10"><Copy size={48} /></div>
-                      {room.description ? (
-                        <p className="text-body text-text leading-relaxed p-8 bg-white/60 rounded-[40px] border border-border/5 italic relative z-10">
-                          &quot;{room.description}&quot;
-                        </p>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-10 bg-white/40 rounded-[40px] border-2 border-dashed border-border/20">
-                          <p className="text-[11px] font-black text-muted uppercase tracking-[3px]">Chưa có mô tả cho phòng này</p>
-                        </div>
-                      )}
-                   </div>
-                </div>
-              </div>
-
-              <div className="lg:col-span-4 space-y-8">
-                 <div className="p-10 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[48px] text-white shadow-2xl relative overflow-hidden group">
-                    <div className="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                       <ShieldCheck size={200} />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mb-4 uppercase tracking-[3px] font-black">Chỉ số đánh giá (Condition)</p>
-                    <div className="flex items-end gap-3 mb-6">
-                       <span className="text-[64px] font-black leading-none tracking-tighter">{room.conditionScore}</span>
-                       <span className="text-2xl text-slate-500 font-bold mb-2">/ 10</span>
-                    </div>
-                    <div className="flex gap-2 mb-10">
-                       {renderStars(room.conditionScore)}
-                    </div>
-                    <div className="space-y-5 pt-8 border-t border-white/10">
-                       <div className="flex justify-between items-center">
-                          <span className="text-slate-400 font-bold text-[11px] uppercase tracking-widest">Ban công</span>
-                          {room.hasBalcony ? <div className="bg-success/20 p-1.5 rounded-full"><CheckCircle2 className="text-success" size={16} /></div> : <span className="text-slate-600">---</span>}
-                       </div>
-                       <div className="flex justify-between items-center">
-                           <span className="text-slate-400 font-bold text-[11px] uppercase tracking-widest">Bảo trì gần nhất</span>
-                           <span className="font-mono text-secondary text-[12px]">{formatDate(room.lastMaintenanceDate || '--')}</span>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="p-10 bg-white/60 rounded-[48px] border border-primary/5 shadow-xl">
-                    <h4 className="text-[10px] text-muted uppercase tracking-[3px] mb-8 border-b border-dashed border-border/20 pb-5 font-black">Cư dân hiện tại</h4>
-                    {room.tenantNames && room.tenantNames.length > 0 ? (
-                      <div className="space-y-6">
-                        {room.tenantNames.map((name, i) => (
-                          <div key={i} className="flex items-center gap-5 p-4 bg-white rounded-[24px] border border-transparent hover:border-primary/10 transition-all hover:shadow-lg group">
-                             <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg ring-4 ring-bg group-hover:scale-110 transition-transform">{name.charAt(0)}</div>
-                             <div>
-                                <p className="text-[14px] font-black text-primary">{name}</p>
-                                <p className="text-[10px] text-muted italic font-bold">Thành viên phòng</p>
-                             </div>
-                             <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ArrowRight size={16} className="text-primary" />
-                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16">
-                        <div className="w-20 h-20 bg-bg rounded-[32px] flex items-center justify-center mx-auto mb-6 text-muted border-2 border-dashed border-border/20">
-                           <Home size={32} />
-                        </div>
-                        <p className="text-small text-muted italic font-black uppercase tracking-widest">Phòng đang trống</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-10 bg-white/60 rounded-[48px] border border-primary/5 shadow-xl overflow-hidden relative group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                      <Share2 size={80} className="text-primary" />
-                    </div>
-                    <h4 className="text-[10px] text-muted uppercase tracking-[3px] mb-6 font-black">Niêm yết công khai</h4>
-                    <div className="flex items-center justify-between">
-                       <div className="flex-1">
-                          <p className="text-[14px] font-black text-primary mb-1">{room.isListed ? 'Đang niêm yết' : 'Chưa niêm yết'}</p>
-                          <p className="text-[10px] text-muted leading-relaxed">Cho phép hiển thị phòng này trên Marketplace để khách tìm thuê.</p>
-                       </div>
-                       <button
-                         onClick={() => {
-                           roomService.updateRoom(room.id, { isListed: !room.isListed })
-                             .then(() => {
-                               queryClient.invalidateQueries({ queryKey: ['room', room.id] });
-                               toast.success(room.isListed ? 'Đã gỡ niêm yết' : 'Đã niêm yết phòng thành công!');
-                             })
-                             .catch((err) => toast.error(err.message));
-                         }}
-                         className={cn(
-                           "relative w-14 h-8 rounded-full p-1 transition-all duration-500 shadow-inner",
-                           room.isListed ? "bg-primary" : "bg-slate-300"
-                         )}
-                       >
-                         <div className={cn(
-                           "w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 flex items-center justify-center",
-                           room.isListed ? "translate-x-6" : "translate-x-0"
-                         )}>
-                            {room.isListed && <div className="w-1 h-1 rounded-full bg-primary" />}
-                         </div>
-                       </button>
-                    </div>
-                    
-                    {room.isListed && (
-                      <div className="mt-8 pt-8 border-t border-dashed border-border/20 animate-in fade-in slide-in-from-top-2">
-                        <button 
-                          onClick={() => {
-                            const url = `${window.location.origin}/listings/${room.id}`;
-                            navigator.clipboard.writeText(url);
-                            toast.success('Đã sao chép link công khai');
-                          }}
-                          className="w-full flex items-center justify-between p-4 bg-primary/5 rounded-2xl hover:bg-primary/10 transition-all group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform"><Share2 size={14} className="text-primary" /></div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Sao chép Link Listing</span>
-                          </div>
-                          <ArrowRight size={14} className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-              </div>
+        <div className="hidden border-b border-border sm:block">
+          <div className="overflow-x-auto px-3">
+            <div className="flex min-w-max gap-2 py-3">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'rounded-2xl px-4 py-2.5 text-sm font-medium transition',
+                    activeTab === tab.id
+                      ? 'bg-primary text-white'
+                      : 'text-muted hover:bg-background hover:text-foreground',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        </div>
 
-          {activeTab === 'Images' && (
-            <div className="space-y-10">
-               <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Thư viện hình ảnh</h3>
-                    <p className="text-[10px] text-muted font-bold italic">{room.images.length} ảnh · JPG, PNG, WebP · Tối đa 2MB/ảnh</p>
-                  </div>
-                  <div className="flex gap-4">
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files ?? []);
-                        if (files.length > 0) uploadImageMutation.mutate(files);
-                        e.target.value = '';
-                      }}
-                    />
-                    <button
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={uploadImageMutation.isPending}
-                      className="btn-primary-sm px-6 h-11 flex items-center gap-2 rounded-xl disabled:opacity-60"
-                    >
-                      {uploadImageMutation.isPending
-                        ? <><Loader2 size={14} className="animate-spin" /> Đang tải {uploadingCount} ảnh...</>
-                        : <><Plus size={14} /> Thêm ảnh</>}
-                    </button>
-                  </div>
-               </div>
+        <div className="p-4 sm:p-5 lg:p-6">
+          {activeTab === 'overview' ? (
+            <OverviewTab
+              room={room}
+              canList={canList}
+              canToggleListing={canToggleListing}
+              onToggleListing={() => toggleListingMutation.mutate(!room.isListed)}
+              isTogglingListing={toggleListingMutation.isPending}
+              onOpenBuilding={() => navigate(`/owner/buildings/${room.buildingId}`)}
+            />
+          ) : null}
 
-               {room.images.length === 0 && !uploadImageMutation.isPending ? (
-                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                   <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center">
-                     <ImageIcon size={36} className="text-primary/30" />
-                   </div>
-                   <div>
-                     <p className="text-body font-black text-muted">Chưa có ảnh nào</p>
-                     <p className="text-small text-muted/70 mt-1">Nhấn &quot;Thêm ảnh&quot; để tải ảnh phòng lên.</p>
-                   </div>
-                   <button onClick={() => photoInputRef.current?.click()} className="btn-primary flex items-center gap-2 mt-2">
-                     <Plus size={16} /> Thêm ảnh đầu tiên
-                   </button>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                   {room.images.map((img, idx) => (
-                     <div key={img.id} className="group relative aspect-square rounded-[40px] overflow-hidden bg-bg shadow-xl hover:shadow-2xl transition-all border-8 border-transparent hover:border-primary/10">
-                       <img
-                         src={img.url}
-                         alt=""
-                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 cursor-zoom-in"
-                         onClick={() => setPreviewIndex(idx)}
-                       />
-                       {img.isMain && (
-                         <div className="absolute top-4 left-4">
-                           <span className="flex items-center gap-1 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow">
-                             <Star size={10} fill="currentColor" /> Đại diện
-                           </span>
-                         </div>
-                       )}
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                       <div className="absolute top-3 right-3 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
-                         <button
-                           onClick={() => setPreviewIndex(idx)}
-                           title="Xem ảnh"
-                           className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-primary shadow-lg hover:bg-white"
-                         >
-                           <ZoomIn size={15} />
-                         </button>
-                         {!img.isMain && (
-                           <button
-                             onClick={() => setMainImageMutation.mutate(img.id)}
-                             disabled={setMainImageMutation.isPending}
-                             title="Đặt làm ảnh đại diện"
-                             className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-yellow-500 shadow-lg hover:bg-white disabled:opacity-50"
-                           >
-                             <Star size={15} />
-                           </button>
-                         )}
-                         <button
-                           onClick={() => deleteImageMutation.mutate(img.id)}
-                           disabled={deleteImageMutation.isPending}
-                           title="Xóa ảnh"
-                           className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-danger shadow-lg hover:bg-white disabled:opacity-50"
-                         >
-                           <Trash2 size={15} />
-                         </button>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               )}
-            </div>
-          )}
+          {activeTab === 'images' ? (
+            <ImagesTab
+              room={room}
+              onAddImages={() => photoInputRef.current?.click()}
+              onPreview={setPreviewIndex}
+              onDelete={(imageId) => deleteImageMutation.mutate(imageId)}
+              onSetMain={(imageId) => setMainImageMutation.mutate(imageId)}
+              uploading={uploadImageMutation.isPending}
+              uploadingCount={uploadingCount}
+            />
+          ) : null}
 
-          {activeTab === 'Assets' && (
-            <div className="space-y-10">
-               <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Tài sản gán theo phòng</h3>
-                    <p className="text-[10px] text-muted font-bold italic">Danh sách trang thiết bị đi kèm căn hộ.</p>
-                  </div>
-                  <button 
-                    onClick={() => setIsAssignAssetModalOpen(true)}
-                    className="btn-primary-sm h-11 px-6 flex items-center gap-2 rounded-xl text-[11px] uppercase tracking-widest font-black"
-                  >
-                    <Plus size={16} /> Gán tài sản mới
-                  </button>
-               </div>
-               <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px]">
-                          <th className="px-8 py-6">Tên tài sản / Mã code</th>
-                          <th className="px-6 py-6 border-l border-white/5">Loại thiết bị</th>
-                          <th className="px-6 py-6 border-l border-white/5">Tình trạng vật lý</th>
-                          <th className="px-6 py-6 border-l border-white/5">Ngày bàn giao</th>
-                          <th className="px-6 py-6 border-l border-white/5">Thu phí hàng tháng</th>
-                          <th className="px-8 py-6 border-l border-white/5 text-right">Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/10">
-                        {room.assets.map((asset) => (
-                          <tr key={asset.id} className="group hover:bg-white/80 transition-all cursor-pointer">
-                             <td className="px-8 py-6">
-                                <div className="flex items-center gap-4">
-                                   <div className="w-12 h-12 bg-bg rounded-2xl flex items-center justify-center text-primary shadow-inner">
-                                      {asset.type === 'Appliance' ? <Zap size={20} /> : <Layout size={20} />}
-                                   </div>
-                                   <div>
-                                      <p className="text-[15px] font-black text-primary uppercase tracking-tighter">{asset.assetName}</p>
-                                      <p className="text-[10px] font-mono text-muted font-bold tracking-widest">{asset.assetCode}</p>
-                                   </div>
-                                </div>
-                             </td>
-                             <td className="px-6 py-6 text-[11px] font-black text-muted uppercase tracking-widest">
-                                <span className="px-3 py-1 bg-bg rounded-lg border border-border/5">{asset.type}</span>
-                             </td>
-                             <td className="px-6 py-6">
-                                <div className="flex gap-1.5">
-                                   {renderStars(asset.condition === 'New' ? 10 : asset.condition === 'Good' ? 8 : asset.condition === 'Fair' ? 6 : 4)}
-                                </div>
-                             </td>
-                             <td className="px-6 py-6 text-[13px] font-bold text-muted font-mono">{formatDate(asset.assignedAt)}</td>
-                             <td className="px-6 py-6 text-[11px] font-bold text-muted">
-                                {asset.isBillable ? (
-                                  <div className="flex flex-col gap-1">
-                                    <span className="font-black text-primary">{formatVND(asset.monthlyCharge || 0)}/thang</span>
-                                    <span className="text-[10px] uppercase tracking-widest text-muted">{asset.billingStatus}</span>
-                                  </div>
-                                ) : (
-                                  <span className="uppercase tracking-widest text-muted/60">Mien phi</span>
-                                )}
-                             </td>
-                             <td className="px-8 py-6 text-right">
-                                <button className="w-10 h-10 bg-bg text-muted hover:bg-white hover:text-primary hover:shadow-lg rounded-xl flex items-center justify-center transition-all group-hover:scale-110">
-                                   <MoreVertical size={18} />
-                                </button>
-                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                 </div>
-               </div>
-            </div>
-          )}
+          {activeTab === 'assets' ? (
+            <AssetsTab room={room} onOpenAssignAsset={() => setIsAssignAssetModalOpen(true)} />
+          ) : null}
 
-          {activeTab === 'History' && (
-            <div className="space-y-10">
-               <div>
-                 <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Audit Trail - Trạng thái</h3>
-                 <p className="text-[10px] text-muted font-bold italic">Nhật ký thay đổi trạng thái tự động được đồng bộ từ backend.</p>
-               </div>
-               <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px]">
-                          <th className="px-8 py-6">Từ Trạng thái</th>
-                          <th className="px-6 py-6 border-l border-white/5 text-center"><ArrowRight size={14} className="mx-auto" /></th>
-                          <th className="px-6 py-6 border-l border-white/5">Đến Trạng thái</th>
-                          <th className="px-6 py-6 border-l border-white/5">Thời điểm</th>
-                          <th className="px-6 py-6 border-l border-white/5">Thực hiện bởi</th>
-                          <th className="px-8 py-6 border-l border-white/5">Ghi chú / Tham chiếu</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/10">
-                        {room.statusHistory.map((h) => (
-                          <tr key={h.id} className="hover:bg-white/80 transition-all">
-                             <td className="px-8 py-6"><StatusBadge status={h.fromStatus} size="sm" /></td>
-                             <td className="px-6 py-6 text-center"><ArrowRight size={16} className="text-muted/20 mx-auto" /></td>
-                             <td className="px-6 py-6"><StatusBadge status={h.toStatus} size="sm" /></td>
-                             <td className="px-6 py-6 text-[12px] text-muted font-black font-mono">{h.changedAt}</td>
-                             <td className="px-6 py-6">
-                                <div className="flex items-center gap-2">
-                                   <div className="w-7 h-7 bg-primary/10 text-primary rounded-lg flex items-center justify-center text-[10px] font-black">{h.changedBy.charAt(0)}</div>
-                                   <span className="text-[11px] font-black text-primary uppercase tracking-widest">{h.changedBy}</span>
-                                </div>
-                             </td>
-                             <td className="px-8 py-6">
-                                <div className="flex flex-col gap-1.5">
-                                   <span className="text-[13px] text-text font-bold italic">&quot;{h.reason}&quot;</span>
-                                   {h.contractId && (
-                                     <button 
-                                       onClick={() => navigate(`/owner/contracts/${h.contractId}`)} 
-                                       className="w-fit px-3 py-1 bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest rounded-lg flex items-center gap-2 hover:bg-primary hover:text-white transition-all border border-primary/10"
-                                     >
-                                        <ClipboardList size={12} /> HD: {h.contractId}
-                                     </button>
-                                   )}
-                                </div>
-                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                 </div>
-               </div>
-               
-               <div className="p-8 bg-info/[0.03] border border-info/20 rounded-[40px] flex gap-5 italic text-[14px] text-info font-bold items-center shadow-lg shadow-info/5">
-                  <div className="p-3 bg-info/10 rounded-2xl"><ShieldCheck size={24} /></div>
-                  Nhật ký này được cập nhật tự động (MANDATORY RULE-10) mỗi khi có sự thay đổi tại cột <code className="bg-info/10 px-2 py-0.5 rounded font-mono mx-1">Rooms.Status</code>.
-               </div>
-            </div>
-          )}
+          {activeTab === 'contracts' ? (
+            <ContractsTab room={room} onOpenContract={(contractId) => navigate(`/owner/contracts/${contractId}`)} />
+          ) : null}
 
-          {activeTab === 'Contracts' && (
-             <div className="space-y-10">
-               <div className="flex justify-between items-center">
-                 <div>
-                   <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Lịch sử Thuê phòng</h3>
-                   <p className="text-[10px] text-muted font-bold italic">Tất cả hợp đồng đã và đang gắn với phòng này.</p>
-                 </div>
-                 <button
-                   onClick={() => navigate('/owner/contracts')}
-                   className="btn-outline-sm px-6 h-11 flex items-center gap-2 rounded-xl text-[11px] font-black uppercase tracking-widest"
-                 >
-                   <History size={16} /> Quản lý hợp đồng
-                 </button>
-               </div>
+          {activeTab === 'handover' ? (
+            <HandoverTab
+              roomId={room.id}
+              onCheckIn={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckIn' } })}
+              onCheckOut={() => navigate(`/owner/rooms/${room.id}/handover`, { state: { type: 'CheckOut' } })}
+            />
+          ) : null}
 
-               {room.contracts && room.contracts.length > 0 ? (
-                 <div className="card-container overflow-hidden p-0 border-none shadow-2xl shadow-primary/5 bg-white/40">
-                   <div className="overflow-x-auto">
-                     <table className="w-full text-left border-collapse">
-                       <thead>
-                         <tr className="bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px]">
-                           <th className="px-8 py-6">Mã hợp đồng</th>
-                           <th className="px-6 py-6 border-l border-white/5">Cư dân</th>
-                           <th className="px-6 py-6 border-l border-white/5">Ngày bắt đầu</th>
-                           <th className="px-6 py-6 border-l border-white/5">Ngày kết thúc</th>
-                           <th className="px-6 py-6 border-l border-white/5">Giá thuê/tháng</th>
-                           <th className="px-8 py-6 border-l border-white/5">Trạng thái</th>
-                           <th className="px-8 py-6 border-l border-white/5 text-right">Thao tác</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-border/10">
-                         {room.contracts.map((c: RoomContractSummary) => (
-                           <tr key={c.id} className="group hover:bg-white/80 transition-all cursor-pointer" onClick={() => navigate(`/owner/contracts/${c.id}`)}>
-                             <td className="px-8 py-6">
-                               <p className="text-[14px] font-black text-primary font-mono tracking-tighter">{c.contractCode || `#${c.id}`}</p>
-                             </td>
-                             <td className="px-6 py-6">
-                               <div className="flex items-center gap-3">
-                                 <div className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm">
-                                   {c.tenantName ? c.tenantName.charAt(0) : '?'}
-                                 </div>
-                                 <span className="text-[13px] font-bold text-text">{c.tenantName || 'Chưa có cư dân'}</span>
-                               </div>
-                             </td>
-                             <td className="px-6 py-6 text-[12px] font-mono text-muted font-bold">{formatDate(c.startDate)}</td>
-                             <td className="px-6 py-6 text-[12px] font-mono text-muted font-bold">{formatDate(c.endDate)}</td>
-                             <td className="px-6 py-6 text-[13px] font-black text-primary font-mono">{formatVND(c.monthlyRent)}</td>
-                             <td className="px-8 py-6">
-                               <StatusBadge status={c.status} size="sm" />
-                             </td>
-                             <td className="px-8 py-6 text-right">
-                               <button
-                                 onClick={(e) => { e.stopPropagation(); navigate(`/owner/contracts/${c.id}`); }}
-                                 className="w-10 h-10 bg-bg text-muted hover:bg-white hover:text-primary hover:shadow-lg rounded-xl flex items-center justify-center transition-all ml-auto"
-                               >
-                                 <ArrowRight size={16} />
-                               </button>
-                             </td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-                 </div>
-               ) : (
-                 <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
-                   <div className="w-24 h-24 bg-bg rounded-[40px] flex items-center justify-center text-muted border-4 border-dashed border-border/20 group">
-                     <History size={48} className="group-hover:rotate-[-45deg] transition-transform duration-500" />
-                   </div>
-                   <div className="space-y-2">
-                     <h3 className="text-[18px] font-black text-primary uppercase tracking-[4px]">Chưa có hợp đồng nào</h3>
-                     <p className="text-[13px] text-muted italic font-bold">Phòng này chưa có hợp đồng thuê nào được tạo.</p>
-                   </div>
-                   {room.status === 'Vacant' && (
-                     <button
-                       className="btn-primary px-8 h-12 rounded-xl text-[11px] font-black uppercase tracking-[3px]"
-                       onClick={() => navigate('/owner/contracts/create', { state: { roomId: room.id } })}
-                     >
-                       Tạo hợp đồng mới
-                     </button>
-                   )}
-                 </div>
-               )}
-              </div>
-           )}
-           {activeTab === 'Handover' && <HandoverTab roomId={room.id} />}
+          {activeTab === 'history' ? (
+            <HistoryTab room={room} />
+          ) : null}
         </div>
       </div>
+
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length > 0) uploadImageMutation.mutate(files);
+          event.target.value = '';
+        }}
+      />
+
+      {previewIndex !== null && room.images[previewIndex] ? (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/88 p-4 backdrop-blur-sm"
+          onClick={() => setPreviewIndex(null)}
+        >
+          <button
+            onClick={() => setPreviewIndex(null)}
+            className="absolute right-5 top-5 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <X size={18} />
+          </button>
+
+          {room.images.length > 1 ? (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setPreviewIndex((index) => (index !== null ? (index - 1 + room.images.length) % room.images.length : null));
+              }}
+              className="absolute left-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          ) : null}
+
+          <img
+            src={room.images[previewIndex].url}
+            alt=""
+            className="max-h-[86vh] max-w-[92vw] rounded-3xl object-contain shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          />
+
+          {room.images.length > 1 ? (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setPreviewIndex((index) => (index !== null ? (index + 1) % room.images.length : null));
+              }}
+              className="absolute right-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            >
+              <ChevronRight size={20} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <RoomModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         room={room}
       />
-
-      {/* Image Lightbox */}
-      {previewIndex !== null && room.images[previewIndex] && (
-        <div
-          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center"
-          onClick={() => setPreviewIndex(null)}
-        >
-          <button onClick={() => setPreviewIndex(null)} className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
-            <X size={20} />
-          </button>
-          <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-white/10 text-white text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-full backdrop-blur-md">
-            {previewIndex + 1} / {room.images.length}
-          </div>
-          {room.images.length > 1 && (
-            <button onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex - 1 + room.images.length) % room.images.length); }} className="absolute left-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
-              <ChevronLeft size={24} />
-            </button>
-          )}
-          <img src={room.images[previewIndex].url} className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl" alt="" onClick={(e) => e.stopPropagation()} />
-          {room.images.length > 1 && (
-            <button onClick={(e) => { e.stopPropagation(); setPreviewIndex((previewIndex + 1) % room.images.length); }} className="absolute right-5 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all">
-              <ChevronRight size={24} />
-            </button>
-          )}
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2" onClick={(e) => e.stopPropagation()}>
-            {room.images[previewIndex].isMain ? (
-              <span className="flex items-center gap-1.5 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow">
-                <Star size={11} fill="currentColor" /> Ảnh đại diện
-              </span>
-            ) : (
-              <button
-                onClick={() => setMainImageMutation.mutate(room.images[previewIndex!].id)}
-                disabled={setMainImageMutation.isPending}
-                className="flex items-center gap-1.5 bg-white/15 hover:bg-yellow-400 hover:text-yellow-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow backdrop-blur-md transition-all disabled:opacity-50"
-              >
-                <Star size={11} /> Đặt làm ảnh đại diện
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       <AssignAssetModal
         isOpen={isAssignAssetModalOpen}
@@ -849,164 +447,543 @@ const RoomDetail = () => {
   );
 };
 
-const HandoverTab = ({ roomId }: { roomId: string }) => {
-  const navigate = useNavigate();
-  const { data: checklists, isLoading } = useQuery({
+const OverviewTab = ({
+  room,
+  canList,
+  canToggleListing,
+  onToggleListing,
+  isTogglingListing,
+  onOpenBuilding,
+}: {
+  room: RoomDetailType;
+  canList: boolean;
+  canToggleListing: boolean;
+  onToggleListing: () => void;
+  isTogglingListing: boolean;
+  onOpenBuilding: () => void;
+}) => (
+  <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_320px]">
+    <div className="min-w-0 space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Giá thuê" value={formatVND(room.baseRentPrice)} />
+        <MetricCard label="Diện tích" value={`${room.areaSqm} m²`} />
+        <MetricCard label="Sức chứa" value={`${room.maxOccupancy} người`} />
+        <MetricCard label="Hiện trạng" value={`${room.conditionScore}/10`} />
+      </div>
+
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Thông tin vận hành</h2>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          <InfoRow label="Loại phòng" value={getRoomTypeLabel(room.roomType)} />
+          <InfoRow label="Hướng phòng" value={getDirectionLabel(room.directionFacing)} />
+          <InfoRow label="Nội thất hiện có" value={getFurnishingLabel(room.furnishing)} />
+          <InfoRow label="Bảo trì gần nhất" value={formatDate(room.lastMaintenanceDate, 'dd/MM/yyyy HH:mm')} />
+          <InfoRow label="Ban công" value={room.hasBalcony ? 'Có' : 'Không'} />
+          <InfoRow label="Tòa nhà" value={room.buildingName} />
+        </dl>
+      </section>
+
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Tiện ích phòng</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(room.amenityDetails?.length ?? 0) > 0 ? (
+            room.amenityDetails!.map((amenity) => (
+              <span
+                key={amenity.code}
+                className="rounded-full bg-primary/8 px-3 py-1.5 text-sm font-medium text-primary"
+              >
+                {getRoomAmenityLabel(amenity.code)}
+              </span>
+            ))
+          ) : (
+            <p className="text-sm text-muted">Chưa có tiện ích nào được ghi nhận.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Ghi chú vận hành</h2>
+        <p className="mt-4 text-sm leading-7 text-foreground/90">
+          {room.description || 'Chưa có ghi chú cho phòng này.'}
+        </p>
+      </section>
+    </div>
+
+    <aside className="min-w-0 space-y-6">
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Khách thuê hiện tại</h2>
+        <div className="mt-4 space-y-3">
+          {room.tenantNames?.length ? (
+            room.tenantNames.map((name) => (
+              <div key={name} className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                  {name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-foreground">{name}</span>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl bg-card px-4 py-4 text-sm text-muted">
+              Hiện chưa có khách thuê đang ở.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Niêm yết công khai</h2>
+        <p className="mt-2 text-sm text-muted">
+          Chỉ phòng trống mới được bật niêm yết công khai.
+        </p>
+        <div className="mt-4 rounded-2xl border border-border bg-card px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">{room.isListed ? 'Đang niêm yết' : 'Chưa niêm yết'}</p>
+              <p className="mt-1 text-xs text-muted">
+                {canList
+                  ? 'Khách có thể xem phòng này trên website.'
+                  : room.isListed
+                    ? 'Phòng đang ở trạng thái không phù hợp. Bạn nên tắt niêm yết.'
+                    : 'Cần chuyển phòng về trạng thái trống trước.'}
+              </p>
+            </div>
+            <button
+              onClick={onToggleListing}
+              disabled={!canToggleListing || isTogglingListing}
+              className={cn(
+                'inline-flex h-10 items-center justify-center rounded-2xl px-4 text-sm font-medium transition',
+                room.isListed
+                  ? 'bg-primary text-white hover:bg-primary/90'
+                  : 'border border-border bg-background text-foreground hover:bg-card',
+                (!canToggleListing || isTogglingListing) && 'cursor-not-allowed opacity-60',
+              )}
+            >
+              {isTogglingListing ? <Loader2 size={15} className="animate-spin" /> : room.isListed ? 'Tắt niêm yết' : 'Bật niêm yết'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-border bg-background/60 p-5">
+        <h2 className="text-base font-semibold text-foreground">Liên kết nhanh</h2>
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={onOpenBuilding}
+            className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:bg-background"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Building2 size={15} />
+              Mở tòa nhà liên quan
+            </span>
+            <ExternalLink size={15} className="text-muted" />
+          </button>
+        </div>
+      </section>
+    </aside>
+  </div>
+);
+
+const ImagesTab = ({
+  room,
+  onAddImages,
+  onPreview,
+  onDelete,
+  onSetMain,
+  uploading,
+  uploadingCount,
+}: {
+  room: RoomDetailType;
+  onAddImages: () => void;
+  onPreview: (index: number) => void;
+  onDelete: (imageId: string) => void;
+  onSetMain: (imageId: string) => void;
+  uploading: boolean;
+  uploadingCount: number;
+}) => (
+  <div className="space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Thư viện ảnh</h2>
+        <p className="mt-1 text-sm text-muted">{room.images.length} ảnh đang lưu cho phòng này.</p>
+      </div>
+      <button
+        onClick={onAddImages}
+        disabled={uploading}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90 disabled:opacity-60"
+      >
+        {uploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+        {uploading ? `Đang tải ${uploadingCount} ảnh` : 'Thêm ảnh'}
+      </button>
+    </div>
+
+    {room.images.length === 0 && !uploading ? (
+      <div className="rounded-[24px] border border-dashed border-border bg-background/60 px-6 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 text-primary">
+          <ImageIcon size={22} />
+        </div>
+        <p className="mt-4 text-lg font-semibold text-foreground">Chưa có ảnh nào</p>
+        <p className="mt-2 text-sm text-muted">Bạn có thể tải ảnh thực tế của phòng tại đây.</p>
+      </div>
+    ) : (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {room.images.map((image, index) => (
+          <article key={image.id} className="overflow-hidden rounded-[24px] border border-border bg-background/50">
+            <button
+              onClick={() => onPreview(index)}
+              className="relative block aspect-[4/3] w-full overflow-hidden"
+            >
+              <img src={image.url} alt="" className="h-full w-full object-cover transition duration-500 hover:scale-105" />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 px-4 py-3 text-white">
+                <span className="text-sm font-medium">
+                  {image.isMain ? 'Ảnh đại diện' : `Ảnh ${index + 1}`}
+                </span>
+                <ImageIcon size={15} />
+              </div>
+            </button>
+            <div className="flex items-center gap-2 p-3">
+              {!image.isMain ? (
+                <button
+                  onClick={() => onSetMain(image.id)}
+                  className="inline-flex h-10 items-center justify-center rounded-2xl border border-border px-3 text-sm font-medium text-foreground transition hover:bg-card"
+                >
+                  Đặt làm ảnh đại diện
+                </button>
+              ) : (
+                <span className="rounded-2xl bg-primary/8 px-3 py-2 text-sm font-medium text-primary">
+                  Đang dùng làm ảnh đại diện
+                </span>
+              )}
+              <button
+                onClick={() => onDelete(image.id)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-danger/25 text-danger transition hover:bg-danger/5"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+const AssetsTab = ({
+  room,
+  onOpenAssignAsset,
+}: {
+  room: RoomDetailType;
+  onOpenAssignAsset: () => void;
+}) => (
+  <div className="space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Tài sản gắn với phòng</h2>
+        <p className="mt-1 text-sm text-muted">
+          Quản lý tình trạng, ngày gán và khoản thu định kỳ nếu có.
+        </p>
+      </div>
+      <button
+        onClick={onOpenAssignAsset}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90"
+      >
+        <Plus size={16} />
+        Gán tài sản
+      </button>
+    </div>
+
+    {room.assets.length === 0 ? (
+      <div className="rounded-[24px] border border-dashed border-border bg-background/60 px-6 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 text-primary">
+          <Package size={22} />
+        </div>
+        <p className="mt-4 text-lg font-semibold text-foreground">Chưa có tài sản nào</p>
+        <p className="mt-2 text-sm text-muted">Bạn có thể gán tài sản để theo dõi nội thất và thiết bị đi kèm.</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto rounded-[24px] border border-border">
+        <table className="min-w-[980px] w-full text-left">
+          <thead className="bg-background/70 text-sm text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Tài sản</th>
+              <th className="px-4 py-3 font-medium">Loại</th>
+              <th className="px-4 py-3 font-medium">Tình trạng</th>
+              <th className="px-4 py-3 font-medium">Ngày gán</th>
+              <th className="px-4 py-3 font-medium">Thu phí</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border bg-card">
+            {room.assets.map((asset) => (
+              <tr key={asset.id} className="hover:bg-background/55">
+                <td className="px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{asset.assetName}</p>
+                    <p className="mt-1 truncate text-xs text-muted">{asset.assetCode}</p>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm text-foreground">{getAssetTypeLabel(asset.type)}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{getAssetConditionLabel(asset.condition)}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{formatDate(asset.assignedAt, 'dd/MM/yyyy HH:mm')}</td>
+                <td className="px-4 py-3 text-sm text-foreground">
+                  {asset.isBillable ? (
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">{formatVND(asset.monthlyCharge || 0)}/tháng</p>
+                      <p className="text-xs text-muted">{asset.billingLabel || 'Thu cùng tiền phòng'}</p>
+                    </div>
+                  ) : (
+                    'Không thu phí'
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+);
+
+const ContractsTab = ({
+  room,
+  onOpenContract,
+}: {
+  room: RoomDetailType;
+  onOpenContract: (contractId: string) => void;
+}) => (
+  <div className="space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Hợp đồng gắn với phòng</h2>
+        <p className="mt-1 text-sm text-muted">
+          Bao gồm hợp đồng hiện tại và lịch sử thuê trước đó.
+        </p>
+      </div>
+      <button
+        onClick={() => room.status === 'Vacant' ? onOpenContract('create') : undefined}
+        disabled={room.status !== 'Vacant'}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Plus size={16} />
+        {room.status === 'Vacant' ? 'Có thể tạo hợp đồng mới ở thanh tiêu đề' : 'Phòng đang có hợp đồng hoặc không ở trạng thái trống'}
+      </button>
+    </div>
+
+    {room.contracts.length === 0 ? (
+      <div className="rounded-[24px] border border-dashed border-border bg-background/60 px-6 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 text-primary">
+          <History size={22} />
+        </div>
+        <p className="mt-4 text-lg font-semibold text-foreground">Chưa có hợp đồng nào</p>
+        <p className="mt-2 text-sm text-muted">Hợp đồng mới sẽ xuất hiện ở đây ngay sau khi được tạo.</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto rounded-[24px] border border-border">
+        <table className="min-w-[980px] w-full text-left">
+          <thead className="bg-background/70 text-sm text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Mã hợp đồng</th>
+              <th className="px-4 py-3 font-medium">Khách thuê</th>
+              <th className="px-4 py-3 font-medium">Bắt đầu</th>
+              <th className="px-4 py-3 font-medium">Kết thúc</th>
+              <th className="px-4 py-3 font-medium">Giá thuê</th>
+              <th className="px-4 py-3 font-medium">Trạng thái</th>
+              <th className="px-4 py-3 font-medium text-right">Chi tiết</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border bg-card">
+            {room.contracts.map((contract: RoomContractSummary) => (
+              <tr key={contract.id} className="hover:bg-background/55">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">{contract.contractCode || `#${contract.id}`}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{contract.tenantName || 'Chưa có khách thuê'}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{formatDate(contract.startDate)}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{formatDate(contract.endDate)}</td>
+                <td className="px-4 py-3 text-sm font-medium text-foreground">{formatVND(contract.monthlyRent)}</td>
+                <td className="px-4 py-3"><StatusBadge status={contract.status} size="sm" /></td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => onOpenContract(contract.id)}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary/90"
+                  >
+                    Xem
+                    <ArrowRight size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+);
+
+const HandoverTab = ({
+  roomId,
+  onCheckIn,
+  onCheckOut,
+}: {
+  roomId: string;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
+}) => {
+  const { data: checklists = [], isLoading } = useQuery({
     queryKey: ['roomHandover', roomId],
-    queryFn: () => roomService.getRoomHandoverChecklist(roomId)
+    queryFn: () => roomService.getRoomHandoverChecklist(roomId),
   });
 
-  if (isLoading) return <div className="py-20 flex justify-center"><Spinner /></div>;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-top-2 duration-700">
-      <div className="flex justify-between items-center bg-white/40 p-8 rounded-[32px] border border-primary/5">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-h3 text-primary font-black uppercase tracking-widest mb-1">Lịch sử bàn giao (Handover)</h3>
-          <p className="text-[10px] text-muted font-bold italic">Tất cả biên bản nhận/trả phòng và kiểm kê tài sản.</p>
+          <h2 className="text-base font-semibold text-foreground">Biên bản bàn giao</h2>
+          <p className="mt-1 text-sm text-muted">
+            Theo dõi lịch sử nhận phòng, trả phòng và các điểm cần xử lý.
+          </p>
         </div>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => navigate(`/owner/rooms/${roomId}/handover`, { state: { type: 'CheckIn' } })}
-            className="h-11 px-6 bg-success text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:shadow-lg hover:shadow-success/20 transition-all shadow-md"
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={onCheckIn}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background"
           >
-            <Plus size={16} /> Bàn giao Nhận
+            <Plus size={16} />
+            Lập biên bản nhận phòng
           </button>
-          <button 
-            onClick={() => navigate(`/owner/rooms/${roomId}/handover`, { state: { type: 'CheckOut' } })}
-            className="h-11 px-6 bg-danger text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:shadow-lg hover:shadow-danger/20 transition-all shadow-md"
+          <button
+            onClick={onCheckOut}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90"
           >
-            <Plus size={16} /> Bàn giao Trả
+            <Plus size={16} />
+            Lập biên bản trả phòng
           </button>
         </div>
       </div>
 
-      {!checklists || checklists.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
-          <div className="w-24 h-24 bg-bg rounded-[40px] flex items-center justify-center text-muted border-4 border-dashed border-border/20 group">
-            <ShieldCheck size={48} className="group-hover:scale-110 transition-transform duration-500" />
+      {checklists.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-border bg-background/60 px-6 py-14 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 text-primary">
+            <ShieldCheck size={22} />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-[18px] font-black text-primary uppercase tracking-[4px]">Chưa có biên bản nào</h3>
-            <p className="text-[13px] text-muted italic font-bold">Phòng này chưa thực hiện quy trình bàn giao nào.</p>
-          </div>
+          <p className="mt-4 text-lg font-semibold text-foreground">Chưa có biên bản nào</p>
+          <p className="mt-2 text-sm text-muted">Lần bàn giao đầu tiên sẽ xuất hiện ở đây sau khi lưu thành công.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-8">
-          {checklists.map((c) => (
-            <div key={c.id} className="card-container p-8 space-y-8 bg-white/60 border-primary/5 hover:border-primary/20 transition-all hover:shadow-2xl hover:shadow-primary/5 group">
-              <div className="flex items-center justify-between pb-6 border-b border-border/10">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg",
-                    c.handoverType === 'CheckIn' ? "bg-success" : c.handoverType === 'CheckOut' ? "bg-danger" : "bg-primary"
-                  )}>
-                    <ClipboardList size={24} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[14px] font-black text-primary uppercase tracking-widest">
-                        {c.handoverType === 'CheckIn' ? 'Bàn giao Nhận phòng' : c.handoverType === 'CheckOut' ? 'Bàn giao Trả phòng' : 'Kiểm kê định kỳ'}
-                      </span>
-                      <span className="px-3 py-1 bg-bg text-[10px] font-mono font-bold text-muted rounded-lg">#{c.id}</span>
+        <div className="grid gap-4">
+          {checklists.map((checklist) => {
+            const issueCount = checklist.sections.flatMap((section) => section.items).filter((item) => item.status === 'NotOK').length;
+
+            return (
+              <article key={checklist.id} className="rounded-[24px] border border-border bg-background/60 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-foreground">
+                        {getHandoverTypeLabel(checklist.handoverType)}
+                      </h3>
+                      <span className="rounded-full bg-card px-3 py-1 text-xs font-medium text-muted">#{checklist.id}</span>
                     </div>
-                    <p className="text-[11px] text-muted font-bold mt-1 flex items-center gap-2">
-                      <Calendar size={12} className="text-primary" /> {formatDate(c.date)}
+                    <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted">
+                      <CalendarDays size={14} />
+                      {formatDate(checklist.date, 'dd/MM/yyyy HH:mm')}
                     </p>
                   </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn(
+                      'rounded-full px-3 py-1 text-xs font-medium',
+                      issueCount > 0 ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success',
+                    )}>
+                      {issueCount > 0 ? `${issueCount} mục cần xử lý` : 'Không có lỗi ghi nhận'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                   <button className="btn-outline-sm h-10 px-4 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border-border/20">
-                      <Printer size={14} /> In biên bản
-                   </button>
-                   <button className="btn-primary-sm h-10 px-4 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10">
-                      <Download size={14} /> Xuất PDF
-                   </button>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">Hạng mục kiểm tra</p>
+                    <p className="mt-2 text-sm text-foreground">{checklist.sections.reduce((sum, section) => sum + section.items.length, 0)} mục</p>
+                  </div>
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">Tài sản ghi nhận</p>
+                    <p className="mt-2 text-sm text-foreground">{checklist.assets.length} tài sản</p>
+                  </div>
+                  <div className="rounded-2xl bg-card px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">Ghi chú</p>
+                    <p className="mt-2 text-sm text-foreground">{checklist.notes || 'Không có ghi chú thêm.'}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Hệ thống & Tiện ích</p>
-                    <div className="space-y-3">
-                       {c.sections.flatMap(s => s.items).slice(0, 5).map(it => (
-                         <div key={it.id} className="flex items-center justify-between text-[12px]">
-                            <span className="font-bold text-primary/80">{it.name}</span>
-                            <span className={cn(
-                              "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter",
-                              it.status === 'OK' ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-                            )}>
-                               {it.status}
-                            </span>
-                         </div>
-                       ))}
-                       {c.sections.flatMap(s => s.items).length > 5 && (
-                         <p className="text-[10px] text-muted italic font-bold">... và {c.sections.flatMap(s => s.items).length - 5} mục khác</p>
-                       )}
-                    </div>
-                 </div>
-
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Thay đổi Tài sản</p>
-                    <div className="space-y-3">
-                       {c.assets.map(a => (
-                         <div key={a.id} className="flex items-center justify-between text-[12px]">
-                            <div className="flex flex-col">
-                               <span className="font-bold text-primary/80">{a.assetName}</span>
-                               <span className="text-[9px] text-muted font-mono">{a.assetCode}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                               <span className="text-[10px] text-muted line-through opacity-50">{a.conditionBefore}</span>
-                               <ArrowRight size={10} className="text-muted" />
-                               <span className="px-2 py-0.5 bg-primary/5 text-primary rounded text-[10px] font-black uppercase tracking-tighter">{a.conditionAfter}</span>
-                            </div>
-                         </div>
-                       ))}
-                       {c.assets.length === 0 && <p className="text-[11px] text-muted italic">Không có tài sản nào được ghi nhận</p>}
-                    </div>
-                 </div>
-
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-muted uppercase tracking-widest border-l-2 border-accent pl-3">Chữ ký & Xác nhận</p>
-                    <div className="flex gap-4">
-                       <div className="flex-1 space-y-2">
-                          <p className="text-[9px] font-black text-muted uppercase">Bên A (Quản lý)</p>
-                          <div className="aspect-video bg-white rounded-xl border border-border/10 overflow-hidden shadow-inner">
-                             {c.witnessSignatureUrl ? (
-                               <img src={c.witnessSignatureUrl} alt="Manager Sig" className="w-full h-full object-contain p-2" />
-                             ) : (
-                               <div className="w-full h-full flex items-center justify-center text-muted/30 italic text-[10px]">Chưa ký</div>
-                             )}
-                          </div>
-                       </div>
-                       <div className="flex-1 space-y-2">
-                          <p className="text-[9px] font-black text-muted uppercase">Bên B (Cư dân)</p>
-                          <div className="aspect-video bg-white rounded-xl border border-border/10 overflow-hidden shadow-inner">
-                             {c.tenantSignatureUrl ? (
-                               <img src={c.tenantSignatureUrl} alt="Tenant Sig" className="w-full h-full object-contain p-2" />
-                             ) : (
-                               <div className="w-full h-full flex items-center justify-center text-muted/30 italic text-[10px]">Chưa ký</div>
-                             )}
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              {c.notes && (
-                <div className="p-4 bg-primary/[0.03] rounded-2xl border border-primary/5 italic text-[13px] text-primary/70 font-medium">
-                   &quot; {c.notes} &quot;
-                </div>
-              )}
-            </div>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
 
+const HistoryTab = ({ room }: { room: RoomDetailType }) => (
+  <div className="space-y-4">
+    <div>
+      <h2 className="text-base font-semibold text-foreground">Lịch sử thay đổi trạng thái</h2>
+      <p className="mt-1 text-sm text-muted">
+        Ghi lại các lần đổi trạng thái để đối chiếu vận hành về sau.
+      </p>
+    </div>
+
+    {room.statusHistory.length === 0 ? (
+      <div className="rounded-[24px] border border-dashed border-border bg-background/60 px-6 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 text-primary">
+          <ClipboardList size={22} />
+        </div>
+        <p className="mt-4 text-lg font-semibold text-foreground">Chưa có lịch sử trạng thái</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto rounded-[24px] border border-border">
+        <table className="min-w-[980px] w-full text-left">
+          <thead className="bg-background/70 text-sm text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Từ trạng thái</th>
+              <th className="px-4 py-3 font-medium">Đến trạng thái</th>
+              <th className="px-4 py-3 font-medium">Thời điểm</th>
+              <th className="px-4 py-3 font-medium">Người thực hiện</th>
+              <th className="px-4 py-3 font-medium">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border bg-card">
+            {room.statusHistory.map((item) => (
+              <tr key={item.id} className="hover:bg-background/55">
+                <td className="px-4 py-3"><StatusBadge status={item.fromStatus} label={getRoomStatusLabel(item.fromStatus)} size="sm" /></td>
+                <td className="px-4 py-3"><StatusBadge status={item.toStatus} label={getRoomStatusLabel(item.toStatus)} size="sm" /></td>
+                <td className="px-4 py-3 text-sm text-foreground">{formatDate(item.changedAt, 'dd/MM/yyyy HH:mm')}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{item.changedBy || '--'}</td>
+                <td className="px-4 py-3 text-sm text-foreground">{item.reason || '--'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+);
+
+const MetricCard = ({ label, value }: { label: string; value: string | number }) => (
+  <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">{label}</p>
+    <p className="mt-2 text-xl font-bold tracking-tight text-foreground">{value}</p>
+  </div>
+);
+
+const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="rounded-2xl bg-card px-4 py-3">
+    <dt className="text-xs uppercase tracking-[0.16em] text-muted">{label}</dt>
+    <dd className="mt-1 text-sm font-medium text-foreground">{value}</dd>
+  </div>
+);
+
 export default RoomDetail;
-
-
-

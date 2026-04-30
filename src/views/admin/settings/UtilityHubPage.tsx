@@ -113,7 +113,7 @@ export default function UtilityHubPage() {
   }, [activePolicies]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-5 py-8 pb-20 md:px-6" style={pageFontStyle}>
+    <div className="w-full min-w-0 space-y-8 pb-20" style={pageFontStyle}>
       {/* HEADER SECTION */}
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_34%),linear-gradient(135deg,_#fffaf0_0%,_#ffffff_52%,_#f8fafc_100%)] p-6 shadow-2xl shadow-slate-900/5 md:p-8 transition-all duration-500 hover:shadow-slate-900/10">
         <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
@@ -181,7 +181,7 @@ export default function UtilityHubPage() {
             <MetricCard
               icon={ShieldAlert}
               title="Nguyên tắc lõi"
-              value="Đúng scope"
+              value="Đúng phạm vi"
               note="Ghi đè một kỳ luôn ưu tiên cao hơn chính sách"
               accent="emerald"
             />
@@ -200,7 +200,7 @@ export default function UtilityHubPage() {
           }`}
         >
           <LayoutDashboard size={18} />
-          Tổng Quan Hoạt Động
+          Tổng quan hoạt động
         </button>
         <button
           onClick={() => setActiveTab('docs')}
@@ -211,7 +211,7 @@ export default function UtilityHubPage() {
           }`}
         >
           <BookOpen size={18} />
-          Hướng Dẫn & Công Thức
+          Hướng dẫn và công thức
         </button>
       </div>
 

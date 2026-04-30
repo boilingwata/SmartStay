@@ -1,27 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
-  User,
-  Menu,
+  Check,
   ChevronRight,
-  Settings,
-  LogOut,
-  Info,
-  AlertTriangle,
-  Moon,
-  Sun,
   CreditCard,
   FileText,
+  Info,
+  LogOut,
+  Menu,
+  Moon,
+  Settings,
+  Sun,
   Ticket,
-  Check,
+  User,
+  AlertTriangle,
 } from 'lucide-react';
-import { cn } from '@/utils';
-import useUIStore from '@/stores/uiStore';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+
 import useAuthStore from '@/stores/authStore';
 import useNotificationStore from '@/stores/notificationStore';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import useUIStore from '@/stores/uiStore';
 import type { Notification } from '@/types/notification';
+import { cn, formatRelativeTime } from '@/utils';
 
 const notificationIconMap: Record<Notification['type'], React.ElementType> = {
   payment: CreditCard,
@@ -49,13 +50,16 @@ const topbarText: Record<string, string> = {
   'topbar.profile': 'Hồ sơ cá nhân',
   'topbar.accountSettings': 'Cài đặt tài khoản',
   'auth.logout': 'Đăng xuất',
-  'breadcrumbs.super-admin': 'Siêu quản trị',
+  'breadcrumbs.owner': 'Quản trị',
   'breadcrumbs.dashboard': 'Tổng quan',
   'breadcrumbs.buildings': 'Tòa nhà',
-  'breadcrumbs.rooms': 'Tin đăng',
+  'breadcrumbs.rooms': 'Phòng',
+  'breadcrumbs.room-lifecycle': 'Vòng đời phòng',
+  'breadcrumbs.handover': 'Biên bản bàn giao',
   'breadcrumbs.leads': 'Đơn thuê',
   'breadcrumbs.tenants': 'Khách thuê',
   'breadcrumbs.contracts': 'Hợp đồng',
+  'breadcrumbs.addendums': 'Phụ lục',
   'breadcrumbs.invoices': 'Hóa đơn',
   'breadcrumbs.payments': 'Thanh toán',
   'breadcrumbs.tickets': 'Yêu cầu hỗ trợ',
@@ -63,34 +67,50 @@ const topbarText: Record<string, string> = {
   'breadcrumbs.announcements': 'Thông báo',
   'breadcrumbs.settings': 'Cài đặt',
   'breadcrumbs.users': 'Người dùng',
-  'breadcrumbs.utility-policies': 'Chính sách điện nước',
+  'breadcrumbs.utility-policies': 'Chính sách tiện ích',
   'breadcrumbs.utility-overrides': 'Điều chỉnh thủ công',
-  'breadcrumbs.billing-runs': 'Đợt tính phí',
+  'breadcrumbs.billing-runs': 'Đợt chốt chỉ số',
+  'breadcrumbs.utility-billing': 'Quản lý điện nước',
+  'breadcrumbs.amenities': 'Tiện ích chung',
+  'breadcrumbs.assets': 'Tài sản',
+  'breadcrumbs.staff': 'Nhân viên',
+  'breadcrumbs.visitor-checkin': 'Kiểm tra khách',
+  'breadcrumbs.amenity-checkin': 'Kiểm tra tiện ích',
+  'breadcrumbs.notifications': 'Thông báo',
+  'breadcrumbs.create': 'Tạo mới',
 };
 
+function isDetailSegment(segment: string) {
+  return /^\d+$/.test(segment) || /^[0-9a-f-]{8,}$/i.test(segment);
+}
+
+function formatBreadcrumbLabel(segment: string, fallbackMap: Record<string, string>, t: (key: string) => string) {
+  if (isDetailSegment(segment)) return 'Chi tiết';
+  const key = `breadcrumbs.${segment}`;
+  return fallbackMap[key] || t(key) || segment;
+}
+
 export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void }) => {
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const theme = useUIStore((state) => state.theme);
+  const toggleTheme = useUIStore((state) => state.toggleTheme);
 
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const theme = useUIStore((s) => s.theme);
-  const toggleTheme = useUIStore((s) => s.toggleTheme);
-
-  const notifications = useNotificationStore((s) => s.notifications);
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const hasNew = useNotificationStore((s) => s.hasNew);
-  const fetchNotifications = useNotificationStore((s) => s.fetchNotifications);
-  const markRead = useNotificationStore((s) => s.markRead);
-  const markAllRead = useNotificationStore((s) => s.markAllRead);
-  const subscribe = useNotificationStore((s) => s.subscribe);
-  const cleanup = useNotificationStore((s) => s.cleanup);
+  const notifications = useNotificationStore((state) => state.notifications);
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const hasNew = useNotificationStore((state) => state.hasNew);
+  const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+  const markRead = useNotificationStore((state) => state.markRead);
+  const markAllRead = useNotificationStore((state) => state.markAllRead);
+  const subscribe = useNotificationStore((state) => state.subscribe);
+  const cleanup = useNotificationStore((state) => state.cleanup);
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { t } = useTranslation();
-  const tt = (key: string) => topbarText[key] || t(key);
+  const translate = (key: string) => topbarText[key] || t(key);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -99,45 +119,39 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
     return () => cleanup();
   }, [cleanup, fetchNotifications, subscribe, user?.id]);
 
-  const pathSegments = location.pathname.split('/').filter((p) => p);
-  const breadcrumbs = pathSegments.map((segment, index) => {
-    const url = `/${pathSegments.slice(0, index + 1).join('/')}`;
-    const key = `breadcrumbs.${segment}`;
-    const translated = tt(key);
-    const fallback = segment.charAt(0).toUpperCase() + segment.slice(1);
-    return { label: translated !== key ? translated : fallback, url };
-  });
+  const breadcrumbs = useMemo(() => {
+    const segments = location.pathname.split('/').filter(Boolean);
+
+    return segments.map((segment, index) => ({
+      url: `/${segments.slice(0, index + 1).join('/')}`,
+      label: formatBreadcrumbLabel(segment, topbarText, t),
+    }));
+  }, [location.pathname, t]);
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 border-b border-border bg-card/88 px-5 backdrop-blur-md transition-all duration-300 sm:px-6 lg:px-8',
-        sidebarOpen ? 'ml-[260px]' : 'ml-[72px]',
-        'lg:ml-auto',
-      )}
-    >
-      <div className="flex h-16 items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/88 backdrop-blur">
+      <div className="mx-auto flex h-16 w-full max-w-[1760px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 2xl:px-10">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={onMobileMenuToggle}
-            className="rounded-xl p-2 text-muted transition-colors hover:bg-background hover:text-foreground lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-muted transition hover:border-primary/25 hover:text-primary lg:hidden"
           >
-            <Menu size={20} />
+            <Menu size={18} />
           </button>
 
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-muted">
-              SmartStay launch workspace
+            <p className="truncate text-[11px] font-black uppercase tracking-[0.2em] text-muted">
+              Không gian quản trị SmartStay
             </p>
-            <div className="mt-1 hidden items-center gap-2 text-sm md:flex">
+            <div className="mt-1 hidden min-w-0 items-center gap-2 text-sm md:flex">
               {breadcrumbs.map((crumb, index) => (
                 <React.Fragment key={crumb.url}>
-                  {index > 0 && <ChevronRight size={14} className="text-muted/50" />}
+                  {index > 0 ? <ChevronRight size={14} className="text-muted/45" /> : null}
                   <Link
                     to={crumb.url}
                     className={cn(
                       'truncate transition-colors',
-                      index === breadcrumbs.length - 1 ? 'font-black text-foreground' : 'text-muted hover:text-foreground',
+                      index === breadcrumbs.length - 1 ? 'font-semibold text-foreground' : 'text-muted hover:text-foreground',
                     )}
                   >
                     {crumb.label}
@@ -151,100 +165,122 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
         <div className="flex items-center gap-2">
           <button
             onClick={toggleTheme}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background text-muted transition-all hover:border-primary/25 hover:text-primary"
-            title={theme === 'light' ? tt('topbar.darkMode') : tt('topbar.lightMode')}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-muted transition hover:border-primary/25 hover:text-primary"
+            title={theme === 'light' ? translate('topbar.darkMode') : translate('topbar.lightMode')}
           >
             {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           </button>
 
           <div className="relative">
             <button
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              onClick={() => setNotificationsOpen((value) => !value)}
               className={cn(
-                'inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background text-muted transition-all hover:border-primary/25 hover:text-primary',
+                'relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-muted transition hover:border-primary/25 hover:text-primary',
                 notificationsOpen && 'border-primary/25 text-primary',
               )}
-              title={tt('topbar.notifications')}
+              title={translate('topbar.notifications')}
             >
               <Bell size={17} />
-              {hasNew && <span className="absolute right-2 top-2 h-2.5 w-2.5 animate-pulse rounded-full border-2 border-white bg-danger ring-2 ring-danger/10" />}
+              {hasNew ? (
+                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-card bg-danger" />
+              ) : null}
             </button>
 
-            {notificationsOpen && (
-              <div className="animate-in slide-in-from-top-4 fade-in zoom-in absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl duration-300">
-                <header className="flex items-center justify-between border-b bg-bg/30 p-4">
-                  <h3 className="text-h3 text-primary">{tt('topbar.notifications')}</h3>
-                  <div className="flex items-center gap-2">
-                    {unreadCount > 0 && (
-                      <>
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase italic text-primary">
-                          {`${unreadCount} mới`}
-                        </span>
-                        <button
-                          onClick={() => user?.id && markAllRead(user.id)}
-                          className="text-[10px] text-muted transition-colors hover:text-primary"
-                          title={tt('topbar.markAllRead')}
-                        >
-                          <Check size={14} />
-                        </button>
-                      </>
-                    )}
+            {notificationsOpen ? (
+              <div className="absolute right-0 top-full z-20 mt-2 w-[22rem] overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
+                <header className="flex items-center justify-between border-b border-border/70 px-4 py-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">{translate('topbar.notifications')}</h3>
+                    <p className="text-xs text-muted">{unreadCount > 0 ? `${unreadCount} mới` : 'Đã xem hết'}</p>
                   </div>
+                  {unreadCount > 0 ? (
+                    <button
+                      onClick={() => user?.id && markAllRead(user.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted transition hover:bg-primary/5 hover:text-primary"
+                      title={translate('topbar.markAllRead')}
+                    >
+                      <Check size={15} />
+                    </button>
+                  ) : null}
                 </header>
+
                 <div className="max-h-96 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-sm text-muted">{tt('topbar.noNotifications')}</div>
+                    <div className="px-4 py-8 text-center text-sm text-muted">
+                      {translate('topbar.noNotifications')}
+                    </div>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.map((notification) => (
                       <NotificationItem
-                        key={n.id}
-                        icon={notificationIconMap[n.type] || Info}
-                        color={notificationColorMap[n.type] || 'text-muted'}
-                        title={n.title}
-                        time={n.createdAt}
-                        desc={n.message}
-                        isRead={n.isRead}
-                        onClick={() => !n.isRead && markRead(n.id)}
+                        key={notification.id}
+                        icon={notificationIconMap[notification.type] || Info}
+                        color={notificationColorMap[notification.type] || 'text-muted'}
+                        title={notification.title}
+                        time={notification.createdAt}
+                        description={notification.message}
+                        isRead={notification.isRead}
+                        onClick={() => !notification.isRead && markRead(notification.id)}
                       />
                     ))
                   )}
                 </div>
-                <footer className="bg-bg/20 p-3 text-center">
-                  <button className="text-small font-bold text-primary hover:underline">{tt('topbar.viewAllNotifications')}</button>
-                </footer>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="relative">
             <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              onClick={() => setUserMenuOpen((value) => !value)}
               className={cn(
-                'flex items-center gap-3 rounded-2xl border border-border bg-background px-2 py-1.5 transition-all hover:border-primary/25',
+                'flex items-center gap-3 rounded-2xl border border-border bg-card px-2 py-1.5 transition hover:border-primary/25',
                 userMenuOpen && 'border-primary/25 ring-4 ring-primary/5',
               )}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white shadow-lg shadow-primary/20">
-                {user?.username?.substring(0, 2).toUpperCase() || 'AD'}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                {user?.username?.slice(0, 2).toUpperCase() || 'AD'}
               </div>
               <div className="hidden min-w-0 pr-2 text-left sm:block">
-                <p className="truncate text-sm font-black text-foreground">{user?.fullName || user?.username || 'Workspace user'}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
-                  {user?.role === 'Owner' ? 'Chủ nhà' : 'Hỗ trợ nội bộ'}
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {(() => {
+                    const rawName = user?.fullName?.trim() || user?.username?.trim() || '';
+                    if (!rawName) return 'Người dùng hệ thống';
+                    const normalized = rawName.toLowerCase();
+                    return normalized === 'system admin' || normalized === 'admin'
+                      ? 'Quản trị hệ thống'
+                      : rawName;
+                  })()}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
+                  {user?.role === 'Owner' || user?.role === 'SuperAdmin'
+                    ? 'Chủ nhà'
+                    : user?.role === 'Tenant'
+                      ? 'Người thuê'
+                      : 'Nhân sự nội bộ'}
                 </p>
               </div>
             </button>
 
-            {userMenuOpen && (
-              <div className="animate-in slide-in-from-top-4 fade-in zoom-in absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl duration-300">
-                <header className="border-b bg-primary/5 p-4">
-                  <p className="truncate text-sm font-bold leading-none text-primary">{user?.fullName || 'Chủ sở hữu'}</p>
-                  <p className="mt-1 truncate text-[10px] text-muted">{user?.email || 'admin@smartstay.vn'}</p>
+            {userMenuOpen ? (
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
+                <header className="border-b border-border/70 bg-primary/5 px-4 py-4">
+                  <p className="truncate text-sm font-semibold text-primary">
+                    {(() => {
+                      const rawName = user?.fullName?.trim() || user?.username?.trim() || '';
+                      if (!rawName) return 'Người dùng hệ thống';
+                      const normalized = rawName.toLowerCase();
+                      return normalized === 'system admin' || normalized === 'admin'
+                        ? 'Quản trị hệ thống'
+                        : rawName;
+                    })()}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted">
+                    {user?.email || 'admin@smartstay.vn'}
+                  </p>
                 </header>
                 <div className="space-y-1 p-2">
-                  <UserMenuItem icon={User} label={tt('topbar.profile')} />
-                  <UserMenuItem icon={Settings} label={tt('topbar.accountSettings')} />
-                  <div className="my-2 border-t border-border/50" />
+                  <UserMenuItem icon={User} label={translate('topbar.profile')} />
+                  <UserMenuItem icon={Settings} label={translate('topbar.accountSettings')} />
+                  <div className="my-2 border-t border-border/70" />
                   <button
                     onClick={async () => {
                       try {
@@ -254,13 +290,14 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
                         return;
                       }
                     }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-danger transition-all hover:bg-danger/5"
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5"
                   >
-                    <LogOut size={16} /> {tt('auth.logout')}
+                    <LogOut size={16} />
+                    {translate('auth.logout')}
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -268,30 +305,12 @@ export const Topbar = ({ onMobileMenuToggle }: { onMobileMenuToggle: () => void 
   );
 };
 
-function formatTimeAgo(dateStr: string): string {
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diffMs = now - date;
-  const diffMin = Math.floor(diffMs / 60000);
-
-  if (diffMin < 1) return 'Vừa xong';
-  if (diffMin < 60) return `${diffMin} phút trước`;
-
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} ngày trước`;
-
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-}
-
 const NotificationItem = ({
   icon: Icon,
   color,
   title,
   time,
-  desc,
+  description,
   isRead = false,
   onClick,
 }: {
@@ -299,32 +318,37 @@ const NotificationItem = ({
   color: string;
   title: string;
   time: string;
-  desc: string;
+  description: string;
   isRead?: boolean;
   onClick?: () => void;
 }) => (
-  <div
-    className={cn('group cursor-pointer border-b border-border/30 p-4 transition-colors hover:bg-bg/50', !isRead && 'bg-primary/5')}
+  <button
     onClick={onClick}
+    className={cn(
+      'flex w-full items-start gap-3 border-b border-border/40 px-4 py-4 text-left transition hover:bg-primary/5',
+      !isRead && 'bg-primary/4',
+    )}
   >
-    <div className="flex gap-4">
-      <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-white shadow-sm', color)}>
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between">
-          <h4 className={cn('truncate text-small', !isRead ? 'font-bold text-text' : 'font-medium text-muted')}>{title}</h4>
-          <span className="ml-2 whitespace-nowrap text-[10px] text-muted">{formatTimeAgo(time)}</span>
-        </div>
-        <p className="mt-1 line-clamp-2 text-small leading-relaxed text-muted">{desc}</p>
-      </div>
+    <div className={cn('mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/50 bg-background', color)}>
+      <Icon size={18} />
     </div>
-  </div>
-);
-
-const UserMenuItem = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
-  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-all hover:bg-primary/5 hover:text-primary">
-    <Icon size={16} /> {label}
+    <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-3">
+        <p className={cn('truncate text-sm', !isRead ? 'font-semibold text-foreground' : 'text-foreground/90')}>
+          {title}
+        </p>
+        <span className="shrink-0 text-[11px] text-muted">
+          {formatRelativeTime(time)}
+        </span>
+      </div>
+      <p className="mt-1 line-clamp-2 text-sm text-muted">{description}</p>
+    </div>
   </button>
 );
 
+const UserMenuItem = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
+  <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-muted transition hover:bg-primary/5 hover:text-primary">
+    <Icon size={16} />
+    {label}
+  </button>
+);

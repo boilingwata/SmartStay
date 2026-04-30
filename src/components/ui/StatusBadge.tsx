@@ -97,7 +97,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const displayLabel =
     label ||
     children ||
-    (ticketVariant ? getTicketStatusLabel(ticketVariant) : translated !== statusKey ? translated : status || '');
+    (ticketVariant ? getTicketStatusLabel(ticketVariant) : translated !== statusKey ? translated : 'Không xác định');
 
   const variantStatus = (ticketVariant ?? status) as VariantProps<typeof badgeVariants>['status'];
 

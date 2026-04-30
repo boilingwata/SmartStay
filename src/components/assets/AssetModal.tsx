@@ -103,7 +103,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                 <span className="text-[20px] uppercase tracking-[2px] text-primary">Tài sản</span>
               </h2>
               <p className="text-[12px] font-bold uppercase tracking-widest leading-relaxed text-white/40">
-                Chỉ giữ lại dữ liệu thực sự được persist trong scope hiện tại.
+                Chỉ lưu dữ liệu thật trong phạm vi vận hành hiện tại.
               </p>
             </div>
           </div>
@@ -111,10 +111,10 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
           <div className="relative z-10 rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur-md">
             <div className="mb-3 flex items-center gap-3">
               <div className="h-5 w-1 rounded-full bg-primary" />
-              <p className="text-[9px] font-black uppercase tracking-[3px] text-white/40">Phạm vi phase 8</p>
+              <p className="text-[9px] font-black uppercase tracking-[3px] text-white/40">Phạm vi dữ liệu hiện tại</p>
             </div>
             <p className="text-[11px] font-medium italic leading-relaxed text-white/60">
-              Asset master lưu ở catalog, billing và room assignment chỉ lưu khi có row trong room_assets.
+              Thông tin tài sản lưu trong danh mục. Phần tính phí và gắn phòng chỉ lưu khi có bản ghi vận hành của phòng.
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                         'input-base h-12 rounded-xl border-slate-200 bg-white pl-12 text-sm font-bold shadow-sm',
                         errors.assetName && 'border-danger bg-danger/5',
                       )}
-                      placeholder="VD: Điều hòa Panasonic"
+                      placeholder="Ví dụ: Điều hòa Panasonic"
                     />
                   </div>
                 </div>
@@ -180,11 +180,11 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                   <div className="relative">
                     <Zap size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted/50" />
                     <select {...register('type')} className="input-base h-12 appearance-none rounded-xl border-slate-200 bg-white pl-12 text-sm font-bold shadow-sm">
-                      <option value="Furniture">Nội thất (Furniture)</option>
-                      <option value="Appliance">Thiết bị gia dụng (Appliance)</option>
-                      <option value="Electronics">Điện tử (Electronics)</option>
-                      <option value="Fixture">Cố định (Fixture)</option>
-                      <option value="Other">Khác (Other)</option>
+                      <option value="Furniture">Nội thất</option>
+                      <option value="Appliance">Thiết bị gia dụng</option>
+                      <option value="Electronics">Thiết bị điện tử</option>
+                      <option value="Fixture">Thiết bị cố định</option>
+                      <option value="Other">Khác</option>
                     </select>
                   </div>
                 </div>
@@ -208,7 +208,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                   </div>
                   {hasOperationalRecord ? (
                     <div className="space-y-2">
-                      <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Serial Number</label>
+                      <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Số sê-ri</label>
                       <input {...register('serialNumber')} className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 font-mono text-sm uppercase shadow-sm" placeholder="S/N..." />
                     </div>
                   ) : null}
@@ -286,7 +286,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                     </>
                   ) : (
                     <div className="md:col-span-2 rounded-2xl border border-primary/10 bg-primary/[0.03] px-4 py-4 text-[12px] font-medium text-primary/70">
-                      Cac truong so luong, tinh trang, ngay mua va bao hanh se duoc cau hinh khi tai san duoc gan vao phong.
+                      Các trường số lượng, tình trạng, ngày mua và bảo hành sẽ được cấu hình khi tài sản được gắn vào phòng.
                     </div>
                   )}
               </div>
@@ -296,7 +296,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
               <section className="space-y-6">
                 <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
                   <FileText size={16} className="text-primary" />
-                  <h3 className="text-[12px] font-black uppercase tracking-[2px] text-slate-900">Billing trên hóa đơn</h3>
+                  <h3 className="text-[12px] font-black uppercase tracking-[2px] text-slate-900">Tính phí trên hóa đơn</h3>
                 </div>
 
                 <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
@@ -311,7 +311,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                       {...register('billingLabel')}
                       disabled={!isBillable}
                       className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50"
-                      placeholder="VD: Phụ phí điều hòa"
+                      placeholder="Ví dụ: Phụ phí điều hòa"
                     />
                   </div>
 
@@ -340,7 +340,7 @@ export const AssetModal = ({ isOpen, onClose, initialData, onSubmit, onDelete, i
                   </div>
 
                   <div className="space-y-2">
-                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Trạng thái billing</label>
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[1.5px] text-muted">Trạng thái tính phí</label>
                     <select {...register('billingStatus')} disabled={!isBillable} className="input-base h-12 rounded-xl border-slate-200 bg-white px-4 text-sm font-bold shadow-sm disabled:opacity-50">
                       <option value="Inactive">Tạm tắt</option>
                       <option value="Active">Đang tính</option>

@@ -4,6 +4,7 @@ import { Check, Layout, Loader2, Package, Search, X, Zap } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AssetType } from '@/models/Asset';
 import { assetService } from '@/services/assetService';
+import { getAssetTypeLabel } from '@/lib/propertyLabels';
 import { cn } from '@/utils';
 import { toast } from 'sonner';
 
@@ -46,7 +47,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['room', String(roomId)] });
       queryClient.invalidateQueries({ queryKey: ['assets'] });
-      toast.success(`Da gan ${selectedIds.length} tai san vao phong`);
+      toast.success(`Đã gán ${selectedIds.length} tài sản vào phòng.`);
       setSelectedIds([]);
       setIsBillable(false);
       setMonthlyCharge('');
@@ -55,7 +56,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
       onClose();
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(error.message || 'Không thể gán tài sản vào phòng. Vui lòng thử lại.');
     },
   });
 
@@ -86,7 +87,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[40px] bg-white shadow-2xl"
+          className="relative flex max-h-[90vh] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
         >
           <div className="flex items-center justify-between border-b bg-slate-900 p-8 text-white">
             <div className="flex items-center gap-4">
@@ -94,9 +95,9 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                 <Package size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-black uppercase tracking-widest text-white">Gan tai san vao phong</h2>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-white/50">
-                  Chon tu asset catalog va tao room assignment ngay khi gan
+                <h2 className="text-xl font-black tracking-tight text-white">Gán tài sản vào phòng</h2>
+                <p className="text-xs font-medium text-white/60">
+                  Chọn từ danh mục tài sản và gắn trực tiếp vào phòng đang xem.
                 </p>
               </div>
             </div>
@@ -110,7 +111,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="text"
-                placeholder="Tim theo ten, ma tai san, serial..."
+                placeholder="Tìm theo tên, mã tài sản hoặc số sê-ri..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 font-bold text-slate-700 transition-all focus:border-primary/30 focus:ring-4 focus:ring-primary/10"
@@ -128,7 +129,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                       : 'border border-slate-200 bg-white text-slate-500 hover:border-primary/30',
                   )}
                 >
-                  {type === 'All' ? 'Tat ca' : type}
+                  {type === 'All' ? 'Tất cả' : getAssetTypeLabel(type)}
                 </button>
               ))}
             </div>
@@ -138,21 +139,21 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
             {isLoading ? (
               <div className="flex flex-col items-center justify-center gap-4 py-20">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Dang tai tai san...</p>
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Đang tải tài sản...</p>
               </div>
             ) : assignableAssets?.length === 0 ? (
               <div className="space-y-4 py-20 text-center">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[32px] bg-slate-100 text-slate-300 shadow-inner">
                   <Package size={40} />
                 </div>
-                <p className="text-[13px] font-bold italic text-slate-400">Khong con tai san phu hop de gan cho phong nay.</p>
+                <p className="text-[13px] font-bold italic text-slate-400">Không còn tài sản phù hợp để gán cho phòng này.</p>
               </div>
             ) : (
               <>
                 <div className="mb-6 flex items-center justify-between px-2">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Tim thay {assignableAssets?.length} tai san</p>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Tìm thấy {assignableAssets?.length} tài sản</p>
                   <button onClick={toggleSelectAll} type="button" className="text-[11px] font-black uppercase tracking-[2px] text-primary hover:underline">
-                    {selectedIds.length === assignableAssets?.length ? 'Bo chon tat ca' : 'Chon tat ca'}
+                    {selectedIds.length === assignableAssets?.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -198,7 +199,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                         <p className="mt-0.5 truncate font-mono text-[10px] font-black tracking-widest text-slate-400">#{asset.assetCode || asset.assetId}</p>
                         <div className="mt-3 flex items-center gap-3">
                           <span className="rounded-lg border border-slate-200/50 bg-slate-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-slate-500">
-                            {asset.type}
+                            {getAssetTypeLabel(asset.type)}
                           </span>
                           {asset.brand ? <span className="truncate text-[9px] font-black uppercase text-slate-400">{asset.brand}</span> : null}
                         </div>
@@ -215,7 +216,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
           <div className="flex flex-col gap-6 border-t bg-slate-900 p-10">
             <div className="grid gap-3 rounded-[28px] border border-white/10 bg-white/5 p-4 md:grid-cols-[180px_1fr_160px_160px]">
               <label className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Tinh vao hoa don</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Tính vào hóa đơn</span>
                 <input type="checkbox" checked={isBillable} onChange={(event) => setIsBillable(event.target.checked)} className="h-4 w-4 accent-primary" />
               </label>
               <input
@@ -223,7 +224,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                 value={billingLabel}
                 onChange={(event) => setBillingLabel(event.target.value)}
                 disabled={!isBillable}
-                placeholder="Nhan hien thi tren hoa don"
+                placeholder="Nhãn hiển thị trên hóa đơn"
                 className="input-base h-12 rounded-2xl border-white/10 bg-white/10 px-4 text-sm text-white placeholder:text-white/35 disabled:opacity-50"
               />
               <input
@@ -233,7 +234,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                 value={monthlyCharge}
                 onChange={(event) => setMonthlyCharge(event.target.value)}
                 disabled={!isBillable}
-                placeholder="Phi thang"
+                placeholder="Phí tháng"
                 className="input-base h-12 rounded-2xl border-white/10 bg-white/10 px-4 text-sm text-white placeholder:text-white/35 disabled:opacity-50"
               />
               <input
@@ -247,9 +248,9 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
 
             <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
               <div className="text-center md:text-left">
-                <p className="text-[18px] font-black uppercase tracking-tighter text-white">Dang chon {selectedIds.length} tai san</p>
+                <p className="text-[18px] font-black tracking-tight text-white">Đang chọn {selectedIds.length} tài sản</p>
                 <p className="mt-1 text-[10px] font-medium uppercase tracking-widest text-white/40">
-                  Asset master se duoc tao room_assets moi cho phong <span className="font-black text-white">{roomId}</span>
+                  Các tài sản này sẽ được gắn vào phòng <span className="font-black text-white">{roomId}</span>
                 </p>
               </div>
               <div className="flex w-full gap-4 md:w-auto">
@@ -257,7 +258,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                   onClick={onClose}
                   className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-10 py-4 font-black uppercase tracking-widest text-white/60 transition-all hover:bg-white/10 hover:text-white active:scale-95 md:flex-none"
                 >
-                  Huy
+                  Hủy
                 </button>
                 <button
                   disabled={selectedIds.length === 0 || assignMutation.isPending || (isBillable && Number(monthlyCharge || 0) <= 0)}
@@ -265,7 +266,7 @@ export const AssignAssetModal = ({ isOpen, onClose, roomId }: AssignAssetModalPr
                   className="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-primary px-12 py-4 font-black uppercase tracking-[3px] text-white shadow-2xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-30 md:flex-none"
                 >
                   {assignMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Package size={20} />}
-                  Xac nhan gan
+                  Xác nhận gán
                 </button>
               </div>
             </div>

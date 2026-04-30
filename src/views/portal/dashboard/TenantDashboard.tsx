@@ -24,7 +24,7 @@ const DASHBOARD_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
 const quickActions = [
   { icon: Receipt, label: 'Hoa don', color: 'bg-teal-50 text-teal-600', route: '/portal/invoices' },
-  { icon: MessageSquare, label: 'Ho tro', color: 'bg-orange-50 text-orange-600', route: '/portal/tickets' },
+  { icon: MessageSquare, label: 'Hỗ trợ', color: 'bg-orange-50 text-orange-600', route: '/portal/tickets' },
   { icon: Droplets, label: 'Tien ich', color: 'bg-purple-50 text-purple-600', route: '/portal/amenities' },
   { icon: Users, label: 'Khach', color: 'bg-blue-50 text-blue-600', route: '/portal/visitors' },
 ];
@@ -75,7 +75,7 @@ function DashboardSectionError({
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-500">
         <AlertCircle size={22} />
       </div>
-      <p className="text-sm font-semibold text-slate-700">Khong the tai du lieu</p>
+      <p className="text-sm font-semibold text-slate-700">Không thể tải dữ liệu</p>
       <p className="mt-1 max-w-xs text-xs text-slate-400">{message}</p>
       <button
         onClick={onRetry}
@@ -113,7 +113,7 @@ function UpcomingInvoices({
     return (
       <DashboardSectionEmpty
         icon={CheckCircle2}
-        title="Khong co hoa don can thanh toan"
+        title="Không có hóa đơn cần thanh toán"
         description="Tat ca hoa don hien tai da duoc thanh toan hoac chua den ky lap."
       />
     );
@@ -146,7 +146,7 @@ function UpcomingInvoices({
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-bold text-slate-800">{invoice.title}</p>
                   <p className={cn('mt-0.5 truncate text-[11px] font-medium', isOverdue ? 'text-red-500' : 'text-slate-500')}>
-                    Han: {invoice.dueDate ? format(new Date(invoice.dueDate), 'dd/MM/yyyy') : 'Chua co'}
+                    Hạn: {invoice.dueDate ? format(new Date(invoice.dueDate), 'dd/MM/yyyy') : 'Chưa có'}
                     {isOverdue ? ' (Qua han)' : ''}
                   </p>
                 </div>
@@ -189,8 +189,8 @@ function RecentTickets({
     return (
       <DashboardSectionEmpty
         icon={CheckCircle2}
-        title="Khong co yeu cau dang xu ly"
-        description="Mọi yeu cau gan day da duoc dong hoac chua co ticket moi."
+        title="Không có yêu cầu đang xử lý"
+        description="Mọi yêu cầu gần đây đã được đóng hoặc chưa có yêu cầu mới."
       />
     );
   }
@@ -212,7 +212,7 @@ function RecentTickets({
                 <p className="mt-0.5 truncate text-[14px] font-bold text-slate-800">{ticket.title}</p>
               </div>
               <span className="shrink-0 rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-bold uppercase text-orange-600">
-                {ticket.status === 'Open' ? 'Moi' : 'Dang xu ly'}
+                {ticket.status === 'Open' ? 'Mới' : 'Đang xử lý'}
               </span>
             </div>
 
@@ -261,7 +261,7 @@ function NotificationList({
     return (
       <DashboardSectionEmpty
         icon={Bell}
-        title="Chua co thong bao moi"
+        title="Chưa có thông báo mới"
         description="He thong chua ghi nhan thong bao nao cho tai khoan nay."
       />
     );
@@ -299,7 +299,7 @@ export default function TenantDashboard() {
   });
 
   const summary = dashboardQuery.data;
-  const errorMessage = dashboardQuery.error instanceof Error ? dashboardQuery.error.message : 'Da xay ra loi khi tai dashboard.';
+  const errorMessage = dashboardQuery.error instanceof Error ? dashboardQuery.error.message : 'Đã xảy ra lỗi khi tải bảng điều khiển.';
 
   useTenantDashboardRealtime({
     tenantId: summary?.context.tenantId,
@@ -324,7 +324,7 @@ export default function TenantDashboard() {
           ) : dashboardQuery.isError ? (
             <div className="relative z-10 max-w-md">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">Tong quan cu dan</p>
-              <h2 className="mt-2 text-2xl font-black">Khong the tai thong tin hop dong</h2>
+              <h2 className="mt-2 text-2xl font-black">Không thể tải thông tin hợp đồng</h2>
               <p className="mt-2 text-sm text-white/75">{errorMessage}</p>
               <button
                 onClick={() => dashboardQuery.refetch()}
@@ -368,7 +368,7 @@ export default function TenantDashboard() {
           ) : (
             <div className="relative z-10 max-w-md">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">Tong quan cu dan</p>
-              <h2 className="mt-2 text-2xl font-black">Chua co hop dong dang hoat dong</h2>
+              <h2 className="mt-2 text-2xl font-black">Chưa có hợp đồng đang hoạt động</h2>
               <p className="mt-2 text-sm text-white/75">
                 Tai khoan nay da duoc xac thuc nhung hien chua co ban ghi hop dong active trong `smartstay.contracts`.
               </p>

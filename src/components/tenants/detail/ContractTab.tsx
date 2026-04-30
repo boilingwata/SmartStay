@@ -16,9 +16,9 @@ export const ContractTab: React.FC<ContractTabProps> = ({ contract }) => {
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-bg text-muted">
           <History size={40} />
         </div>
-        <h3 className="text-h3 font-black uppercase tracking-widest text-primary">Chua co hop dong</h3>
+        <h3 className="text-h3 font-black uppercase tracking-widest text-primary">Chưa có hợp đồng</h3>
         <p className="mx-auto max-w-xs text-small italic text-muted">
-          Tenant nay hien chua tham gia hop dong thue nao trong he thong.
+          Cư dân này hiện chưa tham gia hợp đồng thuê nào trong hệ thống.
         </p>
       </div>
     );
@@ -52,12 +52,12 @@ export const ContractTab: React.FC<ContractTabProps> = ({ contract }) => {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg text-muted">
               <Calendar size={20} />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Thoi han thue</p>
+            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Thời hạn thuê</p>
           </div>
           <p className="mb-1 text-body font-black uppercase tracking-tighter text-primary">
             {formatDate(contract.startDate)} - {formatDate(contract.endDate)}
           </p>
-          <p className="text-[10px] font-medium italic text-muted">Hop dong dang duoc hien thi theo du lieu that</p>
+          <p className="text-[10px] font-medium italic text-muted">Hợp đồng đang được hiển thị theo dữ liệu thật</p>
         </div>
 
         <div className="card-container border-none bg-white/60 p-8 shadow-xl shadow-primary/5">
@@ -65,12 +65,12 @@ export const ContractTab: React.FC<ContractTabProps> = ({ contract }) => {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg text-muted">
               <Wallet size={20} />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Gia thue snapshot</p>
+            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Giá thuê đã chốt</p>
           </div>
           <p className="mb-1 text-body font-black uppercase tracking-tighter text-success">
             {formatVND(contract.rentPriceSnapshot)}
           </p>
-          <p className="text-[10px] font-medium italic text-muted">Chu ky thanh toan: {contract.paymentCycle} thang</p>
+          <p className="text-[10px] font-medium italic text-muted">Chu kỳ thanh toán: {contract.paymentCycle} tháng</p>
         </div>
 
         <div className="card-container border-none bg-white/60 p-8 shadow-xl shadow-primary/5">
@@ -78,12 +78,12 @@ export const ContractTab: React.FC<ContractTabProps> = ({ contract }) => {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg text-muted">
               <UserCheck size={20} />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Vai tro tren hop dong</p>
+            <p className="text-[10px] font-black uppercase tracking-[2px] text-muted">Vai trò trên hợp đồng</p>
           </div>
           <p className="mb-1 text-body font-black uppercase tracking-tighter text-primary">
-            {contract.isRepresentative ? 'Nguoi dai dien' : 'Dong cu dan'}
+            {contract.isRepresentative ? 'Người đại diện' : 'Đồng cư dân'}
           </p>
-          <p className="text-[10px] font-medium italic text-muted">Mapping tu `contract_tenants.is_primary`</p>
+          <p className="text-[10px] font-medium italic text-muted">Dữ liệu lấy từ vai trò đại diện trong hợp đồng</p>
         </div>
       </div>
     </div>

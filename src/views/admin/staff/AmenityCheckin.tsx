@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
-import { 
-  Dumbbell, Clock, User, Check, 
-  X, RefreshCcw, Calendar, MapPin,
-  AlertTriangle, CheckCircle2, MoreVertical
+import {
+  Dumbbell,
+  Clock,
+  RefreshCcw,
+  Calendar,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/utils';
-import { toast } from 'sonner';
-import { StatusBadge } from '@/components/ui';
 
 const AmenityCheckin = () => {
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="w-full min-w-0 space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-display text-primary leading-tight">Kiểm tra Tiện ích</h1>
@@ -42,9 +41,9 @@ const AmenityCheckin = () => {
          ))}
       </div>
 
-      <div className="card-container p-0 overflow-hidden bg-white/60 backdrop-blur-md">
+      <div className="card-container overflow-hidden bg-white/60 p-0 backdrop-blur-md">
          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-[760px] text-left">
                <thead className="bg-[#1e293b] text-white">
                   <tr>
                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[3px]">Thời gian / Tiện ích</th>

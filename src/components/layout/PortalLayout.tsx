@@ -86,7 +86,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 py-4 space-y-2 overflow-y-auto custom-scrollbar px-2 lg:px-4">
+        <nav className="flex-1 py-4 space-y-2 overflow-y-auto scrollbar-hide px-2 lg:px-4">
           {sidebarNavItems.map((item) => (
             <NavLink
               key={item.route}

@@ -115,7 +115,7 @@ const TenantList = () => {
       });
 
       const csv = [
-        ['Họ tên', 'Số điện thoại', 'Email', 'CCCD', 'Trạng thái', 'Onboarding %'].join(','),
+        ['Họ tên', 'Số điện thoại', 'Email', 'CCCD', 'Trạng thái', 'Hoàn tất hồ sơ %'].join(','),
         ...data.map((item) =>
           [item.fullName, item.phone, item.email ?? '', item.cccd, item.status, item.onboardingPercent].join(','),
         ),
@@ -213,7 +213,7 @@ const TenantList = () => {
           </div>
 
           <div className="space-y-4">
-            <label className="text-[11px] font-black uppercase tracking-widest text-muted">Tiến độ onboarding</label>
+            <label className="text-[11px] font-black uppercase tracking-widest text-muted">Tiến độ hoàn tất hồ sơ</label>
             <div className="grid gap-3">
               {[
                 { id: undefined, label: 'Tất cả' },
@@ -253,7 +253,7 @@ const TenantList = () => {
             </span>
           </h1>
           <p className="text-body font-medium italic text-muted">
-            Quản lý hồ sơ, trạng thái onboarding và lịch sử lưu trú của cư dân.
+            Quản lý hồ sơ, tiến độ hoàn tất thông tin và lịch sử lưu trú của cư dân.
           </p>
         </div>
 
@@ -364,8 +364,8 @@ const TenantList = () => {
         <GridSkeleton count={8} />
       ) : (
         <div className="card-premium overflow-hidden rounded-[44px] border-none bg-white/40 p-0 shadow-3xl shadow-slate-200/50 backdrop-blur-3xl">
-          <div className="min-w-0 overflow-hidden [touch-action:pan-y]">
-            <table className="w-full border-collapse text-left">
+          <div className="min-w-0 overflow-x-auto [touch-action:pan-y]">
+            <table className="w-full min-w-[1180px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-black uppercase tracking-[0.16em] text-muted">
                   <th className="w-[30%] px-8 py-7">Cư dân</th>
@@ -373,7 +373,7 @@ const TenantList = () => {
                   <th className="w-[14%] px-6 py-7">CCCD</th>
                   <th className="w-[18%] px-6 py-7">Phòng</th>
                   <th className="w-[10%] px-6 py-7 text-center">Trạng thái</th>
-                  <th className="w-[8%] px-6 py-7">Onboarding</th>
+                  <th className="w-[8%] px-6 py-7">Hồ sơ</th>
                   <th className="w-[2%] px-8 py-7" />
                 </tr>
               </thead>

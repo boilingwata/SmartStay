@@ -190,7 +190,7 @@ const TicketDetail = () => {
         <div className="space-y-4 text-center">
           <Spinner size="lg" />
           <p className="text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
-            Đang tải chi tiết ticket...
+            Đang tải chi tiết yêu cầu...
           </p>
         </div>
       </div>
@@ -202,8 +202,8 @@ const TicketDetail = () => {
       <div className="flex min-h-[80vh] items-center justify-center px-4">
         <EmptyState
           icon={AlertCircle}
-          title="Không tìm thấy ticket"
-          message="Ticket này không còn tồn tại hoặc bạn không có quyền xem."
+          title="Không tìm thấy yêu cầu"
+          message="Yêu cầu này không còn tồn tại hoặc bạn không có quyền xem."
           actionLabel="Quay lại danh sách"
           onAction={() => navigate('/owner/tickets')}
         />
@@ -523,7 +523,7 @@ const TicketDetail = () => {
                 {ticket.status === 'Resolved' && (
                   <>
                     <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                      Ticket đã xử lý xong. Nếu cư dân đã đồng ý kết quả, hãy đóng yêu cầu để hoàn tất hồ sơ.
+                      Yêu cầu đã xử lý xong. Nếu cư dân đã đồng ý kết quả, hãy đóng yêu cầu để hoàn tất hồ sơ.
                     </div>
                     <button
                       onClick={() => handleStatusChange('Closed')}
@@ -537,7 +537,7 @@ const TicketDetail = () => {
 
                 {ticket.status === 'Closed' && (
                   <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                    Ticket đã đóng và không còn thao tác chuyển trạng thái trong phạm vi hiện tại.
+                    Yêu cầu đã đóng và không còn thao tác chuyển trạng thái trong phạm vi hiện tại.
                   </div>
                 )}
               </div>
@@ -557,7 +557,7 @@ const TicketDetail = () => {
       >
         <div className="space-y-5">
           <p className="text-sm text-slate-500">
-            Ghi chú này sẽ được lưu vào ticket để đối soát quá trình xử lý. Nếu có nguyên nhân gốc hoặc chi phí, hãy nhập luôn tại đây.
+            Ghi chú này sẽ được lưu vào yêu cầu để đối soát quá trình xử lý. Nếu có nguyên nhân gốc hoặc chi phí, hãy nhập luôn tại đây.
           </p>
 
           <div className="space-y-2">
@@ -606,7 +606,7 @@ const TicketDetail = () => {
                 inputMode="numeric"
               />
               <p className="text-xs text-slate-500">
-                Chỉ nhập số nếu ticket này có phát sinh chi phí thực tế.
+                Chỉ nhập số nếu yêu cầu này có phát sinh chi phí thực tế.
               </p>
             </div>
           </div>

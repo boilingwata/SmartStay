@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
-  Clock, 
-  Waves, 
-  Dumbbell, 
-  Utensils, 
-  Coffee, 
-  MapPin, 
-  AlertCircle,
-  History
+  ArrowLeft, Clock, Waves, Dumbbell, Utensils, Coffee, MapPin, AlertCircle, History
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { portalAmenityService } from '@/services/portalAmenityService';
@@ -17,18 +9,15 @@ import { cn, formatDate } from '@/utils';
 import { isAfter, addHours, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui';
-
 const MyBookings: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [cancelTarget, setCancelTarget] = useState<any | null>(null);
-
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['portal-my-bookings'],
     queryFn: () => portalAmenityService.getMyBookings()
   });
-
   const cancelMutation = useMutation({
     mutationFn: (id: string) => portalAmenityService.cancelBooking(id),
     onSuccess: () => {
@@ -40,10 +29,7 @@ const MyBookings: React.FC = () => {
       toast.error(`Không thể hủy lịch: ${error.message}`);
     }
   });
-
   const now = new Date();
-
-  // Categories
   const upcomingBookings = bookings.filter(b => 
     b.status === 'booked' && isAfter(parseISO(b.date + 'T' + b.timeSlot.split(' - ')[0]), now)
   );
@@ -51,9 +37,7 @@ const MyBookings: React.FC = () => {
   const pastBookings = bookings.filter(b => 
     b.status !== 'booked' || !isAfter(parseISO(b.date + 'T' + b.timeSlot.split(' - ')[0]), now)
   );
-
   const currentList = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
-
   const getIcon = (name: string) => {
     const n = name.toLowerCase();
     if (n.includes('bơi')) return Waves;
@@ -62,55 +46,50 @@ const MyBookings: React.FC = () => {
     if (n.includes('coffee') || n.includes('cà phê')) return Coffee;
     return MapPin;
   };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'booked':
-        return <span className="px-2.5 py-1 bg-green-50 text-green-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-green-100">Đã xác nhận</span>;
+        return <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-md text-[10px] font-bold uppercase tracking-wider">Đã xác nhận</span>;
       case 'in_use':
-        return <span className="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100">Đang sử dụng</span>;
+        return <span className="px-2.5 py-1 bg-amber-500/10 text-amber-600 rounded-md text-[10px] font-bold uppercase tracking-wider">Đang sử dụng</span>;
       case 'completed':
-        return <span className="px-2.5 py-1 bg-teal-50 text-[#0D8A8A] rounded-lg text-[9px] font-black uppercase tracking-widest border border-teal-100">Hoàn thành</span>;
+        return <span className="px-2.5 py-1 bg-muted text-muted-foreground rounded-md text-[10px] font-bold uppercase tracking-wider">Hoàn thành</span>;
       case 'cancelled':
-        return <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200">Đã hủy</span>;
+        return <span className="px-2.5 py-1 bg-destructive/10 text-destructive rounded-md text-[10px] font-bold uppercase tracking-wider">Đã hủy</span>;
       default:
-        return <span className="px-2.5 py-1 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-100">{status}</span>;
+        return <span className="px-2.5 py-1 bg-muted text-muted-foreground rounded-md text-[10px] font-bold uppercase tracking-wider">{status}</span>;
     }
   };
-
   const handleCancelConfirm = () => {
     if (cancelTarget) {
       cancelMutation.mutate(cancelTarget.id);
     }
   };
-
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 bg-transparent min-h-[60vh]">
+      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-6 min-h-[60vh] bg-background">
         <Spinner size="lg" />
-        <p className="text-small text-muted font-black animate-pulse uppercase tracking-[3px]">Đang tải lịch đặt...</p>
+        <p className="text-sm font-medium text-muted-foreground animate-pulse tracking-wide">Đang tải lịch đặt...</p>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 animate-in fade-in slide-in-from-right-6 duration-700 font-sans">
-      {/* Sticky Top Bar */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-2xl px-5 py-4 border-b border-slate-100 space-y-4 shadow-sm shadow-slate-200/20">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="w-11 h-11 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-700 active:scale-95 transition-all hover:bg-slate-50">
-            <ArrowLeft size={22} />
+    <div className="min-h-screen bg-background pb-20 animate-in fade-in duration-500">
+      {/* Sticky Top Bar with Glassmorphism */}
+      <div className="sticky top-0 z-40 bg-background/70 backdrop-blur-xl px-5 py-4 border-b border-border space-y-4">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-full border border-border bg-background flex items-center justify-center text-foreground hover:bg-muted transition-colors">
+            <ArrowLeft size={20} />
           </button>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase">Lịch sử đặt tiện ích</h2>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Lịch sử đặt tiện ích</h2>
         </div>
-
-        {/* Tab Bar */}
-        <div className="flex p-1 bg-slate-100 rounded-[20px] shadow-inner mb-2 border border-slate-200/50">
+        {/* Segmented Control Tab */}
+        <div className="flex p-1 bg-muted/50 rounded-xl border border-border/50">
           <button 
             onClick={() => setActiveTab('upcoming')}
             className={cn(
-              "flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-[16px] transition-all",
-              activeTab === 'upcoming' ? "bg-white text-teal-600 shadow-lg shadow-teal-600/5" : "text-slate-400 hover:text-slate-600"
+              "flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200",
+              activeTab === 'upcoming' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             )}
           >
             Sắp tới
@@ -118,60 +97,56 @@ const MyBookings: React.FC = () => {
           <button 
             onClick={() => setActiveTab('past')}
             className={cn(
-              "flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-[16px] transition-all",
-              activeTab === 'past' ? "bg-white text-teal-600 shadow-lg shadow-teal-600/5" : "text-slate-400 hover:text-slate-600"
+              "flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200",
+              activeTab === 'past' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             )}
           >
             Đã qua
           </button>
         </div>
       </div>
-
       <div className="p-5 space-y-4">
         {currentList.length === 0 ? (
-          <div className="text-center py-24 bg-white/40 rounded-[48px] border-2 border-dashed border-slate-200 space-y-4 opacity-50 shadow-inner">
-            <div className="w-20 h-20 bg-slate-50 rounded-[32px] flex items-center justify-center mx-auto mb-2">
-              <History size={40} className="text-slate-300" />
+          <div className="text-center py-20 rounded-3xl border border-dashed border-border bg-muted/30">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <History size={28} className="text-muted-foreground" />
             </div>
-            <p className="text-xs font-black text-slate-400 uppercase italic tracking-[4px]">Trống danh sách</p>
+            <p className="text-sm font-medium text-muted-foreground">Chưa có lịch sử tiện ích</p>
           </div>
         ) : (
           currentList.map((booking) => {
             const Icon = getIcon(booking.amenityName);
-            // Cancel button: Booked and > 2h away
             const startTime = parseISO(booking.date + 'T' + booking.timeSlot.split(' - ')[0]);
             const canCancel = booking.status === 'booked' && isAfter(startTime, addHours(now, 2));
-
             return (
-              <div key={booking.id} className="bg-white rounded-[28px] p-5 border border-slate-100 shadow-sm flex flex-col gap-4 group hover:border-teal-100 transition-all hover:shadow-xl hover:shadow-teal-900/[0.02]">
-                <div className="flex gap-5">
-                  <div className="w-16 h-16 bg-teal-50 rounded-[20px] flex items-center justify-center text-teal-600 shrink-0 border border-teal-100 shadow-inner group-hover:scale-105 transition-transform group-hover:rotate-3">
-                    <Icon size={30} strokeWidth={2.5} />
+              <div key={booking.id} className="bg-card rounded-2xl p-5 border border-border shadow-sm flex flex-col gap-4 transition-all hover:border-primary/30 hover:shadow-md">
+                <div className="flex gap-4">
+                  <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0 transition-transform hover:scale-105">
+                    <Icon size={24} strokeWidth={2} />
                   </div>
-                  <div className="flex-1 space-y-1.5 min-w-0 pt-1">
+                  <div className="flex-1 space-y-1.5 min-w-0">
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className="text-[15px] font-black text-slate-800 leading-tight truncate uppercase tracking-tight">{booking.amenityName}</h3>
+                      <h3 className="text-base font-bold text-card-foreground truncate">{booking.amenityName}</h3>
                       <div className="shrink-0">{getStatusBadge(booking.status)}</div>
                     </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Clock size={12} className="text-teal-500" />
-                      <span className="text-[11px] font-black font-mono tracking-wider tabular-nums">{formatDate(booking.date)}</span>
-                      <span className="text-slate-300">|</span>
-                      <span className="text-[11px] font-black text-teal-600 font-mono tracking-tighter uppercase">{booking.timeSlot}</span>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock size={14} className="text-primary/70" />
+                      <span className="text-xs font-medium tabular-nums">{formatDate(booking.date)}</span>
+                      <span className="text-border">•</span>
+                      <span className="text-xs font-medium text-primary tabular-nums">{booking.timeSlot}</span>
                     </div>
                   </div>
                 </div>
-
-                <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                <div className="pt-4 border-t border-border/50 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Giao dịch đã xác thực</p>
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/80 animate-pulse" />
+                    <p className="text-xs font-medium text-muted-foreground">Giao dịch đã xác thực</p>
                   </div>
                   
                   {canCancel && (
                     <button 
                       onClick={() => setCancelTarget(booking)}
-                      className="h-11 px-5 border border-rose-100 text-rose-500 bg-rose-50/30 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-rose-500 hover:text-white hover:border-rose-500 hover:shadow-lg hover:shadow-rose-500/20"
+                      className="h-9 px-4 border border-destructive/20 text-destructive bg-destructive/5 rounded-lg text-xs font-bold transition-colors hover:bg-destructive hover:text-destructive-foreground active:scale-95"
                     >
                       Hủy đặt chỗ
                     </button>
@@ -182,37 +157,35 @@ const MyBookings: React.FC = () => {
           })
         )}
       </div>
-
-      {/* Cancel Confirmation Modal */}
+      {/* Cancel Confirmation Modal (Premium Glassmorphism Overlay) */}
       {cancelTarget && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full sm:max-w-[420px] bg-white rounded-t-[40px] sm:rounded-[40px] p-8 animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-500 shadow-2xl">
-            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full sm:max-w-md bg-card border border-border rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-6 sm:hidden" />
             
-            <div className="w-20 h-20 bg-rose-50 rounded-[32px] flex items-center justify-center text-rose-500 mb-6 border border-rose-100 mx-auto group shadow-inner">
-              <AlertCircle size={40} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
+            <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center text-destructive mb-6 mx-auto">
+              <AlertCircle size={32} strokeWidth={2} />
             </div>
             
-            <h3 className="text-xl font-black text-slate-900 text-center mb-3 tracking-tight uppercase">Xác nhận hủy lịch</h3>
-            <p className="text-[14px] text-slate-500 text-center leading-relaxed font-medium px-4">
-              Bạn có chắc chắn muốn hủy đặt chỗ <span className="font-black text-slate-800">{cancelTarget.amenityName}</span> vào lúc <span className="font-black text-slate-800">{cancelTarget.timeSlot} ngày {formatDate(cancelTarget.date)}</span>?
+            <h3 className="text-xl font-bold text-foreground text-center mb-2">Xác nhận hủy lịch</h3>
+            <p className="text-sm text-muted-foreground text-center leading-relaxed px-2">
+              Bạn có chắc muốn hủy đặt chỗ <span className="font-semibold text-foreground">{cancelTarget.amenityName}</span> vào <span className="font-semibold text-foreground">{cancelTarget.timeSlot} ngày {formatDate(cancelTarget.date)}</span>?
             </p>
             
-            <div className="mt-6 p-4 bg-amber-50/50 rounded-[24px] border border-amber-100 text-[11px] font-bold text-amber-800 text-center italic leading-relaxed">
-              Lưu ý: Bạn chỉ có thể hủy lịch đặt trước ít nhất 2 giờ so với thời gian bắt đầu.
+            <div className="mt-6 p-4 bg-muted/50 rounded-xl border border-border/50 text-xs text-muted-foreground text-center leading-relaxed">
+              Lưu ý: Chỉ có thể hủy lịch đặt trước tối thiểu 2 giờ so với thời gian sử dụng thực tế.
             </div>
-
-            <div className="flex gap-4 mt-8">
+            <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setCancelTarget(null)}
-                className="flex-1 h-14 bg-slate-50 text-slate-500 border border-slate-100 rounded-[22px] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all hover:bg-slate-100"
+                className="flex-1 h-12 bg-secondary text-secondary-foreground rounded-xl font-semibold text-sm transition-colors hover:bg-secondary/80 active:scale-95"
               >
                 Giữ lại
               </button>
               <button 
                 onClick={handleCancelConfirm}
                 disabled={cancelMutation.isPending}
-                className="flex-[1.5] h-14 bg-rose-500 text-white rounded-[22px] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all shadow-xl shadow-rose-500/30 hover:bg-rose-600 disabled:opacity-50"
+                className="flex-[1.5] h-12 bg-destructive text-destructive-foreground rounded-xl font-semibold text-sm transition-colors hover:bg-destructive/90 active:scale-95 disabled:opacity-50"
               >
                 {cancelMutation.isPending ? 'Đang xử lý...' : 'Xác nhận hủy'}
               </button>
@@ -223,5 +196,4 @@ const MyBookings: React.FC = () => {
     </div>
   );
 };
-
 export default MyBookings;

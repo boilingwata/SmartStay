@@ -89,10 +89,10 @@ const TicketList = () => {
       await queryClient.invalidateQueries({ queryKey: ['ticket', 'owner'] });
       await queryClient.invalidateQueries({ queryKey: ['ticket', 'portal'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Đã tạo ticket mới.');
+      toast.success('Đã tạo yêu cầu hỗ trợ mới.');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Không thể tạo ticket lúc này.');
+      toast.error(error.message || 'Không thể tạo yêu cầu hỗ trợ lúc này.');
     },
   });
 
@@ -138,10 +138,10 @@ const TicketList = () => {
     <div className="space-y-6 pb-16">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Tickets / Support</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Yêu cầu hỗ trợ</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Điều phối yêu cầu hỗ trợ</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Theo dõi danh sách ticket, phân công người phụ trách và kiểm soát trạng thái xử lý theo đúng dữ liệu live hiện tại.
+            Theo dõi danh sách yêu cầu, phân công người phụ trách và kiểm soát trạng thái xử lý theo dữ liệu hiện tại.
           </p>
         </div>
 
@@ -161,7 +161,7 @@ const TicketList = () => {
             className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-white shadow-lg shadow-slate-900/15 transition"
           >
             <Plus size={16} />
-            Tạo ticket
+            Tạo yêu cầu
           </button>
         </div>
       </div>
@@ -171,7 +171,7 @@ const TicketList = () => {
           onClick={() => setFilters((current) => ({ ...DEFAULT_FILTERS(), search: current.search }))}
           className="rounded-[28px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
         >
-          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Tổng ticket</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Tổng yêu cầu</p>
           <div className="mt-4 flex items-end justify-between gap-3">
             <span className="text-4xl font-black tracking-tight text-slate-900">{stats?.total ?? 0}</span>
             <span className="rounded-full bg-slate-100 p-3 text-slate-500">
@@ -207,7 +207,7 @@ const TicketList = () => {
             <input
               value={filters.search}
               onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Tìm theo mã ticket, tiêu đề, cư dân hoặc phòng..."
+              placeholder="Tìm theo mã yêu cầu, tiêu đề, cư dân hoặc phòng..."
               className="h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none transition focus:border-primary focus:bg-white"
             />
           </div>
@@ -235,13 +235,13 @@ const TicketList = () => {
         />
 
         <p className="mt-4 text-xs font-medium leading-5 text-slate-500">
-          Danh sách này hiển thị toàn bộ ticket hiện có. Chỉ khi bạn tự chọn trong bộ lọc nâng cao thì hệ thống mới giới hạn theo tòa nhà hoặc phòng.
+          Danh sách này hiển thị toàn bộ yêu cầu hiện có. Chỉ khi bạn tự chọn trong bộ lọc nâng cao thì hệ thống mới giới hạn theo tòa nhà hoặc phòng.
         </p>
       </div>
 
       {ticketsError && (
         <ErrorBanner
-          message="Không tải được danh sách ticket. Vui lòng kiểm tra lại kết nối và thử lại."
+          message="Không tải được danh sách yêu cầu. Vui lòng kiểm tra lại kết nối và thử lại."
           onRetry={() => refetchTickets()}
         />
       )}
@@ -251,7 +251,7 @@ const TicketList = () => {
           <div className="space-y-4 text-center">
             <Spinner size="lg" />
             <p className="text-[12px] font-black uppercase tracking-[0.24em] text-slate-400">
-              Đang đồng bộ ticket...
+              Đang đồng bộ yêu cầu...
             </p>
           </div>
         </div>
@@ -259,19 +259,19 @@ const TicketList = () => {
         <div className="rounded-[32px] border border-dashed border-slate-200 bg-white p-8">
           <EmptyState
             icon={AlertCircle}
-            title="Không có ticket phù hợp"
-            message="Hãy thử đổi bộ lọc hoặc tạo ticket mới nếu cần ghi nhận thêm yêu cầu."
-            actionLabel="Tạo ticket"
+            title="Không có yêu cầu phù hợp"
+            message="Hãy thử đổi bộ lọc hoặc tạo yêu cầu mới nếu cần ghi nhận thêm việc cần xử lý."
+            actionLabel="Tạo yêu cầu"
             onAction={() => setIsCreateOpen(true)}
           />
         </div>
       ) : (
         <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left">
+            <table className="w-full min-w-[1080px] text-left">
               <thead className="bg-slate-50">
                 <tr className="border-b border-slate-200">
-                  <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Mã ticket</th>
+                  <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Mã yêu cầu</th>
                   <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Nội dung</th>
                   <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Trạng thái</th>
                   <th className="px-5 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Người phụ trách</th>

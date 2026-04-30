@@ -27,6 +27,17 @@ interface LocationApiItem {
   wards?: LocationApiItem[];
 }
 
+async function fetchWithTimeout(url: string, timeoutMs = 4_000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 // --- Row-to-model transformers ---
 
 
@@ -285,7 +296,7 @@ export const buildingService = {
   // Get real location data from Vietnam Open API with fallback
   getProvinces: async () => {
     try {
-      const res = await fetch('https://provinces.open-api.vn/api/p/');
+      const res = await fetchWithTimeout('https://provinces.open-api.vn/api/p/');
       if (!res.ok) return FALLBACK_PROVINCES;
       const data = await res.json();
       return data.map((p: LocationApiItem) => ({ id: String(p.code), name: p.name }));
@@ -296,7 +307,7 @@ export const buildingService = {
   getDistricts: async (provinceId: string) => {
     if (!provinceId) return [];
     try {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceId}?depth=2`);
+      const res = await fetchWithTimeout(`https://provinces.open-api.vn/api/p/${provinceId}?depth=2`);
       if (!res.ok) return FALLBACK_DISTRICTS[provinceId] || [];
       const data = await res.json();
       return (data.districts || []).map((d: LocationApiItem) => ({ id: String(d.code), name: d.name }));
@@ -307,7 +318,7 @@ export const buildingService = {
   getWards: async (districtId: string) => {
     if (!districtId) return [];
     try {
-      const res = await fetch(`https://provinces.open-api.vn/api/d/${districtId}?depth=2`);
+      const res = await fetchWithTimeout(`https://provinces.open-api.vn/api/d/${districtId}?depth=2`);
       if (!res.ok) return FALLBACK_WARDS[districtId] || [];
       const data = await res.json();
       return (data.wards || []).map((w: LocationApiItem) => ({ id: String(w.code), name: w.name }));

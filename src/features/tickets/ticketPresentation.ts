@@ -115,9 +115,7 @@ export function getTicketCategoryLabel(category?: TicketCategoryValue | null): s
     return TICKET_CATEGORY_META[normalized].label;
   }
 
-  return String(category)
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return 'Chưa phân loại';
 }
 
 export function getTicketCategoryShortLabel(category?: TicketCategoryValue | null): string {
@@ -128,7 +126,7 @@ export function getTicketCategoryShortLabel(category?: TicketCategoryValue | nul
     return TICKET_CATEGORY_META[normalized].shortLabel;
   }
 
-  return getTicketCategoryLabel(category);
+  return 'Khác';
 }
 
 export function getTicketReferenceDeadline(createdAt: string, priority?: string | null): string {

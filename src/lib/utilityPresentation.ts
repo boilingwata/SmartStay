@@ -194,15 +194,15 @@ const backendMessageMap: Array<{ pattern: RegExp; replacement: string }> = [
 ];
 
 export function getUtilityScopeLabel(scopeType: string): string {
-  return scopeLabels[scopeType as keyof typeof scopeLabels] ?? scopeType;
+  return scopeLabels[scopeType as keyof typeof scopeLabels] ?? 'Không xác định';
 }
 
 export function getUtilityPolicySourceLabel(sourceType: string): string {
-  return sourceLabels[sourceType as keyof typeof sourceLabels] ?? sourceType;
+  return sourceLabels[sourceType as keyof typeof sourceLabels] ?? 'Chưa rõ nguồn áp dụng';
 }
 
 export function getUtilityRunStatusLabel(status: string): string {
-  return statusLabels[status.toLowerCase() as keyof typeof statusLabels] ?? status;
+  return statusLabels[status.toLowerCase() as keyof typeof statusLabels] ?? 'Không xác định';
 }
 
 export function formatUtilityBillingMonthCompact(billingPeriod: string): string {
@@ -235,13 +235,13 @@ export function translateUtilityBackendMessage(message: string): string {
     }
   }
 
-  return input;
+  return 'Không thể xử lý dữ liệu điện nước. Vui lòng kiểm tra lại cấu hình và thử lại.';
 }
 
 export function getUtilityWarningMeta(code: string, fallbackMessage?: string) {
   const meta = warningMeta[code as keyof typeof warningMeta];
   return {
-    label: meta?.label ?? code,
+    label: meta?.label ?? 'Cảnh báo cần kiểm tra',
     message: meta?.message ?? translateUtilityBackendMessage(fallbackMessage ?? code),
   };
 }

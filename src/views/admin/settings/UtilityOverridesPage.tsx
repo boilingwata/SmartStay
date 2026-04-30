@@ -125,7 +125,7 @@ export default function UtilityOverridesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-6 py-10 pb-20" style={pageFontStyle}>
+    <div className="w-full min-w-0 space-y-8 pb-20" style={pageFontStyle}>
       <div className="space-y-4 border-b border-slate-100 pb-6 mb-8">
         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-rose-600 bg-rose-50 w-fit px-3 py-1.5 rounded-full">
           <PenSquare size={14} />
@@ -200,27 +200,27 @@ export default function UtilityOverridesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Điện cơ bản mới (đ)</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức giá điện cơ bản. Phụ thu, prorate vẫn tính. VD: 150000</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức giá điện cơ bản. Phụ thu và phần tính theo ngày vẫn áp dụng. Ví dụ: 150000</p>
                   <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.electricBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Nước cơ bản mới (đ)</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức khoán nước của phòng. Phí theo người vẫn tính. VD: 0</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Chỉ thay đổi mức khoán nước của phòng. Phí theo người vẫn áp dụng. Ví dụ: 0</p>
                   <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.waterBaseOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterBaseOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Số người ở thực tế</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè số người tính phí nước cho tháng này. VD: 1</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè số người tính phí nước cho tháng này. Ví dụ: 1</p>
                   <input type="number" min={0} className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo hợp đồng" value={form.occupantsForBillingOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, occupantsForBillingOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Hệ số Mùa nóng mới</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân tháng nóng. VD: 1.0 (Bỏ mùa nóng)</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân tháng nóng. Ví dụ: 1.0 (bỏ mùa nóng)</p>
                   <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.electricHotSeasonMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricHotSeasonMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                  <label className="space-y-2">
                   <span className="text-xs font-bold text-slate-600">Hệ số Vị trí mới</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân vị trí. VD: 1.0</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Ghi đè hệ số nhân vị trí. Ví dụ: 1.0</p>
                   <input type="number" min={0.1} step="0.01" className="input-base w-full bg-white" style={numericStyle} placeholder="Giữ theo chính sách" value={form.locationMultiplierOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, locationMultiplierOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
               </div>
@@ -276,12 +276,12 @@ export default function UtilityOverridesPage() {
               <div className="grid gap-4 sm:grid-cols-2 mt-2">
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-rose-800">Chốt TỔNG tiền ĐIỆN (đ)</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. VD: Miễn phí điền 0, hoặc thu đúng 200000.</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. Ví dụ: miễn phí thì nhập 0, hoặc thu đúng 200000.</p>
                   <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Không chốt tay" value={form.electricFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, electricFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
                 <label className="space-y-2">
                   <span className="text-xs font-bold text-rose-800">Chốt TỔNG tiền NƯỚC (đ)</span>
-                  <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. VD: Miễn phí điền 0, hoặc thu đúng 50000.</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Thu chính xác con số này, không qua công thức. Ví dụ: miễn phí thì nhập 0, hoặc thu đúng 50000.</p>
                   <input type="number" min={0} className="input-base w-full bg-white border-rose-200 text-rose-700 font-bold focus:border-rose-400 focus:ring-rose-400/20" style={numericStyle} placeholder="Không chốt tay" value={form.waterFinalOverride ?? ''} onChange={(event) => setForm((current) => ({ ...current, waterFinalOverride: event.target.value === '' ? null : Number(event.target.value) }))} />
                 </label>
               </div>
@@ -323,17 +323,19 @@ export default function UtilityOverridesPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-          <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_1fr_120px] gap-4 border-b border-slate-100 bg-slate-50/80 px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            <span>Hợp đồng & Lý do</span>
-            <span>Kỳ hóa đơn</span>
-            <span>Tiền điện</span>
-            <span>Tiền nước</span>
-            <span>Ngày tạo</span>
-            <span className="text-center">Thao tác</span>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {overrides.map((override) => (
-              <div key={override.id} className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_1fr_120px] gap-4 px-8 py-6 text-sm transition-colors hover:bg-slate-50/50">
+          <div className="overflow-x-auto">
+            <div className="min-w-[1040px]">
+              <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_1fr_120px] gap-4 border-b border-slate-100 bg-slate-50/80 px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                <span>Hợp đồng và lý do</span>
+                <span>Kỳ hóa đơn</span>
+                <span>Tiền điện</span>
+                <span>Tiền nước</span>
+                <span>Ngày tạo</span>
+                <span className="text-center">Thao tác</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {overrides.map((override) => (
+                  <div key={override.id} className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_1fr_120px] gap-4 px-8 py-6 text-sm transition-colors hover:bg-slate-50/50">
                 <div className="space-y-1.5">
                   <p className="font-black text-slate-900 text-base">{override.contractCode}</p>
                   <div className="flex items-center gap-2">
@@ -380,8 +382,10 @@ export default function UtilityOverridesPage() {
                     Xóa
                   </button>
                 </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       )}

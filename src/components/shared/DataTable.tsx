@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   useReactTable,
   ColumnDef,
-  Row,
 } from '@tanstack/react-table';
 import { cn } from '@/utils';
 import { 
@@ -98,6 +97,7 @@ interface DataTableProps<T> {
   emptyState?: React.ReactNode;
   stickyHeader?: boolean;
   rowClassName?: (row: T) => string;
+  tableClassName?: string;
 }
 
 export function DataTable<T>({
@@ -114,6 +114,7 @@ export function DataTable<T>({
   emptyState,
   stickyHeader = true,
   rowClassName,
+  tableClassName,
 }: DataTableProps<T>) {
   const tableData = useMemo(() => (loading ? Array(5).fill({}) as T[] : data), [loading, data]);
 
@@ -128,9 +129,9 @@ export function DataTable<T>({
   const totalPages = pagination ? Math.ceil(total / pagination.limit) : 1;
 
   return (
-    <div className="flex flex-col w-full h-full bg-white rounded-xl border shadow-sm overflow-hidden">
-      <div className={cn("overflow-auto flex-1", stickyHeader && "relative")}>
-        <table className="w-full text-sm text-left border-collapse">
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm">
+      <div className={cn("min-w-0 flex-1 overflow-auto", stickyHeader && "relative")}>
+        <table className={cn("w-full min-w-[960px] border-collapse text-left text-sm", tableClassName)}>
           <thead className={cn(
             "bg-slate-50/50 text-slate-500 font-bold text-[10px] uppercase tracking-wider whitespace-nowrap border-b border-slate-100",
             stickyHeader && "sticky top-0 z-10 backdrop-blur-md shadow-sm"
@@ -232,7 +233,7 @@ export function DataTable<T>({
                     </td>
                   )}
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-4 text-slate-600">
+                    <td key={cell.id} className="px-6 py-4 align-middle text-slate-600">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -251,8 +252,8 @@ export function DataTable<T>({
       </div>
 
       {pagination && (
-        <div className="px-4 py-3 bg-white border-t flex items-center justify-between text-sm text-gray-700">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 border-t bg-white px-4 py-3 text-sm text-gray-700 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <p>
               Hiển thị <span className="font-semibold">{(pagination.page - 1) * pagination.limit + 1}</span> - <span className="font-semibold">{Math.min(pagination.page * pagination.limit, total)}</span> của <span className="font-semibold">{total}</span>
             </p>
@@ -266,7 +267,7 @@ export function DataTable<T>({
               ))}
             </select>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => pagination.onChange(pagination.page - 1, pagination.limit)}
               disabled={pagination.page <= 1 || loading}

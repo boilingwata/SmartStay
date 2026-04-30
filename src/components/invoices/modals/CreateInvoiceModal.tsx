@@ -380,7 +380,7 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
                         </div>
                         <div className="rounded-2xl bg-white p-4">
                           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted">Trạng thái mặc định</p>
-                          <p className="mt-2 font-black text-primary">pending_payment</p>
+                          <p className="mt-2 font-black text-primary">Chờ thanh toán</p>
                         </div>
                       </div>
                     </div>
@@ -455,7 +455,7 @@ export const CreateInvoiceModal = ({ isOpen, onClose, onCreated }: CreateInvoice
                     <CalendarDays className="text-primary" size={20} />
                     <div>
                       <p className="text-body font-black text-primary">Tổng tiền dự kiến</p>
-                      <p className="text-small text-muted">Giá trị sẽ được lưu với trạng thái mặc định `pending_payment`.</p>
+                      <p className="text-small text-muted">Hóa đơn sẽ được lưu với trạng thái mặc định Chờ thanh toán.</p>
                     </div>
                   </div>
                   <p className="mt-5 text-4xl font-black tracking-tight text-primary">

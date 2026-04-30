@@ -110,7 +110,7 @@ export default function ContractDetail() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-8">
+    <div className="flex w-full min-w-0 flex-col gap-6 pb-28">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl space-y-5">

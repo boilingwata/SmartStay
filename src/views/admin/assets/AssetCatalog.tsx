@@ -5,19 +5,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { AssetModal } from '@/components/assets/AssetModal';
-import useUIStore from '@/stores/uiStore';
 import { Asset, AssetCondition, AssetType } from '@/models/Asset';
 import { Spinner } from '@/components/ui/Feedback';
 import { assetService } from '@/services/assetService';
+import { buildingService } from '@/services/buildingService';
 import { cn, formatDate, formatVND } from '@/utils';
 
 const AssetCatalog = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const activeBuildingId = useUIStore((state) => state.activeBuildingId);
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [filterBuildingId, setFilterBuildingId] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     type: 'All' as AssetType | 'All',
     status: 'All' as AssetCondition | 'All',
@@ -31,8 +31,14 @@ const AssetCatalog = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
+  const { data: buildings = [] } = useQuery({
+    queryKey: ['buildings-summary', 'assets-page'],
+    queryFn: () => buildingService.getBuildings(),
+  });
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (filterBuildingId !== null) count++;
     if (filters.type !== 'All') count++;
     if (filters.status !== 'All') count++;
     if (filters.minPrice) count++;
@@ -40,13 +46,13 @@ const AssetCatalog = () => {
     if (filters.startDate) count++;
     if (filters.endDate) count++;
     return count;
-  }, [filters]);
+  }, [filters, filterBuildingId]);
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
-    queryKey: ['assets', activeBuildingId, search, filters],
+    queryKey: ['assets', filterBuildingId, search, filters],
     queryFn: () =>
       assetService.getAssets({
-        buildingId: activeBuildingId,
+        buildingId: filterBuildingId,
         search,
         type: filters.type === 'All' ? null : filters.type,
         status: filters.status === 'All' ? null : filters.status,
@@ -69,9 +75,9 @@ const AssetCatalog = () => {
   }, [assets]);
 
   const statCards: Array<{ label: string; value: string; icon: LucideIcon; color: 'primary' | 'warning' | 'danger' }> = [
-    { label: 'Tong gia tri (VND)', value: formatVND(stats.totalValue), icon: DollarSign, color: 'primary' },
-    { label: 'Can bao duong', value: `${stats.maintenanceCount} thiet bi`, icon: History, color: 'warning' },
-    { label: 'Can xu ly', value: `${stats.poorCount} thiet bi`, icon: Trash2, color: 'danger' },
+    { label: 'Tổng giá trị', value: formatVND(stats.totalValue), icon: DollarSign, color: 'primary' },
+    { label: 'Cần bảo dưỡng', value: `${stats.maintenanceCount} thiết bị`, icon: History, color: 'warning' },
+    { label: 'Cần xử lý', value: `${stats.poorCount} thiết bị`, icon: Trash2, color: 'danger' },
   ];
 
   const refreshRelatedQueries = () => {
@@ -83,7 +89,7 @@ const AssetCatalog = () => {
     mutationFn: (id: string) => assetService.deleteAsset(id),
     onSuccess: () => {
       refreshRelatedQueries();
-      toast.success('Da xoa tai san thanh cong');
+      toast.success('Đã xóa tài sản thành công.');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -97,7 +103,7 @@ const AssetCatalog = () => {
     },
     onSuccess: () => {
       refreshRelatedQueries();
-      toast.success(selectedAsset ? 'Cap nhat tai san thanh cong' : 'Da them tai san moi');
+      toast.success(selectedAsset ? 'Cập nhật tài sản thành công.' : 'Đã thêm tài sản mới.');
       setIsModalOpen(false);
       setSelectedAsset(null);
     },
@@ -131,9 +137,9 @@ const AssetCatalog = () => {
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-display leading-tight text-primary">Danh muc Tai san</h1>
+          <h1 className="text-display leading-tight text-primary">Danh mục tài sản</h1>
           <p className="text-body font-medium italic text-muted">
-            Quan ly catalog tai san, trang thai gan phong va billing trong scope hien tai.
+            Quản lý danh mục tài sản, trạng thái gắn phòng và tính phí trong phạm vi hiện tại.
           </p>
         </div>
         <button
@@ -143,7 +149,7 @@ const AssetCatalog = () => {
           }}
           className="btn-primary flex h-11 items-center gap-2 rounded-xl px-6 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
         >
-          <Plus size={18} /> Them tai san moi
+          <Plus size={18} /> Thêm tài sản mới
         </button>
       </div>
 
@@ -157,7 +163,7 @@ const AssetCatalog = () => {
               : 'border-transparent bg-white/50 text-muted hover:bg-white hover:border-primary/20',
           )}
         >
-          Tat ca tai san
+          Tất cả tài sản
         </button>
         <button
           onClick={() => setFilters((prev) => ({ ...prev, status: 'New' }))}
@@ -168,7 +174,7 @@ const AssetCatalog = () => {
               : 'border-transparent bg-white/50 text-muted hover:bg-white hover:border-success/20',
           )}
         >
-          Moi
+          Mới
         </button>
         <button
           onClick={() => setFilters((prev) => ({ ...prev, status: 'Poor' }))}
@@ -179,7 +185,7 @@ const AssetCatalog = () => {
               : 'border-transparent bg-white/50 text-muted hover:bg-white hover:border-danger/20',
           )}
         >
-          Can xu ly
+          Cần xử lý
         </button>
         <button
           onClick={() => setFilters((prev) => ({ ...prev, type: 'Appliance' }))}
@@ -190,7 +196,7 @@ const AssetCatalog = () => {
               : 'border-transparent bg-white/50 text-muted hover:bg-white hover:border-warning/20',
           )}
         >
-          Thiet bi dien
+          Thiết bị điện
         </button>
       </div>
 
@@ -201,7 +207,7 @@ const AssetCatalog = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted transition-colors group-focus-within:text-primary" size={18} />
               <input
                 type="text"
-                placeholder="Tim ten, QR, serial hoac phong..."
+                placeholder="Tìm tên, mã QR, số sê-ri hoặc phòng..."
                 className="input-base h-12 w-full bg-white/50 pl-12 font-bold focus:bg-white"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -216,15 +222,28 @@ const AssetCatalog = () => {
             <div className="flex items-center gap-3">
               <select
                 className="input-base h-12 w-48 border-2 border-transparent font-bold focus:border-primary/20"
+                value={filterBuildingId || ''}
+                onChange={(event) => setFilterBuildingId(event.target.value ? event.target.value : null)}
+              >
+                <option value="">Tất cả tòa nhà</option>
+                {buildings.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.buildingCode} - {building.buildingName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="input-base h-12 w-48 border-2 border-transparent font-bold focus:border-primary/20"
                 value={filters.type}
                 onChange={(event) => setFilters((prev) => ({ ...prev, type: event.target.value as AssetType | 'All' }))}
               >
-                <option value="All">Phan loai</option>
-                <option value="Furniture">Noi that</option>
-                <option value="Appliance">Gia dung</option>
-                <option value="Electronics">Dien tu</option>
-                <option value="Fixture">Co dinh</option>
-                <option value="Other">Khac</option>
+                <option value="All">Phân loại</option>
+                <option value="Furniture">Nội thất</option>
+                <option value="Appliance">Gia dụng</option>
+                <option value="Electronics">Điện tử</option>
+                <option value="Fixture">Cố định</option>
+                <option value="Other">Khác</option>
               </select>
 
               <select
@@ -235,10 +254,10 @@ const AssetCatalog = () => {
                   setFilters((prev) => ({ ...prev, sortBy: field, sortOrder: order as 'asc' | 'desc' }));
                 }}
               >
-                <option value="createdAt-desc">Moi nhat</option>
-                <option value="purchasePrice-desc">Gia tri cao nhat</option>
-                <option value="purchasePrice-asc">Gia tri thap nhat</option>
-                <option value="assetName-asc">Ten A-Z</option>
+                <option value="createdAt-desc">Mới nhất</option>
+                <option value="purchasePrice-desc">Giá trị cao nhất</option>
+                <option value="purchasePrice-asc">Giá trị thấp nhất</option>
+                <option value="assetName-asc">Tên A-Z</option>
               </select>
 
               <button
@@ -251,7 +270,7 @@ const AssetCatalog = () => {
                 )}
               >
                 <SlidersHorizontal size={16} />
-                <span>Bo loc nang cao</span>
+                <span>Bộ lọc nâng cao</span>
                 {activeFilterCount > 0 ? (
                   <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-primary text-[10px] text-white shadow-lg">
                     {activeFilterCount}
@@ -264,7 +283,7 @@ const AssetCatalog = () => {
           <div className="hidden shrink-0 items-center gap-4 text-[10px] font-black uppercase tracking-widest text-muted lg:flex">
             <span className="flex items-center gap-2 rounded-xl bg-bg px-4 py-2">
               <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
-              Hien thi: <span className="text-primary">{assets?.length || 0}</span>
+              Hiển thị: <span className="text-primary">{assets?.length || 0}</span>
             </span>
           </div>
         </div>
@@ -275,29 +294,29 @@ const AssetCatalog = () => {
               <div className="grid grid-cols-1 gap-6 border-t border-dashed border-border/20 pt-6 md:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted">
-                    <ShieldCheck size={12} /> Tinh trang
+                    <ShieldCheck size={12} /> Tình trạng
                   </label>
                   <select
                     className="input-base h-11 w-full bg-white/50 font-bold"
                     value={filters.status}
                     onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value as AssetCondition | 'All' }))}
                   >
-                    <option value="All">Tat ca tinh trang</option>
-                    <option value="New">Moi</option>
-                    <option value="Good">Tot</option>
-                    <option value="Fair">Trung binh</option>
-                    <option value="Poor">Kem / Hong</option>
+                    <option value="All">Tất cả tình trạng</option>
+                    <option value="New">Mới</option>
+                    <option value="Good">Tốt</option>
+                    <option value="Fair">Trung bình</option>
+                    <option value="Poor">Kém / Hỏng</option>
                   </select>
                 </div>
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted">
-                    <DollarSign size={12} /> Khoang gia (VND)
+                    <DollarSign size={12} /> Khoảng giá (VND)
                   </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      placeholder="Tu..."
+                      placeholder="Từ..."
                       className="input-base h-11 w-full bg-white/50 text-[13px] font-bold"
                       value={filters.minPrice}
                       onChange={(event) => setFilters((prev) => ({ ...prev, minPrice: event.target.value }))}
@@ -305,7 +324,7 @@ const AssetCatalog = () => {
                     <span className="text-lg text-muted">-</span>
                     <input
                       type="number"
-                      placeholder="Den..."
+                      placeholder="Đến..."
                       className="input-base h-11 w-full bg-white/50 text-[13px] font-bold"
                       value={filters.maxPrice}
                       onChange={(event) => setFilters((prev) => ({ ...prev, maxPrice: event.target.value }))}
@@ -315,7 +334,7 @@ const AssetCatalog = () => {
 
                 <div className="space-y-2 md:col-span-2 lg:col-span-1">
                   <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted">
-                    <Calendar size={12} /> Ngay mua
+                    <Calendar size={12} /> Ngày mua
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -338,10 +357,10 @@ const AssetCatalog = () => {
                     onClick={resetFilters}
                     className="h-11 rounded-xl border-2 border-border/10 px-6 text-[10px] font-black uppercase tracking-widest text-muted transition-all hover:bg-white hover:text-danger"
                   >
-                    Dat lai
+                    Đặt lại
                   </button>
                   <button onClick={() => setIsAdvancedOpen(false)} className="h-11 rounded-xl bg-slate-900 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-black">
-                    Ap dung
+                    Áp dụng
                   </button>
                 </div>
               </div>
@@ -357,16 +376,16 @@ const AssetCatalog = () => {
       ) : (
         <div className="card-container overflow-hidden border-none bg-white/40 p-0 shadow-2xl shadow-primary/5">
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="min-w-[1000px] w-full table-fixed border-collapse text-left shadow-sm">
+            <table className="min-w-[1120px] w-full table-fixed border-collapse text-left shadow-sm">
               <thead>
                 <tr className="bg-slate-900 text-[10px] font-black uppercase tracking-[3px] text-white">
-                  <th className="w-[25%] px-6 py-6 tracking-[4px]">Thong tin Tai san</th>
-                  <th className="w-[10%] border-l border-white/5 px-5 py-6 text-center">Vi tri</th>
-                  <th className="w-[10%] border-l border-white/5 px-5 py-6 text-center tracking-[1px]">Tinh trang</th>
-                  <th className="w-[18%] border-l border-white/5 px-6 py-6">Thong tin ky thuat</th>
-                  <th className="w-[15%] border-l border-white/5 px-6 py-6 text-right">Gia tri & SL</th>
-                  <th className="w-[12%] border-l border-white/5 px-6 py-6 text-center">Bao tri</th>
-                  <th className="w-[10%] border-l border-white/5 px-6 py-6 text-center tracking-[2px]">Actions</th>
+                  <th className="w-[25%] px-6 py-6 tracking-[4px]">Thông tin tài sản</th>
+                  <th className="w-[10%] border-l border-white/5 px-5 py-6 text-center">Vị trí</th>
+                  <th className="w-[10%] border-l border-white/5 px-5 py-6 text-center tracking-[1px]">Tình trạng</th>
+                  <th className="w-[18%] border-l border-white/5 px-6 py-6">Thông tin kỹ thuật</th>
+                  <th className="w-[15%] border-l border-white/5 px-6 py-6 text-right">Giá trị và số lượng</th>
+                  <th className="w-[12%] border-l border-white/5 px-6 py-6 text-center">Bảo trì</th>
+                  <th className="w-[10%] border-l border-white/5 px-6 py-6 text-center tracking-[2px]">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/10">
@@ -383,10 +402,10 @@ const AssetCatalog = () => {
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="shrink-0 rounded border border-border/10 bg-bg px-2 py-0.5 text-[8.5px] font-black uppercase tracking-widest text-muted">
-                              {t(`assetType.${asset.type}`, asset.type)}
+                              {t(`assetType.${asset.type}`, 'Khác')}
                             </span>
                             <span className="shrink-0 truncate text-[9px] font-mono font-medium text-muted/50">
-                              {asset.assetCode || 'NO-QR'}
+                              {asset.assetCode || 'Chưa có mã QR'}
                             </span>
                           </div>
                         </div>
@@ -396,10 +415,10 @@ const AssetCatalog = () => {
                     <td className="px-5 py-6 align-middle text-center">
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-black uppercase text-primary">
-                          <Home size={13} className="text-primary/40" /> {asset.roomCode || 'Chua gan'}
+                          <Home size={13} className="text-primary/40" /> {asset.roomCode || 'Chưa gắn'}
                         </div>
                         <div className="flex w-full items-center justify-center gap-1 truncate text-[8.5px] font-bold uppercase tracking-widest text-muted italic">
-                          <Building2 size={11} className="text-muted/40" /> {asset.buildingName || 'Catalog'}
+                          <Building2 size={11} className="text-muted/40" /> {asset.buildingName || 'Chưa đưa vào tòa nhà'}
                         </div>
                       </div>
                     </td>
@@ -416,7 +435,7 @@ const AssetCatalog = () => {
                                 : 'border border-warning/20 bg-warning/20 text-warning',
                           )}
                         >
-                          {t(`assetCondition.${asset.condition}`, asset.condition)}
+                          {t(`assetCondition.${asset.condition}`, 'Không xác định')}
                         </span>
                         <div className="flex scale-75 items-center justify-center gap-0.5">{renderStars(asset.condition)}</div>
                       </div>
@@ -424,12 +443,12 @@ const AssetCatalog = () => {
 
                     <td className="overflow-hidden px-6 py-6 align-middle">
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-2 truncate text-[10px] font-black uppercase text-primary/70" title={asset.brand || 'No Brand'}>
+                        <div className="flex items-center gap-2 truncate text-[10px] font-black uppercase text-primary/70" title={asset.brand || 'Chưa có hãng'}>
                           <div className="h-3 w-1 rounded-full bg-primary/20" />
-                          {asset.brand || 'No Brand'}
+                          {asset.brand || 'Chưa có hãng'}
                         </div>
                         <div className="inline-flex w-fit truncate whitespace-nowrap rounded-lg border border-border/10 bg-bg px-2 py-0.5 text-[9px] font-mono font-medium text-muted/60">
-                          SN: {asset.serialNumber || 'N/A'}
+                          Số sê-ri: {asset.serialNumber || 'Chưa có'}
                         </div>
                       </div>
                     </td>
@@ -439,7 +458,7 @@ const AssetCatalog = () => {
                         <span className="whitespace-nowrap font-mono text-[15px] font-black text-[#00a86b]">{formatVND(asset.purchasePrice || 0)}</span>
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="whitespace-nowrap text-[8.5px] font-black uppercase tracking-[1.5px] text-muted">
-                            So luong: {asset.quantity || 1}
+                            Số lượng: {asset.quantity || 1}
                           </span>
                         </div>
                       </div>
@@ -449,10 +468,10 @@ const AssetCatalog = () => {
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center justify-center gap-1.5 whitespace-nowrap text-[10px] font-black uppercase text-muted">
                           <Activity size={12} className="text-muted/30" />
-                          {asset.lastMaintenance ? formatDate(asset.lastMaintenance) : 'Chua bao tri'}
+                          {asset.lastMaintenance ? formatDate(asset.lastMaintenance) : 'Chưa bảo trì'}
                         </div>
                         <span className="whitespace-nowrap rounded border border-muted/5 bg-bg px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-widest text-muted/40">
-                          WRT: {asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}
+                          Bảo hành: {asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}
                         </span>
                       </div>
                     </td>
@@ -465,18 +484,18 @@ const AssetCatalog = () => {
                             setIsModalOpen(true);
                           }}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-bg text-muted shadow-sm transition-all hover:border-primary/10 hover:bg-primary/10 hover:text-primary active:scale-90"
-                          title="Sua"
+                          title="Sửa"
                         >
                           <Edit size={14} />
                         </button>
                         <button
                           onClick={() => {
-                            if (confirm(`Ban co chac muon xoa tai san ${asset.assetName}?`)) {
+                            if (confirm(`Bạn có chắc muốn xóa tài sản ${asset.assetName}?`)) {
                               deleteMutation.mutate(asset.id);
                             }
                           }}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-bg text-muted shadow-sm transition-all hover:border-danger/10 hover:bg-danger/10 hover:text-danger active:scale-90 disabled:opacity-50"
-                          title="Xoa"
+                          title="Xóa"
                           disabled={deleteMutation.isPending}
                         >
                           <Trash2 size={14} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,22 +13,17 @@ import {
   Plus, 
   CheckCircle2, 
   XCircle,
-  AlertCircle
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 
 import { Modal, CurrencyInput } from "@/components/shared";
 import { createServiceSchema, updateServiceSchema, CreateServiceForm, UpdateServiceForm } from "@/schemas/serviceSchema";
 import { 
-  Service, 
-  ServiceType, 
   BillingMethod, 
-  ServicePriceHistory,
   UpdateServiceDto 
 } from "@/types/service";
 import { 
   getServiceById, 
-  getServices, 
   createService, 
   updateService, 
   getPriceHistory, 
@@ -60,7 +55,7 @@ const BILLING_METHOD_DESCRIPTIONS: Partial<Record<BillingMethod, string>> = {
   Usage: "Tính theo số lần sử dụng thực tế",
 };
 
-const UNIT_SUGGESTIONS = ["người/tháng", "m2/tháng", "lần", "tháng"];
+const UNIT_SUGGESTIONS = ["người/tháng", "m²/tháng", "lần", "tháng"];
 
 const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   open,
@@ -74,7 +69,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
-  // Mode based schema
+  // Chọn bộ quy tắc kiểm tra theo chế độ đang mở.
   const schema = mode === "create" ? createServiceSchema : updateServiceSchema;
 
   const {
@@ -104,7 +99,6 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
     } as any,
   });
 
-  const selectedBillingMethod = watch("billingMethod");
   const currentServiceCode = watch("serviceCode");
 
   // Fetch Service History Data
@@ -227,7 +221,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                     : "text-slate-500 hover:text-slate-900"
                )}
              >
-                <History size={16} /> Lịch sử Giá
+                <History size={16} /> Lịch sử giá
              </button>
           </div>
         )}
@@ -260,7 +254,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                                         errors.serviceName && "border-red-500",
                                         isReadOnly && "bg-slate-50 text-slate-500 border-none shadow-inner"
                                     )}
-                                    placeholder="VD: Cửa cuốn tự động, Vệ sinh tầng..."
+                                    placeholder="Ví dụ: Cửa cuốn tự động, vệ sinh tầng..."
                                 />
                             )}
                         />
@@ -504,7 +498,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                                                 "w-full bg-white border border-slate-200 rounded-2xl p-5 outline-none focus:ring-4 focus:ring-primary/10 transition-all font-medium text-slate-600 resize-none",
                                                 (errors as any)?.priceReason && "border-red-500"
                                             )}
-                                            placeholder="VD: Giá quy định theo hợp đồng thuê, giá điện nhà nước Q1/2025..."
+                                            placeholder="Ví dụ: Giá quy định theo hợp đồng thuê, giá điện nhà nước quý 1/2025..."
                                         />
                                     )}
                                 />

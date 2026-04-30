@@ -1,41 +1,43 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  FileText,
-  FileSearch,
-  Receipt,
-  CreditCard,
-  Users,
-  DoorOpen,
-  Building,
-  Package,
   AlertCircle,
   BarChart2,
-  Megaphone,
-  Wrench,
-  Settings,
-  ScrollText,
+  Building,
+  Building2,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Building2,
-  UserPlus,
-  Waves,
-  ShieldCheck,
+  CreditCard,
+  DoorOpen,
   FilePlus2,
-  Zap,
+  FileSearch,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  Package,
+  Receipt,
+  ScrollText,
+  Settings,
+  ShieldCheck,
   UserCog,
+  UserPlus,
+  Users,
+  Waves,
+  Wrench,
+  X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@/utils';
-import useUIStore from '@/stores/uiStore';
-import useAuthStore from '@/stores/authStore';
-import { usePermission } from '@/hooks/usePermission';
-import { toast } from 'sonner';
-import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+
 import { buildingService } from '@/services/buildingService';
+import { usePermission } from '@/hooks/usePermission';
+import useAuthStore from '@/stores/authStore';
+import useUIStore from '@/stores/uiStore';
+import { cn } from '@/utils';
 
 interface NavItem {
   labelKey: string;
@@ -43,23 +45,28 @@ interface NavItem {
   icon: LucideIcon;
   permission?: string;
   ownerOnly?: boolean;
-  badge?: number;
+}
+
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+  width?: number;
 }
 
 const sidebarText: Record<string, string> = {
-  'sidebar.overview': 'TỔNG QUAN',
-  'sidebar.property': 'BẤT ĐỘNG SẢN',
-  'sidebar.leasing': 'THUÊ & HỢP ĐỒNG',
-  'sidebar.utilities_services': 'ĐIỆN NƯỚC & DỊCH VỤ',
-  'sidebar.finance': 'TÀI CHÍNH',
-  'sidebar.operations': 'VẬN HÀNH & CSKH',
-  'sidebar.settings': 'CÀI ĐẶT HỆ THỐNG',
-  'sidebar.dashboard': 'Tổng quan launch',
-  'sidebar.reports': 'Báo cáo phân tích',
+  'sidebar.overview': 'Tổng quan',
+  'sidebar.property': 'Bất động sản',
+  'sidebar.leasing': 'Khách thuê và hợp đồng',
+  'sidebar.utilities_services': 'Điện nước và dịch vụ',
+  'sidebar.finance': 'Tài chính',
+  'sidebar.operations': 'Vận hành',
+  'sidebar.settings': 'Cài đặt hệ thống',
+  'sidebar.dashboard': 'Bảng điều khiển',
+  'sidebar.reports': 'Báo cáo',
   'sidebar.buildings': 'Tòa nhà',
-  'sidebar.rooms': 'Tin đăng',
-  'sidebar.assets': 'Tài sản & Thiết bị',
-  'sidebar.amenities': 'Khu tiện ích',
+  'sidebar.rooms': 'Phòng',
+  'sidebar.assets': 'Tài sản',
+  'sidebar.amenities': 'Tiện ích chung',
   'sidebar.tenants': 'Khách thuê',
   'sidebar.leads': 'Đơn thuê',
   'sidebar.contracts': 'Hợp đồng thuê',
@@ -70,16 +77,16 @@ const sidebarText: Record<string, string> = {
   'sidebar.utilityOverrides': 'Điều chỉnh thủ công',
   'sidebar.services': 'Bảng giá dịch vụ',
   'sidebar.invoices': 'Hóa đơn',
-  'sidebar.payments': 'Phiếu thu / Thanh toán',
+  'sidebar.payments': 'Thanh toán',
   'sidebar.allTickets': 'Yêu cầu hỗ trợ',
-  'sidebar.announcements': 'Thông báo nội bộ',
-  'sidebar.visitorCheckin': 'Check-in Khách',
-  'sidebar.amenityCheckin': 'Check-in Tiện ích',
-  'sidebar.users': 'Nhân sự & Tài khoản',
+  'sidebar.announcements': 'Thông báo',
+  'sidebar.visitorCheckin': 'Kiểm tra khách',
+  'sidebar.amenityCheckin': 'Kiểm tra tiện ích',
+  'sidebar.users': 'Nhân sự và tài khoản',
   'sidebar.permissions': 'Phân quyền',
   'sidebar.systemConfig': 'Cấu hình hệ thống',
   'sidebar.auditLogs': 'Nhật ký hoạt động',
-  'sidebar.commandCenter': 'TRUNG TÂM ĐIỀU KHIỂN',
+  'sidebar.commandCenter': 'TRUNG TÂM ĐIỀU HÀNH',
   'sidebar.activeBuilding': 'Tòa nhà đang chọn',
 };
 
@@ -146,17 +153,21 @@ const navItems: { groupKey: string; items: NavItem[] }[] = [
   },
 ];
 
-export const Sidebar = () => {
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const activeBuildingId = useUIStore((s) => s.activeBuildingId);
-
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+export const Sidebar = ({
+  mobileOpen = false,
+  onMobileClose,
+  width = 272,
+}: SidebarProps) => {
+  const sidebarOpen = useUIStore((state) => state.sidebarOpen);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+  const activeBuildingId = useUIStore((state) => state.activeBuildingId);
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const { can } = usePermission();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const tt = (key: string) => sidebarText[key] || t(key);
+
+  const translate = (key: string) => sidebarText[key] || t(key);
 
   const { data: buildings } = useQuery({
     queryKey: ['buildings-sidebar'],
@@ -164,7 +175,7 @@ export const Sidebar = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  const activeBuilding = buildings?.find((b) => String(b.id) === String(activeBuildingId));
+  const activeBuilding = buildings?.find((building) => String(building.id) === String(activeBuildingId));
   const isOwner = user?.role === 'Owner' || user?.role === 'SuperAdmin';
 
   const handleLogout = async () => {
@@ -173,46 +184,55 @@ export const Sidebar = () => {
       toast.success('Đăng xuất thành công');
       navigate('/login', { replace: true });
     } catch {
-      toast.error('Lỗi đăng xuất');
+      toast.error('Không thể đăng xuất');
     }
   };
 
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-50 flex h-screen flex-col bg-primary text-white shadow-2xl transition-all duration-300 ease-in-out',
-        sidebarOpen ? 'w-[260px]' : 'w-[72px]',
+        'z-50 flex h-screen flex-col border-r border-white/10 bg-primary text-white shadow-2xl transition-all duration-300',
+        mobileOpen ? 'fixed left-0 top-0' : 'sticky top-0 hidden lg:flex',
       )}
+      style={{ width }}
     >
-      <div className="h-20 shrink-0 border-b border-white/10 px-6">
-        <div className="flex h-full items-center gap-3 overflow-hidden">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent shadow-lg shadow-accent/20">
-            <Building2 size={22} className="text-white" />
+      <div className="flex h-20 shrink-0 items-center border-b border-white/10 px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 shadow-lg shadow-slate-950/20">
+            <Building2 size={22} />
           </div>
-          {sidebarOpen && (
-            <div className="animate-in slide-in-from-left-4 fade-in duration-500">
-              <h1 className="whitespace-nowrap text-xl font-display font-bold tracking-tight">
-                SmartStay <span className="text-accent">Launch</span>
-              </h1>
-              <p className="text-[9px] font-mono tracking-[0.2em] text-white/40">{tt('sidebar.commandCenter')}</p>
+          {(sidebarOpen || mobileOpen) ? (
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-display font-bold tracking-tight">SmartStay BMS</h1>
+              <p className="truncate text-[10px] font-mono tracking-[0.18em] text-white/55">
+                {translate('sidebar.commandCenter')}
+              </p>
             </div>
-          )}
+          ) : null}
+        </div>
+
+        {mobileOpen ? (
+          <button
+            onClick={onMobileClose}
+            className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            <X size={18} />
+          </button>
+        ) : null}
+      </div>
+
+      <div className={cn('px-3 py-4', sidebarOpen || mobileOpen ? 'block' : 'hidden')}>
+        <div className="rounded-2xl border border-white/10 bg-white/6 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">
+            {translate('sidebar.activeBuilding')}
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-white">
+            {activeBuilding?.buildingName || 'Chưa chọn tòa nhà'}
+          </p>
         </div>
       </div>
 
-      <div className={cn('overflow-hidden px-4 py-4 transition-all', sidebarOpen ? 'block' : 'hidden lg:block lg:h-0 lg:invisible')}>
-        <div className="group flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition-colors hover:bg-white/10">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
-            <Building size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">{tt('sidebar.activeBuilding')}</p>
-            <p className="truncate text-sm font-bold">{activeBuilding?.buildingName || 'Chọn tòa nhà'}</p>
-          </div>
-        </div>
-      </div>
-
-      <nav className="custom-scrollbar flex-1 space-y-6 overflow-y-auto px-3 py-4">
+      <nav className="min-w-0 flex-1 space-y-5 overflow-y-auto scrollbar-hide px-3 pb-4">
         {navItems.map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.ownerOnly && !isOwner) return false;
@@ -224,35 +244,34 @@ export const Sidebar = () => {
 
           return (
             <div key={group.groupKey} className="space-y-1">
-              {sidebarOpen && (
-                <p className="mb-2 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
-                  {tt(group.groupKey)}
+              {(sidebarOpen || mobileOpen) ? (
+                <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+                  {translate(group.groupKey)}
                 </p>
-              )}
+              ) : null}
+
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.route}
                   to={item.route}
+                  onClick={() => onMobileClose?.()}
+                  title={!sidebarOpen && !mobileOpen ? translate(item.labelKey) : undefined}
                   className={({ isActive }) =>
                     cn(
-                      'group relative flex items-center gap-3 rounded-xl px-4 py-3 transition-all',
-                      isActive ? 'bg-white/10 font-bold text-white ring-1 ring-white/20' : 'text-white/60 hover:bg-white/5 hover:text-white',
+                      'group flex min-w-0 items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-all',
+                      isActive
+                        ? 'bg-white/12 text-white shadow-inner ring-1 ring-white/12'
+                        : 'text-white/68 hover:bg-white/7 hover:text-white',
+                      !sidebarOpen && !mobileOpen && 'justify-center px-2',
                     )
                   }
-                  title={!sidebarOpen ? tt(item.labelKey) : undefined}
                 >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon size={20} className="shrink-0 transition-transform group-hover:scale-110" />
-                      {sidebarOpen && <span className="flex-1 truncate text-sm">{tt(item.labelKey)}</span>}
-                      {item.badge && sidebarOpen && (
-                        <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white ring-2 ring-primary">
-                          {item.badge}
-                        </span>
-                      )}
-                      {!sidebarOpen && isActive && <div className="absolute left-0 h-8 w-1 rounded-r-full bg-accent" />}
-                    </>
-                  )}
+                  <item.icon size={19} className="shrink-0" />
+                  {(sidebarOpen || mobileOpen) ? (
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {translate(item.labelKey)}
+                    </span>
+                  ) : null}
                 </NavLink>
               ))}
             </div>
@@ -260,28 +279,53 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      <div className="space-y-2 border-t border-white/10 bg-white/5 p-3">
-        <div className={cn('flex items-center gap-3 rounded-xl p-3 transition-all', sidebarOpen ? 'bg-white/5' : 'bg-transparent')}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold shadow-lg shadow-accent/20">
-            {user?.username?.substring(0, 2).toUpperCase() || 'AD'}
+      <div className="border-t border-white/10 bg-white/5 p-3">
+        <div className={cn('flex items-center gap-3 rounded-2xl p-2', sidebarOpen || mobileOpen ? 'bg-white/5' : 'justify-center')}>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">
+            {user?.username?.slice(0, 2).toUpperCase() || 'AD'}
           </div>
-          {sidebarOpen && (
+          {(sidebarOpen || mobileOpen) ? (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold leading-none">{user?.username || 'Người dùng hệ thống'}</p>
-              <p className="mt-1 text-[10px] uppercase tracking-tighter text-white/40">{user?.role || 'Chủ sở hữu'}</p>
+              <p className="truncate text-sm font-semibold text-white">
+                {(() => {
+                  const rawName = user?.fullName?.trim() || user?.username?.trim() || '';
+                  if (!rawName) return 'Người dùng hệ thống';
+                  const normalized = rawName.toLowerCase();
+                  return normalized === 'system admin' || normalized === 'admin'
+                    ? 'Quản trị hệ thống'
+                    : rawName;
+                })()}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.16em] text-white/45">
+                {user?.role === 'Owner' || user?.role === 'SuperAdmin'
+                  ? 'Chủ nhà'
+                  : user?.role === 'Tenant'
+                    ? 'Người thuê'
+                    : user?.role === 'Staff'
+                      ? 'Nhân sự nội bộ'
+                      : 'Người dùng hệ thống'}
+              </p>
             </div>
-          )}
+          ) : null}
+
           <button
             onClick={handleLogout}
-            className={cn('shrink-0 rounded-lg p-1.5 transition-colors hover:bg-danger/20 hover:text-danger', !sidebarOpen && 'mx-auto')}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
+            title="Đăng xuất"
           >
             <LogOut size={16} />
           </button>
         </div>
 
-        <button onClick={toggleSidebar} className="flex w-full items-center justify-center py-2 text-white/30 transition-colors hover:text-white">
-          {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-        </button>
+        {mobileOpen ? null : (
+          <button
+            onClick={toggleSidebar}
+            className="mt-2 hidden w-full items-center justify-center rounded-2xl py-2 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
+            title={sidebarOpen ? 'Thu gọn thanh điều hướng' : 'Mở rộng thanh điều hướng'}
+          >
+            {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
+        )}
       </div>
     </aside>
   );

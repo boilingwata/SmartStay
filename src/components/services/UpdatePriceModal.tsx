@@ -1,6 +1,5 @@
-// RULE-08: ServicePriceHistory IMMUTABLE
-// Tuyệt đối không Edit/Delete lịch sử giá
-// Cập nhật giá = POST (INSERT mới), backend xử lý UPDATE EffectiveTo
+// RULE-08: Lịch sử giá không được sửa hoặc xóa.
+// Khi cập nhật giá, hệ thống thêm một mốc giá mới và tự đóng mốc giá cũ.
 
 import React, { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
@@ -144,7 +143,7 @@ const UpdatePriceModal: React.FC<UpdatePriceModalProps> = ({
     <Modal
       isOpen={open}
       onClose={onClose}
-      title={`CẬP NHẬT GIÁ — ${service.serviceCode}`}
+      title={`Cập nhật giá - ${service.serviceCode}`}
       className="max-w-lg"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -260,7 +259,7 @@ const UpdatePriceModal: React.FC<UpdatePriceModalProps> = ({
                         <textarea
                             {...field}
                             rows={3}
-                            placeholder="VD: Điều chỉnh theo khung giá nhà nước mới áp dụng từ Q2/2026..."
+                            placeholder="Ví dụ: Điều chỉnh theo khung giá nhà nước mới áp dụng từ quý 2/2026..."
                             className={cn(
                                 "w-full bg-white border border-slate-200 rounded-2xl p-4 outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium resize-none shadow-sm",
                                 errors.reason && "border-red-500 focus:ring-red-500/10"

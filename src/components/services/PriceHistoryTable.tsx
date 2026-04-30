@@ -1,6 +1,4 @@
-// RULE-08: ServicePriceHistory IMMUTABLE
-// Tuyệt đối không Edit/Delete lịch sử giá
-// Cập nhật giá = POST (INSERT mới), backend xử lý UPDATE EffectiveTo
+// RULE-08: lịch sử giá chỉ được thêm bản ghi mới, không sửa hoặc xóa trực tiếp.
 
 import React, { useState } from "react";
 import { Eye, Plus, Shield, User, Calendar, MessageSquare } from "lucide-react";
@@ -9,8 +7,7 @@ import { ServicePriceHistory } from "@/types/service";
 import { formatDate, cn } from "@/utils";
 import { formatVND } from "@/utils/serviceHelpers";
 
-// RULE-08: IMMUTABLE - Lịch sử giá là dạng ghi đè (INSERT mới), không có chế độ Edit hay Delete.
-// Thành phần này chỉ cung cấp chức năng Xem (Eye icon) cho các giá đã hết hạn.
+// Thành phần này chỉ cung cấp chức năng xem cho các giá đã hết hạn.
 
 interface PriceHistoryTableProps {
   priceHistory: ServicePriceHistory[];
@@ -68,7 +65,7 @@ const PriceHistoryTable: React.FC<PriceHistoryTableProps> = ({
       </div>
 
       <div className="overflow-x-auto rounded-[32px] border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 custom-scrollbar">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[1040px] border-collapse text-left">
           <thead>
             <tr className="bg-slate-50/50 border-b border-slate-100">
               <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[2px] text-slate-400">Giá (VND)</th>
@@ -123,7 +120,7 @@ const PriceHistoryTable: React.FC<PriceHistoryTableProps> = ({
                 </td>
                 <td className="px-8 py-6">
                   <div className="flex justify-center">
-                    {/* RULE-08: Immutable - Only View (Inactive Rows). Active row has no actions. */}
+                    {/* RULE-08: Chỉ xem bản ghi cũ, bản ghi đang hiệu lực không có thao tác. */}
                     {!history.isActive && (
                       <button
                         onClick={() => setSelectedHistory(history)}
@@ -154,7 +151,7 @@ const PriceHistoryTable: React.FC<PriceHistoryTableProps> = ({
       <Modal
         isOpen={!!selectedHistory}
         onClose={() => setSelectedHistory(null)}
-        title={`Chi tiết giá (Chỉ xem) — ${selectedHistory ? formatDate(selectedHistory.effectiveFrom) : ""} đến ${selectedHistory?.effectiveTo ? formatDate(selectedHistory.effectiveTo) : "nay"}`}
+        title={`Chi tiết giá (chỉ xem) — ${selectedHistory ? formatDate(selectedHistory.effectiveFrom) : ""} đến ${selectedHistory?.effectiveTo ? formatDate(selectedHistory.effectiveTo) : "nay"}`}
         className="max-w-md"
       >
         <div className="space-y-6">

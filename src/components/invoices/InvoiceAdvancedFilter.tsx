@@ -1,10 +1,7 @@
-import React from 'react';
 import { 
   Building, Calendar, DollarSign, 
   RotateCcw, SlidersHorizontal, Hash,
-  Eye, FileText
 } from 'lucide-react';
-import { cn } from '@/utils';
 import { useTranslation } from 'react-i18next';
 
 interface AdvancedFilterState {
@@ -30,7 +27,7 @@ export const InvoiceAdvancedFilter = ({
 }: InvoiceAdvancedFilterProps) => {
   const { t } = useTranslation();
 
-  const updateFilter = (key: keyof AdvancedFilterState, value: any) => {
+  const updateFilter = <K extends keyof AdvancedFilterState>(key: K, value: AdvancedFilterState[K] | undefined) => {
     onChange({ ...filters, [key]: value === '' ? undefined : value });
   };
 
@@ -112,7 +109,7 @@ export const InvoiceAdvancedFilter = ({
                 <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/input:text-primary transition-colors" size={14} />
                 <input 
                   type="text"
-                  placeholder={t('pages.invoices.roomCodePlaceholder') || "Mã phòng (VD: A-101)..."}
+                  placeholder={t('pages.invoices.roomCodePlaceholder') || "Mã phòng (ví dụ: A-101)..."}
                   value={filters.roomCode || ''}
                   onChange={(e) => updateFilter('roomCode', e.target.value)}
                   className="w-full h-11 pl-10 pr-4 bg-slate-50/50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-primary/30 transition-all font-bold text-xs shadow-inner"

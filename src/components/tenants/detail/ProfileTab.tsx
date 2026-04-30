@@ -13,6 +13,19 @@ interface ProfileTabProps {
   isSavingVehicles?: boolean;
 }
 
+function getGenderLabel(value?: string | null) {
+  switch (value) {
+    case 'Male':
+      return 'Nam';
+    case 'Female':
+      return 'Nữ';
+    case 'Other':
+      return 'Khác';
+    default:
+      return 'Chưa cập nhật';
+  }
+}
+
 export const ProfileTab: React.FC<ProfileTabProps> = ({
   profile,
   canViewPII,
@@ -65,7 +78,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-tighter text-muted">Giới tính</p>
-              <StatusBadge status="Info" label={profile.gender} className="!bg-primary/5 !py-1 !capitalize !text-primary" />
+              <StatusBadge status="Info" label={getGenderLabel(profile.gender)} className="!bg-primary/5 !py-1 !text-primary" />
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-tighter text-muted">Ngày sinh</p>
@@ -84,7 +97,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
         <div className="card-container bg-white/60 p-8">
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-label font-black uppercase tracking-widest text-muted">Định danh (CCCD/Passport)</h3>
+            <h3 className="text-label font-black uppercase tracking-widest text-muted">Định danh (CCCD/Hộ chiếu)</h3>
             {canViewPII && (
               <button
                 onClick={() => setShowSensitive(!showSensitive)}

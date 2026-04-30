@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, setupQueryNetworkRecovery } from '@/lib/queryClient';
 import { Toaster } from 'sonner';
 import { OfflineBanner, SessionExpiredOverlay } from '../ui/StatusStates';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
@@ -9,13 +9,16 @@ import useUIStore from '@/stores/uiStore';
 import i18n from '@/i18n/i18n';
 
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const logout = useAuthStore((s) => s.logout);
   const sessionExpired = useAuthStore((s) => s.sessionExpired);
   const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
 
   const theme = useUIStore((s) => s.theme);
   const language = useUIStore((s) => s.language);
+
+  useEffect(() => {
+    setupQueryNetworkRecovery();
+  }, []);
   
   // Apply theme to document
   useEffect(() => {

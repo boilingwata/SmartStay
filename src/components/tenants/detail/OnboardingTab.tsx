@@ -12,16 +12,16 @@ interface OnboardingTabProps {
 
 export const OnboardingTab: React.FC<OnboardingTabProps> = ({ onboarding, onTabChange }) => {
   const steps: Array<{ key: keyof OnboardingProgress; label: string; target: TenantDetailTab | null }> = [
-    { key: 'isPersonalInfoConfirmed', label: 'Xac nhan thong tin ca nhan', target: 'Ho so' },
-    { key: 'isCCCDUploaded', label: 'Upload CCCD/Ho chieu', target: 'Ho so' },
-    { key: 'isEmergencyContactAdded', label: 'Them lien he khan cap', target: 'Lien he' },
-    { key: 'isContractSigned', label: 'Ky hop dong thue', target: 'Hop dong' },
-    { key: 'isDepositPaid', label: 'Thanh toan tien coc', target: 'Hoa don' },
-    { key: 'isRoomHandovered', label: 'Nhan ban giao phong', target: 'Hop dong' },
+    { key: 'isPersonalInfoConfirmed', label: 'Xác nhận thông tin cá nhân', target: 'Ho so' },
+    { key: 'isCCCDUploaded', label: 'Tải CCCD/hộ chiếu', target: 'Ho so' },
+    { key: 'isEmergencyContactAdded', label: 'Thêm liên hệ khẩn cấp', target: 'Lien he' },
+    { key: 'isContractSigned', label: 'Ký hợp đồng thuê', target: 'Hop dong' },
+    { key: 'isDepositPaid', label: 'Thanh toán tiền cọc', target: 'Hoa don' },
+    { key: 'isRoomHandovered', label: 'Nhận bàn giao phòng', target: 'Hop dong' },
   ];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-12 py-10 animate-in slide-in-from-right-4 duration-500">
+    <div className="w-full max-w-5xl space-y-12 py-10 animate-in slide-in-from-right-4 duration-500">
       <div className="card-container relative overflow-hidden border-none bg-slate-900 p-10">
         <div className="relative z-10 flex flex-col items-center gap-10 md:flex-row">
           <div className="relative flex h-32 w-32 items-center justify-center">
@@ -34,13 +34,13 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({ onboarding, onTabC
           </div>
 
           <div className="flex-1 space-y-3">
-            <h2 className="text-h2 font-black uppercase tracking-widest text-white">Qua trinh Onboarding</h2>
+            <h2 className="text-h2 font-black uppercase tracking-widest text-white">Quá trình hoàn tất hồ sơ</h2>
             <p className="text-small font-medium text-slate-400">
-              Tab nay chi hien tien do onboarding theo du lieu thuc te trong tenant, contract va invoice.
+              Mục này hiển thị tiến độ hoàn tất hồ sơ theo dữ liệu thực tế trong hồ sơ cư dân, hợp đồng và hóa đơn.
             </p>
             {onboarding?.completionPercent === 100 ? (
               <div className="flex items-center gap-2 text-[11px] font-black uppercase text-success">
-                <CheckCircle2 size={16} /> Da hoan tat
+                <CheckCircle2 size={16} /> Đã hoàn tất
               </div>
             ) : null}
           </div>
@@ -80,11 +80,11 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({ onboarding, onTabC
                   onClick={() => onTabChange(step.target!)}
                   className="inline-flex items-center gap-2 text-[10px] font-black uppercase text-primary hover:underline"
                 >
-                  Mo tab lien quan
+                  Mở mục liên quan
                   <ArrowRight size={14} />
                 </button>
               ) : (
-                <span className="text-[10px] font-black uppercase text-muted">{completed ? 'Da xong' : 'Theo doi'}</span>
+                <span className="text-[10px] font-black uppercase text-muted">{completed ? 'Đã xong' : 'Theo dõi'}</span>
               )}
             </div>
           );

@@ -869,21 +869,25 @@ export const invoiceService = {
     };
   },
 
-  getInvoiceCounts: async (): Promise<Record<InvoiceStatus | 'All', number>> => {
+  getInvoiceCounts: async (): Promise<Record<InvoiceStatus | 'All', number> & { overdueAmount: number }> => {
     const rows = await unwrap(
       supabase
         .from('invoices')
-        .select('status')
-    ) as unknown as { status: string }[];
+        .select('status, balance_due')
+    ) as unknown as { status: string; balance_due: number | null }[];
 
-    const counts: Record<string, number> = { All: rows.length, Unpaid: 0, Paid: 0, Overdue: 0, Cancelled: 0 };
+    const counts: Record<string, number> = { All: rows.length, Unpaid: 0, Paid: 0, Overdue: 0, Cancelled: 0, overdueAmount: 0 };
 
     for (const row of rows) {
       const mapped = mapInvoiceStatus.fromDb(row.status) as InvoiceStatus;
       counts[mapped] = (counts[mapped] ?? 0) + 1;
+      
+      if (mapped === 'Overdue') {
+        counts.overdueAmount += Number(row.balance_due ?? 0);
+      }
     }
 
-    return counts as Record<InvoiceStatus | 'All', number>;
+    return counts as Record<InvoiceStatus | 'All', number> & { overdueAmount: number };
   },
 
   getInvoiceDetail: async (id: string): Promise<InvoiceDetail> => {

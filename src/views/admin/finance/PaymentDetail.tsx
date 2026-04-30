@@ -350,8 +350,8 @@ const PaymentDetail = () => {
               <div className="flex items-start gap-3">
                 <AlertCircle size={20} className="mt-0.5 shrink-0 text-info" />
                 <div className="space-y-1 text-sm text-info/80">
-                  <p className="font-bold text-info">Màn hình này đang hiển thị đúng trạng thái backend.</p>
-                  <p>Không có thao tác chỉnh tay bổ sung ngoài duyệt / từ chối để tránh làm lệch dữ liệu giữa frontend và Supabase.</p>
+                  <p className="font-bold text-info">Màn hình này đang hiển thị đúng trạng thái thanh toán đã ghi nhận.</p>
+                  <p>Không có thao tác chỉnh tay bổ sung ngoài duyệt / từ chối để tránh làm lệch dữ liệu giữa giao diện và hệ thống lưu trữ.</p>
                 </div>
               </div>
             </section>

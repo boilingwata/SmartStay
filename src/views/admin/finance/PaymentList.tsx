@@ -112,7 +112,7 @@ const PaymentList = () => {
         </div>
 
         <button type="button" className="btn-outline self-start" onClick={() => navigate('/owner/payments/webhooks')}>
-          Xem nhật ký webhook
+          Xem nhật ký kết nối thanh toán
         </button>
       </div>
 
@@ -193,7 +193,7 @@ const PaymentList = () => {
 
       <div className="card-container overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full min-w-[1160px] text-left">
             <thead className="bg-bg/40">
               <tr>
                 <th className="px-6 py-4 text-[11px] font-black uppercase tracking-wider text-muted">Mã giao dịch</th>

@@ -159,7 +159,7 @@ export default function UtilityPoliciesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-6 py-10 pb-20">
+    <div className="w-full min-w-0 space-y-8 pb-20">
       <div className="flex flex-col gap-4 border-b border-slate-100 pb-6 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-amber-600">
@@ -533,7 +533,7 @@ export default function UtilityPoliciesPage() {
                       const meta = deviceCatalog.find((item) => item.code === adjustment.deviceCode);
                       return (
                         <span key={adjustment.deviceCode} className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white">
-                          {meta?.label ?? adjustment.deviceCode}: {formatVND(adjustment.chargeAmount)}
+                          {meta?.label ?? 'Thiết bị khác'}: {formatVND(adjustment.chargeAmount)}
                         </span>
                       );
                     })}

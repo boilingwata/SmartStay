@@ -281,9 +281,6 @@ export const roomService = {
       query = query.in('status', dbStatuses);
     }
 
-    if (filters?.roomType) {
-      query = query.eq('room_type', filters.roomType);
-    }
     if (filters?.facing) {
       query = query.eq('facing', filters.facing as DirectionFacing);
     }
@@ -318,7 +315,13 @@ export const roomService = {
     }
 
     const rows = await unwrap(query) as unknown as RoomRow[];
-    return rows.map(toRoom);
+    let rooms = rows.map(toRoom);
+
+    if (filters?.roomType) {
+      rooms = rooms.filter((room) => room.roomType === filters.roomType);
+    }
+
+    return rooms;
   },
 
   getRoomDetail: async (id: string): Promise<RoomDetail> => {

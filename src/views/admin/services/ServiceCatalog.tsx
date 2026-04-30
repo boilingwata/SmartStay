@@ -145,7 +145,7 @@ const ServiceCatalog: React.FC = () => {
           "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider",
           SERVICE_TYPE_COLORS[row.original.serviceType] || "bg-slate-100 text-slate-600 shadow-sm"
         )}>
-          {SERVICE_TYPE_LABELS[row.original.serviceType] || row.original.serviceType}
+          {SERVICE_TYPE_LABELS[row.original.serviceType] || "Khác"}
         </span>
       )
     },
@@ -215,7 +215,7 @@ const ServiceCatalog: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-in fade-in duration-700">
+    <div className="w-full min-w-0 space-y-6 pb-20 md:space-y-8 animate-in fade-in duration-700">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-5">
@@ -232,7 +232,7 @@ const ServiceCatalog: React.FC = () => {
                 </span>
               </div>
               <p className="text-slate-500 text-sm font-medium mt-1">
-                Chỉ quản lý các khoản thu cố định theo hợp đồng. Điện nước và tiện ích đặt chỗ đã được tách sang domain riêng.
+                Chỉ quản lý các khoản thu cố định theo hợp đồng. Điện nước và tiện ích đặt chỗ đã được tách sang màn hình riêng.
               </p>
            </div>
         </div>

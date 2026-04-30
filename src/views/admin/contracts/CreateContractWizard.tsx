@@ -233,7 +233,7 @@ export default function CreateContractWizard() {
   };
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 pb-28 pt-6 sm:px-6 lg:px-8">
+    <div className="flex w-full min-w-0 flex-col gap-6 pb-28">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="space-y-3">
           <span className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
@@ -288,7 +288,7 @@ export default function CreateContractWizard() {
         </div>
 
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 p-4 backdrop-blur">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3">
+          <div className="mx-auto flex w-full max-w-[1760px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 2xl:px-10">
             <button
               type="button"
               onClick={() => setBuoc((current) => Math.max(current - 1, 1))}
