@@ -1,142 +1,158 @@
 # Architecture
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-01
 
 ## Pattern Overview
 
-**Overall:** Browser-only React SPA with a layered frontend service architecture over direct Supabase access.
+SmartStay is a browser-first React SPA with a layered service architecture over Supabase. The frontend owns routing, role-specific layouts, form orchestration, and most presentation logic. Supabase owns persistence, auth, storage, realtime, transactional RPCs, and selected Edge Function workflows.
 
 **Key Characteristics:**
-- Route namespaces separate public, owner/staff, super-admin, and tenant portal experiences from one bundled app.
-- UI reads and writes the database directly through a typed Supabase client instead of a separate application server.
-- Domain services translate DB rows into frontend models and normalize enum values before UI consumption.
-- Global state is split between React Query for async server state and Zustand for persistent client state.
+- One SPA serves public listings/auth, owner/staff workspace, super-admin workspace, and tenant portal.
+- Route namespaces are defined in `src/App.tsx`, `src/routes/ownerRoutes.tsx`, `src/routes/portalRoutes.tsx`, and `src/routes/superAdminRoutes.tsx`.
+- UI components call domain services that map database rows into frontend models.
+- React Query manages server state; Zustand persists client state.
+- Supabase RPCs and Edge Functions handle operations that need transactionality or service-role privileges.
 
 ## Layers
 
-**Application Shell:**
-- Purpose: boot the app, wire providers, initialize telemetry, and start routing.
+**Application Shell**
 - Location: `src/main.tsx`, `src/App.tsx`, `src/components/layout/AppProviders.tsx`
-- Contains: root render, router tree, query client provider, toasts, theme and language side effects
-- Depends on: routing, stores, i18n, Sentry
-- Used by: entire application
+- Responsibilities: initialize Sentry and i18n, mount React, bootstrap auth, wire providers, render router, toasts, offline/session overlays, and error boundaries.
 
-**Route and Guard Layer:**
-- Purpose: define navigable namespaces and access control.
-- Location: `src/routes/*.tsx`, `src/components/auth/PortalAuthGuard.tsx`
-- Contains: `RouteObject[]`, redirects, role checks, onboarding gating
-- Depends on: auth store and layout components
-- Used by: `src/App.tsx`
+**Routing and Access Control**
+- Location: `src/routes/*.tsx`, `src/components/auth/PortalAuthGuard.tsx`, `src/lib/authRouting.ts`
+- Responsibilities: role gating, tenant-stage gating, legacy redirects, post-login redirect normalization, route tree exports.
+- Current namespaces: `/`, `/login`, `/public/*`, `/listings/*`, `/owner/*`, `/super-admin/*`, `/portal/*`, and compatibility redirects from older `/admin/*` paths.
 
-**View Layer:**
-- Purpose: compose screens, trigger queries and mutations, and render domain UIs.
-- Location: `src/views/**`, feature-heavy components under `src/components/**`
-- Contains: page components, wizards, tables, dashboards, modals
-- Depends on: hooks, services, shared UI components, stores
-- Used by: route definitions
+**View Layer**
+- Location: `src/views/**`
+- Responsibilities: route-level UI, query/mutation orchestration, form flows, table/chart/page composition.
+- Examples: `src/views/admin/contracts/CreateContractWizard.tsx`, `src/views/admin/rooms/RoomDetail.tsx`, `src/views/portal/finance/InvoiceList.tsx`, `src/views/super-admin/Dashboard.tsx`.
 
-**Service Layer:**
-- Purpose: own Supabase interactions and map DB shapes into frontend-facing models.
+**Component Layer**
+- Location: `src/components/**`
+- Responsibilities: layout shells, shared UI, modals, domain composites, data display, form controls, tenant portal components.
+- Examples: `src/components/layout/AdminLayout.tsx`, `src/components/ui/Button.tsx`, `src/components/rooms/RoomModal.tsx`, `src/components/contracts/wizard/steps/RoomTenantStep.tsx`.
+
+**Service Layer**
 - Location: `src/services/*.ts`
-- Contains: domain CRUD, RPC calls, auth-aware flows, storage calls
-- Depends on: `src/lib/supabase.ts`, enum mappers, helpers, generated types
-- Used by: views, hooks, and sometimes stores
+- Responsibilities: Supabase table queries, RPC calls, Edge Function invocation, row-to-model mapping, business-specific request construction.
+- Examples: `src/services/roomService.ts`, `src/services/contractService.ts`, `src/services/utilityAdminService.ts`, `src/services/portalInvoiceService.ts`, `src/services/amenityAdminService.ts`.
 
-**Model / Utility Layer:**
-- Purpose: centralize reusable types, enum transforms, presentation helpers, and validation schemas.
-- Location: `src/models/`, `src/lib/`, `src/schemas/`, `src/utils/`, `src/types/`
-- Contains: UI models, mapping functions, Zod schemas, security helpers, pure utilities
-- Depends on: framework utilities and generated DB types
-- Used by: service and view layers
+**Infrastructure and Domain Utilities**
+- Location: `src/lib/`, `src/utils/`, `src/models/`, `src/types/`, `src/schemas/`
+- Responsibilities: Supabase client, query client, enum mappers, presentation helpers, security helpers, generated DB types, Zod schemas, and frontend-facing models.
 
-**State Layer:**
-- Purpose: manage session, UI context, and notification state outside component trees.
-- Location: `src/stores/*.ts`, `src/hooks/useQueryWithBuilding.ts`
-- Contains: persisted auth/UI stores and building-scoped query glue
-- Depends on: Supabase auth, localStorage, React Query
-- Used by: guards, layouts, and pages
+**Supabase Backend Assets**
+- Location: `supabase/migrations/`, `supabase/functions/`, `supabase/seeds/`
+- Responsibilities: database schema, RLS, RPCs, Edge Functions, and seed/demo data.
 
 ## Data Flow
 
-**Authenticated Owner/Staff Screen:**
+**Owner/Staff Workspace Flow**
+1. `src/main.tsx` loads infrastructure and renders `src/App.tsx`.
+2. `src/App.tsx` calls `useAuthStore.getState().initialize()`.
+3. `ProtectedRoute` checks session and role for `/owner/*`.
+4. A route from `src/routes/ownerRoutes.tsx` lazy-loads the page.
+5. The page calls a domain service directly or through React Query.
+6. The service uses `src/lib/supabase.ts`, `unwrap()` from `src/lib/supabaseHelpers.ts`, and mappers from `src/lib/enumMaps.ts`.
+7. Mutations invalidate query keys or update local state; global mutation errors are toasted by `src/lib/queryClient.ts`.
 
-1. `src/main.tsx` loads Sentry, CSS, and i18n, then mounts `src/App.tsx`.
-2. `src/App.tsx` calls `useAuthStore.getState().initialize()` and waits on `isLoading`.
-3. Router and guards choose the correct namespace from `src/routes/ownerRoutes.tsx`, `src/routes/superAdminRoutes.tsx`, or portal routes.
-4. A page component calls a service directly or via React Query, often using `src/hooks/useQueryWithBuilding.ts`.
-5. Service code queries Supabase through `src/lib/supabase.ts`, unwraps errors with `src/lib/supabaseHelpers.ts`, and maps DB enums into frontend enums with `src/lib/enumMaps.ts`.
-6. The page renders frontend models and mutation side effects invalidate React Query caches.
+**Tenant Portal Flow**
+1. `PortalAuthGuard` verifies authentication, `Tenant` role, and resident stage.
+2. Incomplete resident profiles are redirected to `/portal/onboarding`.
+3. Portal views call tenant-scoped services such as `src/services/portalInvoiceService.ts`, `src/services/portalProfileService.ts`, and `src/services/tenantDashboardService.ts`.
+4. Realtime hooks such as `src/hooks/usePortalInvoiceRealtime.ts` and `src/hooks/useTenantDashboardRealtime.ts` subscribe to live updates.
 
-**Tenant Portal Flow:**
+**Transactional Backend Flow**
+1. The UI calls a service method, for example `contractService.createContract()`.
+2. The service either invokes a Supabase Edge Function when `VITE_USE_EDGE_FUNCTIONS === 'true'`, or calls an RPC directly.
+3. Edge Functions validate caller roles with `supabase/functions/_shared/auth.ts` and use a service-role client from `supabase/functions/_shared/supabaseAdmin.ts`.
+4. Database RPCs persist multi-table changes in one transaction.
 
-1. `src/components/auth/PortalAuthGuard.tsx` checks auth, role, tenant stage, and session-expired state.
-2. If onboarding is incomplete, the user is forced into `/portal/onboarding`.
-3. Portal services such as `src/services/portalInvoiceService.ts` and `src/services/portalProfileService.ts` fetch current-user-scoped data.
-4. Realtime hooks such as `src/hooks/usePortalInvoiceRealtime.ts` and `src/hooks/useTenantDashboardRealtime.ts` update the portal on live changes.
+## State Management
 
-**State Management:**
-- Server state: TanStack Query configured in `src/lib/queryClient.ts`
-- Client state: Zustand stores in `src/stores/authStore.ts`, `src/stores/uiStore.ts`, and `src/stores/notificationStore.ts`
-- Auth persistence: Supabase session + Zustand persisted snapshot
-- Building scope: appended into query keys by `src/hooks/useQueryWithBuilding.ts`
+**React Query**
+- Configured in `src/lib/queryClient.ts`.
+- Uses `staleTime` 5 minutes, `gcTime` 10 minutes, retry 1 for queries, retry 0 for mutations.
+- Global query/mutation errors are sent to Sentry; mutation errors also produce Sonner toasts.
+- Network recovery listeners invalidate active queries after long idle, focus, or online transitions.
+
+**Zustand**
+- `src/stores/authStore.ts` - resolved user, role, auth mode, session-expired state, Supabase auth listener.
+- `src/stores/uiStore.ts` - sidebar state, active building, theme, language.
+- `src/stores/notificationStore.ts` - notification list, unread count, realtime subscription handle.
+- `src/stores/permissionStore.ts` - permission snapshot.
+
+**Building Scope**
+- UI building context comes from `activeBuildingId` in `src/stores/uiStore.ts`.
+- `src/hooks/useQueryWithBuilding.ts` appends it to query keys and injects it into query functions.
+- `buildingScoped()` applies `building_id` filters when services receive a building ID.
 
 ## Key Abstractions
 
-**Typed Supabase Client:**
-- Purpose: single browser entry to database, auth, storage, and edge functions
-- Examples: `src/lib/supabase.ts`, `src/types/supabase.ts`
-- Pattern: singleton module
+**Typed Supabase Client**
+- File: `src/lib/supabase.ts`
+- Creates `createClient<Database, 'smartstay'>`.
+- Adds custom fetch retry and hard timeouts to avoid indefinitely pending requests after tab wake.
 
-**Domain Service:**
-- Purpose: encapsulate table access and row-to-model transformations
-- Examples: `src/services/roomService.ts`, `src/services/ticketService.ts`, `src/services/userService.ts`
-- Pattern: exported object with async methods
+**Enum Mapping Layer**
+- File: `src/lib/enumMaps.ts`
+- Maps DB enum strings into frontend labels and back.
+- Keeps UI code mostly isolated from raw database enum values.
 
-**Enum Mapping Layer:**
-- Purpose: isolate DB enum strings from UI-facing names
-- Examples: `src/lib/enumMaps.ts`, `src/lib/assetMappers.ts`
-- Pattern: bidirectional mapper modules
+**Domain Services**
+- Files: `src/services/*.ts`
+- Pattern: row interfaces, transformer functions, exported service object or named async functions.
+- Services are the expected place for Supabase select shapes and DB enum conversion.
 
-**RouteObject Namespace:**
-- Purpose: keep route trees modular and lazily loaded
-- Examples: `src/routes/ownerRoutes.tsx`, `src/routes/portalRoutes.tsx`, `src/routes/superAdminRoutes.tsx`
-- Pattern: route arrays mapped recursively in `src/App.tsx`
+**RouteObject Arrays**
+- Files: `src/routes/ownerRoutes.tsx`, `src/routes/portalRoutes.tsx`, `src/routes/superAdminRoutes.tsx`
+- `src/App.tsx` recursively maps arrays to `<Route>` elements.
+
+**Edge Function Shared Helpers**
+- Files: `supabase/functions/_shared/auth.ts`, `supabase/functions/_shared/supabaseAdmin.ts`, `supabase/functions/_shared/errors.ts`, `supabase/functions/_shared/cors.ts`
+- Provide authentication, service-role client setup, common responses, and CORS.
 
 ## Entry Points
 
-**Browser Entry:**
-- Location: `src/main.tsx`
-- Triggers: browser loading `index.html`
-- Responsibilities: initialize Sentry and i18n, render React root
+**Browser**
+- `index.html`
+- `src/main.tsx`
+- `src/App.tsx`
 
-**App Router:**
-- Location: `src/App.tsx`
-- Triggers: render after root mount
-- Responsibilities: auth bootstrap, layout selection, lazy routing, legacy redirects
-
-**Auth Store Bootstrap:**
-- Location: `src/stores/authStore.ts`
-- Triggers: `initialize()` from `src/App.tsx`
-- Responsibilities: resolve Supabase session to app user, subscribe to auth state changes, set Sentry user
+**Supabase Edge Functions**
+- `supabase/functions/create-contract/index.ts`
+- `supabase/functions/create-user/index.ts`
+- `supabase/functions/create-utility-invoice/index.ts`
+- `supabase/functions/run-utility-billing/index.ts`
+- `supabase/functions/process-payment/index.ts`
+- `supabase/functions/sepay-webhook/index.ts`
+- `supabase/functions/webhook-payment/index.ts`
 
 ## Error Handling
 
-**Strategy:** throw service-level errors and surface them through React Query, toasts, redirects, or error boundaries.
+**Frontend**
+- `unwrap()` enriches Supabase PostgREST errors in `src/lib/supabaseHelpers.ts`.
+- `src/lib/queryClient.ts` captures query and mutation errors and toasts mutation failures.
+- `src/components/ErrorBoundary.tsx` catches render failures and reports to Sentry.
+- Several services catch schema compatibility or optional data failures and return fallbacks, for example `src/services/amenityAdminService.ts` and `src/services/publicListingsService.ts`.
 
-**Patterns:**
-- `src/lib/supabaseHelpers.ts` wraps PostgREST responses and throws enriched `Error` objects.
-- `src/lib/queryClient.ts` captures query and mutation failures globally and toasts mutation errors.
-- `src/components/ErrorBoundary.tsx` catches render failures and reports them to Sentry.
-- Some services still catch and downgrade failures to empty results or warnings, for example `src/services/publicListingsService.ts` and `src/services/portalOnboardingService.ts`.
+**Edge Functions**
+- Shared error helpers in `supabase/functions/_shared/errors.ts`.
+- Auth helpers return denied responses instead of throwing through function handlers.
+- Webhook functions return JSON status payloads and log server-side failures.
 
 ## Cross-Cutting Concerns
 
-**Logging:** console logging is still used directly in services, auth flows, and tests; there is no dedicated logger abstraction.
+**Localization:** i18next resources live in `src/i18n/`; Vietnamese is the primary UI language, but some inline strings remain in components.
 
-**Validation:** Zod and React Hook Form validate forms such as `src/schemas/contractSchema.ts` and `src/schemas/serviceSchema.ts`.
+**Security:** Supabase RLS, route guards, URL/file validation, Edge Function auth, and RPC hardening all matter because the browser client directly accesses the backend.
 
-**Authentication:** Supabase auth session is the root identity source; route guards apply role and tenant-stage rules in the browser.
+**Observability:** Sentry is present for frontend errors; Edge Function logging is console-based.
+
+**Design System:** Tailwind tokens and local shadcn-style primitives form the UI base. The current design direction favors dense operational workspaces over marketing layouts.
 
 ---
 
-*Architecture analysis: 2026-04-26*
+*Architecture analysis: 2026-05-01*

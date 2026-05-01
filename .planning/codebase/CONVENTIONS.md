@@ -1,110 +1,136 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-01
 
 ## Naming Patterns
 
-**Files:**
-- `PascalCase.tsx` for most React views and components, for example `src/views/admin/rooms/RoomDetail.tsx` and `src/components/ui/Button.tsx`.
-- `camelCase.ts` for services, hooks, libs, and schemas, for example `src/services/ticketService.ts`, `src/hooks/useQueryWithBuilding.ts`, `src/lib/supabaseHelpers.ts`.
-- Test files use `*.test.ts` and Playwright uses `*.spec.ts`.
+**Files**
+- React components and pages usually use `PascalCase.tsx`, for example `src/views/admin/rooms/RoomDetail.tsx` and `src/components/ui/Button.tsx`.
+- Services, hooks, libs, schemas, and utilities usually use `camelCase.ts`, for example `src/services/ticketService.ts`, `src/hooks/useQueryWithBuilding.ts`, and `src/lib/supabaseHelpers.ts`.
+- Unit tests use `*.test.ts`; Playwright tests use `*.spec.ts`.
 
-**Functions:**
-- `camelCase` for helpers and service methods such as `buildStatus`, `getRooms`, `updateStatus`.
-- React event handlers usually use `handleX` naming, though Vietnamese names also appear in feature-heavy screens such as `taiHoSoPhapLy` and `sangBuocSau` in `src/views/admin/contracts/CreateContractWizard.tsx`.
-- Async functions are not prefixed specially.
+**Types**
+- Interfaces and type aliases use `PascalCase`, for example `RoomRow`, `PortalInvoiceDetail`, and `CreateRoomData`.
+- DB row interfaces are often local to service files.
+- Frontend-facing model types live in `src/models/`.
 
-**Variables:**
-- `camelCase` for regular locals and state.
-- `UPPER_SNAKE_CASE` for constants such as `STORAGE_STATE`, `TRUSTED_DOMAINS`, and `DB_TICKET_STATUSES`.
-- Some files mix English and Vietnamese identifiers, especially in UI-heavy pages.
+**Functions and Variables**
+- Regular functions and variables use `camelCase`.
+- React event handlers commonly use `handleX`.
+- Constants use `UPPER_SNAKE_CASE` when they are static maps or config-like values, for example `TRUSTED_DOMAINS`.
+- Some feature-heavy UI files use Vietnamese identifiers or inline Vietnamese copy; new shared abstractions should prefer English identifiers and i18n-backed user copy.
 
-**Types:**
-- Interfaces and type aliases use `PascalCase` without `I` prefixes, for example `ProfileRow`, `PortalOnboardingStatus`, `CreateTicketInput`.
-- Enum-like unions also use `PascalCase` type names, while runtime values are string literals.
+## Module Patterns
+
+**Services**
+- Pattern: imports, DTO/model types, row interfaces, transformer helpers, exported service object or named async functions.
+- Services own Supabase select strings and row mapping.
+- UI should consume frontend models, not raw database rows.
+- Example files: `src/services/roomService.ts`, `src/services/contractService.ts`, `src/services/portalInvoiceService.ts`.
+
+**Enum Mapping**
+- DB enum strings should be mapped through `src/lib/enumMaps.ts` or domain-specific mappers such as `src/lib/assetMappers.ts`.
+- UI code should avoid depending on raw DB enum values like `available`, `pending_payment`, or `super_admin`.
+
+**Building Scope**
+- Building-aware services should accept a building ID parameter and use `buildingScoped()` from `src/lib/supabaseHelpers.ts`.
+- React Query consumers should prefer `src/hooks/useQueryWithBuilding.ts` when the active building changes query identity.
+- Services should not directly read Zustand stores unless the surrounding file already established that pattern.
+
+**Routes**
+- Route trees are exported as `RouteObject[]`.
+- Views are lazily imported through `React.lazy()`.
+- `src/App.tsx` maps route arrays recursively.
 
 ## Code Style
 
-**Formatting:**
-- No Prettier config detected.
-- Codebase currently mixes semicolon-heavy and semicolon-light styles; new code tends to follow the surrounding file rather than a repo-wide formatter.
-- Quotes are mixed but single quotes are common in newer TypeScript files.
+**Formatting**
+- No Prettier config was detected.
+- The codebase mixes semicolon and no-semicolon styles.
+- Follow the surrounding file style for scoped changes.
+- Prefer concise comments only when explaining non-obvious business rules or integration behavior.
 
-**Linting:**
-- ESLint via `.eslintrc.json`
-- Key rules: `no-console` warn, `@typescript-eslint/no-explicit-any` warn, `react-refresh/only-export-components` warn
-- Run: `npm run lint`
+**Imports**
+- Common order: external packages, `@/` alias imports, relative imports.
+- Type-only imports are used in newer files, but not consistently.
+- `@/` resolves to `src/` through `vite.config.ts` and TypeScript config.
 
-## Import Organization
-
-**Order:**
-1. External packages
-2. Internal alias imports from `@/`
-3. Relative imports
-4. Type imports are sometimes separated, but not consistently
-
-**Grouping:**
-- Blank lines between groups are common in newer files such as `src/services/ticketService.ts`.
-- Alphabetical sorting is not enforced.
-
-**Path Aliases:**
-- `@/*` maps to `src/*` from `tsconfig.json` and `vite.config.ts`.
+**TypeScript**
+- `tsconfig.app.json` uses strict settings, including `strict`, `noUnusedLocals`, `noUnusedParameters`, `erasableSyntaxOnly`, `noFallthroughCasesInSwitch`, and `noUncheckedSideEffectImports`.
+- `any` still appears in several shared components, reports, services, and compatibility areas; avoid adding new `any` unless matching a local compatibility boundary.
 
 ## Error Handling
 
-**Patterns:**
-- Prefer service-level throws using `unwrap()` from `src/lib/supabaseHelpers.ts`.
-- UI mutations often rely on React Query `onError` plus `sonner` toasts.
-- Some boundary cases intentionally swallow failures and return empty data or warnings, for example `src/services/publicListingsService.ts`.
+**Supabase Queries**
+- Prefer `unwrap()` from `src/lib/supabaseHelpers.ts` for PostgREST responses.
+- Preserve Supabase error details when useful.
+- Guard invalid IDs before querying, as in `src/services/roomService.ts` and `src/services/contractService.ts`.
 
-**Error Types:**
-- Standard `Error` objects dominate; custom error classes were not detected.
-- Services often convert Supabase messages into end-user strings before throwing.
-- Guard clauses are common for invalid IDs and missing auth context.
+**React Query**
+- Mutations rely on global error toasts in `src/lib/queryClient.ts`.
+- Query and mutation errors are captured through Sentry helpers.
+- Feature-level error copy should be user-facing Vietnamese where shown in UI.
 
-## Logging
+**Fallbacks**
+- Some services intentionally degrade for compatibility, such as `src/services/amenityAdminService.ts` falling back between `amenity_id` and `service_id`.
+- If adding fallbacks, make the compatibility reason explicit and avoid hiding critical environment failures silently.
 
-**Framework:** `console` plus Sentry.
+## UI Conventions
 
-**Patterns:**
-- Runtime error reporting goes through `captureException()` in `src/lib/sentry.ts`.
-- Console logging and warnings still exist in auth flows, services, and security helpers.
-- There is no structured logger abstraction yet.
+**Design System**
+- Use local primitives in `src/components/ui/` and existing shared/domain components before adding new patterns.
+- Tailwind tokens map to CSS variables in `src/index.css`.
+- Icons should come from `lucide-react` when an icon exists.
 
-## Comments
+**Copy and Localization**
+- Vietnamese is the primary UI language.
+- i18next resources are in `src/i18n/`; many older files still contain inline Vietnamese strings.
+- Avoid introducing mojibake; run `npm run audit:encoding` when touching Vietnamese-heavy files.
 
-**When to Comment:**
-- Comments usually explain business rules, temporary gaps, or implementation warnings.
-- Examples: onboarding limitations in `src/services/portalOnboardingService.ts`, routing notes in `src/views/layouts/Layouts.tsx`.
-- Some comments are architectural breadcrumbs left by previous refactors.
+**Layout**
+- Operational screens favor dense, scannable layouts.
+- Existing SmartStay design direction favors split workspaces for complex selection flows, especially building -> room -> tenant selection in contract creation.
 
-**JSDoc/TSDoc:**
-- Sparse. Short block comments exist on helpers and utilities, but full API docs are not common.
+## State and Side Effects
 
-## Function Design
+**Global State**
+- Use Zustand stores only for session/UI/notification/permission state.
+- Use React Query for server data rather than mirroring remote collections in Zustand.
 
-**Size:**
-- Utility modules stay compact, but some view and service files are very large, for example `src/views/admin/rooms/RoomDetail.tsx` and `src/services/invoiceService.ts`.
-- Large files often keep multiple responsibilities together rather than extracting submodules.
+**Auth**
+- Auth initialization belongs to `src/stores/authStore.ts`.
+- Route-level decisions belong in guards or `src/lib/authRouting.ts`.
+- Do not rely only on client guards for sensitive backend authorization.
 
-**Parameters:**
-- Services usually accept a single options object or a small number of positional arguments.
-- Form-heavy pages pass many props into step components instead of giant prop bags on one component.
+**Network Recovery**
+- Supabase fetch retry and hard timeout behavior is centralized in `src/lib/supabase.ts`.
+- React Query recovery listeners are centralized in `src/lib/queryClient.ts`.
 
-**Return Values:**
-- Early returns are common for guards.
-- Service methods usually return frontend model objects rather than raw Supabase rows.
+## Testing Conventions
 
-## Module Design
+**Unit Tests**
+- Co-locate pure logic tests beside source when practical.
+- Use Vitest `describe`, `it`, and `expect`.
+- Keep fixtures inline unless repeated enough to justify factories.
 
-**Exports:**
-- Named exports are common for services, helpers, and route arrays.
-- Default exports are common for React pages and a few service modules.
+**E2E Tests**
+- Put browser flows under `tests/`.
+- Playwright auth setup writes `playwright/.auth/user.json`.
+- Current E2E suite expects a working Supabase-backed app and demo/test account.
 
-**Barrel Files:**
-- Present selectively, for example `src/views/layouts/index.ts` and `src/hooks/index.ts`.
-- Not a strict convention; many modules are imported directly from source files.
+## Comments and Documentation
+
+**Good Comment Targets**
+- Business rule rationale.
+- Compatibility fallbacks.
+- Transaction boundaries.
+- Security-sensitive assumptions.
+
+**Avoid**
+- Comments that restate simple assignments.
+- Large unrelated refactors while implementing feature work.
+- Updating generated Supabase types manually unless regenerating from schema.
 
 ---
 
-*Convention analysis: 2026-04-26*
+*Convention analysis: 2026-05-01*

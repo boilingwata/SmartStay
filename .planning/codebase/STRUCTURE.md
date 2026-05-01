@@ -1,165 +1,178 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-01
 
 ## Directory Layout
 
 ```text
 SmartStay/
-├── .planning/           # GSD planning state and generated codebase docs
-├── .github/             # GitHub Actions workflows
-├── docs/                # Project documentation outside app runtime
-├── public/              # Static public assets served by Vite
-├── scripts/             # Repo scripts such as encoding audits
-├── src/                 # Frontend application source
-│   ├── components/      # Reusable UI and composite building blocks
-│   ├── hooks/           # Custom React hooks
-│   ├── i18n/            # Translation resources and i18n bootstrap
-│   ├── lib/             # Core infrastructure helpers and mappers
-│   ├── models/          # Frontend-facing domain models
-│   ├── routes/          # Route trees and guards
-│   ├── schemas/         # Zod form schemas
-│   ├── services/        # Supabase-backed domain services
-│   ├── stores/          # Zustand stores
-│   ├── utils/           # Pure utilities and security helpers
-│   └── views/           # Route-level pages by namespace
-├── supabase/            # Supabase SQL, scripts, or backend support assets
-├── tests/               # Playwright tests
-├── package.json         # Project manifest and scripts
-├── playwright.config.ts # E2E test runner config
-├── tailwind.config.js   # Tailwind theme config
-├── tsconfig.json        # TypeScript config
-├── vercel.json          # SPA rewrite rules
-└── vite.config.ts       # Vite build and dev server config
+|-- .github/              # GitHub Actions workflows
+|-- .planning/            # GSD state, phases, sketches, generated codebase map
+|-- docs/                 # Project and domain documentation
+|-- public/               # Static assets served by Vite
+|-- scripts/              # Repo scripts such as encoding audits
+|-- src/                  # Frontend application source
+|   |-- components/       # Reusable UI, layouts, modals, domain composites
+|   |-- config/           # Permission and app configuration
+|   |-- constants/        # App-wide constants and static data
+|   |-- features/         # Feature-local helpers
+|   |-- hooks/            # Custom React hooks
+|   |-- i18n/             # i18next bootstrap and locale JSON
+|   |-- lib/              # Infrastructure helpers and domain utilities
+|   |-- models/           # Frontend-facing domain model types
+|   |-- routes/           # Route trees and route guards
+|   |-- schemas/          # Zod validation schemas
+|   |-- services/         # Supabase-backed service layer
+|   |-- stores/           # Zustand stores
+|   |-- types/            # Shared and generated TypeScript types
+|   |-- utils/            # Pure utilities and tests
+|   `-- views/            # Route-level pages by namespace
+|-- supabase/             # Migrations, Edge Functions, seeds, scripts
+|-- tests/                # Playwright E2E tests
+|-- package.json
+|-- playwright.config.ts
+|-- tailwind.config.js
+|-- tsconfig.json
+|-- vercel.json
+`-- vite.config.ts
 ```
 
-## Directory Purposes
+## Major Source Directories
 
-**src/components/**
-- Purpose: reusable pieces below full-page views
-- Contains: `ui/`, `layout/`, `shared/`, `auth/`, plus domain folders such as `tickets/`, `contracts/`, `service/`, `public/`
-- Key files: `src/components/layout/AppProviders.tsx`, `src/components/ErrorBoundary.tsx`, `src/components/auth/PortalAuthGuard.tsx`
-- Subdirectories: mostly grouped by concern or domain
+**`src/components/`**
+- Purpose: shared UI and domain-level components below page routes.
+- Important folders: `ui/`, `layout/`, `shared/`, `auth/`, `rooms/`, `contracts/`, `invoices/`, `settings/`, `portal/`, `tickets/`.
+- Key files: `src/components/layout/AppProviders.tsx`, `src/components/layout/AdminLayout.tsx`, `src/components/auth/PortalAuthGuard.tsx`, `src/components/ErrorBoundary.tsx`.
 
-**src/views/**
-- Purpose: route-level screens
-- Contains: namespace folders such as `admin/`, `portal/`, `auth/`, `public/`, `super-admin/`, `error/`, `layouts/`
-- Key files: `src/views/admin/contracts/CreateContractWizard.tsx`, `src/views/portal/dashboard/TenantDashboard.tsx`, `src/views/public/LandingPage.tsx`
-- Subdirectories: large feature branches with nested `components/`, `tabs/`, or `wizard/`
+**`src/views/`**
+- Purpose: route-level screens split by audience.
+- Namespaces: `admin/`, `portal/`, `public/`, `auth/`, `super-admin/`, `error/`.
+- Key examples: `src/views/admin/MarketplaceDashboard.tsx`, `src/views/admin/contracts/CreateContractWizard.tsx`, `src/views/admin/settings/AmenityManagementPage.tsx`, `src/views/portal/dashboard/TenantDashboard.tsx`, `src/views/public/ListingsPage.tsx`.
 
-**src/services/**
-- Purpose: all Supabase CRUD, RPC, auth-aware workflows, and storage orchestration
-- Contains: one service module per domain plus portal-specific service modules
-- Key files: `src/services/roomService.ts`, `src/services/ticketService.ts`, `src/services/userService.ts`, `src/services/publicListingsService.ts`
-- Subdirectories: flat
+**`src/routes/`**
+- Purpose: route arrays and guard components.
+- Key files: `src/routes/ownerRoutes.tsx`, `src/routes/portalRoutes.tsx`, `src/routes/superAdminRoutes.tsx`, `src/routes/ProtectedRoute.tsx`.
+- Note: there is no `src/routes/adminRoutes.tsx` in the current tree; `/admin/*` paths are legacy redirects to `/owner/*`.
 
-**src/lib/**
-- Purpose: infrastructure glue and mapping code shared across features
-- Contains: `supabase.ts`, `supabaseHelpers.ts`, `queryClient.ts`, `sentry.ts`, enum and presentation helpers
-- Key files: `src/lib/supabase.ts`, `src/lib/enumMaps.ts`, `src/lib/queryClient.ts`
-- Subdirectories: flat
+**`src/services/`**
+- Purpose: Supabase CRUD/RPC/function wrappers and row-to-model mapping.
+- Shape: flat folder, one service per domain.
+- Key services: `src/services/roomService.ts`, `src/services/buildingService.ts`, `src/services/contractService.ts`, `src/services/invoiceService.ts`, `src/services/paymentService.ts`, `src/services/ticketService.ts`, `src/services/utilityAdminService.ts`, `src/services/amenityAdminService.ts`, `src/services/portalInvoiceService.ts`.
 
-**src/stores/**
-- Purpose: persisted app-wide state
-- Contains: auth, UI, permission, and notification stores
-- Key files: `src/stores/authStore.ts`, `src/stores/uiStore.ts`, `src/stores/notificationStore.ts`
-- Subdirectories: flat
+**`src/lib/`**
+- Purpose: core infrastructure and domain helpers.
+- Key files: `src/lib/supabase.ts`, `src/lib/supabaseHelpers.ts`, `src/lib/queryClient.ts`, `src/lib/enumMaps.ts`, `src/lib/sentry.ts`, `src/lib/utilityBilling.ts`, `src/lib/assetBilling.ts`, `src/lib/authRouting.ts`.
 
-**tests/**
-- Purpose: Playwright browser automation
-- Contains: smoke flow, auth setup, admin feature suites, utility-focused tests
-- Key files: `tests/auth.setup.ts`, `tests/01-smoke.spec.ts`, `tests/admin/02-buildings-and-rooms.spec.ts`
-- Subdirectories: `tests/admin/`
+**`src/stores/`**
+- Purpose: persisted global client state.
+- Files: `src/stores/authStore.ts`, `src/stores/uiStore.ts`, `src/stores/notificationStore.ts`, `src/stores/permissionStore.ts`.
+
+**`src/i18n/`**
+- Purpose: i18next resources and initialization.
+- Files: `src/i18n/i18n.ts`, `src/i18n/vi/common.json`, `src/i18n/vi/public.json`, `src/i18n/en/common.json`, `src/i18n/en/public.json`.
+
+**`supabase/`**
+- Purpose: backend assets colocated with the frontend repo.
+- Includes: `supabase/migrations/`, `supabase/functions/`, `supabase/seeds/`, `supabase/config.toml`.
+- Function shared modules are in `supabase/functions/_shared/`.
+
+**`tests/`**
+- Purpose: Playwright browser tests.
+- Files: `tests/auth.setup.ts`, `tests/01-smoke.spec.ts`, `tests/admin/02-buildings-and-rooms.spec.ts`, `tests/admin/03-owner-tickets.spec.ts`.
+
+## File Counts Snapshot
+
+- TypeScript/TSX files under `src/`: 316
+- Route-level TSX files under `src/views/`: 83
+- Supabase Edge Function TS files: 18
+- Active Supabase migration files: 20
+
+Counts are from the 2026-05-01 workspace snapshot and exclude `node_modules`.
 
 ## Key File Locations
 
-**Entry Points:**
-- `src/main.tsx`: React root bootstrap
-- `src/App.tsx`: router composition and auth initialization
+**Entrypoints**
+- `src/main.tsx` - React root, Sentry, CSS, i18n.
+- `src/App.tsx` - auth bootstrap, route tree, legacy redirects.
+- `index.html` - Vite HTML entry.
 
-**Configuration:**
-- `package.json`: npm scripts and dependencies
-- `vite.config.ts`: bundler/server config and alias setup
-- `playwright.config.ts`: Playwright runtime
-- `.eslintrc.json`: ESLint rules
-- `tailwind.config.js`: CSS theme tokens and breakpoints
-- `.env.example`: committed env var reference
+**Configuration**
+- `package.json`
+- `vite.config.ts`
+- `tsconfig.app.json`
+- `.eslintrc.json`
+- `tailwind.config.js`
+- `playwright.config.ts`
+- `supabase/config.toml`
+- `.env.example`
 
-**Core Logic:**
-- `src/services/`: domain services over Supabase
-- `src/routes/`: route trees and auth guards
-- `src/stores/`: persisted state
-- `src/lib/`: mappers, clients, infra helpers
+**Business Logic**
+- `src/services/*.ts` - service layer.
+- `src/lib/enumMaps.ts` - enum translation.
+- `src/lib/utilityBilling.ts` - utility billing computation.
+- `src/lib/assetBilling.ts` - billable asset line computation.
+- `supabase/migrations/*.sql` - schema and RPC evolution.
 
-**Testing:**
-- `src/**/*.test.ts`: small set of unit tests
-- `tests/**/*.spec.ts`: Playwright E2E
-- `tests/auth.setup.ts`: storage-state auth bootstrap
-
-**Documentation:**
-- `README.md`: setup and stack overview
-- `AGENTS.md`: agent guidance for the repo
-- `.planning/codebase/*.md`: generated codebase map
+**Tests**
+- `src/**/*.test.ts`
+- `tests/**/*.spec.ts`
 
 ## Naming Conventions
 
-**Files:**
-- `PascalCase.tsx` for many components and pages such as `Button.tsx`, `PortalLayout.tsx`, `CreateContractWizard.tsx`
-- `camelCase.ts` for many services, hooks, and helpers such as `roomService.ts`, `useQueryWithBuilding.ts`, `enumMaps.ts`
-- `*.test.ts` and `*.spec.ts` for tests
+**Files**
+- `PascalCase.tsx` for React pages/components, for example `RoomDetail.tsx` and `Button.tsx`.
+- `camelCase.ts` for services, hooks, helpers, and schemas, for example `roomService.ts`, `useQueryWithBuilding.ts`, `enumMaps.ts`.
+- `*.test.ts` for unit tests and `*.spec.ts` for Playwright.
 
-**Directories:**
-- lower-case or kebab-lite folder names such as `views/admin/contracts`, `components/shared`, `services`
-- namespace folders reflect user role or concern: `portal`, `admin`, `public`, `auth`
+**Directories**
+- Mostly lower-case by domain or role: `portal`, `admin`, `public`, `auth`, `settings`, `contracts`, `rooms`.
+- Some feature subfolders use descriptive compound names such as `amenity-components`.
 
-**Special Patterns:**
-- Route files export `RouteObject[]` arrays from `src/routes/*.tsx`
-- Some feature folders embed local support modules, for example `src/views/admin/contracts/wizard/`
-- Barrel files exist in a few places such as `src/views/layouts/index.ts` and `src/components/ui/index.ts`, but they are not universal
+**Routes**
+- Owner/staff workspace route definitions: `src/routes/ownerRoutes.tsx`.
+- Tenant portal route definitions: `src/routes/portalRoutes.tsx`.
+- Super admin route definitions: `src/routes/superAdminRoutes.tsx`.
 
 ## Where to Add New Code
 
-**New Feature:**
-- Primary code: matching page under `src/views/` plus related service in `src/services/`
-- Tests: unit logic beside source in `src/` and browser coverage under `tests/` if the flow is user-facing
-- Config if needed: root config files or `src/constants/`
+**New owner/staff page**
+- Route: `src/routes/ownerRoutes.tsx`
+- View: `src/views/admin/<domain>/`
+- Service: `src/services/<domain>Service.ts`
+- Component pieces: `src/components/<domain>/` or `src/components/shared/`
 
-**New Component/Module:**
-- Implementation: `src/components/<domain>/` or `src/components/shared/`
-- Types: `src/models/` or `src/types/`
-- Tests: colocated `*.test.ts(x)` where practical
+**New tenant portal page**
+- Route: `src/routes/portalRoutes.tsx`
+- View: `src/views/portal/<domain>/`
+- Tenant-scoped service: `src/services/portal<Domain>Service.ts`
 
-**New Route:**
-- Definition: `src/routes/ownerRoutes.tsx`, `src/routes/portalRoutes.tsx`, or sibling route files
-- Page: `src/views/...`
-- Guarding: `src/routes/ProtectedRoute.tsx` or `src/components/auth/PortalAuthGuard.tsx`
+**New backend capability**
+- Migration: `supabase/migrations/`
+- Edge Function if service-role or webhook behavior is needed: `supabase/functions/<function-name>/`
+- Shared Edge Function helper: `supabase/functions/_shared/`
+- Frontend wrapper: `src/services/`
 
-**Utilities:**
-- Shared helpers: `src/utils/` for pure utilities, `src/lib/` for infra-aware helpers
-- Query wrappers or view hooks: `src/hooks/`
+**New pure logic**
+- Use `src/lib/` for domain logic that is app-aware.
+- Use `src/utils/` for generic utility logic.
+- Add colocated `*.test.ts` when practical.
 
-## Special Directories
+## Generated and Local Artifact Directories
 
-**dist/**
-- Purpose: Vite build output
-- Source: generated by `npm run build`
-- Committed: No
+**Generated:**
+- `dist/`
+- `playwright-report/`
+- `test-results/`
+- `*.tsbuildinfo`
 
-**playwright-report/**
-- Purpose: HTML report from Playwright runs
-- Source: generated by `npx playwright test`
-- Committed: No
+**Planning:**
+- `.planning/codebase/` - generated codebase maps.
+- `.planning/phases/` - phase artifacts.
+- `.planning/sketches/` - sketch outputs.
 
-**test-results/**
-- Purpose: Playwright artifacts
-- Source: generated during E2E execution
-- Committed: No
-
-**.planning/codebase/**
-- Purpose: generated repo map used by GSD workflows
-- Source: refreshed by `$gsd-map-codebase`
-- Committed: Yes, intended living documentation
+**Temporary / scratch:**
+- `tmp*` folders and screenshot files are present locally and should not be treated as application source.
 
 ---
 
-*Structure analysis: 2026-04-26*
+*Structure analysis: 2026-05-01*

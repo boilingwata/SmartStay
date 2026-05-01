@@ -1,126 +1,128 @@
 # External Integrations
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-01
 
-## APIs & External Services
+## Backend Platform
 
-**Backend Platform:**
-- Supabase - primary backend for database, auth, storage, realtime, and edge functions.
-  - SDK/Client: `@supabase/supabase-js` via `src/lib/supabase.ts`
-  - Auth: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
-  - Features used: auth sessions, table CRUD, RPCs, storage uploads, edge function invoke
+**Supabase**
+- Purpose: database, auth, storage, realtime, RPCs, and Edge Functions.
+- Browser client: `src/lib/supabase.ts`
+- Schema: custom Postgres schema `smartstay`.
+- Generated types: `src/types/supabase.ts`
+- Local config: `supabase/config.toml`
+- Migrations: `supabase/migrations/`
+- Seeds: `supabase/seed.sql`, `supabase/seeds/domain_demo_seed.sql`, `supabase/seeds/domain_smoke_checks.sql`
 
-**Error Tracking:**
-- Sentry - client-side exception tracking and session replay.
-  - SDK/Client: `@sentry/react` and `@sentry/vite-plugin`
-  - Auth: `VITE_SENTRY_DSN` at runtime, plus `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source-map upload
-  - Entry points: `src/lib/sentry.ts`, `src/lib/queryClient.ts`, `src/components/ErrorBoundary.tsx`
+The frontend talks to Supabase directly through domain services in `src/services/`. Sensitive or transactional paths also use RPCs and Edge Functions.
 
-**Banking / Payment QR Metadata:**
-- Bank transfer display config - consumed from env for invoice and portal payment UI.
-  - Integration method: env-driven frontend rendering
-  - Auth: `VITE_BANK_NAME`, `VITE_BANK_CODE`, `VITE_BANK_ACCOUNT_NUMBER`, `VITE_BANK_ACCOUNT_NAME`, `VITE_BANK_BRANCH`
-  - Usage: portal finance flows and invoice display helpers
+## Database and RPCs
 
-**Webhook-related Payment Support:**
-- SePay webhook configuration is declared in `.env.example`.
-  - Integration method: config presence only in the frontend repo
-  - Auth: `SEPAY_WEBHOOK_API_KEY`, `SEPAY_ALLOW_DEMO`
-  - Runtime ownership likely belongs to backend or Supabase edge functions; no direct frontend webhook handler was detected
+**Primary Database:**
+- PostgreSQL on Supabase.
+- Accessed by `supabase.from(...)` calls in `src/services/*.ts`.
+- Common helper: `unwrap()` in `src/lib/supabaseHelpers.ts`.
+- Building scoping helper: `buildingScoped()` in `src/lib/supabaseHelpers.ts`.
 
-## Data Storage
+**Frequent RPCs:**
+- Contract lifecycle: `create_contract_v3`, `add_contract_occupant`, `remove_contract_occupant`, `transfer_contract_representative`, `liquidate_contract` in `src/services/contractService.ts`.
+- Room handover: `create_handover_checklist_v1` in `src/services/roomService.ts`.
+- Payments: `approve_payment`, `process_payment`, `portal_record_invoice_payment`, `portal_mark_invoice_paid`, `portal_cancel_invoice` in `src/services/paymentService.ts` and `src/services/portalInvoiceService.ts`.
+- Utility billing: `create_policy_utility_invoice` and `validate_utility_billing_cron_secret` from `supabase/functions/run-utility-billing/index.ts` and `supabase/functions/create-utility-invoice/index.ts`.
+- Webhooks: `handle_sepay_webhook` from `supabase/functions/sepay-webhook/index.ts` and `supabase/functions/webhook-payment/index.ts`.
 
-**Databases:**
-- PostgreSQL on Supabase, custom schema `smartstay`
-  - Connection: `VITE_SUPABASE_URL` plus publishable key
-  - Client: Supabase JS typed with `src/types/supabase.ts`
-  - Query pattern: service layer under `src/services/` plus helper wrappers in `src/lib/supabaseHelpers.ts`
-  - RPC usage detected in `src/services/roomService.ts`
+## Authentication and Identity
 
-**File Storage:**
-- Supabase Storage bucket `smartstay-files`
-  - SDK/Client: Supabase storage client via `src/services/fileService.ts`
-  - Auth: browser session or anon-key-backed access with RLS
-  - Upload path pattern: `uploads/...`, `tickets/...`, `contract-supporting-docs/...`
+**Supabase Auth**
+- Browser session is initialized in `src/stores/authStore.ts`.
+- Supabase session persistence is enabled in `src/lib/supabase.ts`.
+- App user enrichment reads `smartstay.profiles` and maps roles with `src/lib/enumMaps.ts`.
+- Route guards live in `src/routes/ProtectedRoute.tsx` and `src/components/auth/PortalAuthGuard.tsx`.
 
-**Caching:**
-- No external cache service detected.
-- Client-side cache relies on TanStack Query in `src/lib/queryClient.ts`.
+**Roles Detected:**
+- `Owner`
+- `Staff`
+- `Tenant`
+- `SuperAdmin`
 
-## Authentication & Identity
+`SuperAdmin` can be resolved from `app_metadata.workspace_role` in `src/stores/authStore.ts`; other roles are loaded from profiles.
 
-**Auth Provider:**
-- Supabase Auth
-  - Implementation: browser client session persisted in `localStorage` through `src/lib/supabase.ts`
-  - Token storage: localStorage-backed Supabase auth plus Zustand persistence in `src/stores/authStore.ts`
-  - Session management: `supabase.auth.getSession()`, `onAuthStateChange`, and refresh handled client-side
+## Edge Functions
 
-**Role / Tenant Identity:**
-- Profile enrichment comes from `smartstay.profiles`
-  - Implementation: `src/stores/authStore.ts` resolves session user into app role and tenant stage
-  - Route guards: `src/routes/ProtectedRoute.tsx` and `src/components/auth/PortalAuthGuard.tsx`
+**Configured in `supabase/config.toml`:**
+- `sepay-webhook` - incoming SePay payment webhook, JWT verification disabled but API-key validation implemented in function code.
+- `run-utility-billing` - scheduled or operator-triggered utility billing run.
+- `create-contract` - transactional contract creation wrapper around `create_contract_v3`.
+- `create-user` - privileged user creation.
+- `create-utility-invoice` - utility invoice persistence through RPC.
 
-## Monitoring & Observability
+**Additional function directories present:**
+- `activate-resident`
+- `adjust-balance`
+- `create-owner`
+- `process-payment`
+- `webhook-payment`
 
-**Error Tracking:**
-- Sentry
-  - DSN: `VITE_SENTRY_DSN`
-  - Coverage: React boundary, React Query cache/mutation errors, manual `captureException`
+Shared Edge Function infrastructure is under `supabase/functions/_shared/`, including auth verification, service-role client creation, CORS, error responses, and utility invoice building.
 
-**Logs:**
-- Browser console logging is still present in multiple files such as `src/lib/sentry.ts`, `src/services/fileService.ts`, and Playwright tests.
-- No centralized log shipping beyond Sentry was detected.
+## Storage
 
-## CI/CD & Deployment
+**Supabase Storage**
+- Service wrapper: `src/services/fileService.ts`
+- Public bucket expected by code: `smartstay-files`
+- Common object paths include uploads, tickets, and contract supporting documents.
+- Client-side file and URL safety helpers are in `src/utils/security.ts`.
 
-**Hosting:**
-- Vercel-style SPA deployment is implied by `vercel.json`.
-  - Deployment behavior: history rewrite to `index.html`
-  - Environment vars: expected to be configured in hosting dashboard for production
+## Payments
 
-**CI Pipeline:**
-- GitHub Actions workflow in `.github/workflows/playwright.yml`
-  - Scope: install deps, install Playwright browsers, run `npx playwright test`
-  - Missing from CI: dedicated `npm run build`, `npm run lint`, and `npm run test` steps
+**Bank Transfer / QR Display**
+- Frontend env variables feed invoice and portal payment display:
+  - `VITE_BANK_NAME`
+  - `VITE_BANK_CODE`
+  - `VITE_BANK_ACCOUNT_NUMBER`
+  - `VITE_BANK_ACCOUNT_NAME`
+  - `VITE_BANK_BRANCH`
+- Portal invoice support lives in `src/services/portalInvoiceService.ts`.
 
-## Environment Configuration
+**SePay**
+- Incoming webhook handlers: `supabase/functions/sepay-webhook/index.ts`, `supabase/functions/webhook-payment/index.ts`.
+- Frontend demo trigger exists in `src/views/portal/finance/InvoiceList.tsx`.
+- Secrets: `SEPAY_WEBHOOK_API_KEY`, `SEPAY_API_KEY`, `SEPAY_ALLOW_DEMO`.
 
-**Required env vars:**
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+**MoMo**
+- Payment creation support appears in `supabase/functions/process-payment/index.ts`.
+- Env variables include `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_PARTNER_NAME`, `MOMO_STORE_ID`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`, and `MOMO_API_ENDPOINT`.
 
-**Optional env vars detected in code or examples:**
-- `VITE_SENTRY_DSN`
-- `SENTRY_AUTH_TOKEN`
-- `SENTRY_ORG`
-- `SENTRY_PROJECT`
-- `SITE_URL`
-- `VITE_BANK_NAME`
-- `VITE_BANK_CODE`
-- `VITE_BANK_ACCOUNT_NUMBER`
-- `VITE_BANK_ACCOUNT_NAME`
-- `VITE_BANK_BRANCH`
-- `VITE_DEMO_MODE`
-- `VITE_USE_EDGE_FUNCTIONS`
-- `SEPAY_WEBHOOK_API_KEY`
-- `SEPAY_ALLOW_DEMO`
+## Observability
 
-**Secrets location:**
-- Local: `.env.local`
-- Shared example: `.env.example`
-- Production: not committed; expected via host or Supabase/Vercel settings
+**Sentry**
+- Client setup: `src/lib/sentry.ts`
+- Error boundary: `src/components/ErrorBoundary.tsx`
+- React Query integration: `src/lib/queryClient.ts`
+- Build-time source maps: optional `sentryVitePlugin` in `vite.config.ts`.
 
-## Webhooks & Callbacks
+**Logging**
+- Browser and Edge Function console logging is still used directly in several areas.
+- No centralized logging abstraction beyond Sentry was detected.
 
-**Incoming:**
-- No browser-side webhook endpoints exist in this repo.
-- Payment webhook review pages exist in `src/views/admin/finance/WebhookLogs.tsx`, implying webhook producers exist outside this frontend.
+## CI/CD and Hosting
 
-**Outgoing:**
-- Supabase Edge Function invocation detected in `src/services/portalOnboardingService.ts` for `activate-resident`.
-- Supabase function invocation detected in `src/services/userService.ts` for `create-user`.
-- No third-party REST webhook sender was detected in the frontend code.
+**GitHub Actions**
+- Workflow: `.github/workflows/playwright.yml`
+- Runs dependency install, Playwright browser install, and `npx playwright test`.
+- It does not currently run `npm run build`, `npm run lint`, or `npm run test`.
+
+**Vercel-style Static Hosting**
+- `vercel.json` rewrites all non-asset paths to `index.html`.
+- This supports client-side React Router paths such as `/owner/dashboard`, `/portal/dashboard`, and `/super-admin/dashboard`.
+
+## Environment Reference
+
+**Committed reference:** `.env.example`
+
+**Local secrets:** `.env.local` exists in the workspace but was not read during this mapping.
+
+**Security note:** Edge Functions that set `verify_jwt = false` must continue to enforce custom authentication internally. Most configured operator functions use `requireWorkspaceOperator()`; webhooks use provider API-key validation.
 
 ---
 
-*Integration audit: 2026-04-26*
+*Integration audit: 2026-05-01*

@@ -1,152 +1,163 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-01
 
-## Test Framework
+## Test Frameworks
 
-**Runner:**
-- Vitest 0.34 from `package.json`
-- Config: no dedicated `vitest.config.ts` detected; tests run off default Vitest behavior
-- Playwright 1.40 for browser E2E in `playwright.config.ts`
+**Unit Tests**
+- Runner: Vitest 0.34 from `package.json`.
+- Config: no dedicated `vitest.config.ts` detected; Vite/Vitest defaults apply.
+- Assertion API: Vitest `expect`.
+- Common command: `npm run test`.
 
-**Assertion Library:**
-- Vitest built-in `expect`
-- Playwright built-in `expect`
+**Browser / E2E Tests**
+- Runner: Playwright 1.40.
+- Config: `playwright.config.ts`.
+- Browser project: Chromium with saved storage state from `tests/auth.setup.ts`.
+- Common command: `npm run e2e`.
 
-**Run Commands:**
+**React Testing Library**
+- Installed as `@testing-library/react` and `@testing-library/jest-dom`, but active component-test usage is minimal in the current tree.
+
+## Run Commands
+
 ```bash
-npm run test                                # Run Vitest
-npx vitest run src/path/to/file.test.ts     # Run one unit test file
-npm run e2e                                 # Run all Playwright tests
-npm run test:smoke                          # Run the smoke Playwright suite
+npm run test
+npx vitest run src/path/to/file.test.ts
+npm run e2e
+npm run test:smoke
+npm run build
+npm run lint
 ```
+
+`npm run build` performs TypeScript project build plus Vite production build. `npm run lint` uses ESLint with `--max-warnings 0`.
 
 ## Test File Organization
 
-**Location:**
-- Unit tests are colocated in `src/`, for example `src/utils/security.test.ts` and `src/lib/assetBilling.test.ts`.
-- Browser tests live in the separate `tests/` tree.
+**Unit Tests**
+- `src/lib/assetBilling.test.ts`
+- `src/utils/security.test.ts`
+- `src/utils/notificationUtils.test.ts`
+- `tests/admin/utilityBilling.test.ts`
+- `tests/admin/utilityPresentation.test.ts`
 
-**Naming:**
-- Unit tests: `*.test.ts`
-- Playwright flows: `*.spec.ts`
-- Playwright bootstrap: `*.setup.ts`
+**Playwright Tests**
+- `tests/auth.setup.ts`
+- `tests/01-smoke.spec.ts`
+- `tests/admin/02-buildings-and-rooms.spec.ts`
+- `tests/admin/03-owner-tickets.spec.ts`
 
-**Structure:**
-```text
-src/
-  lib/
-    assetBilling.ts
-    assetBilling.test.ts
-  utils/
-    security.ts
-    security.test.ts
-tests/
-  auth.setup.ts
-  01-smoke.spec.ts
-  admin/
-    02-buildings-and-rooms.spec.ts
-```
+## Unit Test Patterns
 
-## Test Structure
+**Pure Logic Tests**
+- Best-covered areas are pure helpers:
+  - `src/lib/assetBilling.ts`
+  - `src/lib/invoiceItems.ts`
+  - `src/lib/utilityBilling.ts`
+  - `src/lib/utilityPresentation.ts`
+  - `src/utils/security.ts`
+  - `src/utils/notificationUtils.ts`
 
-**Suite Organization:**
+**Typical Shape**
 ```typescript
-describe('moduleName', () => {
-  it('handles the target case', () => {
+import { describe, expect, it } from 'vitest';
+
+describe('module behavior', () => {
+  it('handles a concrete case', () => {
     expect(result).toBe(expected);
   });
 });
 ```
 
-**Patterns:**
-- Unit tests are straightforward behavior checks with minimal shared setup.
-- Playwright uses scenario-style tests with explicit page navigation and UI assertions.
-- `tests/auth.setup.ts` prepares a persisted storage state and Playwright projects depend on it.
+**Fixtures**
+- Mostly inline object literals.
+- No shared factories or fixture modules were detected.
+
+## Playwright Patterns
+
+**Auth Setup**
+- `tests/auth.setup.ts` signs in through `/login`.
+- It currently uses a committed owner email/password pair.
+- The storage state is written to `playwright/.auth/user.json`.
+
+**Configuration**
+- Tests run against `http://127.0.0.1:5173`.
+- Playwright starts `npm run dev` automatically.
+- `fullyParallel` is `false`; `workers` is set to `1`.
+- Chromium project depends on the setup project.
+
+**Flow Style**
+- Tests navigate to role-specific routes such as `/owner/dashboard`, `/owner/buildings`, and `/owner/rooms`.
+- Assertions use visible headings, tables, cards, forms, and toast text.
+- Some tests are serial because they create and clean up state.
+
+## CI Coverage
+
+**GitHub Actions**
+- Workflow: `.github/workflows/playwright.yml`
+- Runs on pushes and pull requests to `main` and `master`.
+- Steps: checkout, setup Node 18, `npm install`, install Playwright browsers, run `npx playwright test`, upload Playwright report.
+
+**Current CI Gaps**
+- No explicit `npm run build` step.
+- No explicit `npm run lint` step.
+- No explicit `npm run test` Vitest step.
+- No coverage threshold or report upload for unit tests.
 
 ## Mocking
 
-**Framework:** Vitest `vi` is available, but little active mocking was detected in the current unit test set.
+**Current State**
+- Little active Vitest mocking was detected.
+- Most unit tests target pure functions and avoid network/browser mocks.
 
-**Patterns:**
-```typescript
-import { describe, it, expect } from 'vitest';
+**When Adding Tests**
+- Mock Supabase for service and hook tests.
+- Mock auth state and time for route guards, billing, and session logic.
+- Prefer pure function extraction when service/view logic is hard to test.
 
-describe('getNormalizedHttpUrl', () => {
-  it('returns null for invalid inputs', () => {
-    expect(getNormalizedHttpUrl('javascript:alert(1)')).toBeNull();
-  });
-});
-```
+**Avoid Mocking**
+- Pure enum, presentation, and calculation helpers.
+- The input/output shape under test when the function is already deterministic.
 
-**What to Mock:**
-- External network, Supabase, file upload, and browser APIs when adding unit tests for services or hooks.
-- Time and auth state for billing or portal workflow logic.
+## Coverage Strengths
 
-**What NOT to Mock:**
-- Pure transformation helpers in `src/lib/` and `src/utils/`.
-- String normalization and enum-mapping functions.
+**Good Existing Coverage**
+- URL sanitization and trusted-domain behavior in `src/utils/security.test.ts`.
+- Notification type normalization and style fallback in `src/utils/notificationUtils.test.ts`.
+- Utility billing math and seasonal/device/override behavior in `tests/admin/utilityBilling.test.ts`.
+- Asset charge generation and invoice item type fallback in `src/lib/assetBilling.test.ts`.
+- Basic owner smoke and building/room browser flows in Playwright.
 
-## Fixtures and Factories
+## Coverage Gaps
 
-**Test Data:**
-- Current tests mostly inline their fixtures directly in each file.
-- No shared `tests/fixtures/` or `tests/factories/` pattern was detected.
+**High Priority**
+- Auth store initialization and role resolution in `src/stores/authStore.ts`.
+- Guard behavior in `src/routes/ProtectedRoute.tsx` and `src/components/auth/PortalAuthGuard.tsx`.
+- Supabase service mapping and error handling in `src/services/*.ts`.
+- Contract creation, transfer, addendum, and liquidation flows.
+- Utility admin screens and batch billing workflows.
+- Amenity policy creation/edit/version/review flows.
+- Super admin routes and authorization behavior.
 
-**Location:**
-- Local constants inside each test file
-- Browser auth fixture persisted to `playwright/.auth/user.json`
+**Medium Priority**
+- File upload validation and storage paths in `src/services/fileService.ts`.
+- Network recovery behavior in `src/lib/supabase.ts` and `src/lib/queryClient.ts`.
+- Public listing apply flow and owner lead conversion.
+- Realtime hooks under `src/hooks/`.
 
-## Coverage
+## Test Data Risks
 
-**Requirements:**
-- No enforced coverage threshold detected.
-- No CI step runs Vitest today.
+**Hardcoded Credentials**
+- `tests/auth.setup.ts` contains an owner test credential.
+- This should be moved to environment variables before broader CI or shared deployments.
 
-**Configuration:**
-- No explicit Vitest coverage config detected.
-- Coverage appears ad hoc rather than gated.
+**Live Backend Coupling**
+- Playwright tests depend on a reachable Supabase-backed app and seeded data.
+- Failures may indicate environment drift rather than frontend regression.
 
-**View Coverage:**
-```bash
-npx vitest run
-npx vitest run --coverage
-```
-
-## Test Types
-
-**Unit Tests:**
-- Narrow utility coverage for URL security, notification normalization, and invoice/asset billing helpers.
-- Examples: `src/utils/security.test.ts`, `src/utils/notificationUtils.test.ts`, `src/lib/assetBilling.test.ts`
-
-**Integration Tests:**
-- Some browser tests exercise integrated owner flows against a running app and real backend environment.
-- Service-layer integration tests against Supabase were not detected.
-
-**E2E Tests:**
-- Playwright is the main end-to-end strategy.
-- Config in `playwright.config.ts` runs one browser worker with auth setup and a local Vite server.
-
-## Common Patterns
-
-**Async Testing:**
-```typescript
-test('Critical Path: Dashboard & Navigation', async ({ page }) => {
-  await page.goto('/owner/dashboard');
-  await expect(page).toHaveURL(/.*\/owner\/dashboard/);
-});
-```
-
-**Error Testing:**
-```typescript
-it('should return null for unsafe protocols', () => {
-  expect(getNormalizedHttpUrl('javascript:alert(1)')).toBeNull();
-});
-```
-
-**Snapshot Testing:**
-- Not used.
+**Serial State**
+- Some E2E tests create/update/delete records; keep them serial unless they are made isolated by unique test data and cleanup.
 
 ---
 
-*Testing analysis: 2026-04-26*
+*Testing analysis: 2026-05-01*
