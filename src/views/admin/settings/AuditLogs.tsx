@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  History, 
-  Search, 
-  Filter, 
-  Download, 
-  RefreshCw, 
-  Eye, 
-  User as UserIcon, 
-  Shield, 
+import {
+  History,
+  Search,
+  Download,
+  RefreshCw,
+  Eye,
+  User as UserIcon,
+  Shield,
   Database,
   ArrowRight
 } from 'lucide-react';
@@ -23,7 +22,7 @@ import { Card } from '@/components/ui/Card';
 const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterValues, setFilterValues] = useState<Record<string, any>>({
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({
     search: '',
     entityType: '',
   });
@@ -34,7 +33,7 @@ const AuditLogs: React.FC = () => {
       setLoading(true);
       const data = await auditService.getLogs(filterValues);
       setLogs(data);
-    } catch (error) {
+    } catch {
       toast.error('Không thể tải lịch sử thao tác');
     } finally {
       setLoading(false);
@@ -43,6 +42,7 @@ const AuditLogs: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterValues]);
 
   const getActionColor = (action: string) => {
@@ -75,7 +75,7 @@ const AuditLogs: React.FC = () => {
                 <div className="flex items-center gap-3 text-slate-500 font-medium">
                   <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded-full text-xs">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    Live Audit Tracking
+                    Đang theo dõi trực tiếp
                   </span>
                   <span className="text-slate-300">•</span>
                   <p className="text-sm italic">Mọi thao tác thay đổi dữ liệu đều được ghi lại vĩnh viễn.</p>
@@ -169,7 +169,7 @@ const AuditLogs: React.FC = () => {
                         <td className="px-6 py-5 whitespace-nowrap">
                           <div className="flex flex-col">
                             <span className="text-sm font-bold text-slate-700">{formatRelativeTime(log.timestamp)}</span>
-                            <span className="text-[10px] font-medium text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                            <span className="text-[10px] font-medium text-slate-400">{new Date(log.timestamp).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap">
@@ -260,7 +260,7 @@ const AuditLogs: React.FC = () => {
                           <p className="text-xs font-black text-slate-400 uppercase tracking-widest ml-2">Dữ liệu thay đổi</p>
                           <div className="bg-slate-900 rounded-[32px] p-6 font-mono text-[11px] text-slate-300 leading-relaxed overflow-hidden relative group">
                              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="ghost" className="h-7 px-3 rounded-full bg-white/10 text-white hover:bg-white/20 text-[10px] font-bold">Copy JSON</Button>
+                                <Button variant="ghost" className="h-7 px-3 rounded-full bg-white/10 text-white hover:bg-white/20 text-[10px] font-bold">Sao chép JSON</Button>
                              </div>
                              <div className="max-h-[300px] overflow-y-auto scrollbar-hide">
                                <pre>{selectedLog.details}</pre>

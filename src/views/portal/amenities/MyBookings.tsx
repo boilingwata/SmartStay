@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Clock, Waves, Dumbbell, Utensils, Coffee, MapPin, AlertCircle, History
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { portalAmenityService } from '@/services/portalAmenityService';
+import type { PortalAmenityBooking } from '@/services/portalAmenityService';
+import {
+  getAmenityBookingStatusClass,
+  getAmenityBookingStatusLabel,
+  translateAmenityError,
+} from '@/lib/amenityPresentation';
 import { cn, formatDate } from '@/utils';
 import { isAfter, addHours, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -13,7 +19,7 @@ const MyBookings: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<PortalAmenityBooking | null>(null);
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['portal-my-bookings'],
     queryFn: () => portalAmenityService.getMyBookings()
@@ -25,18 +31,20 @@ const MyBookings: React.FC = () => {
       toast.success('Đã hủy lịch đặt thành công');
       setCancelTarget(null);
     },
-    onError: (error: any) => {
-      toast.error(`Không thể hủy lịch: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(translateAmenityError(error, 'Không thể hủy lịch đặt. Vui lòng thử lại.'));
     }
   });
-  const now = new Date();
-  const upcomingBookings = bookings.filter(b => 
-    b.status === 'booked' && isAfter(parseISO(b.date + 'T' + b.timeSlot.split(' - ')[0]), now)
-  );
-  
-  const pastBookings = bookings.filter(b => 
-    b.status !== 'booked' || !isAfter(parseISO(b.date + 'T' + b.timeSlot.split(' - ')[0]), now)
-  );
+  const { upcomingBookings, pastBookings } = useMemo(() => {
+    const now = new Date();
+    const upcomingBookings = bookings.filter((booking) =>
+      booking.status === 'booked' && isAfter(parseISO(booking.date + 'T' + booking.timeSlot.split(' - ')[0]), now)
+    );
+    const pastBookings = bookings.filter((booking) =>
+      booking.status !== 'booked' || !isAfter(parseISO(booking.date + 'T' + booking.timeSlot.split(' - ')[0]), now)
+    );
+    return { upcomingBookings, pastBookings };
+  }, [bookings]);
   const currentList = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   const getIcon = (name: string) => {
     const n = name.toLowerCase();
@@ -46,20 +54,11 @@ const MyBookings: React.FC = () => {
     if (n.includes('coffee') || n.includes('cà phê')) return Coffee;
     return MapPin;
   };
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'booked':
-        return <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-md text-[10px] font-bold uppercase tracking-wider">Đã xác nhận</span>;
-      case 'in_use':
-        return <span className="px-2.5 py-1 bg-amber-500/10 text-amber-600 rounded-md text-[10px] font-bold uppercase tracking-wider">Đang sử dụng</span>;
-      case 'completed':
-        return <span className="px-2.5 py-1 bg-muted text-muted-foreground rounded-md text-[10px] font-bold uppercase tracking-wider">Hoàn thành</span>;
-      case 'cancelled':
-        return <span className="px-2.5 py-1 bg-destructive/10 text-destructive rounded-md text-[10px] font-bold uppercase tracking-wider">Đã hủy</span>;
-      default:
-        return <span className="px-2.5 py-1 bg-muted text-muted-foreground rounded-md text-[10px] font-bold uppercase tracking-wider">{status}</span>;
-    }
-  };
+  const getStatusBadge = (status: string) => (
+    <span className={cn('rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider', getAmenityBookingStatusClass(status))}>
+      {getAmenityBookingStatusLabel(status)}
+    </span>
+  );
   const handleCancelConfirm = () => {
     if (cancelTarget) {
       cancelMutation.mutate(cancelTarget.id);
@@ -117,7 +116,7 @@ const MyBookings: React.FC = () => {
           currentList.map((booking) => {
             const Icon = getIcon(booking.amenityName);
             const startTime = parseISO(booking.date + 'T' + booking.timeSlot.split(' - ')[0]);
-            const canCancel = booking.status === 'booked' && isAfter(startTime, addHours(now, 2));
+            const canCancel = booking.status === 'booked' && isAfter(startTime, addHours(new Date(), 2));
             return (
               <div key={booking.id} className="bg-card rounded-2xl p-5 border border-border shadow-sm flex flex-col gap-4 transition-all hover:border-primary/30 hover:shadow-md">
                 <div className="flex gap-4">

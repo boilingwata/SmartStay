@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Shield, 
-  Save, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  Shield,
+  Save,
+  AlertTriangle,
+  CheckCircle2,
   ChevronLeft,
   Lock,
-  RefreshCw,
   Info,
   Layers,
   Settings,
@@ -41,9 +40,8 @@ const PermissionMatrix: React.FC = () => {
       setPermissions(allPerms);
       setRolePerms(currentRP);
       setHasChanges(false);
-    } catch (error) {
+    } catch {
       toast.error('Không thể tải dữ liệu phân quyền');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -55,7 +53,7 @@ const PermissionMatrix: React.FC = () => {
 
   const togglePermission = (roleId: string, permKey: string) => {
     const role = roles.find(r => r.id === roleId);
-    if (role?.isSystem) return; // System roles are immutable
+    if (role?.isSystem) return; // Vai trò hệ thống không thể chỉnh sửa
     
     setRolePerms(prev => {
       const index = prev.findIndex(rp => rp.roleId === roleId);
@@ -118,7 +116,7 @@ const PermissionMatrix: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      // Save each modified role
+      // Lưu từng vai trò đã sửa
       const updatePromises = rolePerms.map(rp => 
         roleService.updateRolePermissions(rp.roleId, rp.permissions)
       );
@@ -126,7 +124,7 @@ const PermissionMatrix: React.FC = () => {
       
       toast.success('Đã lưu ma trận quyền thành công!');
       setHasChanges(false);
-    } catch (error) {
+    } catch {
       toast.error('Có lỗi xảy ra khi lưu thay đổi');
     } finally {
       setSaving(false);
@@ -201,18 +199,18 @@ const PermissionMatrix: React.FC = () => {
                     <Info className="w-7 h-7" />
                  </div>
                  <div className="space-y-1">
-                    <h3 className="text-lg font-black tracking-tight">Kiểm soát quyền hạt nhân (Granular RBAC)</h3>
+                    <h3 className="text-lg font-black tracking-tight">Kiểm soát quyền chi tiết (RBAC hạt nhân)</h3>
                     <p className="text-indigo-100 text-sm font-medium">Bạn đang chỉnh sửa cấu hình quyền trực tiếp. Thay đổi sẽ áp dụng ngay sau khi lưu.</p>
                  </div>
               </div>
               <div className="flex items-center gap-3">
                  <div className="px-4 py-2 bg-white/10 rounded-xl border border-white/20 flex items-center gap-2">
                     <Layers size={14} className="text-indigo-200" />
-                    <span className="text-[11px] font-black uppercase">{roles.length} Roles</span>
+                    <span className="text-[11px] font-black uppercase">{roles.length} vai trò</span>
                  </div>
                  <div className="px-4 py-2 bg-white/10 rounded-xl border border-white/20 flex items-center gap-2">
                     <Activity size={14} className="text-indigo-200" />
-                    <span className="text-[11px] font-black uppercase">{permissions.length} Perms</span>
+                    <span className="text-[11px] font-black uppercase">{permissions.length} quyền</span>
                  </div>
               </div>
            </div>
@@ -244,7 +242,7 @@ const PermissionMatrix: React.FC = () => {
                              </Badge>
                            ) : (
                              <Badge variant="outline" className="text-[9px] font-black uppercase border-slate-200 text-slate-400 px-2 py-0.5 rounded-full">
-                               Customizable
+                               Tùy chỉnh
                              </Badge>
                            )}
                         </div>
@@ -272,7 +270,7 @@ const PermissionMatrix: React.FC = () => {
                                onClick={() => toggleGroup(role.id, group)}
                                className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-600 transition-colors"
                              >
-                               Toggle Group
+                               Bật/tắt cả nhóm
                              </button>
                            )}
                         </td>

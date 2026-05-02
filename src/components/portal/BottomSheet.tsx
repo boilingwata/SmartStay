@@ -36,22 +36,22 @@ export const BottomSheet = ({ isOpen, onClose, title, children, height = 'h-[70v
         onClick={onClose}
       />
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:bottom-10 md:rounded-[40px] bg-white rounded-t-[40px] p-8 transition-transform duration-300 transform shadow-2xl overflow-hidden flex flex-col w-full md:max-w-[500px] lg:max-w-[600px]",
+        "absolute bottom-0 left-0 right-0 flex w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-card p-5 shadow-2xl transition-transform duration-300 md:bottom-10 md:left-1/2 md:max-w-[600px] md:-translate-x-1/2 md:rounded-3xl md:p-6 lg:max-w-[640px]",
         height,
         isOpen ? "translate-y-0" : "translate-y-full"
       )}>
         {/* Handle bar */}
         <div className="flex justify-center mb-6">
-          <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
+          <div className="h-1.5 w-12 rounded-full bg-muted" />
         </div>
 
         <div className="flex justify-between items-center mb-6 shrink-0">
           <h2 className="text-xl font-black text-primary uppercase tracking-tight">{title}</h2>
-          <button 
+          <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-all"
+            className="rounded-xl p-2 transition-all hover:bg-muted"
           >
-            <X size={20} className="text-muted" />
+            <X size={20} className="text-muted-foreground" />
           </button>
         </div>
 

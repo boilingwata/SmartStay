@@ -477,7 +477,7 @@ const OverviewTab = ({
           <InfoRow label="Loại phòng" value={getRoomTypeLabel(room.roomType)} />
           <InfoRow label="Hướng phòng" value={getDirectionLabel(room.directionFacing)} />
           <InfoRow label="Nội thất hiện có" value={getFurnishingLabel(room.furnishing)} />
-          <InfoRow label="Bảo trì gần nhất" value={formatDate(room.lastMaintenanceDate, 'dd/MM/yyyy HH:mm')} />
+          <InfoRow label="Kiểm tra gần nhất" value={formatDate(room.lastInspection, 'dd/MM/yyyy')} />
           <InfoRow label="Ban công" value={room.hasBalcony ? 'Có' : 'Không'} />
           <InfoRow label="Tòa nhà" value={room.buildingName} />
         </dl>

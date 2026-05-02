@@ -24,6 +24,17 @@ const STATUS_STYLES: Record<DbRentalApplicationStatus, string> = {
   cancelled: 'bg-slate-100 text-slate-500',
 };
 
+const VERIFICATION_METHOD_LABELS: Record<string, string> = {
+  id: 'Giấy tờ tùy thân',
+  phone: 'Số điện thoại',
+  email: 'Email',
+};
+
+function getVerificationMethodLabel(method?: string | null): string {
+  if (!method) return 'Chưa chọn';
+  return VERIFICATION_METHOD_LABELS[method] ?? 'Cách xác minh khác';
+}
+
 const LeadList: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | DbRentalApplicationStatus>('all');
@@ -131,7 +142,7 @@ const LeadList: React.FC = () => {
             Chưa có đơn thuê phù hợp với bộ lọc hiện tại.
           </h2>
           <p className="mt-3 text-sm leading-7 text-muted">
-            Khi khách gửi hồ sơ từ marketplace, danh sách này sẽ hiển thị ngay để đội launch phản hồi nhanh.
+            Khi khách gửi hồ sơ từ website công khai, danh sách này sẽ hiển thị ngay để đội phụ trách phản hồi nhanh.
           </p>
         </div>
       ) : (
@@ -159,7 +170,7 @@ const LeadList: React.FC = () => {
                     {lead.submittedAt && (
                       <span className="inline-flex items-center gap-2">
                         <CalendarDays size={15} />
-                        {formatDate(lead.submittedAt, 'dd/MM/yyyy')}
+                        {formatDate(lead.submittedAt, 'dd/MM/yyyy HH:mm')}
                       </span>
                     )}
                   </div>
@@ -201,8 +212,8 @@ const LeadList: React.FC = () => {
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <MetaItem label="Ngày vào ở mong muốn" value={lead.preferredMoveIn ?? 'Chưa cung cấp'} />
-                <MetaItem label="Cách xác minh" value={lead.verificationMethod ?? 'Chưa chọn'} />
+                <MetaItem label="Ngày vào ở mong muốn" value={lead.preferredMoveIn ? formatDate(lead.preferredMoveIn) : 'Chưa cung cấp'} />
+                <MetaItem label="Cách xác minh" value={getVerificationMethodLabel(lead.verificationMethod)} />
               </div>
 
               {lead.notes && (
@@ -219,12 +230,18 @@ const LeadList: React.FC = () => {
                   Mở phòng
                   <ArrowRight size={16} />
                 </Link>
-                <Link
-                  to={`/listings/${lead.roomId}`}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-5 text-sm font-black text-foreground transition-all hover:border-primary/25 hover:text-primary"
-                >
-                  Xem trang công khai
-                </Link>
+                {lead.isPublicListingAvailable ? (
+                  <Link
+                    to={`/listings/${lead.roomId}`}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-5 text-sm font-black text-foreground transition-all hover:border-primary/25 hover:text-primary"
+                  >
+                    Xem trang công khai
+                  </Link>
+                ) : (
+                  <span className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-background px-5 text-sm font-black text-muted">
+                    Chưa hiển thị công khai
+                  </span>
+                )}
               </div>
             </article>
           ))}

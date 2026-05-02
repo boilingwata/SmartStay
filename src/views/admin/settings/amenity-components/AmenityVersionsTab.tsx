@@ -54,23 +54,33 @@ export default function AmenityVersionsTab({ selectedPolicy }: Props) {
   });
 
   return (
-    <section className="grid gap-8 xl:grid-cols-[1fr_1fr] animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-6 rounded-[32px] border border-border bg-card p-6 shadow-sm">
+    <section className="grid min-w-0 gap-6 xl:grid-cols-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="min-w-0 space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground"><History size={16} />Lịch sử và xét duyệt</div>
         
         {selectedPolicy ? (
-          <div className="rounded-[24px] border border-primary/20 bg-primary/5 p-5">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Đang theo dõi chính sách: {selectedPolicy.code}</p>
             <h3 className="mt-1 text-xl font-bold text-foreground">{selectedPolicy.name}</h3>
             <p className="text-sm font-medium text-muted-foreground">{selectedPolicy.amenityName}</p>
           </div>
         ) : (
-          <div className="rounded-[20px] p-4 bg-amber-500/10 text-amber-600 text-sm font-medium">Vui lòng chọn một chính sách ở mục &ldquo;Chính sách và nội quy&rdquo; để xem lịch sử phiên bản.</div>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm font-medium text-amber-700 dark:text-amber-300">Vui lòng chọn một chính sách ở mục &ldquo;Chính sách và nội quy&rdquo; để xem lịch sử phiên bản.</div>
         )}
 
         <div className="space-y-3">
+          {versionsQuery.isLoading ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-sm font-medium text-muted-foreground">
+              Đang tải lịch sử phiên bản...
+            </div>
+          ) : null}
+          {selectedPolicy && !versionsQuery.isLoading && versionsQuery.data?.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-sm font-medium text-muted-foreground">
+              Chưa có lịch sử phiên bản cho chính sách này.
+            </div>
+          ) : null}
           {versionsQuery.data?.map((version) => (
-            <div key={version.id} className="rounded-[24px] border border-border bg-muted/30 p-5 hover:bg-background transition-colors">
+            <div key={version.id} className="rounded-2xl border border-border bg-muted/30 p-4 transition-colors hover:bg-background sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-base font-bold text-foreground">Phiên bản {version.versionNo}</p>
                 <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${statusClass(version.status)}`}>{statusLabel(version.status)}</span>
@@ -82,7 +92,7 @@ export default function AmenityVersionsTab({ selectedPolicy }: Props) {
         </div>
       </div>
 
-      <div className="space-y-6 rounded-[32px] border border-border bg-card p-6 shadow-sm">
+      <div className="min-w-0 space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground"><BellRing size={16} />Chiến dịch thông báo</div>
         <div className="space-y-4">
           <div className="space-y-1">
@@ -98,8 +108,18 @@ export default function AmenityVersionsTab({ selectedPolicy }: Props) {
         
         <div className="space-y-3 mt-6 pt-6 border-t border-border">
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Thông báo gần đây</p>
+          {notificationsQuery.isLoading ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-5 text-sm font-medium text-muted-foreground">
+              Đang tải thông báo gần đây...
+            </div>
+          ) : null}
+          {!notificationsQuery.isLoading && notificationsQuery.data?.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-5 text-sm font-medium text-muted-foreground">
+              Chưa có thông báo tiện ích nào.
+            </div>
+          ) : null}
           {notificationsQuery.data?.map((item) => (
-            <div key={item.id} className="rounded-[20px] border border-border bg-background p-4 shadow-sm relative overflow-hidden">
+            <div key={item.id} className="relative overflow-hidden rounded-2xl border border-border bg-background p-4 shadow-sm">
               <div className="absolute top-0 left-0 w-1 h-full bg-primary/80"></div>
               <div className="flex items-center justify-between gap-3 pl-2">
                 <p className="text-sm font-bold text-foreground truncate">{item.title}</p>

@@ -12,8 +12,11 @@ import {
   ChevronRight,
   Phone,
   Fingerprint,
-  Activity,
   UserCheck,
+  UserCog,
+  Building2,
+  SearchCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import { DataTable, RowAction } from '@/components/shared/DataTable';
 import { FilterPanel, FilterConfig } from '@/components/shared/FilterPanel';
@@ -41,6 +44,16 @@ const UserListPage: React.FC = () => {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({
     isActive: 'true'
   });
+
+  const activeUsers = users.filter((user) => user.isActive).length;
+  const lockedUsers = users.filter((user) => !user.isActive).length;
+  const ownerUsers = users.filter((user) => user.role.toLowerCase() === 'owner').length;
+  const staffUsers = users.filter((user) => user.role.toLowerCase() === 'staff').length;
+  const tenantUsers = users.filter((user) => user.role.toLowerCase() === 'tenant').length;
+  const superAdminUsers = users.filter((user) => user.role.toLowerCase() === 'superadmin').length;
+  const selectedRoleLabel =
+    roles.find((role) => role.id === filterValues.roleId)?.name ??
+    (filterValues.roleId && filterValues.roleId !== 'All' ? 'Vai trò đã chọn' : 'Tất cả vai trò');
 
   const fetchData = useCallback(async () => {
     try {
@@ -208,8 +221,8 @@ const UserListPage: React.FC = () => {
       icon: <UserX className="w-4 h-4" />,
       variant: 'danger',
       onClick: (u) => {
-        if (u.role.toLowerCase() === 'owner') {
-          toast.error('Không thể thao tác trên tài khoản Owner');
+        if (['owner', 'superadmin'].includes(u.role.toLowerCase())) {
+          toast.error('Không thể thao tác trên tài khoản quản trị cấp cao');
           return;
         }
         handleToggleStatus(u);
@@ -246,146 +259,217 @@ const UserListPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
-      {/* Header Section */}
-      <div className="bg-white border-b border-slate-200/60 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-1">
-               <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-slate-900 rounded-xl text-white shadow-lg">
-                    <Users size={22} strokeWidth={2.5} />
-                  </div>
-                  <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Quản lý người dùng</h1>
-               </div>
-               <p className="text-sm text-slate-400 font-medium pl-1">Phân quyền, bảo mật và hồ sơ cá nhân toàn hệ thống.</p>
+    <div className="min-h-screen bg-slate-50 pb-16 font-sans">
+      <div className="border-b border-slate-200 bg-white">
+        <div className="px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-950 text-white">
+                  <UserCog size={21} strokeWidth={2.4} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
+                    Không gian quản lý
+                  </p>
+                  <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                    Tài khoản & phân quyền
+                  </h1>
+                </div>
+              </div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+                Quản lý tài khoản owner, nhân sự vận hành và cư dân; theo dõi trạng thái truy cập, quyền hệ thống và nhật ký thay đổi.
+              </p>
             </div>
 
-            <div className="flex items-center gap-3">
-               <Button 
-                variant="outline" 
-                onClick={() => navigate('/owner/settings/users/permissions')} 
-                className="h-11 px-5 rounded-xl border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 shadow-sm"
-               >
-                  <Shield size={16} className="mr-2 opacity-60 text-indigo-600" /> Ma trận quyền
-               </Button>
-               <Button 
-                onClick={() => { setSelectedUser(null); setIsModalOpen(true); }} 
-                className="h-11 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/10 active:scale-95 transition-all"
-               >
-                  <UserPlus size={16} className="mr-2" /> Thêm người dùng
-               </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/owner/settings/audit-logs')}
+                className="h-10 rounded-lg border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
+                <History size={15} className="mr-2 text-slate-500" /> Nhật ký
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/owner/settings/users/permissions')}
+                className="h-10 rounded-lg border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
+                <Shield size={15} className="mr-2 text-indigo-600" /> Ma trận quyền
+              </Button>
+              <Button
+                onClick={() => { setSelectedUser(null); setIsModalOpen(true); }}
+                className="h-10 rounded-lg bg-slate-950 px-4 text-xs font-bold uppercase tracking-wider text-white hover:bg-slate-800"
+              >
+                <UserPlus size={15} className="mr-2" /> Thêm tài khoản
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Quick Insights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-           <Card className="p-6 rounded-2xl border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all group">
-              <div className="flex items-center gap-4">
-                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                    <Users size={20} />
-                 </div>
-                 <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tổng số</p>
-                    <h3 className="text-2xl font-bold text-slate-800 leading-none">{users.length}</h3>
-                 </div>
-              </div>
-           </Card>
-           <Card className="p-6 rounded-2xl border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all group">
-              <div className="flex items-center gap-4">
-                 <div className="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-colors duration-300">
-                    <Shield size={20} />
-                 </div>
-                 <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chủ sở hữu</p>
-                    <h3 className="text-2xl font-bold text-slate-800 leading-none">
-                      {users.filter(u => u.role.toLowerCase() === 'owner').length}
-                    </h3>
-                 </div>
-              </div>
-           </Card>
-           <Card className="p-6 rounded-2xl border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all group">
-              <div className="flex items-center gap-4">
-                 <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-300">
-                    <UserCheck size={20} />
-                 </div>
-                 <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đang online</p>
-                    <h3 className="text-2xl font-bold text-emerald-600 leading-none">
-                       {users.filter(u => u.isActive).length}
-                    </h3>
-                 </div>
-              </div>
-           </Card>
-           <Card className="p-6 rounded-2xl border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all group">
-              <div className="flex items-center gap-4">
-                 <div className="p-3 bg-slate-50 text-slate-400 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300">
-                    <Activity size={20} />
-                 </div>
-                 <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tác vụ 24h</p>
-                    <h3 className="text-2xl font-bold text-slate-800 leading-none">32</h3>
-                 </div>
-              </div>
-           </Card>
-        </div>
-
-        {/* Action & Filter Bar */}
-        <FilterPanel
-          filters={filterConfig}
-          values={filterValues}
-          onChange={setFilterValues}
-          onReset={() => setFilterValues({ isActive: 'true' })}
-          className="bg-white border-slate-200/60 rounded-2xl px-6 py-5 shadow-sm"
-          activeCount={Object.values(filterValues).filter(v => v !== '' && v !== 'true' && v !== 'All').length}
-        />
-
-        {/* Data Container */}
-        <Card className="rounded-3xl overflow-hidden border border-slate-200/60 shadow-sm bg-white">
-          <DataTable
-            columns={columns}
-            data={users}
-            total={users.length}
-            loading={loading}
-            rowActions={rowActions}
-            emptyState={
-               <div className="py-24 flex flex-col items-center justify-center space-y-4 opacity-40">
-                  <Layers size={48} className="text-slate-300" strokeWidth={1} />
-                  <div className="text-center space-y-1">
-                    <p className="text-sm font-bold text-slate-600">Danh sách trống</p>
-                    <p className="text-xs font-medium text-slate-400">Không tìm thấy kết quả phù hợp với bộ lọc.</p>
+      <div className="px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Card className="rounded-lg border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tổng tài khoản</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950">{users.length}</p>
                   </div>
-               </div>
-            }
-          />
-        </Card>
-      </div>
-
-      {/* Footer / Info Section */}
-      <div className="max-w-7xl mx-auto px-6 mt-12 mb-20">
-         <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200/60 flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400 border border-slate-100">
-                  <Fingerprint size={24} />
-               </div>
-               <div>
-                  <h4 className="text-sm font-bold text-slate-800 tracking-tight">Tính bảo mật và minh bạch</h4>
-                  <p className="text-xs text-slate-400 font-medium max-w-xl">
-                    Mọi thao tác thay đổi vai trò hoặc trạng thái tài khoản đều được lưu lại trong nhật ký hoạt động. Hãy đảm bảo bạn tuân thủ các chính sách bảo mật của SmartStay.
-                  </p>
-               </div>
+                  <Users size={22} className="text-slate-400" />
+                </div>
+              </Card>
+              <Card className="rounded-lg border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Đang hoạt động</p>
+                    <p className="mt-2 text-3xl font-black text-emerald-600">{activeUsers}</p>
+                  </div>
+                  <UserCheck size={22} className="text-emerald-500" />
+                </div>
+              </Card>
+              <Card className="rounded-lg border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Bị khóa</p>
+                    <p className="mt-2 text-3xl font-black text-rose-600">{lockedUsers}</p>
+                  </div>
+                  <ShieldAlert size={22} className="text-rose-500" />
+                </div>
+              </Card>
+              <Card className="rounded-lg border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Vai trò lọc</p>
+                    <p className="mt-2 truncate text-xl font-black text-slate-950">{selectedRoleLabel}</p>
+                  </div>
+                  <SearchCheck size={22} className="text-amber-500" />
+                </div>
+              </Card>
             </div>
-            <Button 
-               variant="outline" 
-               className="h-11 px-6 rounded-xl border-slate-200 bg-white text-slate-600 font-bold text-xs uppercase tracking-wider shadow-sm flex items-center gap-2 hover:bg-slate-50"
-              onClick={() => navigate('/owner/settings/audit-logs')}
-            >
-               Xem nhật ký truy vết <ChevronRight size={14} className="opacity-60" />
-            </Button>
-         </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <FilterPanel
+                filters={filterConfig}
+                values={filterValues}
+                onChange={setFilterValues}
+                onReset={() => setFilterValues({ isActive: 'true' })}
+                className="rounded-lg border-slate-200 bg-white px-5 py-4 shadow-sm"
+                activeCount={Object.values(filterValues).filter(v => v !== '' && v !== 'true' && v !== 'All').length}
+              />
+
+              <Card className="rounded-lg border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Phân bổ vai trò</p>
+                <div className="mt-4 space-y-3 text-sm">
+                  {[
+                    { label: 'Chủ nhà', value: ownerUsers, tone: 'bg-indigo-500' },
+                    { label: 'Nhân viên', value: staffUsers, tone: 'bg-slate-700' },
+                    { label: 'Cư dân', value: tenantUsers, tone: 'bg-emerald-500' },
+                    { label: 'Quản trị tối cao', value: superAdminUsers, tone: 'bg-rose-500' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 font-semibold text-slate-600">
+                        <span className={cn('h-2.5 w-2.5 rounded-full', item.tone)} />
+                        {item.label}
+                      </span>
+                      <span className="font-black text-slate-950">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <DataTable
+                columns={columns}
+                data={users}
+                total={users.length}
+                loading={loading}
+                rowActions={rowActions}
+                emptyState={
+                  <div className="flex flex-col items-center justify-center space-y-4 py-24 opacity-60">
+                    <Layers size={48} className="text-slate-300" strokeWidth={1} />
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-bold text-slate-600">Danh sách trống</p>
+                      <p className="text-xs font-medium text-slate-400">Không tìm thấy kết quả phù hợp với bộ lọc.</p>
+                    </div>
+                  </div>
+                }
+              />
+            </Card>
+          </div>
+
+          <aside className="space-y-4">
+            <Card className="rounded-lg border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
+                  <Building2 size={19} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Quy trình</p>
+                  <h2 className="text-base font-black text-slate-950">Thiết lập tài khoản</h2>
+                </div>
+              </div>
+              <div className="mt-5 space-y-4">
+                {[
+                  'Tạo tài khoản và gán vai trò đúng phạm vi.',
+                  'Gán quyền truy cập tòa nhà cho nhân sự liên quan.',
+                  'Gửi liên kết đặt lại mật khẩu hoặc buộc đổi mật khẩu.',
+                  'Kiểm tra nhật ký sau các thay đổi quyền nhạy cảm.',
+                ].map((item, index) => (
+                  <div key={item} className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
+                      {index + 1}
+                    </span>
+                    <p className="text-sm leading-6 text-slate-600">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="rounded-lg border-rose-200 bg-rose-50 p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-rose-700">
+                  <Shield size={19} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-500">Xác thực</p>
+                  <h2 className="text-base font-black text-rose-950">Tài khoản mẫu Quản trị tối cao</h2>
+                </div>
+              </div>
+              <div className="mt-4 rounded-lg border border-rose-200 bg-white p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Thư điện tử</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-950">superadmin@smartstay.vn</p>
+                <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-slate-400">Mật khẩu mẫu</p>
+                <p className="mt-1 break-all text-sm font-black text-slate-950">SuperAdmin@123456</p>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-rose-700">
+                Thư điện tử này được đối chiếu từ Supabase Auth. Quyền Quản trị tối cao được nhận qua <code className="font-mono">app_metadata.workspace_role = super_admin</code>.
+              </p>
+            </Card>
+
+            <Card className="rounded-lg border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <Fingerprint size={22} className="mt-1 text-slate-400" />
+                <div>
+                  <h2 className="text-sm font-black text-slate-950">Bảo mật & truy vết</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Mọi thao tác thay đổi vai trò hoặc trạng thái tài khoản cần được đối chiếu với nhật ký để kiểm soát rủi ro vận hành.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4 h-10 rounded-lg border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wider text-slate-700"
+                    onClick={() => navigate('/owner/settings/audit-logs')}
+                  >
+                    Xem nhật ký <ChevronRight size={14} className="ml-2 opacity-60" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </aside>
+        </div>
       </div>
 
       <UserModal 

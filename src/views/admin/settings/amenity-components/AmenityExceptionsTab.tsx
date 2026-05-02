@@ -135,8 +135,8 @@ export default function AmenityExceptionsTab() {
   const exceptionPageCount = Math.max(1, Math.ceil((exceptionsQuery.data?.total ?? 0) / exceptionFilters.limit));
 
   return (
-    <section className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr] animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-6 rounded-[32px] border border-border bg-card p-6 shadow-sm">
+    <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="min-w-0 space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="grid gap-3 md:grid-cols-2">
           <input className="input-base w-full" placeholder="Tìm ngoại lệ" value={exceptionFilters.search} onChange={(event) => setExceptionFilters((current) => ({ ...current, search: event.target.value, page: 1 }))} />
           
@@ -154,10 +154,27 @@ export default function AmenityExceptionsTab() {
           />
         </div>
         
+        {exceptionsQuery.isLoading ? (
+          <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-sm font-medium text-muted-foreground">
+            Đang tải danh sách ngoại lệ tiện ích...
+          </div>
+        ) : null}
+        {exceptionsQuery.isError ? (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm font-semibold text-destructive">
+            Không tải được danh sách ngoại lệ. Vui lòng thử lại.
+          </div>
+        ) : null}
+        {!exceptionsQuery.isLoading && !exceptionsQuery.isError && exceptionsQuery.data?.data.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center">
+            <p className="text-sm font-bold text-foreground">Chưa có ngoại lệ tiện ích</p>
+            <p className="mt-1 text-sm text-muted-foreground">Các lịch đóng cửa, đổi sức chứa hoặc đổi giá tạm thời sẽ hiển thị tại đây.</p>
+          </div>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2">
         {exceptionsQuery.data?.data.map((item) => (
-          <div key={item.id} className="rounded-[24px] border border-border bg-muted/30 p-5 hover:border-rose-500/30 hover:bg-rose-500/5 transition-colors">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">{getAmenityExceptionTypeLabel(item.exceptionType)}</p>
+          <div key={item.id} className="rounded-2xl border border-border bg-muted/30 p-4 transition-colors hover:border-destructive/30 hover:bg-destructive/5 sm:p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-destructive">{getAmenityExceptionTypeLabel(item.exceptionType)}</p>
             <h3 className="mt-2 text-lg font-bold text-foreground">{item.title}</h3>
             <p className="text-sm font-medium text-muted-foreground">{item.amenityName}{item.buildingName ? ` · ${item.buildingName}` : ''}</p>
             <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-muted-foreground bg-background rounded-full px-3 py-1.5 w-fit border border-border">
@@ -178,8 +195,8 @@ export default function AmenityExceptionsTab() {
         </div>
       </div>
 
-      <div className="space-y-6 rounded-[32px] border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-rose-500"><Plus size={16} />Thêm ngoại lệ</div>
+      <div className="min-w-0 space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-destructive"><Plus size={16} />Thêm ngoại lệ</div>
         
         <div className="space-y-1">
           <Select 
@@ -228,7 +245,7 @@ export default function AmenityExceptionsTab() {
         
         <div className="space-y-1">
           <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Thông tin ghi đè</label>
-          <div className="rounded-[24px] border border-border bg-muted/30 p-4">
+          <div className="rounded-2xl border border-border bg-muted/30 p-4">
             <p className="text-xs text-muted-foreground mb-4">Hệ thống tự sinh dữ liệu kỹ thuật ở phía sau.</p>
             <div className="space-y-4">
               <div className="space-y-1">
@@ -257,7 +274,7 @@ export default function AmenityExceptionsTab() {
           </div>
         </div>
         
-        <button disabled={createExceptionMutation.isPending} onClick={() => createExceptionMutation.mutate()} className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 font-bold text-white hover:bg-rose-700 disabled:opacity-70 transition-transform active:scale-[0.98] shadow-lg shadow-rose-600/20"><Plus size={16} />Xác nhận ngoại lệ</button>
+        <button disabled={createExceptionMutation.isPending} onClick={() => createExceptionMutation.mutate()} className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-destructive px-5 font-bold text-destructive-foreground transition-transform hover:bg-destructive/90 active:scale-[0.98] disabled:opacity-70"><Plus size={16} />Xác nhận ngoại lệ</button>
       </div>
     </section>
   );

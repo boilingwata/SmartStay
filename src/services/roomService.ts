@@ -13,7 +13,7 @@ import { mapAssetCondition, mapAssetType, mapBillingStatusFromDb } from '@/lib/a
 import { 
   mapRoomStatus, mapContractStatus, mapHandoverType, mapConditionScore 
 } from '@/lib/enumMaps';
-import { deriveFurnishingFromAssets, deriveRoomType, getAmenityViewModel, normalizeAmenityCodes } from '@/lib/propertyBusiness';
+import { deriveFurnishingFromAssets, deriveRoomType, getAmenityLabel, normalizeAmenityCodes } from '@/lib/propertyBusiness';
 import type { DbRoomStatus } from '@/types/supabase';
 
 // --- Row interfaces ---
@@ -28,13 +28,14 @@ interface RoomRow {
   room_type: string | null
   max_occupants: number | null
   has_balcony: boolean | null
+  has_private_bathroom: boolean | null
   facing: string | null
   amenities: unknown
   base_rent: number | null
   condition_score: number | null
   status: string | null
   description: string | null
-  last_maintenance_date: string | null
+  last_inspection: string | null
   is_deleted: boolean | null
   is_listed: boolean | null
   buildings?: { name: string } | null
@@ -139,7 +140,7 @@ function toRoomDetail(
   contracts: RoomContractRow[]
 ): RoomDetail {
   const room = toRoom(row);
-  const amenities = normalizeAmenityCodes(row.amenities);
+  const amenities = normalizeRoomAmenityCodes(row);
 
   // Collect tenant names from active contracts
   const activeContracts = contracts.filter(c => c.status === 'active');
@@ -169,7 +170,7 @@ function toRoomDetail(
   return {
     ...room,
     description: (row as unknown as { description?: string }).description ?? undefined,
-    lastMaintenanceDate: (row as unknown as { last_maintenance_date?: string }).last_maintenance_date ?? undefined,
+    lastInspection: row.last_inspection ?? undefined,
     maxOccupancy: row.max_occupants ?? 2,
     furnishing: deriveFurnishingFromAssets(
       assets.map((asset) => ({
@@ -183,12 +184,24 @@ function toRoomDetail(
     tenantNames: tenantNames.length > 0 ? tenantNames : undefined,
     images: [],
     amenities,
-    amenityDetails: getAmenityViewModel(row.amenities),
+    amenityDetails: amenities.map((code) => ({ code, label: getAmenityLabel(code) })),
     meters: [],
     assets: assets.map(toRoomAsset),
     statusHistory: history.map(toStatusHistory),
     contracts: contractSummaries,
   };
+}
+
+function normalizeRoomAmenityCodes(row: Pick<RoomRow, 'amenities' | 'has_private_bathroom'>): string[] {
+  const amenities = normalizeAmenityCodes(row.amenities);
+  if (row.has_private_bathroom && !amenities.includes('PrivateBathroom')) {
+    return [...amenities, 'PrivateBathroom'];
+  }
+  return amenities;
+}
+
+function hasPrivateBathroom(amenities?: string[]): boolean {
+  return Boolean(amenities?.includes('PrivateBathroom'));
 }
 
 function toRoomAsset(row: RoomAssetRow): RoomAsset {
@@ -456,6 +469,9 @@ export const roomService = {
       );
     }
 
+    const status = data.status ?? 'Vacant';
+    const isListed = status === 'Vacant' && Boolean(data.isListed);
+
     const row = await unwrap(
       supabase
         .from('rooms')
@@ -464,15 +480,17 @@ export const roomService = {
           room_code: data.roomCode,
           floor_number: data.floorNumber,
           area_sqm: data.areaSqm,
+          description: data.description || null,
           room_type: data.roomType,
           max_occupants: data.maxOccupancy,
           has_balcony: data.hasBalcony ?? false,
+          has_private_bathroom: hasPrivateBathroom(data.amenities),
           facing: data.directionFacing,
           amenities: data.amenities ?? [],
           base_rent: data.baseRentPrice,
           condition_score: data.conditionScore,
-          status: mapRoomStatus.toDb(data.status ?? 'Vacant') as DbRoomStatus,
-          is_listed: data.isListed ?? false,
+          status: mapRoomStatus.toDb(status) as DbRoomStatus,
+          is_listed: isListed,
         })
         .select('*, buildings(name)')
         .single()
@@ -486,6 +504,8 @@ export const roomService = {
     if (!Number.isFinite(numId)) {
       throw new Error(`[roomService] Invalid room id: "${id}"`);
     }
+    const isListed = data.status && data.status !== 'Vacant' ? false : data.isListed;
+
     const row = await unwrap(
       supabase
         .from('rooms')
@@ -493,15 +513,17 @@ export const roomService = {
           room_code: data.roomCode,
           floor_number: data.floorNumber,
           area_sqm: data.areaSqm,
+          description: data.description,
           room_type: data.roomType,
           max_occupants: data.maxOccupancy,
           has_balcony: data.hasBalcony,
+          has_private_bathroom: data.amenities ? hasPrivateBathroom(data.amenities) : undefined,
           facing: data.directionFacing,
           amenities: data.amenities,
           base_rent: data.baseRentPrice,
           condition_score: data.conditionScore,
           status: data.status ? mapRoomStatus.toDb(data.status) as DbRoomStatus : undefined,
-          is_listed: data.isListed,
+          is_listed: isListed,
         })
         .eq('id', numId)
         .select('*, buildings(name)')

@@ -7,7 +7,8 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { portalAmenityService, type PortalAmenityItem } from "@/services/portalAmenityService";
 import { BottomSheet } from "@/components/portal/BottomSheet";
-import { SafeImage, Spinner } from "@/components/ui";
+import { Spinner } from "@/components/ui";
+import { translateAmenityError } from "@/lib/amenityPresentation";
 import { cn, formatVND } from "@/utils";
 const AmenityList: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const AmenityList: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
-  const { data: amenities = [], isLoading } = useQuery({
+  const { data: amenities = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["portal-amenities"],
     queryFn: () => portalAmenityService.getAmenities(),
   });
@@ -27,12 +28,8 @@ const AmenityList: React.FC = () => {
       toast.success(`Đặt thành công ${selectedAmenity?.amenityName}`);
       resetBookingState();
     },
-    onError: (error: any) => {
-      if (error.code === "23505" || error.message?.includes("conflict")) {
-        toast.error("Khung giờ này đã được đặt, vui lòng chọn giờ khác");
-        return;
-      }
-      toast.error(`Không thể đặt tiện ích: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(translateAmenityError(error, "Không thể đặt tiện ích. Vui lòng thử lại."));
     },
   });
   const resetBookingState = () => {
@@ -59,13 +56,6 @@ const AmenityList: React.FC = () => {
     if (normalized.includes("cà phê") || normalized.includes("coffee")) return Coffee;
     return MapPin;
   };
-  const getImageUrl = (name: string) => {
-    const normalized = name.toLowerCase();
-    if (normalized.includes("bơi")) return "https://images.unsplash.com/photo-1540553016722-983e48a2cd10?q=80&w=800&auto=format&fit=crop";
-    if (normalized.includes("gym")) return "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop";
-    if (normalized.includes("bbq")) return "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?q=80&w=800&auto=format&fit=crop";
-    return "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop";
-  };
   const handleBook = () => {
     if (!selectedTimeSlot || !selectedAmenity) return;
     const endHour = parseInt(selectedTimeSlot.split(":")[0] ?? "0", 10) + 1;
@@ -81,6 +71,23 @@ const AmenityList: React.FC = () => {
       <div className="flex min-h-[80vh] flex-col items-center justify-center space-y-4 px-6">
         <Spinner size="lg" />
         <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground animate-pulse">Đang tải tiện ích...</p>
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 px-6 text-center">
+        <AlertCircle size={42} className="text-destructive" />
+        <div className="space-y-1">
+          <h2 className="text-lg font-bold text-foreground">Không tải được tiện ích</h2>
+          <p className="text-sm text-muted-foreground">Vui lòng kiểm tra kết nối và thử lại.</p>
+        </div>
+        <button
+          onClick={() => void refetch()}
+          className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+        >
+          Thử lại
+        </button>
       </div>
     );
   }
@@ -109,42 +116,44 @@ const AmenityList: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {amenities.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.amenityId}
               onClick={() => {
                 setSelectedAmenity(item);
                 setBookingStep(1);
                 setSelectedTimeSlot(null);
               }}
-              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[24px] bg-muted shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
+              className="group flex min-h-[210px] flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
             >
-              <SafeImage
-                src={getImageUrl(item.amenityName)}
-                alt={item.amenityName}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300" />
-              <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-black/40 backdrop-blur-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
-                Sẵn sàng
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  {React.createElement(getIcon(item.amenityName), { size: 24, strokeWidth: 2 })}
+                </div>
+                <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  Sẵn sàng
+                </span>
               </div>
-              <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-6 text-white">
+              <div className="space-y-4">
                 <div className="space-y-1">
-                  <h4 className="text-xl font-bold tracking-tight text-white">{item.amenityName}</h4>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-semibold text-white/90">
-                      {item.bookingPrice > 0 ? formatVND(item.bookingPrice) : "Miễn phí"}
-                    </span>
-                  </div>
+                  <h4 className="line-clamp-2 text-xl font-bold tracking-tight text-foreground">{item.amenityName}</h4>
+                  <p className="text-sm font-medium text-muted-foreground">Chọn ngày và khung giờ để đặt chỗ.</p>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm text-white transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
-                  <ArrowRight size={18} strokeWidth={2.5} className="transition-transform group-hover:translate-x-1" />
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+                  <span className="text-sm font-bold text-primary">
+                    {item.bookingPrice > 0 ? formatVND(item.bookingPrice) : "Miễn phí"}
+                  </span>
+                  <span className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground">
+                    Đặt chỗ
+                    <ArrowRight size={16} strokeWidth={2.5} />
+                  </span>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
         {amenities.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-muted/50 py-24 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/50 py-20 text-center">
             <AlertCircle size={48} className="text-muted-foreground/50 mb-4" />
             <p className="text-sm font-medium tracking-wide text-muted-foreground">Chưa có tiện ích khả dụng</p>
           </div>

@@ -28,12 +28,18 @@ import useAuthStore from '@/stores/authStore';
 import { cn } from '@/utils';
 
 const conditionOptions = ['New', 'Good', 'Fair', 'Poor'] as const;
+const handoverTypes = ['CheckIn', 'CheckOut'] as const;
+
+function resolveHandoverType(value: unknown): 'CheckIn' | 'CheckOut' {
+  const candidate = value as 'CheckIn' | 'CheckOut';
+  return handoverTypes.includes(candidate) ? candidate : 'CheckIn';
+}
 
 const HandoverChecklist = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const type = (location.state?.type as 'CheckIn' | 'CheckOut') || 'CheckIn';
+  const handoverType = resolveHandoverType(location.state?.type);
 
   const witnessSigRef = useRef<SignatureCanvas>(null);
   const tenantSigRef = useRef<SignatureCanvas>(null);
@@ -57,7 +63,7 @@ const HandoverChecklist = () => {
         { id: '5', name: 'Thoát sàn và vòi nước', status: 'OK', note: '' },
         { id: '6', name: 'Thiết bị vệ sinh', status: 'OK', note: '' },
         { id: '7', name: 'Độ sạch tổng thể', status: 'OK', note: '' },
-        { id: '8', name: 'Remote thiết bị', status: 'OK', note: '' },
+        { id: '8', name: 'Điều khiển thiết bị', status: 'OK', note: '' },
         { id: '9', name: 'Chỉ số điện nước tại thời điểm bàn giao', status: 'OK', note: '' },
       ],
     },
@@ -161,7 +167,7 @@ const HandoverChecklist = () => {
           try {
             await ticketService.createTicket({
               roomId: Number(id),
-              title: `[Bàn giao ${type === 'CheckIn' ? 'nhận phòng' : 'trả phòng'}] ${item.name} cần xử lý`,
+              title: `[Bàn giao ${handoverType === 'CheckIn' ? 'nhận phòng' : 'trả phòng'}] ${item.name} cần xử lý`,
               description: `Hạng mục: ${item.name}\nNhóm kiểm tra: ${item.category}\nGhi chú: ${item.note || 'Không có'}\nMã biên bản: #${checklistId}`,
               type: 'Maintenance',
               priority: 'Medium',
@@ -175,15 +181,27 @@ const HandoverChecklist = () => {
         }
       }
 
-      toast.success('Đã lưu biên bản bàn giao.');
+      toast.success('Đã lưu biên bản bàn giao.', { id: 'handover-save' });
       navigate(`/owner/rooms/${id}`);
     },
     onError: (error: Error) => {
-      toast.error(`Không thể lưu biên bản: ${error.message}`);
+      toast.error(`Không thể lưu biên bản: ${error.message}`, { id: 'handover-save' });
     },
   });
 
   const handleSave = async () => {
+    if (createMutation.isPending) return;
+
+    if (!id) {
+      toast.error('Không xác định được phòng cần bàn giao.');
+      return;
+    }
+
+    if (!room) {
+      toast.error('Chưa tải được thông tin phòng. Vui lòng thử lại sau.');
+      return;
+    }
+
     const witnessSigData = witnessSigRef.current?.toDataURL('image/png');
     const tenantSigData = tenantSigRef.current?.toDataURL('image/png');
 
@@ -214,10 +232,10 @@ const HandoverChecklist = () => {
       }
 
       const payload: CreateHandoverData = {
-        roomId: id!,
+        roomId: id,
         contractId: activeContract?.id,
         tenantId: activeContract?.tenantId,
-        handoverType: type,
+        handoverType,
         performedBy: user.id,
         notes,
         sections: checklist.map((section, sectionIndex) => ({
@@ -244,7 +262,6 @@ const HandoverChecklist = () => {
       };
 
       createMutation.mutate(payload);
-      toast.dismiss('handover-save');
     } catch (error: unknown) {
       const err = error as Error;
       toast.error(`Không thể lưu biên bản: ${err.message}`, { id: 'handover-save' });
@@ -284,13 +301,13 @@ const HandoverChecklist = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Biên bản {getHandoverTypeLabel(type).toLowerCase()}
+                Biên bản {getHandoverTypeLabel(handoverType).toLowerCase()}
               </h1>
               <span className={cn(
                 'rounded-full px-3 py-1 text-xs font-medium',
-                type === 'CheckIn' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary',
+                handoverType === 'CheckIn' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary',
               )}>
-                {getHandoverTypeLabel(type)}
+                {getHandoverTypeLabel(handoverType)}
               </span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">

@@ -49,6 +49,7 @@ function clearLockoutData() {
 }
 
 const quickAccounts = [
+  { email: 'superadmin@smartstay.vn', password: 'SuperAdmin@123456', label: 'Super Admin' },
   { email: 'admin@smartstay.vn', password: 'Admin@123456', label: 'Chủ nhà' },
   { email: 'staff@smartstay.vn', password: 'Staff@123456', label: 'Hỗ trợ nội bộ' },
   { email: 'tenant@smartstay.vn', password: 'Tenant@123456', label: 'Người thuê' },

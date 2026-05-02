@@ -27,7 +27,7 @@ export interface RoomDetail extends Room {
   directionFacing: DirectionFacing;
   hasBalcony: boolean;
   conditionScore: number; // 1-10
-  lastMaintenanceDate?: string;
+  lastInspection?: string;
   images: RoomImage[];
   amenities: string[];
   amenityDetails?: Array<{ code: string; label: string }>;
@@ -161,6 +161,7 @@ export interface CreateRoomData {
   roomCode: string;
   floorNumber: number;
   areaSqm: number;
+  description?: string;
   roomType: RoomType;
   maxOccupancy: number;
   hasBalcony?: boolean;

@@ -1,8 +1,28 @@
 import { supabase } from "@/lib/supabase";
 import { unwrap } from "@/lib/supabaseHelpers";
+import { getAmenityDisplayName, type AmenityBookingStatus } from "@/lib/amenityPresentation";
 import { isSchemaCompatError } from "./domainSchemaCompat";
+import type { PostgrestResponse, PostgrestSingleResponse } from "@supabase/supabase-js";
 
-const db = supabase as any;
+type UntypedPostgrestResult = PostgrestSingleResponse<unknown> | PostgrestResponse<unknown>;
+
+interface SupabaseUntypedQuery extends PromiseLike<UntypedPostgrestResult> {
+  select(...args: unknown[]): SupabaseUntypedQuery;
+  eq(...args: unknown[]): SupabaseUntypedQuery;
+  is(...args: unknown[]): SupabaseUntypedQuery;
+  in(...args: unknown[]): SupabaseUntypedQuery;
+  insert(...args: unknown[]): SupabaseUntypedQuery;
+  update(...args: unknown[]): SupabaseUntypedQuery;
+  limit(...args: unknown[]): SupabaseUntypedQuery;
+  order(...args: unknown[]): SupabaseUntypedQuery;
+  single(): SupabaseUntypedQuery;
+}
+
+interface SupabaseUntypedClient {
+  from(table: string): SupabaseUntypedQuery;
+}
+
+const db = supabase as unknown as SupabaseUntypedClient;
 
 export interface PortalAmenityItem {
   amenityId: number;
@@ -12,13 +32,23 @@ export interface PortalAmenityItem {
   bookingPrice: number;
 }
 
+export interface PortalAmenityBooking {
+  id: string;
+  amenityId: string;
+  amenityName: string;
+  date: string;
+  timeSlot: string;
+  status: AmenityBookingStatus;
+  createdAt: string | null;
+}
+
 interface DbAmenityBookingRow {
   id: number;
   tenant_id: number;
   amenity_id: number;
   booking_date: string;
   time_slot: string;
-  status: "booked" | "in_use" | "completed" | "cancelled";
+  status: AmenityBookingStatus;
   created_at: string | null;
   amenity_catalog: { name: string } | null;
 }
@@ -29,7 +59,7 @@ interface DbLegacyAmenityBookingRow {
   service_id: number;
   booking_date: string;
   time_slot: string;
-  status: "booked" | "in_use" | "completed" | "cancelled";
+  status: AmenityBookingStatus;
   created_at: string | null;
   services: { name: string } | null;
 }
@@ -39,7 +69,7 @@ async function getCurrentTenantId(): Promise<number | null> {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error("Not authenticated");
+  if (authError || !user) throw new Error("Phiên đăng nhập không còn hợp lệ.");
 
   const tenants = (await unwrap(
     db.from("tenants").select("id").eq("profile_id", user.id).eq("is_deleted", false).limit(1),
@@ -84,7 +114,7 @@ export const portalAmenityService = {
         return {
           amenityId: Number(row.id),
           amenityCode: String(row.code ?? ""),
-          amenityName: String(row.name ?? ""),
+          amenityName: getAmenityDisplayName(String(row.name ?? "")),
           isActive: Boolean(row.is_active ?? true),
           bookingPrice,
         };
@@ -120,7 +150,7 @@ export const portalAmenityService = {
         return {
           amenityId: serviceId,
           amenityCode: `AMN-${String(serviceId).padStart(4, "0")}`,
-          amenityName: service?.name ?? `Tiện ích #${serviceId}`,
+          amenityName: getAmenityDisplayName(service?.name ?? `Tiện ích #${serviceId}`),
           isActive: service?.isActive ?? true,
           bookingPrice: row.charge_mode === "free" ? 0 : Number(row.price_override_amount ?? 0),
         };
@@ -128,7 +158,7 @@ export const portalAmenityService = {
     }
   },
 
-  getMyBookings: async (): Promise<any[]> => {
+  getMyBookings: async (): Promise<PortalAmenityBooking[]> => {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return [];
 
@@ -144,7 +174,7 @@ export const portalAmenityService = {
       return rows.map((row) => ({
         id: String(row.id),
         amenityId: String(row.amenity_id),
-        amenityName: row.amenity_catalog?.name ?? "Unknown",
+        amenityName: getAmenityDisplayName(row.amenity_catalog?.name),
         date: row.booking_date,
         timeSlot: row.time_slot,
         status: row.status,
@@ -164,7 +194,7 @@ export const portalAmenityService = {
       return rows.map((row) => ({
         id: String(row.id),
         amenityId: String(row.service_id),
-        amenityName: row.services?.name ?? "Unknown",
+        amenityName: getAmenityDisplayName(row.services?.name),
         date: row.booking_date,
         timeSlot: row.time_slot,
         status: row.status,
@@ -175,7 +205,7 @@ export const portalAmenityService = {
 
   createBooking: async (body: { amenityId: number; date: string; timeSlot: string }): Promise<void> => {
     const tenantId = await getCurrentTenantId();
-    if (!tenantId) throw new Error("Unauthenticated");
+    if (!tenantId) throw new Error("Phiên đăng nhập không còn hợp lệ.");
 
     try {
       await unwrap(

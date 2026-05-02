@@ -340,6 +340,8 @@ const BuildingDetail = () => {
             <RoomsTab
               rooms={rooms}
               onAddRoom={() => setIsRoomModalOpen(true)}
+              onOpenAllRooms={() => navigate('/owner/rooms')}
+              onOpenRoom={(roomId) => navigate(`/owner/rooms/${roomId}`)}
             />
           ) : null}
 
@@ -557,9 +559,13 @@ const OverviewTab = ({
 const RoomsTab = ({
   rooms,
   onAddRoom,
+  onOpenAllRooms,
+  onOpenRoom,
 }: {
   rooms: Room[];
   onAddRoom: () => void;
+  onOpenAllRooms: () => void;
+  onOpenRoom: (roomId: string) => void;
 }) => (
   <div className="space-y-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -572,7 +578,7 @@ const RoomsTab = ({
 
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => window.location.assign('/owner/rooms')}
+          onClick={onOpenAllRooms}
           className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-medium text-foreground transition hover:bg-background"
         >
           Xem toàn bộ phòng
@@ -613,7 +619,7 @@ const RoomsTab = ({
               <tr key={room.id} className="hover:bg-background/55">
                 <td className="px-4 py-3">
                   <button
-                    onClick={() => window.location.assign(`/owner/rooms/${room.id}`)}
+                    onClick={() => onOpenRoom(room.id)}
                     className="font-medium text-primary hover:underline"
                   >
                     {room.roomCode}

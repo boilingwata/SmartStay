@@ -86,7 +86,7 @@ const sidebarText: Record<string, string> = {
   'sidebar.permissions': 'Phân quyền',
   'sidebar.systemConfig': 'Cấu hình hệ thống',
   'sidebar.auditLogs': 'Nhật ký hoạt động',
-  'sidebar.commandCenter': 'TRUNG TÂM ĐIỀU HÀNH',
+  'sidebar.commandCenter': 'KHÔNG GIAN QUẢN LÝ',
   'sidebar.activeBuilding': 'Tòa nhà đang chọn',
 };
 
@@ -203,7 +203,7 @@ export const Sidebar = ({
           </div>
           {(sidebarOpen || mobileOpen) ? (
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-display font-bold tracking-tight">SmartStay BMS</h1>
+              <h1 className="truncate text-lg font-display font-bold tracking-tight">SmartStay</h1>
               <p className="truncate text-[10px] font-mono tracking-[0.18em] text-white/55">
                 {translate('sidebar.commandCenter')}
               </p>
@@ -214,6 +214,7 @@ export const Sidebar = ({
         {mobileOpen ? (
           <button
             onClick={onMobileClose}
+            aria-label="Đóng menu"
             className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white/70 transition hover:bg-white/10 hover:text-white"
           >
             <X size={18} />
@@ -310,7 +311,8 @@ export const Sidebar = ({
 
           <button
             onClick={handleLogout}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
+            aria-label="Đăng xuất"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
             title="Đăng xuất"
           >
             <LogOut size={16} />
@@ -320,7 +322,9 @@ export const Sidebar = ({
         {mobileOpen ? null : (
           <button
             onClick={toggleSidebar}
-            className="mt-2 hidden w-full items-center justify-center rounded-2xl py-2 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
+            aria-expanded={sidebarOpen}
+            aria-label={sidebarOpen ? 'Thu gọn thanh điều hướng' : 'Mở rộng thanh điều hướng'}
+            className="mt-2 hidden w-full items-center justify-center rounded-2xl py-2 text-white/35 transition hover:bg-white/5 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 lg:flex"
             title={sidebarOpen ? 'Thu gọn thanh điều hướng' : 'Mở rộng thanh điều hướng'}
           >
             {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}

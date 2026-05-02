@@ -29,6 +29,16 @@ interface PublicListingRow {
   base_rent: number | null;
 }
 
+interface RoomLeadRow {
+  id: number;
+  room_code: string;
+  base_rent: number | null;
+  buildings?: {
+    name: string | null;
+    address: string | null;
+  } | null;
+}
+
 export interface RentalLeadSummary {
   id: string;
   profileId: string;
@@ -45,6 +55,7 @@ export interface RentalLeadSummary {
   notes?: string | null;
   verificationMethod?: string | null;
   preferredMoveIn?: string;
+  isPublicListingAvailable: boolean;
 }
 
 function readPreferredMoveIn(payload: Record<string, unknown> | null): string | undefined {
@@ -67,7 +78,7 @@ export const ownerLeadService = {
     const profileIds = Array.from(new Set(applications.map((application) => application.profile_id)));
     const roomIds = Array.from(new Set(applications.map((application) => application.room_id)));
 
-    const [profiles, listings] = await Promise.all([
+    const [profiles, listings, rooms] = await Promise.all([
       unwrap(
         supabase
           .from('profiles')
@@ -80,14 +91,22 @@ export const ownerLeadService = {
           .select('room_id, room_code, building_name, building_address, base_rent')
           .in('room_id', roomIds)
       ) as unknown as Promise<PublicListingRow[]>,
+      unwrap(
+        supabase
+          .from('rooms')
+          .select('id, room_code, base_rent, buildings(name, address)')
+          .in('id', roomIds)
+      ) as unknown as Promise<RoomLeadRow[]>,
     ]);
 
     const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
     const listingMap = new Map(listings.map((listing) => [listing.room_id, listing]));
+    const roomMap = new Map(rooms.map((room) => [room.id, room]));
 
     return applications.map((application) => {
       const profile = profileMap.get(application.profile_id);
       const listing = listingMap.get(application.room_id);
+      const room = roomMap.get(application.room_id);
 
       return {
         id: String(application.id),
@@ -96,15 +115,16 @@ export const ownerLeadService = {
         applicantName: profile?.full_name ?? 'Khách thuê',
         applicantPhone: profile?.phone ?? undefined,
         tenantStage: profile?.tenant_stage ?? 'prospect',
-        roomCode: listing?.room_code ?? `Phòng #${application.room_id}`,
-        buildingName: listing?.building_name ?? 'Danh mục SmartStay',
-        buildingAddress: listing?.building_address ?? '',
-        rentAmount: Number(listing?.base_rent ?? 0),
+        roomCode: listing?.room_code ?? room?.room_code ?? `Phòng #${application.room_id}`,
+        buildingName: listing?.building_name ?? room?.buildings?.name ?? 'Tòa nhà chưa xác định',
+        buildingAddress: listing?.building_address ?? room?.buildings?.address ?? '',
+        rentAmount: Number(listing?.base_rent ?? room?.base_rent ?? 0),
         status: application.status,
         submittedAt: application.submitted_at,
         notes: application.notes,
         verificationMethod: application.verification_method,
         preferredMoveIn: readPreferredMoveIn(application.verification_payload),
+        isPublicListingAvailable: Boolean(listing),
       };
     });
   },

@@ -5,7 +5,17 @@ import { Link } from 'react-router-dom';
 import { buildingService } from '@/services/buildingService';
 import ownerLeadService from '@/services/ownerLeadService';
 import { roomService } from '@/services/roomService';
-import { formatVND } from '@/utils';
+import { formatDate, formatVND } from '@/utils';
+import type { DbRentalApplicationStatus } from '@/types/supabase';
+
+const LEAD_STATUS_LABELS: Record<DbRentalApplicationStatus, string> = {
+  draft: 'Nháp',
+  submitted: 'Mới gửi',
+  under_review: 'Đang xem xét',
+  approved: 'Đã duyệt',
+  rejected: 'Từ chối',
+  cancelled: 'Đã hủy',
+};
 
 const MarketplaceDashboard: React.FC = () => {
   const { data: buildings = [] } = useQuery({
@@ -30,18 +40,18 @@ const MarketplaceDashboard: React.FC = () => {
     {
       label: 'Tòa nhà',
       value: buildings.length,
-      helper: 'Danh mục đang hiển thị trong workspace',
+      helper: 'Danh mục đang hiển thị trong không gian quản lý',
       icon: Building2,
       href: '/owner/buildings',
       cta: 'Xem tòa nhà',
     },
     {
-      label: 'Tin đang quản lý',
+      label: 'Phòng đang quản lý',
       value: rooms.length,
       helper: `${vacantRooms} phòng đang sẵn sàng nhận khách thuê`,
       icon: DoorOpen,
       href: '/owner/rooms',
-      cta: 'Quản lý tin đăng',
+      cta: 'Quản lý phòng',
     },
     {
       label: 'Đơn thuê mới',
@@ -59,13 +69,13 @@ const MarketplaceDashboard: React.FC = () => {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <p className="text-[11px] font-black uppercase tracking-[0.24em] text-secondary">
-              Marketplace workspace
+              Không gian quản lý
             </p>
             <h1 className="text-4xl font-black tracking-tight text-foreground">
-              Tập trung vào tin đăng và khách thuê.
+              Tập trung vào phòng trống và khách thuê.
             </h1>
             <p className="max-w-2xl text-sm leading-7 text-muted">
-              Đây là bề mặt launch tối giản cho chủ nhà và đội hỗ trợ nội bộ: quản lý danh mục,
+              Đây là bề mặt ra mắt tối giản cho chủ nhà và đội hỗ trợ nội bộ: quản lý danh mục,
               cập nhật phòng đang trống và theo dõi đơn thuê mới.
             </p>
           </div>
@@ -76,7 +86,7 @@ const MarketplaceDashboard: React.FC = () => {
               className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground transition-all hover:bg-primary/95"
             >
               <Plus size={16} />
-              Cập nhật tin đăng
+              Cập nhật phòng trống
             </Link>
             <Link
               to="/owner/leads"
@@ -135,7 +145,7 @@ const MarketplaceDashboard: React.FC = () => {
           <div className="mt-6 space-y-3">
             {latestLeads.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-border bg-background/70 p-6 text-sm leading-7 text-muted">
-                Chưa có đơn thuê mới. Khi khách gửi hồ sơ từ marketplace, danh sách này sẽ cập nhật tại đây.
+                Chưa có đơn thuê mới. Khi khách gửi hồ sơ từ website công khai, danh sách này sẽ cập nhật tại đây.
               </div>
             ) : (
               latestLeads.map((lead) => (
@@ -150,13 +160,13 @@ const MarketplaceDashboard: React.FC = () => {
                       </p>
                     </div>
                     <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
-                      {lead.status.replaceAll('_', ' ')}
+                      {LEAD_STATUS_LABELS[lead.status]}
                     </span>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted">
                     {lead.applicantPhone && <span>{lead.applicantPhone}</span>}
-                    {lead.preferredMoveIn && <span>Vào ở: {lead.preferredMoveIn}</span>}
+                    {lead.preferredMoveIn && <span>Vào ở: {formatDate(lead.preferredMoveIn)}</span>}
                     <span>Giá thuê: {formatVND(lead.rentAmount)}</span>
                   </div>
                 </div>
@@ -167,20 +177,20 @@ const MarketplaceDashboard: React.FC = () => {
 
         <article className="rounded-[30px] border border-border/70 bg-card p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.34)]">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-muted">
-            Launch boundary
+            Phạm vi ra mắt
           </p>
           <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">
-            Những gì chưa đưa vào launch
+            Những gì chưa đưa vào giai đoạn ra mắt
           </h2>
           <div className="mt-6 space-y-3 text-sm leading-7 text-muted">
             <p className="rounded-[22px] bg-background/70 px-4 py-4">
-              Hợp đồng, hóa đơn, thanh toán, ticket, báo cáo và các không gian resident portal đã được rút khỏi bề mặt launch.
+              Hợp đồng, hóa đơn, thanh toán, yêu cầu hỗ trợ, báo cáo và cổng cư dân đã được rút khỏi bề mặt ra mắt.
             </p>
             <p className="rounded-[22px] bg-background/70 px-4 py-4">
-              Workspace này chỉ giữ lại phần việc cần để xuất bản phòng trống, nhận đơn thuê và phản hồi khách.
+              Không gian này chỉ giữ lại phần việc cần để xuất bản phòng trống, nhận đơn thuê và phản hồi khách.
             </p>
             <p className="rounded-[22px] bg-background/70 px-4 py-4">
-              Nếu cần mở rộng sau launch, có thể kích hoạt lại từng module từ codebase hiện có thay vì xây mới từ đầu.
+              Nếu cần mở rộng sau giai đoạn ra mắt, có thể kích hoạt lại từng module từ codebase hiện có thay vì xây mới từ đầu.
             </p>
           </div>
         </article>
