@@ -1,21 +1,19 @@
 /**
- * Static Role Permission Configuration
+ * Static Role Permission Fallback
  *
  * PRM-01 / ROL-01 FIX:
  * This file contains the role permission definitions as a proper static
  * configuration module. The data lives in the correct location (config/)
  * to ensure production stability and logical separation from dynamic data.
  *
- * DESIGN DECISION: Permissions are statically defined because:
- *  1. No `role_permissions` table exists in the DB schema.
+ * Fallback assumptions:
+ *  1. DB-backed `role_permissions` exists; this file is a fallback only.
  *  2. The application uses a fixed canonical role hierarchy (super admin / owner / staff / tenant).
- *  3. Changing permissions requires a code deploy (intentional — prevents accidental
- *     permission escalation via a UI bug).
+ *  3. Live permissions should be changed in the RBAC tables; this file keeps the
+ *     UI usable if those tables are temporarily unavailable.
  *
- * TO make permissions DB-backed in the future:
- *   1. Create a `role_permissions` table in a new migration.
- *   2. Re-generate src/types/supabase.ts.
- *   3. Replace the exports below with Supabase queries in permissionService.ts.
+ * `permissionService` reads DB-backed RBAC first and uses these values only if
+ * the UI cannot load the live tables.
  */
 
 export interface PermissionDefinition {

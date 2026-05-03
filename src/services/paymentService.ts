@@ -482,33 +482,11 @@ export const paymentService = {
   approvePayment: async (routeId: string): Promise<boolean> => {
     const parsed = parsePaymentRouteId(routeId);
 
-    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      await invokeProcessPayment(
-        parsed.source === 'attempt'
-          ? { paymentAttemptId: parsed.id, confirm: true }
-          : { existingPaymentId: parsed.id, confirm: true },
-      );
-      return true;
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('Phiên đăng nhập đã hết hạn.');
-    }
-
-    const { error } = await supabase.rpc('approve_payment', {
-      p_payment_id: parsed.source === 'payment' ? parsed.id : 0,
-      p_confirmed_by: user.id,
-      p_attempt_id: parsed.source === 'attempt' ? parsed.id : null,
-      p_confirmation_source: 'admin_manual',
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    await invokeProcessPayment(
+      parsed.source === 'attempt'
+        ? { paymentAttemptId: parsed.id, confirm: true }
+        : { existingPaymentId: parsed.id, confirm: true },
+    );
     return true;
   },
 
@@ -520,29 +498,11 @@ export const paymentService = {
       throw new Error('Vui lòng nhập lý do từ chối rõ ràng.');
     }
 
-    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      await invokeProcessPayment(
-        parsed.source === 'attempt'
-          ? { paymentAttemptId: parsed.id, reject: true, reason: trimmedReason }
-          : { existingPaymentId: parsed.id, reject: true, reason: trimmedReason },
-      );
-      return true;
-    }
-
-    if (parsed.source === 'attempt') {
-      throw new Error('Cần bật Edge Function để từ chối yêu cầu thanh toán đang chờ duyệt.');
-    }
-
-    await unwrap(
-      supabase
-        .from('payments')
-        .update({
-          status: 'rejected',
-          notes: `[REJECTED] ${trimmedReason}`,
-        })
-        .eq('id', parsed.id),
+    await invokeProcessPayment(
+      parsed.source === 'attempt'
+        ? { paymentAttemptId: parsed.id, reject: true, reason: trimmedReason }
+        : { existingPaymentId: parsed.id, reject: true, reason: trimmedReason },
     );
-
     return true;
   },
 
@@ -568,57 +528,19 @@ export const paymentService = {
       attemptStatus: autoConfirm ? null : 'submitted',
     };
 
-    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      const data = await invokeProcessPayment(payload);
-      const paymentId = Number(data?.paymentId);
-      const attemptId = Number(data?.attemptId);
+    const data = await invokeProcessPayment(payload);
+    const paymentId = Number(data?.paymentId);
+    const attemptId = Number(data?.attemptId);
 
-      if (Number.isFinite(paymentId) && paymentId > 0) {
-        return paymentService.getPaymentDetail(String(paymentId));
-      }
-
-      if (Number.isFinite(attemptId) && attemptId > 0) {
-        return paymentService.getPaymentDetail(`attempt-${attemptId}`);
-      }
-
-      throw new Error('Không nhận được mã thanh toán sau khi ghi nhận giao dịch.');
+    if (Number.isFinite(paymentId) && paymentId > 0) {
+      return paymentService.getPaymentDetail(String(paymentId));
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('Phiên đăng nhập đã hết hạn.');
+    if (Number.isFinite(attemptId) && attemptId > 0) {
+      return paymentService.getPaymentDetail(`attempt-${attemptId}`);
     }
 
-    const { data, error } = await supabase.rpc('process_payment', {
-      p_invoice_id: invoiceId,
-      p_amount: payment.amount,
-      p_method: mapUiMethodToDb(payment.method),
-      p_payment_date: payment.paidAt,
-      p_notes: payment.note?.trim() || undefined,
-      p_receipt_url: payment.evidenceImage ?? undefined,
-      p_reference: payment.transactionCode?.trim() || payment.referenceNumber || undefined,
-      p_bank_name: payment.bankName ?? undefined,
-      p_confirmed_by: user.id,
-      p_auto_confirm: autoConfirm,
-      p_idempotency_key: undefined,
-      p_attempt_status: autoConfirm ? undefined : 'submitted',
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const result = data as { paymentId?: number | null; attemptId?: number | null } | null;
-    if (result?.paymentId) {
-      return paymentService.getPaymentDetail(String(result.paymentId));
-    }
-    if (result?.attemptId) {
-      return paymentService.getPaymentDetail(`attempt-${result.attemptId}`);
-    }
-
-    throw new Error('Không nhận được kết quả ghi nhận thanh toán.');
+    throw new Error('Không nhận được mã thanh toán sau khi ghi nhận giao dịch.');
   },
 
   getWebhookLogs: async (): Promise<WebhookLog[]> => {
@@ -710,10 +632,6 @@ export const paymentService = {
 
   canRejectPayment: (payment: PaymentTransaction): boolean => {
     if (!REVIEWABLE_STATUSES.includes(payment.status) || !canOperateOnInvoice(payment)) {
-      return false;
-    }
-
-    if (payment.source === 'Attempt' && import.meta.env.VITE_USE_EDGE_FUNCTIONS !== 'true') {
       return false;
     }
 

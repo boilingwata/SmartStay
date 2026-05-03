@@ -3,7 +3,7 @@
 // eslint-disable no-console -- console.error is appropriate for Deno Edge Function server-side logging
 
 import { handleOptions } from '../_shared/cors.ts';
-import { requireWorkspaceOperator, requireAuth } from '../_shared/auth.ts';
+import { requireOwner, requireAuth, type Caller } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
@@ -69,6 +69,40 @@ function isReject(body: ProcessPaymentRequest): body is RejectPaymentRequest {
 
 const VALID_METHODS = ['cash', 'bank_transfer', 'momo', 'zalopay', 'vnpay', 'other'];
 
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function callerOwnsInvoice(db: AdminClient, invoiceId: number, userId: string): Promise<boolean> {
+  const { data: invoice, error: invoiceError } = await db
+    .from('invoices')
+    .select('contract_id')
+    .eq('id', invoiceId)
+    .maybeSingle();
+
+  if (invoiceError || !invoice?.contract_id) return false;
+
+  const { data: tenantRows, error: tenantsError } = await db
+    .from('tenants')
+    .select('id')
+    .eq('profile_id', userId)
+    .eq('is_deleted', false);
+
+  if (tenantsError || !tenantRows || tenantRows.length === 0) return false;
+
+  const { data: participant, error: participantError } = await db
+    .from('contract_tenants')
+    .select('tenant_id')
+    .eq('contract_id', invoice.contract_id)
+    .in('tenant_id', tenantRows.map((row) => row.id))
+    .maybeSingle();
+
+  if (participantError) return false;
+  return !!participant;
+}
+
+function normalizeAutoConfirm(value: unknown): boolean {
+  return value === true;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return handleOptions();
 
@@ -83,7 +117,7 @@ Deno.serve(async (req: Request) => {
 
   // --- Branch C: Reject existing payment or attempt ---
   if (isReject(body)) {
-    const { caller, denied } = await requireWorkspaceOperator(req);
+    const { caller, denied } = await requireOwner(req);
     if (denied) return denied;
 
     const { existingPaymentId, paymentAttemptId, reason } = body;
@@ -180,7 +214,7 @@ Deno.serve(async (req: Request) => {
 
   // --- Branch B: Approve existing payment ---
   if (isApprove(body)) {
-    const { caller, denied } = await requireWorkspaceOperator(req);
+    const { caller, denied } = await requireOwner(req);
     if (denied) return denied;
 
     const { existingPaymentId, paymentAttemptId } = body;
@@ -221,7 +255,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Branch A: New payment ---
-  let caller;
+  let caller: Caller;
   try {
     caller = await requireAuth(req);
   } catch (error) {
@@ -237,10 +271,44 @@ Deno.serve(async (req: Request) => {
     receiptUrl,
     referenceNumber,
     bankName,
-    autoConfirm = true,
+    autoConfirm: rawAutoConfirm,
     idempotencyKey,
-    attemptStatus,
+    attemptStatus: rawAttemptStatus,
   } = body as NewPaymentRequest;
+
+  const autoConfirm = normalizeAutoConfirm(rawAutoConfirm);
+
+  if (!invoiceId || typeof invoiceId !== 'number') {
+    return errorResponse('invoiceId must be a number');
+  }
+  if (typeof amount !== 'number' || amount <= 0) {
+    return errorResponse('amount must be a positive number');
+  }
+  if (!method || !VALID_METHODS.includes(method)) {
+    return errorResponse(`method must be one of: ${VALID_METHODS.join(', ')}`);
+  }
+  if (!paymentDate) {
+    return errorResponse('paymentDate is required');
+  }
+
+  if (autoConfirm) {
+    const { caller: ownerCaller, denied } = await requireOwner(req);
+    if (denied) return denied;
+    caller = ownerCaller!;
+  } else if (caller.role === 'staff') {
+    return errorResponse('Owner access required for staff payment handling', 403);
+  } else if (caller.role === 'tenant') {
+    const ownsInvoice = await callerOwnsInvoice(db, invoiceId, caller.userId);
+    if (!ownsInvoice) {
+      return errorResponse('Invoice not found or access denied', 403);
+    }
+  }
+
+  const attemptStatus = autoConfirm
+    ? rawAttemptStatus
+    : method === 'momo'
+      ? 'processing'
+      : 'submitted';
 
   if (method === 'momo' && !autoConfirm) {
     const partnerCode = Deno.env.get('MOMO_PARTNER_CODE') ?? '';
@@ -322,19 +390,6 @@ Deno.serve(async (req: Request) => {
       deeplink: momoPayload.deeplink ?? null,
       qrCodeUrl: momoPayload.qrCodeUrl ?? null,
     });
-  }
-
-  if (!invoiceId || typeof invoiceId !== 'number') {
-    return errorResponse('invoiceId must be a number');
-  }
-  if (typeof amount !== 'number' || amount <= 0) {
-    return errorResponse('amount must be a positive number');
-  }
-  if (!method || !VALID_METHODS.includes(method)) {
-    return errorResponse(`method must be one of: ${VALID_METHODS.join(', ')}`);
-  }
-  if (!paymentDate) {
-    return errorResponse('paymentDate is required');
   }
 
   const { data, error } = await db.rpc('process_payment', {

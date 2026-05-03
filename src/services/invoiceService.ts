@@ -1026,74 +1026,32 @@ export const invoiceService = {
     method: PaymentMethod,
     amount?: number
   ): Promise<{ success: boolean; redirectUrl?: string; message?: string }> => {
-    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      let paymentAmount = amount;
-      if (paymentAmount === undefined) {
-        const row = (await unwrap(
-          supabase.from('invoices').select('total_amount, amount_paid').eq('id', Number(invoiceId)).single()
-        )) as unknown as { total_amount: number | null; amount_paid: number | null };
-        paymentAmount = (row.total_amount ?? 0) - (row.amount_paid ?? 0);
-      }
-
-      const methodMap: Record<PaymentMethod, string> = {
-        Wallet: 'other',
-        VNPay: 'vnpay',
-        MoMo: 'momo',
-        ZaloPay: 'zalopay',
-        Transfer: 'bank_transfer',
-      };
-
-      const { error } = await supabase.functions.invoke('process-payment', {
-        body: {
-          invoiceId: Number(invoiceId),
-          amount: paymentAmount,
-          method: methodMap[method] ?? 'other',
-          paymentDate: new Date().toISOString(),
-          autoConfirm: true,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return { success: true, message: 'Thanh toán đã được ghi nhận.' };
+    let paymentAmount = amount;
+    if (paymentAmount === undefined) {
+      const row = (await unwrap(
+        supabase.from('invoices').select('total_amount, amount_paid').eq('id', Number(invoiceId)).single()
+      )) as unknown as { total_amount: number | null; amount_paid: number | null };
+      paymentAmount = (row.total_amount ?? 0) - (row.amount_paid ?? 0);
     }
 
-    const invoiceRow = (await unwrap(
-      supabase
-        .from('invoices')
-        .select('id, total_amount, amount_paid, status')
-        .eq('id', Number(invoiceId))
-        .single()
-    )) as unknown as {
-      id: number;
-      total_amount: number | null;
-      amount_paid: number | null;
-      status: string | null;
+    const methodMap: Record<PaymentMethod, string> = {
+      Wallet: 'other',
+      VNPay: 'vnpay',
+      MoMo: 'momo',
+      ZaloPay: 'zalopay',
+      Transfer: 'bank_transfer',
     };
 
-    const total = invoiceRow.total_amount ?? 0;
-    const alreadyPaid = invoiceRow.amount_paid ?? 0;
-    const paymentAmount = amount ?? (total - alreadyPaid);
-    const newPaid = alreadyPaid + paymentAmount;
-
-    let newStatus: string;
-    if (newPaid >= total) {
-      newStatus = 'paid';
-    } else if (newPaid > 0) {
-      newStatus = 'partially_paid';
-    } else {
-      newStatus = invoiceRow.status ?? 'pending_payment';
-    }
-
-    await unwrap(
-      supabase
-        .from('invoices')
-        .update({
-          amount_paid: newPaid,
-          status: newStatus as import('@/types/supabase').DbInvoiceStatus,
-          paid_date: newPaid >= total ? new Date().toISOString() : null,
-        })
-        .eq('id', Number(invoiceId))
-    );
-
+    const { error } = await supabase.functions.invoke('process-payment', {
+      body: {
+        invoiceId: Number(invoiceId),
+        amount: paymentAmount,
+        method: methodMap[method] ?? 'other',
+        paymentDate: new Date().toISOString(),
+        autoConfirm: true,
+      },
+    });
+    if (error) throw new Error(error.message);
     return { success: true, message: 'Thanh toán đã được ghi nhận.' };
   },
 

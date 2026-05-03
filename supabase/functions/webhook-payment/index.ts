@@ -35,6 +35,11 @@ Deno.serve(async (req: Request) => {
     return json({ success: false, error: 'demo_not_enabled' }, 403);
   }
 
+  if (!isDemoRequest && !expectedApiKey) {
+    console.error('[webhook-payment] Missing SePay webhook API key configuration');
+    return json({ success: false, error: 'missing_api_key_configuration' }, 500);
+  }
+
   if (expectedApiKey && !isDemoRequest) {
     const authHeader = req.headers.get('authorization') ?? '';
     if (authHeader !== `Apikey ${expectedApiKey}`) {

@@ -11,7 +11,7 @@ import '../_shared/deno-globals.d.ts';
  */
 
 import { handleOptions } from '../_shared/cors.ts';
-import { requireWorkspaceOperator } from '../_shared/auth.ts';
+import { requireOwner } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 
@@ -57,7 +57,7 @@ interface CreateContractRequest {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return handleOptions();
 
-  const { caller, denied } = await requireWorkspaceOperator(req);
+  const { caller, denied } = await requireOwner(req);
   if (denied) return denied;
 
   let body: CreateContractRequest;

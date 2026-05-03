@@ -1,7 +1,7 @@
 import "../_shared/deno-globals.d.ts";
 
 import { handleOptions } from '../_shared/cors.ts';
-import { requireWorkspaceOperator } from '../_shared/auth.ts';
+import { requireOwner } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/supabaseAdmin.ts';
 import { errorResponse, successResponse } from '../_shared/errors.ts';
 import { buildUtilityInvoicePayload } from '../_shared/utilityInvoiceBuilder.ts';
@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
 
   const cronAuthorized = await isValidCronRequest(req);
   if (!cronAuthorized) {
-    const { denied } = await requireWorkspaceOperator(req);
+    const { denied } = await requireOwner(req);
     if (denied) return denied;
   }
 

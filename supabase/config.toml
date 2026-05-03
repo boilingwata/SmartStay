@@ -10,6 +10,16 @@ entrypoint = "./functions/sepay-webhook/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/sepay-webhook/*.html" ]
 
+[functions.webhook-payment]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/webhook-payment/index.ts"
+
+[functions.process-payment]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/process-payment/index.ts"
+
 [functions.run-utility-billing]
 enabled = true
 verify_jwt = false
@@ -17,12 +27,12 @@ entrypoint = "./functions/run-utility-billing/index.ts"
 
 [functions.create-contract]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 entrypoint = "./functions/create-contract/index.ts"
 
 [functions.create-user]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 entrypoint = "./functions/create-user/index.ts"
 
 [functions.create-utility-invoice]

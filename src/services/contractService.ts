@@ -594,65 +594,31 @@ export const contractService = {
       );
     }
 
-    let result: RpcContractResult | null = null;
-
-    if (import.meta.env.VITE_USE_EDGE_FUNCTIONS === 'true') {
-      const { data: invokeResult, error } = await supabase.functions.invoke('create-contract', {
-        body: {
-          roomId: numRoomId,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          rentPrice: data.rentPrice,
-          depositAmount: data.depositAmount,
-          paymentCycle: data.paymentCycle,
-          paymentDueDay: data.paymentDueDay,
-          primaryTenantId: representativeId,
-          occupantIds,
-          utilityPolicyId,
-          selectedServices: selectedServiceIds.map((id) => ({ serviceId: id })),
-          markDepositReceived: data.depositAmount > 0,
-          ownerRep: data.ownerRep,
-          ownerLegalConfirmation: {
-            ...data.ownerLegalConfirmation,
-            legalBasisType,
-            supportingDocumentUrls: legalDocumentUrls,
-          },
+    const { data: invokeResult, error } = await supabase.functions.invoke('create-contract', {
+      body: {
+        roomId: numRoomId,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        rentPrice: data.rentPrice,
+        depositAmount: data.depositAmount,
+        paymentCycle: data.paymentCycle,
+        paymentDueDay: data.paymentDueDay,
+        primaryTenantId: representativeId,
+        occupantIds,
+        utilityPolicyId,
+        selectedServices: selectedServiceIds.map((id) => ({ serviceId: id })),
+        markDepositReceived: data.depositAmount > 0,
+        ownerRep: data.ownerRep,
+        ownerLegalConfirmation: {
+          ...data.ownerLegalConfirmation,
+          legalBasisType,
+          supportingDocumentUrls: legalDocumentUrls,
         },
-      });
+      },
+    });
 
-      if (error) throw new Error(error.message);
-      result = invokeResult as RpcContractResult;
-    } else {
-      const { data: rpcResult, error } = await (supabase as any).rpc('create_contract_v3', {
-        p_room_id: numRoomId,
-        p_start_date: data.startDate,
-        p_end_date: data.endDate,
-        p_monthly_rent: data.rentPrice,
-        p_deposit_amount: data.depositAmount ?? 0,
-        p_payment_cycle_months: data.paymentCycle ?? 1,
-        p_primary_tenant_id: representativeId,
-        p_occupant_ids: occupantIds,
-        p_payment_due_day: data.paymentDueDay ?? 5,
-        p_utility_policy_id: utilityPolicyId,
-        p_service_ids: selectedServiceIds,
-        p_service_prices: selectedServiceIds.map(() => null),
-        p_service_quantities: selectedServiceIds.map(() => 1),
-        p_mark_deposit_received: data.depositAmount > 0,
-        p_owner_legal_basis_type: legalBasisType,
-        p_owner_legal_basis_note: data.ownerLegalConfirmation.legalBasisNote || null,
-        p_owner_supporting_document_urls: legalDocumentUrls,
-        p_owner_has_legal_rental_rights: data.ownerLegalConfirmation.hasLegalRentalRightsConfirmed,
-        p_owner_property_eligibility_confirmed: data.ownerLegalConfirmation.propertyEligibilityConfirmed,
-        p_owner_responsibilities_accepted: data.ownerLegalConfirmation.landlordResponsibilitiesAccepted,
-        p_owner_final_acknowledgement: data.ownerLegalConfirmation.finalAcknowledgementAccepted,
-        p_owner_rep_full_name: data.ownerRep.fullName,
-        p_owner_rep_cccd: data.ownerRep.cccd || null,
-        p_owner_rep_role: data.ownerRep.role,
-      });
-
-      if (error) throw new Error(error.message);
-      result = rpcResult as RpcContractResult;
-    }
+    if (error) throw new Error(error.message);
+    const result = invokeResult as RpcContractResult | null;
 
     if (!result?.contractId) {
       throw new Error('Không thể tạo hợp đồng');

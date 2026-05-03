@@ -135,7 +135,7 @@ const App = () => {
               <Route path="/invoices/*" element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="/payments/*" element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="/tickets/*" element={<Navigate to="/owner/leads" replace />} />
-              <Route path="/staff/*" element={<Navigate to="/owner/dashboard" replace />} />
+              <Route path="/staff/*" element={<Navigate to="/owner/staff/dashboard" replace />} />
 
               {/* 3.3 Portal Namespace (Tenant) */}
               <Route path="/portal">

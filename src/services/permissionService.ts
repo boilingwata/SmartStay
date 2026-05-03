@@ -1,25 +1,35 @@
 import { ROLE_PERMISSION_CONFIG } from '@/config/rolePermissions';
+import { roleService } from '@/services/roleService';
 
 /**
  * Permissions Service
  *
- * PRM-01 FIX: Imports from @/config/rolePermissions for static definition.
- * The `role_permissions` table does NOT exist in the `smartstay` schema.
- * Permissions are managed via static configuration for security — changes require
- * a code deploy, preventing accidental escalation via a UI bug.
- *
- * TO add DB-backed permissions in the future:
- *   1. Create a `role_permissions` table in supabase/migrations
- *   2. Re-generate src/types/supabase.ts
- *   3. Replace the static return below with a supabase.from('role_permissions') query
+ * Dynamic RBAC tables exist in the `smartstay` schema. The static config is a
+ * UI fallback only; authorization is enforced by Supabase RLS/RPC policies.
  */
 export const permissionService = {
   async getPermissionsForRole(role: string): Promise<string[]> {
-    return ROLE_PERMISSION_CONFIG.roleMap[role] ?? [];
+    try {
+      const normalizedRole = role.trim().toLowerCase();
+      const [roles, rolePermissions] = await Promise.all([
+        roleService.getRoles(),
+        roleService.getRolePermissions(),
+      ]);
+      const targetRole = roles.find((item) => item.name.trim().toLowerCase() === normalizedRole);
+      if (!targetRole) return ROLE_PERMISSION_CONFIG.roleMap[role] ?? [];
+
+      return rolePermissions.find((item) => item.roleId === targetRole.id)?.permissions ?? [];
+    } catch {
+      return ROLE_PERMISSION_CONFIG.roleMap[role] ?? [];
+    }
   },
 
   async getAllPermissions() {
-    return ROLE_PERMISSION_CONFIG.permissions;
+    try {
+      return await roleService.getAllPermissions();
+    } catch {
+      return ROLE_PERMISSION_CONFIG.permissions;
+    }
   },
 };
 

@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import { PageSkeleton } from '@/components/ui/StatusStates';
 import ProtectedRoute from '@/routes/ProtectedRoute';
+import WorkspaceIndexRedirect from '@/routes/WorkspaceIndexRedirect';
 
 // View Imports
 const MarketplaceDashboard = lazy(() => import('@/views/admin/MarketplaceDashboard'));
@@ -55,40 +56,40 @@ const StaffReport = lazy(() => import('@/views/admin/reports/StaffReport'));
 const AlertsReport = lazy(() => import('@/views/admin/reports/AlertsReport'));
 
 export const ownerRoutes: RouteObject[] = [
-  { path: 'dashboard', element: <MarketplaceDashboard /> },
-  { path: 'invoices', element: <InvoiceList /> },
-  { path: 'invoices/:id', element: <InvoiceDetail /> },
-  { path: 'contracts', element: <ContractList /> },
-  { path: 'contracts/create', element: <CreateContractWizard /> },
-  { path: 'contracts/addendums', element: <AddendumList /> },
-  { path: 'contracts/:id', element: <ContractDetail /> },
-  { path: 'payments', element: <PaymentList /> },
-  { path: 'payments/webhooks', element: <WebhookLogs /> },
-  { path: 'payments/:id', element: <PaymentDetail /> },
-  { path: 'amenities', element: <AmenityManagementPage /> },
-  { path: 'utility-billing', element: <UtilityHubPage /> },
-  { path: 'tenants', element: <TenantList /> },
-  { path: 'tenants/:id', element: <TenantDetail /> },
   { path: 'rooms', element: <RoomList /> },
   { path: 'rooms/:id', element: <RoomDetail /> },
   { path: 'rooms/:id/handover', element: <HandoverChecklist /> },
-  { path: 'assets', element: <AssetCatalog /> },
-  { path: 'buildings', element: <BuildingList /> },
-  { path: 'buildings/:id', element: <BuildingDetail /> },
-  { path: 'tickets', element: <TicketList /> },
   { path: 'tickets/:id', element: <TicketDetail /> },
-  { path: 'leads', element: <LeadList /> },
   { path: 'staff/dashboard', element: <StaffDashboard /> },
   { path: 'staff/my-tickets', element: <StaffMyTickets /> },
   { path: 'staff/visitor-checkin', element: <VisitorCheckin /> },
   { path: 'staff/amenity-checkin', element: <AmenityCheckin /> },
   { path: 'staff/:id/ratings', element: <StaffRatings /> },
-  { path: 'announcements', element: <AnnouncementPage /> },
-  { path: 'notifications', element: <NotificationPage /> },
-  { path: 'services', element: <ServiceCatalog /> },
   {
-    element: <ProtectedRoute requiredRole="Owner" />,
+    element: <ProtectedRoute allowedRoles={['Owner', 'SuperAdmin']} />,
     children: [
+      { path: 'dashboard', element: <MarketplaceDashboard /> },
+      { path: 'invoices', element: <InvoiceList /> },
+      { path: 'invoices/:id', element: <InvoiceDetail /> },
+      { path: 'contracts', element: <ContractList /> },
+      { path: 'contracts/create', element: <CreateContractWizard /> },
+      { path: 'contracts/addendums', element: <AddendumList /> },
+      { path: 'contracts/:id', element: <ContractDetail /> },
+      { path: 'payments', element: <PaymentList /> },
+      { path: 'payments/webhooks', element: <WebhookLogs /> },
+      { path: 'payments/:id', element: <PaymentDetail /> },
+      { path: 'amenities', element: <AmenityManagementPage /> },
+      { path: 'utility-billing', element: <UtilityHubPage /> },
+      { path: 'tenants', element: <TenantList /> },
+      { path: 'tenants/:id', element: <TenantDetail /> },
+      { path: 'assets', element: <AssetCatalog /> },
+      { path: 'buildings', element: <BuildingList /> },
+      { path: 'buildings/:id', element: <BuildingDetail /> },
+      { path: 'tickets', element: <TicketList /> },
+      { path: 'leads', element: <LeadList /> },
+      { path: 'announcements', element: <AnnouncementPage /> },
+      { path: 'notifications', element: <NotificationPage /> },
+      { path: 'services', element: <ServiceCatalog /> },
       {
         path: 'reports',
         element: (
@@ -129,7 +130,7 @@ export const ownerRoutes: RouteObject[] = [
       },
     ],
   },
-  { path: '', element: <Navigate to="dashboard" replace /> },
+  { path: '', element: <WorkspaceIndexRedirect /> },
 ];
 
 export default ownerRoutes;
