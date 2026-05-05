@@ -25,67 +25,67 @@ export const HomepageListingCard: React.FC<Props> = ({ listing, index }) => {
   return (
     <Link
       to={`/listings/${listing.roomId}`}
-      className="block bg-white rounded-[15px] overflow-hidden shrink-0 w-[300px] h-[392px] relative hover:shadow-xl transition-shadow duration-300 group"
+      className="block bg-card text-card-foreground rounded-2xl overflow-hidden shrink-0 w-72 sm:w-80 border border-border hover:shadow-md transition-shadow duration-300 group"
       aria-label={listing.roomCode}
     >
-      {/* Cover image */}
-      <div className="absolute top-[7px] left-[10px] right-[10px] h-[264px] rounded-[15px] overflow-hidden">
-        <img
-          src={imageSrc}
-          alt={listing.buildingName}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-        />
-        {/* Top gradient for tag contrast */}
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent" />
-        {/* Tags */}
-        <div className="absolute top-3 left-3 flex gap-1.5">
-          <span
-            className={cn(
-              'flex items-center gap-1 text-white text-[8px] font-bold px-[5px] h-[20px] rounded-[20px]',
-              isAvailable ? 'bg-[#1e7e4a]' : 'bg-[#d44333]'
-            )}
-          >
-            {isAvailable ? (
-              <>
-                <ShieldCheck size={10} />
-                Đã xác thực
-              </>
-            ) : (
-              'Sắp hết'
-            )}
-          </span>
-          {!isAvailable && (
-            <span className="flex items-center gap-1 bg-[#1e7e4a] text-white text-[8px] font-bold px-[5px] h-[20px] rounded-[20px]">
-              <ShieldCheck size={10} />
-              Đã xác thực
+      <div className="p-2 pb-0">
+        {/* Cover image */}
+        <div className="relative aspect-[4/3] rounded-xl overflow-hidden">
+          <img
+            src={imageSrc}
+            alt={listing.buildingName}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+          {/* Top gradient for tag contrast */}
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent" />
+          {/* Tags */}
+          <div className="absolute top-3 left-3 flex gap-2">
+            <span
+              className={cn(
+                'flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded-full',
+                isAvailable ? 'bg-emerald-600' : 'bg-destructive'
+              )}
+            >
+              {isAvailable ? (
+                <>
+                  <ShieldCheck size={12} />
+                  Đã xác thực
+                </>
+              ) : (
+                'Sắp hết'
+              )}
             </span>
-          )}
+            {!isAvailable && (
+              <span className="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                <ShieldCheck size={12} />
+                Đã xác thực
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Availability bar */}
-      <div className="absolute top-[275px] left-[10px] right-[10px] h-[22px] bg-[#0d6b5a] rounded-[2.5px] flex items-center justify-center">
-        <span className="text-[#e8f5f1] text-[12px]">{listing.availabilityLabel}</span>
-      </div>
+      <div className="p-4 flex flex-col gap-2">
+        {/* Availability bar */}
+        <div className="w-full bg-primary/10 text-primary py-1 px-2 rounded-md flex items-center justify-center">
+          <span className="text-xs font-medium">{listing.availabilityLabel}</span>
+        </div>
 
-      {/* Address */}
-      <div className="absolute bottom-[53px] left-[10px] right-[10px] h-[39px] overflow-hidden flex items-start">
-        <p className="text-black text-[12px] line-clamp-2 leading-tight">{listing.buildingAddress}</p>
-      </div>
-
-      {/* Price */}
-      <div className="absolute bottom-[35px] left-[10px] right-[10px] h-[15px] flex items-center">
-        <p className="text-[#0a5547] text-[12px] font-semibold truncate">
-          Giá từ: {formatVND(listing.baseRent)}/tháng
+        {/* Address */}
+        <p className="text-sm font-medium line-clamp-2 leading-tight">
+          {listing.buildingAddress}
         </p>
-      </div>
 
-      {/* Room info */}
-      <div className="absolute bottom-[12px] left-[10px] right-[10px] h-[15px] flex items-center">
-        <p className="text-black text-[12px] truncate">
-          {listing.roomType} · {listing.areaSqm}m²
-        </p>
+        {/* Price and Info */}
+        <div className="mt-1 flex flex-col gap-1">
+          <p className="text-primary text-sm font-semibold truncate">
+            Giá từ: {formatVND(listing.baseRent)}/tháng
+          </p>
+          <p className="text-muted-foreground text-xs truncate">
+            {listing.roomType} · {listing.areaSqm}m²
+          </p>
+        </div>
       </div>
     </Link>
   );

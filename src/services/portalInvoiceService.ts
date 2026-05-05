@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import { normalizeInvoiceItemType } from '@/lib/invoiceItems';
+import { isNetworkError, getNetworkErrorMessage } from '@/lib/networkError';
 import type { DbInvoiceStatus, DbPaymentMethod, Json } from '@/types/supabase';
 
 type InvoiceRow = {
@@ -296,12 +297,31 @@ function getCurrentIsoTimestamp(): string {
 }
 
 async function getCurrentTenantId(): Promise<number> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  if (authError || !user) {
+    if (authError) {
+      // Phân biệt lỗi mạng vs lỗi xác thực thật sự
+      if (isNetworkError(authError)) {
+        throw new Error(getNetworkErrorMessage());
+      }
+      throw new Error('Bạn cần đăng nhập để xem hóa đơn.');
+    }
+
+    user = authUser;
+  } catch (err) {
+    // TypeError: Failed to fetch xảy ra khi mất internet
+    if (isNetworkError(err)) {
+      throw new Error(getNetworkErrorMessage());
+    }
+    throw err;
+  }
+
+  if (!user) {
     throw new Error('Bạn cần đăng nhập để xem hóa đơn.');
   }
 
@@ -518,13 +538,15 @@ async function fetchBankTransferDetails(): Promise<PortalBankDetails | null> {
     };
   }
 
+  // ST-03 resolved: portal_payment_settings is a View in the smartstay schema,
+  // now present in generated types. Direct typed query, no cast workaround needed.
   const row = (await unwrap(
-    (supabase as any)
+    supabase
       .from('portal_payment_settings')
       .select('value')
       .eq('key', 'payment.bank_transfer_details')
       .maybeSingle()
-  )) as unknown as SystemSettingRow | null;
+  )) as SystemSettingRow | null;
 
   const value = row?.value;
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -572,7 +594,8 @@ async function recordInvoicePayment(
   }
 
   const rpcResult = data as PaymentRpcResult | null;
-  if (!rpcResult?.attemptId && !rpcResult?.paymentId) {
+  // B-03 fix: use null-check (not falsy) so ID = 0 doesn't trigger a false error
+  if (rpcResult?.attemptId == null && rpcResult?.paymentId == null) {
     throw new Error('Yêu cầu thanh toán chưa được ghi nhận chính xác.');
   }
 

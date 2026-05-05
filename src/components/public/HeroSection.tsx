@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { cn } from '@/utils';
+import { Button } from '@/views/components/ui/button';
+import { Input } from '@/views/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/views/components/ui/select';
 
 const BANNERS = [
   'https://images.unsplash.com/photo-1486325212027-8081e485255e?auto=format&fit=crop&w=1280&q=80',
@@ -99,36 +102,39 @@ export const HeroSection: React.FC = () => {
       <div className="absolute top-[108px] inset-x-0 px-4 flex justify-center">
         <form
           onSubmit={handleSearch}
-          className="w-full max-w-[780px] bg-[rgba(239,239,239,0.7)] backdrop-blur-md rounded-[15px] px-[55px] py-[33px]"
+          className="w-full max-w-[780px] bg-background/70 backdrop-blur-md rounded-2xl px-6 sm:px-12 py-8"
         >
-          <div className="bg-white flex rounded-[10px] overflow-hidden shadow-sm h-[45px]">
+          <div className="bg-background flex flex-col sm:flex-row rounded-lg overflow-hidden shadow-sm border border-border">
             {/* Province */}
-            <div className="flex items-center px-[10px] w-[193px] border-r border-slate-200 shrink-0">
-              <select
-                value={province}
-                onChange={(e) => setProvince(e.target.value)}
-                className="w-full bg-transparent text-[12px] text-[rgba(13,107,90,0.75)] outline-none cursor-pointer"
-              >
-                <option value="">Tỉnh/Thành phố</option>
-                {PROVINCES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+            <div className="flex items-center w-full sm:w-[193px] border-b sm:border-b-0 sm:border-r border-border shrink-0">
+              <Select value={province} onValueChange={setProvince}>
+                <SelectTrigger className="w-full h-12 border-0 focus:ring-0 rounded-none shadow-none text-muted-foreground text-sm">
+                  <SelectValue placeholder="Tỉnh/Thành phố" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCES.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {/* Keyword */}
-            <input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Nhập nội dung tìm kiếm"
-              className="flex-1 px-[10px] text-[12px] text-[rgba(13,107,90,0.64)] bg-transparent outline-none"
-            />
+            <div className="flex-1 flex items-center px-3 h-12 border-b sm:border-b-0 border-border">
+              <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
+              <Input
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="Nhập nội dung tìm kiếm..."
+                className="border-0 focus-visible:ring-0 shadow-none px-0 h-full text-sm"
+              />
+            </div>
             {/* Search button */}
-            <button
+            <Button
               type="submit"
-              className="bg-[#0d6b5a] text-[#e8f5f1] text-[12px] font-semibold px-[10px] w-[83px] shrink-0 hover:bg-[#0a5547] transition-colors whitespace-nowrap"
+              className="rounded-none h-12 sm:px-8 shrink-0 w-full sm:w-auto"
             >
               Tìm kiếm
-            </button>
+            </Button>
           </div>
         </form>
       </div>

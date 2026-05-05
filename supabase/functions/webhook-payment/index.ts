@@ -1,4 +1,5 @@
-/// <reference path="../_shared/deno-globals.d.ts" />
+import '../_shared/deno-globals.d.ts';
+/* eslint-disable no-console */
 
 /**
  * webhook-payment

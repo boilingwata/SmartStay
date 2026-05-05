@@ -1,4 +1,4 @@
-/// <reference path="../_shared/deno-globals.d.ts" />
+import '../_shared/deno-globals.d.ts';
 
 import { handleOptions } from '../_shared/cors.ts';
 import { requireOwner } from '../_shared/auth.ts';

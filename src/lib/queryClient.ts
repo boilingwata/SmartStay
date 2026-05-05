@@ -1,15 +1,24 @@
 import { QueryClient, QueryCache, MutationCache, focusManager, onlineManager } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { captureException } from './sentry';
+import { isNetworkError } from './networkError';
+
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error: unknown) => {
+      // Lỗi mạng không phải bug — bỏ qua, không gửi Sentry
+      if (isNetworkError(error)) return;
       captureException(error, { source: 'react-query' });
     },
   }),
   mutationCache: new MutationCache({
     onError: (error: unknown) => {
+      // Lỗi mạng: chỉ hiện toast thân thiện, không gửi Sentry
+      if (isNetworkError(error)) {
+        toast.error('Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng.');
+        return;
+      }
       captureException(error, { source: 'react-query-mutation' });
       const message = error instanceof Error ? error.message : 'Lỗi hệ thống';
       toast.error(`Thao tác thất bại: ${message}`);

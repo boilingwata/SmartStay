@@ -6,9 +6,9 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  CheckCircle2,
   CreditCard,
   Droplets,
-  History,
   Info,
   Landmark,
   Receipt,
@@ -23,7 +23,7 @@ import utilityAdminService from '@/services/utilityAdminService';
 import { InvoiceDetail as InvoiceDetailType } from '@/models/Invoice';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatDate, formatVND } from '@/utils';
-import { Spinner } from '@/components/ui/Feedback';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { RecordPaymentModal } from '@/components/shared/modals/RecordPaymentModal';
 import { useAdminFinanceRealtime } from '@/hooks/useAdminFinanceRealtime';
 import { getUtilityWarningMeta } from '@/lib/utilityPresentation';
@@ -130,8 +130,27 @@ const InvoiceDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Spinner />
+      <div className="space-y-6 animate-in fade-in duration-500">
+        {/* Header skeleton */}
+        <div className="flex items-start gap-4 border-b pb-6">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <Skeleton className="h-10 w-44 rounded-full" />
+        </div>
+        {/* Content skeleton */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          <div className="space-y-8 lg:col-span-8">
+            <Skeleton className="h-64 rounded-3xl" />
+            <Skeleton className="h-48 rounded-3xl" />
+          </div>
+          <div className="space-y-6 lg:col-span-4">
+            <Skeleton className="h-40 rounded-3xl" />
+            <Skeleton className="h-56 rounded-3xl" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -148,7 +167,10 @@ const InvoiceDetail = () => {
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
-            <button onClick={() => navigate(-1)} className="rounded-full p-2 transition-all hover:bg-bg">
+            <button
+              onClick={() => navigate(-1)}
+              className="rounded-full p-2 transition-all duration-200 hover:bg-bg hover:scale-105 active:scale-95"
+            >
               <ArrowLeft size={20} />
             </button>
 
@@ -177,7 +199,7 @@ const InvoiceDetail = () => {
 
           <button
             type="button"
-            className="btn-primary flex items-center gap-2 self-start"
+            className="btn-primary flex items-center gap-2 self-start transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!canRecordPayment}
             onClick={() => setIsPaymentModalOpen(true)}
           >
@@ -363,7 +385,7 @@ const InvoiceDetail = () => {
                       {invoice.utilitySnapshot.resolvedDeviceSurcharges.map((item) => (
                         <span
                           key={`${item.deviceCode}-${item.chargeAmount}`}
-                          className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white"
+                          className="rounded-full bg-foreground px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-background"
                         >
                           {getDeviceSurchargeLabel(item.deviceCode)}: {formatVND(item.chargeAmount)}
                         </span>
@@ -421,7 +443,7 @@ const InvoiceDetail = () => {
                       key={payment.id}
                       type="button"
                       onClick={() => navigate(`/owner/payments/${payment.id}`)}
-                      className="w-full rounded-3xl border border-border/40 bg-bg/20 p-4 text-left transition-all hover:border-primary/30 hover:bg-white"
+                      className="w-full rounded-3xl border border-border/40 bg-bg/20 p-4 text-left transition-all duration-200 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm active:scale-[0.99]"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-2">
@@ -451,6 +473,7 @@ const InvoiceDetail = () => {
               )}
             </section>
 
+            {remainingAmount > 0 ? (
             <section className="card-container space-y-4 p-8">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted">Thông tin chuyển khoản</p>
@@ -488,8 +511,8 @@ const InvoiceDetail = () => {
                   : null;
 
                 return (
-                  <div className="rounded-3xl border border-blue-200/60 bg-blue-50/30 p-5 space-y-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-500">Chuyển khoản qua QR</p>
+                  <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">Chuyển khoản qua QR</p>
 
                     {/* QR image */}
                     <div className="flex justify-center">
@@ -503,32 +526,37 @@ const InvoiceDetail = () => {
                           }}
                         />
                       ) : (
-                        <div className="w-52 h-52 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 text-center p-4">
-                          <p className="text-xs text-blue-400 font-medium">Chưa cấu hình<br/>thông tin ngân hàng.<br/>Kiểm tra <code>.env.local</code></p>
+                        <div className="w-52 h-52 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 text-center p-4">
+                          <p className="text-xs text-muted font-medium">Chưa cấu hình<br/>thông tin ngân hàng.<br/>Kiểm tra <code>.env.local</code></p>
                         </div>
                       )}
                     </div>
 
                     {/* Nội dung chuyển khoản */}
-                    <div className="rounded-2xl border border-blue-200/60 bg-white/80 p-4 text-center space-y-1">
+                    <div className="rounded-2xl border border-primary/20 bg-card p-4 text-center space-y-1">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted">Nội dung chuyển khoản</p>
-                      <p className="text-xl font-black text-blue-600 tracking-widest select-all font-mono">SS{invoice.invoiceCode}</p>
+                      <p className="text-xl font-black text-primary tracking-widest select-all font-mono">SS{invoice.invoiceCode}</p>
                       <p className="text-[11px] text-muted">Hệ thống SePay sẽ tự động nhận diện hóa đơn qua mã này</p>
                     </div>
                   </div>
                 );
               })()}
             </section>
-
-            <section className="rounded-3xl border border-info/20 bg-info/5 p-6">
-              <div className="flex items-start gap-3">
-                <History size={20} className="mt-0.5 shrink-0 text-info" />
-                <div className="space-y-1 text-sm text-info/80">
-                  <p className="font-bold text-info">Ghi chú vận hành</p>
-                  <p>Màn hình này chỉ hiển thị dữ liệu đã chốt trong cấu trúc hiện tại. Các thao tác xuất tệp, gửi lại thông báo và thanh toán trực tuyến chưa được luồng xử lý hỗ trợ ổn định nên đã được ẩn khỏi phạm vi hiện tại.</p>
+            ) : invoice.status === 'Paid' ? (
+              <section className="card-container border-success/30 bg-success/5 p-8 text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="rounded-full bg-success/10 p-4">
+                    <CheckCircle2 size={48} className="text-success" />
+                  </div>
                 </div>
-              </div>
-            </section>
+                <div>
+                  <h3 className="text-xl font-black text-success uppercase tracking-tight">Hóa đơn đã tất toán</h3>
+                  <p className="mt-2 text-sm text-muted max-w-[280px] mx-auto">
+                    Hệ thống đã ghi nhận đầy đủ các khoản thanh toán cho hóa đơn này. Không còn dư nợ.
+                  </p>
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
       </div>

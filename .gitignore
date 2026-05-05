@@ -72,9 +72,11 @@ lerna-debug.log*
 .cortex/
 .crush/
 .factory/
+.gemini/
 .goose/
 .iflow/
 .junie/
+.kilo/
 .kilocode/
 .kiro/
 .kode/

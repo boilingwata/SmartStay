@@ -1,6 +1,5 @@
-// eslint-disable-next-line @typescript-eslint/triple-slash-reference
-/// <reference path="../_shared/deno-globals.d.ts" />
-// eslint-disable no-console -- console.error is appropriate for Deno Edge Function server-side logging
+import '../_shared/deno-globals.d.ts';
+/* eslint-disable no-console */
 
 import { handleOptions } from '../_shared/cors.ts';
 import { requireOwner, requireAuth, type Caller } from '../_shared/auth.ts';
@@ -92,7 +91,7 @@ async function callerOwnsInvoice(db: AdminClient, invoiceId: number, userId: str
     .from('contract_tenants')
     .select('tenant_id')
     .eq('contract_id', invoice.contract_id)
-    .in('tenant_id', tenantRows.map((row) => row.id))
+    .in('tenant_id', tenantRows.map((row: { id: number }) => row.id))
     .maybeSingle();
 
   if (participantError) return false;

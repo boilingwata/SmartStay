@@ -1,4 +1,5 @@
-/// <reference path="../_shared/deno-globals.d.ts" />
+import '../_shared/deno-globals.d.ts';
+/* eslint-disable no-console */
 
 /**
  * sepay-webhook
@@ -27,6 +28,11 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SEPAY_WEBHOOK_API_KEY')
     ?? Deno.env.get('SEPAY_API_KEY')
     ?? '';
+
+  // W-SEC-01 guard: log visibly if demo mode is active — catch misconfigured prod deployments
+  if (allowDemo) {
+    console.warn('[sepay-webhook] SEPAY_ALLOW_DEMO is ENABLED — ensure this is not production!');
+  }
 
   if (isDemoRequest && !allowDemo) {
     return json({ success: false, error: 'demo_not_enabled' }, 403);

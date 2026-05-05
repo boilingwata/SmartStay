@@ -40,7 +40,7 @@ const LandingPage: React.FC = () => {
       {/* Hero starts at y=0; topbar overlays it */}
       <HeroSection />
 
-      <div className="pb-8">
+      <div className="flex flex-col gap-12 sm:gap-16 pb-16 pt-8 sm:pt-12">
         <RoomTypesSection />
 
         <HomepageListingSection

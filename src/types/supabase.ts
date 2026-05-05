@@ -6,38 +6,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Backward-compatible aliases kept because the app imports these names widely.
-// The canonical source remains the generated Database type below.
-export type DbUserRole = Database["smartstay"]["Enums"]["user_role"]
-export type DbTenantStage =
-  | "prospect"
-  | "applicant"
-  | "resident_pending_onboarding"
-  | "resident_active"
-export type DbRoomStatus = Database["smartstay"]["Enums"]["room_status"]
-export type DbContractStatus = Database["smartstay"]["Enums"]["contract_status"]
-export type DbDepositStatus = Database["smartstay"]["Enums"]["deposit_status"]
-export type DbInvoiceStatus = Database["smartstay"]["Enums"]["invoice_status"]
-export type DbPaymentMethod = Database["smartstay"]["Enums"]["payment_method"]
-export type DbPriorityType = Database["smartstay"]["Enums"]["priority_type"]
-export type DbTicketStatus = Database["smartstay"]["Enums"]["ticket_status"]
-export type DbAssetStatus = Database["smartstay"]["Enums"]["asset_status"]
-export type DbBalanceTransactionType =
-  Database["smartstay"]["Enums"]["balance_transaction_type"]
-export type DbGenderType = Database["smartstay"]["Enums"]["gender_type"]
-export type DbServiceCalcType = Database["smartstay"]["Enums"]["service_calc_type"]
-export type DbWebhookStatus = Database["smartstay"]["Enums"]["webhook_status"]
-export type DbUtilityPolicyScope =
-  Database["smartstay"]["Enums"]["utility_policy_scope"]
-export type DbHandoverType = "check_in" | "check_out" | "periodic" | "other"
-export type DbRentalApplicationStatus =
-  | "draft"
-  | "submitted"
-  | "under_review"
-  | "approved"
-  | "rejected"
-  | "cancelled"
-
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -46,6 +14,858 @@ export type Database = {
   }
   smartstay: {
     Tables: {
+      amenity_booking_charges: {
+        Row: {
+          amount: number
+          billing_period: string | null
+          booking_id: number
+          created_at: string
+          id: number
+          invoice_id: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          billing_period?: string | null
+          booking_id: number
+          created_at?: string
+          id?: number
+          invoice_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_period?: string | null
+          booking_id?: number
+          created_at?: string
+          id?: number
+          invoice_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_booking_charges_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_charges_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_booking_checkins: {
+        Row: {
+          booking_id: number
+          checked_in_at: string | null
+          checked_in_by: string | null
+          checked_out_at: string | null
+          checked_out_by: string | null
+          created_at: string
+          id: number
+          note: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: number
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          created_at?: string
+          id?: number
+          note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: number
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          created_at?: string
+          id?: number
+          note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_booking_checkins_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_checkins_checked_in_by_fkey"
+            columns: ["checked_in_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_checkins_checked_in_by_fkey"
+            columns: ["checked_in_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_checkins_checked_out_by_fkey"
+            columns: ["checked_out_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_checkins_checked_out_by_fkey"
+            columns: ["checked_out_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_booking_exceptions: {
+        Row: {
+          amenity_id: number | null
+          building_id: number | null
+          created_at: string
+          created_by: string | null
+          end_at: string
+          exception_type: string
+          id: number
+          is_active: boolean
+          override_json: Json
+          policy_id: number | null
+          reason: string | null
+          room_id: number | null
+          service_id: number | null
+          start_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amenity_id?: number | null
+          building_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          end_at: string
+          exception_type: string
+          id?: number
+          is_active?: boolean
+          override_json?: Json
+          policy_id?: number | null
+          reason?: string | null
+          room_id?: number | null
+          service_id?: number | null
+          start_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amenity_id?: number | null
+          building_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          end_at?: string
+          exception_type?: string
+          id?: number
+          is_active?: boolean
+          override_json?: Json
+          policy_id?: number | null
+          reason?: string | null
+          room_id?: number | null
+          service_id?: number | null
+          start_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_booking_exceptions_amenity_id_fkey"
+            columns: ["amenity_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_booking_exceptions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_bookings: {
+        Row: {
+          amenity_id: number | null
+          amount: number
+          booking_date: string
+          building_id: number | null
+          created_at: string
+          created_by: string | null
+          id: number
+          note: string | null
+          party_size: number
+          policy_id: number | null
+          room_id: number | null
+          service_id: number | null
+          slot_end_at: string | null
+          slot_start_at: string | null
+          status: string
+          tenant_id: number
+          time_slot: string
+          updated_at: string
+        }
+        Insert: {
+          amenity_id?: number | null
+          amount?: number
+          booking_date: string
+          building_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          note?: string | null
+          party_size?: number
+          policy_id?: number | null
+          room_id?: number | null
+          service_id?: number | null
+          slot_end_at?: string | null
+          slot_start_at?: string | null
+          status?: string
+          tenant_id: number
+          time_slot: string
+          updated_at?: string
+        }
+        Update: {
+          amenity_id?: number | null
+          amount?: number
+          booking_date?: string
+          building_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          note?: string | null
+          party_size?: number
+          policy_id?: number | null
+          room_id?: number | null
+          service_id?: number | null
+          slot_end_at?: string | null
+          slot_start_at?: string | null
+          status?: string
+          tenant_id?: number
+          time_slot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_bookings_amenity_id_fkey"
+            columns: ["amenity_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_catalog: {
+        Row: {
+          building_id: number | null
+          code: string
+          created_at: string
+          description: string | null
+          id: number
+          is_active: boolean
+          is_deleted: boolean
+          legacy_service_id: number | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          building_id?: number | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          is_active?: boolean
+          is_deleted?: boolean
+          legacy_service_id?: number | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          building_id?: number | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          is_active?: boolean
+          is_deleted?: boolean
+          legacy_service_id?: number | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_catalog_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_catalog_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_catalog_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_catalog_legacy_service_id_fkey"
+            columns: ["legacy_service_id"]
+            isOneToOne: true
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_policies: {
+        Row: {
+          active_from: string
+          active_to: string | null
+          allow_waitlist: boolean
+          amenity_id: number | null
+          approved_at: string | null
+          approved_by: string | null
+          auto_complete_after_minutes: number
+          booking_mode: string
+          building_id: number | null
+          cancellation_cutoff_hours: number
+          charge_mode: string
+          code: string
+          created_at: string
+          created_by: string | null
+          current_version_no: number
+          deleted_at: string | null
+          id: number
+          max_advance_days: number
+          max_capacity_per_slot: number
+          name: string
+          notes: string | null
+          price_override_amount: number | null
+          requires_checkin: boolean
+          requires_staff_approval: boolean
+          rules_json: Json
+          service_id: number | null
+          slot_granularity_minutes: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active_from?: string
+          active_to?: string | null
+          allow_waitlist?: boolean
+          amenity_id?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_complete_after_minutes?: number
+          booking_mode?: string
+          building_id?: number | null
+          cancellation_cutoff_hours?: number
+          charge_mode?: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_version_no?: number
+          deleted_at?: string | null
+          id?: number
+          max_advance_days?: number
+          max_capacity_per_slot?: number
+          name: string
+          notes?: string | null
+          price_override_amount?: number | null
+          requires_checkin?: boolean
+          requires_staff_approval?: boolean
+          rules_json?: Json
+          service_id?: number | null
+          slot_granularity_minutes?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active_from?: string
+          active_to?: string | null
+          allow_waitlist?: boolean
+          amenity_id?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_complete_after_minutes?: number
+          booking_mode?: string
+          building_id?: number | null
+          cancellation_cutoff_hours?: number
+          charge_mode?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_version_no?: number
+          deleted_at?: string | null
+          id?: number
+          max_advance_days?: number
+          max_capacity_per_slot?: number
+          name?: string
+          notes?: string | null
+          price_override_amount?: number | null
+          requires_checkin?: boolean
+          requires_staff_approval?: boolean
+          rules_json?: Json
+          service_id?: number | null
+          slot_granularity_minutes?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_policies_amenity_id_fkey"
+            columns: ["amenity_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policies_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_policy_notifications: {
+        Row: {
+          audience_scope: string
+          channel: string
+          created_at: string
+          created_by: string | null
+          id: number
+          message: string
+          payload_json: Json
+          policy_id: number
+          sent_at: string | null
+          status: string
+          title: string
+          version_id: number | null
+        }
+        Insert: {
+          audience_scope?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          message: string
+          payload_json?: Json
+          policy_id: number
+          sent_at?: string | null
+          status?: string
+          title: string
+          version_id?: number | null
+        }
+        Update: {
+          audience_scope?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          message?: string
+          payload_json?: Json
+          policy_id?: number
+          sent_at?: string | null
+          status?: string
+          title?: string
+          version_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_policy_notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_notifications_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_notifications_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_policy_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amenity_policy_versions: {
+        Row: {
+          change_summary: string | null
+          change_type: string
+          created_at: string
+          id: number
+          policy_id: number
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          snapshot_json: Json
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          version_no: number
+        }
+        Insert: {
+          change_summary?: string | null
+          change_type?: string
+          created_at?: string
+          id?: number
+          policy_id: number
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          snapshot_json?: Json
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          version_no: number
+        }
+        Update: {
+          change_summary?: string | null
+          change_type?: string
+          created_at?: string
+          id?: number
+          policy_id?: number
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          snapshot_json?: Json
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          version_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenity_policy_versions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "amenity_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_versions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_versions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_versions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amenity_policy_versions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          building_ids: number[]
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_pinned: boolean
+          publish_at: string | null
+          status: string
+          target_groups: string[]
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          building_ids?: number[]
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          publish_at?: string | null
+          status?: string
+          target_groups?: string[]
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          building_ids?: number[]
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_pinned?: boolean
+          publish_at?: string | null
+          status?: string
+          target_groups?: string[]
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           brand: string | null
@@ -336,6 +1156,13 @@ export type Database = {
             referencedRelation: "public_room_listings"
             referencedColumns: ["building_id"]
           },
+          {
+            foreignKeyName: "building_images_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
         ]
       }
       buildings: {
@@ -419,6 +1246,112 @@ export type Database = {
           },
         ]
       }
+      contract_addendums: {
+        Row: {
+          addendum_code: string | null
+          addendum_type: string
+          approved_by: string | null
+          content: string | null
+          contract_id: number
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          id: number
+          parent_addendum_id: number | null
+          signed_at: string | null
+          signed_file_url: string | null
+          source_type: string
+          status: string
+          summary_json: Json
+          title: string
+          updated_at: string
+          version_no: number
+        }
+        Insert: {
+          addendum_code?: string | null
+          addendum_type?: string
+          approved_by?: string | null
+          content?: string | null
+          contract_id: number
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          id?: number
+          parent_addendum_id?: number | null
+          signed_at?: string | null
+          signed_file_url?: string | null
+          source_type?: string
+          status?: string
+          summary_json?: Json
+          title: string
+          updated_at?: string
+          version_no?: number
+        }
+        Update: {
+          addendum_code?: string | null
+          addendum_type?: string
+          approved_by?: string | null
+          content?: string | null
+          contract_id?: number
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          id?: number
+          parent_addendum_id?: number | null
+          signed_at?: string | null
+          signed_file_url?: string | null
+          source_type?: string
+          status?: string
+          summary_json?: Json
+          title?: string
+          updated_at?: string
+          version_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_addendums_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_addendums_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_addendums_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_addendums_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_addendums_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_addendums_parent_addendum_id_fkey"
+            columns: ["parent_addendum_id"]
+            isOneToOne: false
+            referencedRelation: "contract_addendums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_renewals: {
         Row: {
           contract_id: number
@@ -481,7 +1414,8 @@ export type Database = {
           fixed_price: number
           id: number
           quantity: number | null
-          service_id: number
+          service_catalog_id: number | null
+          service_id: number | null
         }
         Insert: {
           contract_id: number
@@ -489,7 +1423,8 @@ export type Database = {
           fixed_price: number
           id?: number
           quantity?: number | null
-          service_id: number
+          service_catalog_id?: number | null
+          service_id?: number | null
         }
         Update: {
           contract_id?: number
@@ -497,7 +1432,8 @@ export type Database = {
           fixed_price?: number
           id?: number
           quantity?: number | null
-          service_id?: number
+          service_catalog_id?: number | null
+          service_id?: number | null
         }
         Relationships: [
           {
@@ -505,6 +1441,13 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_services_service_catalog_id_fkey"
+            columns: ["service_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "service_catalog"
             referencedColumns: ["id"]
           },
           {
@@ -623,71 +1566,267 @@ export type Database = {
           },
         ]
       }
+      contract_transfers: {
+        Row: {
+          approved_by: string | null
+          carry_over_deposit_amount: number
+          created_at: string
+          deposit_mode: string
+          from_tenant_id: number
+          id: number
+          new_contract_id: number
+          note: string | null
+          old_contract_id: number
+          room_id: number
+          status: Database["smartstay"]["Enums"]["contract_transfer_status"]
+          to_tenant_id: number
+          transfer_date: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          carry_over_deposit_amount?: number
+          created_at?: string
+          deposit_mode?: string
+          from_tenant_id: number
+          id?: number
+          new_contract_id: number
+          note?: string | null
+          old_contract_id: number
+          room_id: number
+          status?: Database["smartstay"]["Enums"]["contract_transfer_status"]
+          to_tenant_id: number
+          transfer_date: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          carry_over_deposit_amount?: number
+          created_at?: string
+          deposit_mode?: string
+          from_tenant_id?: number
+          id?: number
+          new_contract_id?: number
+          note?: string | null
+          old_contract_id?: number
+          room_id?: number
+          status?: Database["smartstay"]["Enums"]["contract_transfer_status"]
+          to_tenant_id?: number
+          transfer_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_transfers_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_from_tenant_id_fkey"
+            columns: ["from_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_new_contract_id_fkey"
+            columns: ["new_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_old_contract_id_fkey"
+            columns: ["old_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_transfers_to_tenant_id_fkey"
+            columns: ["to_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
+          approved_by: string | null
           contract_code: string
           created_at: string | null
+          created_by: string | null
           deposit_amount: number | null
+          deposit_note: string | null
           deposit_status:
             | Database["smartstay"]["Enums"]["deposit_status"]
             | null
           end_date: string
           id: number
           is_deleted: boolean | null
+          linked_contract_id: number | null
           monthly_rent: number
+          notice_period_days: number
+          occupants_for_billing: number
           payment_cycle_months: number
+          payment_due_day: number
+          primary_tenant_id: number | null
           room_id: number
+          signed_at: string | null
+          signed_file_url: string | null
           signing_date: string | null
           start_date: string
           status: Database["smartstay"]["Enums"]["contract_status"] | null
+          terminated_at: string | null
           termination_reason: string | null
           terms: Json | null
           updated_at: string | null
+          utility_billing_type: string | null
+          utility_policy_id: number | null
           uuid: string
         }
         Insert: {
+          approved_by?: string | null
           contract_code?: string
           created_at?: string | null
+          created_by?: string | null
           deposit_amount?: number | null
+          deposit_note?: string | null
           deposit_status?:
             | Database["smartstay"]["Enums"]["deposit_status"]
             | null
           end_date: string
           id?: number
           is_deleted?: boolean | null
+          linked_contract_id?: number | null
           monthly_rent: number
+          notice_period_days?: number
+          occupants_for_billing?: number
           payment_cycle_months?: number
+          payment_due_day?: number
+          primary_tenant_id?: number | null
           room_id: number
+          signed_at?: string | null
+          signed_file_url?: string | null
           signing_date?: string | null
           start_date: string
           status?: Database["smartstay"]["Enums"]["contract_status"] | null
+          terminated_at?: string | null
           termination_reason?: string | null
           terms?: Json | null
           updated_at?: string | null
+          utility_billing_type?: string | null
+          utility_policy_id?: number | null
           uuid?: string
         }
         Update: {
+          approved_by?: string | null
           contract_code?: string
           created_at?: string | null
+          created_by?: string | null
           deposit_amount?: number | null
+          deposit_note?: string | null
           deposit_status?:
             | Database["smartstay"]["Enums"]["deposit_status"]
             | null
           end_date?: string
           id?: number
           is_deleted?: boolean | null
+          linked_contract_id?: number | null
           monthly_rent?: number
+          notice_period_days?: number
+          occupants_for_billing?: number
           payment_cycle_months?: number
+          payment_due_day?: number
+          primary_tenant_id?: number | null
           room_id?: number
+          signed_at?: string | null
+          signed_file_url?: string | null
           signing_date?: string | null
           start_date?: string
           status?: Database["smartstay"]["Enums"]["contract_status"] | null
+          terminated_at?: string | null
           termination_reason?: string | null
           terms?: Json | null
           updated_at?: string | null
+          utility_billing_type?: string | null
+          utility_policy_id?: number | null
           uuid?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contracts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_linked_contract_id_fkey"
+            columns: ["linked_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_primary_tenant_id_fkey"
+            columns: ["primary_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contracts_room_id_fkey"
             columns: ["room_id"]
@@ -702,6 +1841,184 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contracts_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_utility_policy_id_fkey"
+            columns: ["utility_policy_id"]
+            isOneToOne: false
+            referencedRelation: "utility_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_asset_snapshots: {
+        Row: {
+          current_condition_score: number
+          handover_id: number
+          id: number
+          note: string | null
+          previous_condition_score: number | null
+          room_asset_id: number
+        }
+        Insert: {
+          current_condition_score: number
+          handover_id: number
+          id?: never
+          note?: string | null
+          previous_condition_score?: number | null
+          room_asset_id: number
+        }
+        Update: {
+          current_condition_score?: number
+          handover_id?: number
+          id?: never
+          note?: string | null
+          previous_condition_score?: number | null
+          room_asset_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_asset_snapshots_handover_id_fkey"
+            columns: ["handover_id"]
+            isOneToOne: false
+            referencedRelation: "handover_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_asset_snapshots_room_asset_id_fkey"
+            columns: ["room_asset_id"]
+            isOneToOne: false
+            referencedRelation: "room_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_asset_snapshots_room_asset_id_fkey"
+            columns: ["room_asset_id"]
+            isOneToOne: false
+            referencedRelation: "vw_room_assets_warranty"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_checklists: {
+        Row: {
+          contract_id: number | null
+          created_at: string | null
+          handover_type: Database["smartstay"]["Enums"]["handover_type"]
+          id: number
+          manager_signature: string | null
+          notes: string | null
+          performed_at: string | null
+          performed_by: string
+          room_id: number
+          tenant_id: string | null
+          tenant_signature: string | null
+          updated_at: string | null
+          uuid: string | null
+        }
+        Insert: {
+          contract_id?: number | null
+          created_at?: string | null
+          handover_type: Database["smartstay"]["Enums"]["handover_type"]
+          id?: never
+          manager_signature?: string | null
+          notes?: string | null
+          performed_at?: string | null
+          performed_by: string
+          room_id: number
+          tenant_id?: string | null
+          tenant_signature?: string | null
+          updated_at?: string | null
+          uuid?: string | null
+        }
+        Update: {
+          contract_id?: number | null
+          created_at?: string | null
+          handover_type?: Database["smartstay"]["Enums"]["handover_type"]
+          id?: never
+          manager_signature?: string | null
+          notes?: string | null
+          performed_at?: string | null
+          performed_by?: string
+          room_id?: number
+          tenant_id?: string | null
+          tenant_signature?: string | null
+          updated_at?: string | null
+          uuid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_checklists_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handover_checklists_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_items: {
+        Row: {
+          category: string
+          handover_id: number
+          id: number
+          item_name: string
+          note: string | null
+          photo_urls: string[] | null
+          status: string
+        }
+        Insert: {
+          category: string
+          handover_id: number
+          id?: never
+          item_name: string
+          note?: string | null
+          photo_urls?: string[] | null
+          status: string
+        }
+        Update: {
+          category?: string
+          handover_id?: number
+          id?: never
+          item_name?: string
+          note?: string | null
+          photo_urls?: string[] | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_items_handover_id_fkey"
+            columns: ["handover_id"]
+            isOneToOne: false
+            referencedRelation: "handover_checklists"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invoice_items: {
@@ -710,9 +2027,12 @@ export type Database = {
           description: string
           id: number
           invoice_id: number
+          item_type: string
           line_total: number
           quantity: number | null
           sort_order: number | null
+          source_ref_id: number | null
+          source_ref_type: string | null
           unit_price: number
         }
         Insert: {
@@ -720,9 +2040,12 @@ export type Database = {
           description: string
           id?: number
           invoice_id: number
+          item_type?: string
           line_total: number
           quantity?: number | null
           sort_order?: number | null
+          source_ref_id?: number | null
+          source_ref_type?: string | null
           unit_price: number
         }
         Update: {
@@ -730,9 +2053,12 @@ export type Database = {
           description?: string
           id?: number
           invoice_id?: number
+          item_type?: string
           line_total?: number
           quantity?: number | null
           sort_order?: number | null
+          source_ref_id?: number | null
+          source_ref_type?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -1008,6 +2334,13 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoice_utility_snapshots_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invoices: {
@@ -1122,150 +2455,6 @@ export type Database = {
             columns: ["room_asset_id"]
             isOneToOne: false
             referencedRelation: "vw_room_assets_warranty"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      meter_readings: {
-        Row: {
-          billing_period: string
-          created_at: string | null
-          electricity_current: number
-          electricity_previous: number
-          electricity_usage: number | null
-          id: number
-          previous_reading_id: number | null
-          read_by: string | null
-          reading_date: string
-          room_id: number
-          water_current: number
-          water_previous: number
-          water_usage: number | null
-        }
-        Insert: {
-          billing_period: string
-          created_at?: string | null
-          electricity_current: number
-          electricity_previous: number
-          electricity_usage?: number | null
-          id?: number
-          previous_reading_id?: number | null
-          read_by?: string | null
-          reading_date?: string
-          room_id: number
-          water_current: number
-          water_previous: number
-          water_usage?: number | null
-        }
-        Update: {
-          billing_period?: string
-          created_at?: string | null
-          electricity_current?: number
-          electricity_previous?: number
-          electricity_usage?: number | null
-          id?: number
-          previous_reading_id?: number | null
-          read_by?: string | null
-          reading_date?: string
-          room_id?: number
-          water_current?: number
-          water_previous?: number
-          water_usage?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "meter_readings_previous_reading_id_fkey"
-            columns: ["previous_reading_id"]
-            isOneToOne: false
-            referencedRelation: "meter_readings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meter_readings_read_by_fkey"
-            columns: ["read_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meter_readings_read_by_fkey"
-            columns: ["read_by"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meter_readings_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "public_room_listings"
-            referencedColumns: ["room_id"]
-          },
-          {
-            foreignKeyName: "meter_readings_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "rooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      announcements: {
-        Row: {
-          building_ids: number[]
-          content: string
-          created_at: string
-          created_by: string | null
-          id: string
-          is_pinned: boolean
-          publish_at: string | null
-          status: string
-          target_groups: string[]
-          title: string
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          building_ids?: number[]
-          content: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_pinned?: boolean
-          publish_at?: string | null
-          status?: string
-          target_groups?: string[]
-          title: string
-          type?: string
-          updated_at?: string
-        }
-        Update: {
-          building_ids?: number[]
-          content?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_pinned?: boolean
-          publish_at?: string | null
-          status?: string
-          target_groups?: string[]
-          title?: string
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "announcements_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "announcements_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1769,6 +2958,13 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rental_applications_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       role_permissions: {
@@ -1929,6 +3125,13 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_assets_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       room_images: {
@@ -1969,6 +3172,160 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_images_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_inquiries: {
+        Row: {
+          created_at: string | null
+          id: number
+          inquirer_name: string
+          inquirer_phone: string
+          message: string | null
+          room_id: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          inquirer_name: string
+          inquirer_phone: string
+          message?: string | null
+          room_id: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          inquirer_name?: string
+          inquirer_phone?: string
+          message?: string | null
+          room_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_inquiries_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "room_inquiries_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_inquiries_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_occupants: {
+        Row: {
+          contract_id: number
+          created_at: string
+          created_by: string | null
+          id: number
+          is_primary_tenant: boolean
+          move_in_at: string
+          move_out_at: string | null
+          note: string | null
+          relationship_to_primary: string | null
+          room_id: number
+          status: Database["smartstay"]["Enums"]["occupant_status"]
+          tenant_id: number
+          updated_at: string
+        }
+        Insert: {
+          contract_id: number
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          is_primary_tenant?: boolean
+          move_in_at: string
+          move_out_at?: string | null
+          note?: string | null
+          relationship_to_primary?: string | null
+          room_id: number
+          status?: Database["smartstay"]["Enums"]["occupant_status"]
+          tenant_id: number
+          updated_at?: string
+        }
+        Update: {
+          contract_id?: number
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          is_primary_tenant?: boolean
+          move_in_at?: string
+          move_out_at?: string | null
+          note?: string | null
+          relationship_to_primary?: string | null
+          room_id?: number
+          status?: Database["smartstay"]["Enums"]["occupant_status"]
+          tenant_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_occupants_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_occupants_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_occupants_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_occupants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "public_room_listings"
+            referencedColumns: ["room_id"]
+          },
+          {
+            foreignKeyName: "room_occupants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_occupants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_occupants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -2039,6 +3396,13 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_status_history_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       rooms: {
@@ -2049,12 +3413,14 @@ export type Database = {
           building_id: number
           condition_score: number | null
           created_at: string | null
+          description: string | null
           facing: string | null
           floor_number: number | null
           has_balcony: boolean | null
           has_private_bathroom: boolean | null
           id: number
           is_deleted: boolean | null
+          is_listed: boolean | null
           last_inspection: string | null
           max_occupants: number | null
           noise_level: number | null
@@ -2071,12 +3437,14 @@ export type Database = {
           building_id: number
           condition_score?: number | null
           created_at?: string | null
+          description?: string | null
           facing?: string | null
           floor_number?: number | null
           has_balcony?: boolean | null
           has_private_bathroom?: boolean | null
           id?: number
           is_deleted?: boolean | null
+          is_listed?: boolean | null
           last_inspection?: string | null
           max_occupants?: number | null
           noise_level?: number | null
@@ -2093,12 +3461,14 @@ export type Database = {
           building_id?: number
           condition_score?: number | null
           created_at?: string | null
+          description?: string | null
           facing?: string | null
           floor_number?: number | null
           has_balcony?: boolean | null
           has_private_bathroom?: boolean | null
           id?: number
           is_deleted?: boolean | null
+          is_listed?: boolean | null
           last_inspection?: string | null
           max_occupants?: number | null
           noise_level?: number | null
@@ -2123,6 +3493,66 @@ export type Database = {
             referencedRelation: "public_room_listings"
             referencedColumns: ["building_id"]
           },
+          {
+            foreignKeyName: "rooms_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["building_id"]
+          },
+        ]
+      }
+      service_catalog: {
+        Row: {
+          billing_method: string
+          code: string
+          created_at: string
+          description: string | null
+          id: number
+          is_active: boolean
+          is_deleted: boolean
+          legacy_service_id: number | null
+          name: string
+          service_kind: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          billing_method?: string
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          is_active?: boolean
+          is_deleted?: boolean
+          legacy_service_id?: number | null
+          name: string
+          service_kind?: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          billing_method?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          is_active?: boolean
+          is_deleted?: boolean
+          legacy_service_id?: number | null
+          name?: string
+          service_kind?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_catalog_legacy_service_id_fkey"
+            columns: ["legacy_service_id"]
+            isOneToOne: true
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_prices: {
@@ -2132,7 +3562,8 @@ export type Database = {
           effective_to: string | null
           id: number
           is_active: boolean | null
-          service_id: number
+          service_catalog_id: number | null
+          service_id: number | null
           unit_price: number
         }
         Insert: {
@@ -2141,7 +3572,8 @@ export type Database = {
           effective_to?: string | null
           id?: number
           is_active?: boolean | null
-          service_id: number
+          service_catalog_id?: number | null
+          service_id?: number | null
           unit_price: number
         }
         Update: {
@@ -2150,10 +3582,18 @@ export type Database = {
           effective_to?: string | null
           id?: number
           is_active?: boolean | null
-          service_id?: number
+          service_catalog_id?: number | null
+          service_id?: number | null
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "service_prices_service_catalog_id_fkey"
+            columns: ["service_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "service_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_prices_service_id_fkey"
             columns: ["service_id"]
@@ -2487,6 +3927,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2623,212 +4070,6 @@ export type Database = {
           },
         ]
       }
-      handover_asset_snapshots: {
-        Row: {
-          current_condition_score: number
-          handover_id: number
-          id: number
-          note: string | null
-          previous_condition_score: number | null
-          room_asset_id: number
-        }
-        Insert: {
-          current_condition_score: number
-          handover_id: number
-          id?: number
-          note?: string | null
-          previous_condition_score?: number | null
-          room_asset_id: number
-        }
-        Update: {
-          current_condition_score?: number
-          handover_id?: number
-          id?: number
-          note?: string | null
-          previous_condition_score?: number | null
-          room_asset_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "handover_asset_snapshots_handover_id_fkey"
-            columns: ["handover_id"]
-            isOneToOne: false
-            referencedRelation: "handover_checklists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_asset_snapshots_room_asset_id_fkey"
-            columns: ["room_asset_id"]
-            isOneToOne: false
-            referencedRelation: "room_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      handover_checklists: {
-        Row: {
-          contract_id: number | null
-          created_at: string | null
-          handover_type: Database["smartstay"]["Enums"]["handover_type"]
-          id: number
-          manager_signature: string | null
-          notes: string | null
-          performed_at: string | null
-          performed_by: string
-          room_id: number
-          tenant_id: string | null
-          tenant_signature: string | null
-          updated_at: string | null
-          uuid: string | null
-        }
-        Insert: {
-          contract_id?: number | null
-          created_at?: string | null
-          handover_type: Database["smartstay"]["Enums"]["handover_type"]
-          id?: number
-          manager_signature?: string | null
-          notes?: string | null
-          performed_at?: string | null
-          performed_by: string
-          room_id: number
-          tenant_id?: string | null
-          tenant_signature?: string | null
-          updated_at?: string | null
-          uuid?: string | null
-        }
-        Update: {
-          contract_id?: number | null
-          created_at?: string | null
-          handover_type?: Database["smartstay"]["Enums"]["handover_type"]
-          id?: number
-          manager_signature?: string | null
-          notes?: string | null
-          performed_at?: string | null
-          performed_by?: string
-          room_id?: number
-          tenant_id?: string | null
-          tenant_signature?: string | null
-          updated_at?: string | null
-          uuid?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "handover_checklists_contract_id_fkey"
-            columns: ["contract_id"]
-            isOneToOne: false
-            referencedRelation: "contracts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_checklists_performed_by_fkey"
-            columns: ["performed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_checklists_performed_by_fkey"
-            columns: ["performed_by"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_checklists_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "rooms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_checklists_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "handover_checklists_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      handover_items: {
-        Row: {
-          category: string
-          handover_id: number
-          id: number
-          item_name: string
-          note: string | null
-          photo_urls: string[] | null
-          status: string
-        }
-        Insert: {
-          category: string
-          handover_id: number
-          id?: number
-          item_name: string
-          note?: string | null
-          photo_urls?: string[] | null
-          status: string
-        }
-        Update: {
-          category?: string
-          handover_id?: number
-          id?: number
-          item_name?: string
-          note?: string | null
-          photo_urls?: string[] | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "handover_items_handover_id_fkey"
-            columns: ["handover_id"]
-            isOneToOne: false
-            referencedRelation: "handover_checklists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      room_inquiries: {
-        Row: {
-          created_at: string | null
-          id: number
-          inquirer_name: string
-          inquirer_phone: string
-          message: string | null
-          room_id: number
-        }
-        Insert: {
-          created_at?: string | null
-          id?: number
-          inquirer_name: string
-          inquirer_phone: string
-          message?: string | null
-          room_id: number
-        }
-        Update: {
-          created_at?: string | null
-          id?: number
-          inquirer_name?: string
-          inquirer_phone?: string
-          message?: string | null
-          room_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "room_inquiries_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "rooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       webhook_logs: {
         Row: {
           created_at: string | null
@@ -2925,6 +4166,24 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_public_room_listings: {
+        Row: {
+          amenities: Json | null
+          area_sqm: number | null
+          base_rent: number | null
+          building_address: string | null
+          building_id: number | null
+          building_name: string | null
+          description: string | null
+          facing: string | null
+          floor_number: number | null
+          has_balcony: boolean | null
+          id: number | null
+          room_code: string | null
+          room_type: string | null
+        }
+        Relationships: []
+      }
       vw_room_assets_warranty: {
         Row: {
           asset_id: number | null
@@ -2999,10 +4258,28 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_assets_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "vw_public_room_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Functions: {
+      add_contract_occupant: {
+        Args: {
+          p_contract_id: number
+          p_move_in_date: string
+          p_note?: string
+          p_processed_by?: string
+          p_relationship_to_primary?: string
+          p_tenant_id: number
+        }
+        Returns: Json
+      }
       adjust_balance: {
         Args: {
           p_amount: number
@@ -3054,6 +4331,91 @@ export type Database = {
         }
         Returns: Json
       }
+      create_contract_addendum: {
+        Args: {
+          p_addendum_type: string
+          p_content?: string
+          p_contract_id: number
+          p_created_by?: string
+          p_effective_date?: string
+          p_parent_addendum_id?: number
+          p_signed_file_url?: string
+          p_source_type?: string
+          p_status?: string
+          p_summary_json?: Json
+          p_title: string
+        }
+        Returns: {
+          addendum_code: string | null
+          addendum_type: string
+          approved_by: string | null
+          content: string | null
+          contract_id: number
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          id: number
+          parent_addendum_id: number | null
+          signed_at: string | null
+          signed_file_url: string | null
+          source_type: string
+          status: string
+          summary_json: Json
+          title: string
+          updated_at: string
+          version_no: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "contract_addendums"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_contract_v3: {
+        Args: {
+          p_deposit_amount?: number
+          p_end_date: string
+          p_mark_deposit_received?: boolean
+          p_monthly_rent: number
+          p_occupant_ids?: number[]
+          p_owner_final_acknowledgement?: boolean
+          p_owner_has_legal_rental_rights?: boolean
+          p_owner_legal_basis_note?: string
+          p_owner_legal_basis_type?: string
+          p_owner_property_eligibility_confirmed?: boolean
+          p_owner_rep_cccd?: string
+          p_owner_rep_full_name?: string
+          p_owner_rep_role?: string
+          p_owner_responsibilities_accepted?: boolean
+          p_owner_supporting_document_urls?: string[]
+          p_payment_cycle_months?: number
+          p_payment_due_day?: number
+          p_primary_tenant_id?: number
+          p_room_id: number
+          p_service_ids?: number[]
+          p_service_prices?: number[]
+          p_service_quantities?: number[]
+          p_start_date: string
+          p_utility_policy_id?: number
+        }
+        Returns: Json
+      }
+      create_handover_checklist_v1: {
+        Args: {
+          p_assets: Json
+          p_contract_id: number
+          p_handover_type: Database["smartstay"]["Enums"]["handover_type"]
+          p_items: Json
+          p_manager_signature: string
+          p_notes: string
+          p_performed_by: string
+          p_room_id: number
+          p_tenant_id: string
+          p_tenant_signature: string
+        }
+        Returns: number
+      }
       create_policy_utility_invoice: {
         Args: {
           p_billing_period: string
@@ -3075,6 +4437,7 @@ export type Database = {
         Args: { prefix: string; sequence_name: string }
         Returns: string
       }
+      get_domain_schema_health: { Args: never; Returns: Json }
       handle_momo_ipn: {
         Args: {
           p_access_key: string
@@ -3086,6 +4449,17 @@ export type Database = {
       }
       handle_sepay_webhook: {
         Args: { p_api_key?: string; p_payload: Json; p_received_at?: string }
+        Returns: Json
+      }
+      liquidate_contract: {
+        Args: {
+          p_additional_charges?: number
+          p_contract_id: number
+          p_deposit_used?: number
+          p_processed_by?: string
+          p_reason: string
+          p_termination_date: string
+        }
         Returns: Json
       }
       map_legacy_payment_method: {
@@ -3118,39 +4492,55 @@ export type Database = {
         }
         Returns: Json
       }
-      process_payment:
-        | {
-            Args: {
-              p_amount: number
-              p_auto_confirm?: boolean
-              p_bank_name?: string
-              p_confirmed_by?: string
-              p_invoice_id: number
-              p_method: string
-              p_notes?: string
-              p_payment_date: string
-              p_receipt_url?: string
-              p_reference?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_amount: number
-              p_attempt_status?: Database["smartstay"]["Enums"]["payment_status"]
-              p_auto_confirm?: boolean
-              p_bank_name?: string
-              p_confirmed_by?: string
-              p_idempotency_key?: string
-              p_invoice_id: number
-              p_method: string
-              p_notes?: string
-              p_payment_date: string
-              p_receipt_url?: string
-              p_reference?: string
-            }
-            Returns: Json
-          }
+      process_payment: {
+        Args: {
+          p_amount: number
+          p_attempt_status?: Database["smartstay"]["Enums"]["payment_status"]
+          p_auto_confirm?: boolean
+          p_bank_name?: string
+          p_confirmed_by?: string
+          p_idempotency_key?: string
+          p_invoice_id: number
+          p_method: string
+          p_notes?: string
+          p_payment_date: string
+          p_receipt_url?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
+      remove_contract_occupant: {
+        Args: {
+          p_contract_id: number
+          p_move_out_date: string
+          p_note?: string
+          p_processed_by?: string
+          p_tenant_id: number
+        }
+        Returns: Json
+      }
+      schedule_monthly_utility_billing_job: {
+        Args: { job_name?: string }
+        Returns: number
+      }
+      transfer_contract_representative: {
+        Args: {
+          p_approved_by?: string
+          p_note?: string
+          p_old_contract_id: number
+          p_to_tenant_id: number
+          p_transfer_date: string
+        }
+        Returns: Json
+      }
+      unschedule_monthly_utility_billing_job: {
+        Args: { job_name?: string }
+        Returns: boolean
+      }
+      validate_utility_billing_cron_secret: {
+        Args: { p_candidate: string }
+        Returns: boolean
+      }
     }
     Enums: {
       asset_status: "in_use" | "maintenance" | "disposed" | "cancelled"
@@ -3172,6 +4562,7 @@ export type Database = {
         | "expired"
         | "terminated"
         | "cancelled"
+      contract_transfer_status: "pending" | "completed" | "cancelled"
       deposit_status:
         | "pending"
         | "received"
@@ -3179,6 +4570,7 @@ export type Database = {
         | "refunded"
         | "forfeited"
       gender_type: "male" | "female" | "other"
+      handover_type: "check_in" | "check_out" | "periodic" | "other"
       invoice_status:
         | "draft"
         | "pending_payment"
@@ -3186,6 +4578,7 @@ export type Database = {
         | "paid"
         | "overdue"
         | "cancelled"
+      occupant_status: "active" | "moved_out"
       payment_attempt_method: "momo" | "cash" | "bank_transfer"
       payment_method:
         | "cash"
@@ -3223,7 +4616,6 @@ export type Database = {
         | "super_admin"
         | "viewer"
       utility_policy_scope: "system" | "building" | "room" | "contract"
-      handover_type: "check_in" | "check_out" | "periodic" | "other"
       webhook_status: "received" | "processing" | "success" | "failed" | "retry"
     }
     CompositeTypes: {
@@ -3374,6 +4766,7 @@ export const Constants = {
         "terminated",
         "cancelled",
       ],
+      contract_transfer_status: ["pending", "completed", "cancelled"],
       deposit_status: [
         "pending",
         "received",
@@ -3382,6 +4775,7 @@ export const Constants = {
         "forfeited",
       ],
       gender_type: ["male", "female", "other"],
+      handover_type: ["check_in", "check_out", "periodic", "other"],
       invoice_status: [
         "draft",
         "pending_payment",
@@ -3390,6 +4784,7 @@ export const Constants = {
         "overdue",
         "cancelled",
       ],
+      occupant_status: ["active", "moved_out"],
       payment_attempt_method: ["momo", "cash", "bank_transfer"],
       payment_method: [
         "cash",
@@ -3420,10 +4815,53 @@ export const Constants = {
         "resolved",
         "closed",
       ],
-      user_role: ["admin", "manager", "staff", "landlord", "tenant", "owner", "super_admin", "viewer"],
+      user_role: [
+        "admin",
+        "manager",
+        "staff",
+        "landlord",
+        "tenant",
+        "owner",
+        "super_admin",
+        "viewer",
+      ],
       utility_policy_scope: ["system", "building", "room", "contract"],
-      handover_type: ["check_in", "check_out", "periodic", "other"],
       webhook_status: ["received", "processing", "success", "failed", "retry"],
     },
   },
 } as const
+
+// ─── Project-level type aliases ────────────────────────────────────────────────
+// These are convenience re-exports that map Db enum types to friendly names.
+// They are NOT generated by the CLI — do NOT remove them when regenerating.
+// When regenerating supabase.ts, preserve this block from the previous file.
+
+export type DbUserRole = Database["smartstay"]["Enums"]["user_role"]
+export type DbTenantStage =
+  | "prospect"
+  | "applicant"
+  | "resident_pending_onboarding"
+  | "resident_active"
+export type DbRoomStatus = Database["smartstay"]["Enums"]["room_status"]
+export type DbContractStatus = Database["smartstay"]["Enums"]["contract_status"]
+export type DbDepositStatus = Database["smartstay"]["Enums"]["deposit_status"]
+export type DbInvoiceStatus = Database["smartstay"]["Enums"]["invoice_status"]
+export type DbPaymentMethod = Database["smartstay"]["Enums"]["payment_method"]
+export type DbPriorityType = Database["smartstay"]["Enums"]["priority_type"]
+export type DbTicketStatus = Database["smartstay"]["Enums"]["ticket_status"]
+export type DbAssetStatus = Database["smartstay"]["Enums"]["asset_status"]
+export type DbBalanceTransactionType =
+  Database["smartstay"]["Enums"]["balance_transaction_type"]
+export type DbGenderType = Database["smartstay"]["Enums"]["gender_type"]
+export type DbServiceCalcType = Database["smartstay"]["Enums"]["service_calc_type"]
+export type DbWebhookStatus = Database["smartstay"]["Enums"]["webhook_status"]
+export type DbUtilityPolicyScope =
+  Database["smartstay"]["Enums"]["utility_policy_scope"]
+export type DbHandoverType = "check_in" | "check_out" | "periodic" | "other"
+export type DbRentalApplicationStatus =
+  | "draft"
+  | "submitted"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "cancelled"

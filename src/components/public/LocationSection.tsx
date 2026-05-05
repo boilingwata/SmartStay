@@ -25,16 +25,16 @@ const CITIES = [
 ];
 
 export const LocationSection: React.FC = () => (
-  <section className="max-w-[1100px] mx-auto px-4 lg:px-0 py-4">
-    <h2 className="text-[#0d6b5a] text-[30px] font-bold tracking-tight mb-4">
-      &nbsp;Tìm phòng trọ theo địa điểm
+  <section className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <h2 className="text-primary text-2xl sm:text-3xl font-bold tracking-tight mb-6">
+      Tìm phòng trọ theo địa điểm
     </h2>
-    <div className="flex flex-wrap gap-5 justify-center py-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
       {CITIES.map(({ name, img, count }) => (
         <Link
           key={name}
           to={`/listings?search=${encodeURIComponent(name)}`}
-          className="relative w-full sm:w-[535px] h-[200px] rounded-[20px] overflow-hidden group cursor-pointer shrink-0 block"
+          className="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden group block"
         >
           <img
             src={img}
@@ -43,12 +43,12 @@ export const LocationSection: React.FC = () => (
             loading="lazy"
           />
           {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           {/* Text */}
-          <div className="absolute bottom-[17px] left-0 right-0 px-[15px] text-[#e8f5f1]">
-            <p className="text-[25px] font-bold leading-tight tracking-tight">{name}</p>
-            <p className="text-[20px] font-normal leading-tight">
-              Xem ngay còn {count}+ phòng còn trống
+          <div className="absolute bottom-4 sm:bottom-6 left-0 right-0 px-4 sm:px-6 text-white">
+            <p className="text-xl sm:text-2xl font-bold leading-tight tracking-tight">{name}</p>
+            <p className="text-base sm:text-lg font-normal leading-tight mt-1 opacity-90">
+              Xem ngay {count}+ phòng còn trống
             </p>
           </div>
         </Link>

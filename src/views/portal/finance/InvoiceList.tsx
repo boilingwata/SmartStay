@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, Landmark, RefreshCw, Search, Wallet } from 'lucide-react';
+import { AlertCircle, RefreshCw, Search, FileText, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BottomSheet } from '@/components/portal/BottomSheet';
-import { Skeleton, Spinner } from '@/components/ui';
+import { Skeleton, Badge, Button, Input, Select } from '@/components/ui';
+import { InvoiceDetailContent } from '@/components/portal/finance/InvoiceDetailContent';
 import { usePortalInvoiceRealtime } from '@/hooks/usePortalInvoiceRealtime';
 import { supabase } from '@/lib/supabase';
 import {
@@ -50,23 +51,14 @@ const createInitialPaymentForm = (invoice?: PortalInvoiceDetail | null): Payment
 
 const getStatusChip = (status: PortalInvoiceStatus) =>
   ({
-    pending: { label: 'Chờ thanh toán', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
-    partial: { label: 'Thanh toán một phần', className: 'bg-sky-50 text-sky-700 border border-sky-200' },
-    paid: { label: 'Đã thanh toán', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
-    overdue: { label: 'Quá hạn', className: 'bg-rose-50 text-rose-700 border border-rose-200' },
-    cancelled: { label: 'Đã hủy', className: 'bg-slate-100 text-slate-600 border border-slate-200' },
+    pending: { label: 'Chờ thanh toán', className: 'bg-amber-50 text-amber-700 border border-amber-200', variant: 'warning' as const },
+    partial: { label: 'Thanh toán một phần', className: 'bg-sky-50 text-sky-700 border border-sky-200', variant: 'default' as const },
+    paid: { label: 'Đã thanh toán', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200', variant: 'success' as const },
+    overdue: { label: 'Quá hạn', className: 'bg-rose-50 text-rose-700 border border-rose-200', variant: 'destructive' as const },
+    cancelled: { label: 'Đã hủy', className: 'bg-slate-100 text-slate-600 border border-slate-200', variant: 'default' as const },
   })[status];
 
-const getLineItemTypeLabel = (itemType: PortalInvoiceDetail['lineItems'][number]['itemType']) =>
-  ({
-    rent: 'Tiền phòng',
-    utility_electric: 'Dien',
-    utility_water: 'Nước',
-    service: 'Dịch vụ',
-    asset: 'Tài sản',
-    discount: 'Giảm trừ',
-    other: 'Khác',
-  })[itemType];
+// getLineItemTypeLabel is now handled within InvoiceDetailContent
 
 const toIsoString = (value: string) => {
   return toIsoFromDateTimeLocal(value);
@@ -92,47 +84,6 @@ const filterInvoices = (
   });
 };
 
-const SummaryCard = ({ label, value, hint }: { label: string; value: string; hint: string }) => (
-  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">{label}</p>
-    <p className="mt-2 text-2xl font-black tracking-tight text-slate-900">{value}</p>
-    <p className="mt-1 text-sm text-slate-500">{hint}</p>
-  </div>
-);
-
-const InfoRow = ({
-  label,
-  value,
-  copyValue,
-}: {
-  label: string;
-  value: string;
-  copyValue?: string;
-}) => (
-  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/80 px-4 py-3">
-    <div>
-      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-bold text-slate-900 break-all">{value}</p>
-    </div>
-    {copyValue ? (
-      <button
-        type="button"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(copyValue);
-            toast.success('Đã sao chép');
-          } catch {
-            toast.error('Không thể sao chép');
-          }
-        }}
-        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-700"
-      >
-        Sao chép
-      </button>
-    ) : null}
-  </div>
-);
-
 const buildSepayQrValue = (
   bankDetails: PortalInvoiceDetail['bankDetails'] | null | undefined,
   amount: number,
@@ -146,6 +97,26 @@ const buildSepayQrValue = (
 
   return `https://img.vietqr.io/image/${encodeURIComponent(bankIdentifier)}-${encodeURIComponent(bankDetails.accountNumber)}-compact2.png?amount=${encodeURIComponent(Math.round(amount))}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankDetails.accountName)}`;
 };
+
+const SummaryCard: React.FC<{ label: string; value: string | number; hint: string; icon: React.ReactNode }> = ({
+  label,
+  value,
+  hint,
+  icon,
+}) => (
+  <div className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-teal-200 hover:shadow-md">
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="mt-1 text-2xl font-black text-slate-900 tracking-tight">{value}</p>
+        <p className="mt-1 text-[11px] text-slate-400 font-medium">{hint}</p>
+      </div>
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 transition-colors group-hover:bg-teal-50">
+        {icon}
+      </div>
+    </div>
+  </div>
+);
 
 const InvoiceList: React.FC = () => {
   const queryClient = useQueryClient();
@@ -279,7 +250,9 @@ const InvoiceList: React.FC = () => {
   usePortalInvoiceRealtime(selectedInvoiceId, watchedContractIds, (invoiceId) => {
     void fetchInvoiceById(invoiceId)
       .then(closePaidInvoice)
-      .catch(() => {
+      .catch((err: unknown) => {
+        // W-02: log để không swallow lỗi realtime silently
+        console.warn('[portal-realtime] fetch failed for invoice', invoiceId, err);
         void queryClient.invalidateQueries({ queryKey: ['portal-invoice', invoiceId] });
         void queryClient.invalidateQueries({ queryKey: ['portal-invoices'] });
       });
@@ -384,14 +357,14 @@ const InvoiceList: React.FC = () => {
             {invoicesQuery.error instanceof Error ? invoicesQuery.error.message : 'Đã xảy ra lỗi không mong muốn.'}
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={() => invoicesQuery.refetch()}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black uppercase tracking-widest text-white"
+          className="rounded-2xl"
+          leftIcon={<RefreshCw size={14} />}
         >
-          <RefreshCw size={14} />
           Tải lại
-        </button>
+        </Button>
       </div>
     );
   }
@@ -408,68 +381,88 @@ const InvoiceList: React.FC = () => {
                 Theo dõi công nợ, lịch sử thanh toán và gửi yêu cầu thanh toán ngay trên portal.
               </p>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={() => invoicesQuery.refetch()}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black uppercase tracking-widest text-slate-700"
+              className="rounded-2xl"
+              leftIcon={<RefreshCw size={14} className={cn(invoicesQuery.isFetching && 'animate-spin')} />}
             >
-              <RefreshCw size={14} className={cn(invoicesQuery.isFetching && 'animate-spin')} />
               Làm mới
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="Tổng hóa đơn" value={String(summary.total)} hint="Toàn bộ hóa đơn đang hiển thị" />
-          <SummaryCard label="Chờ thanh toán" value={String(summary.pending)} hint="Hóa đơn đang chờ thanh toán hoặc đối soát" />
-          <SummaryCard label="Đã thanh toán" value={String(summary.paid)} hint="Hóa đơn đã được tất toán" />
-          <SummaryCard label="Doanh thu đã thu" value={formatVND(summary.revenue)} hint="Tổng giá trị hóa đơn đã thanh toán" />
+          <SummaryCard
+            label="Hóa đơn của tôi"
+            value={summary.total}
+            hint="Toàn bộ hóa đơn hiện tại"
+            icon={<FileText className="h-5 w-5 text-slate-400 group-hover:text-blue-500 transition-colors" strokeWidth={1.75} />}
+          />
+          <SummaryCard
+            label="Chờ thanh toán"
+            value={summary.pending}
+            hint="Hóa đơn chưa hoàn tất"
+            icon={<Clock className="h-5 w-5 text-slate-400 group-hover:text-amber-500 transition-colors" strokeWidth={1.75} />}
+          />
+          <SummaryCard
+            label="Tôi đã thanh toán"
+            value={formatVND(summary.revenue)}
+            hint="Tổng tiền đã chi trả"
+            icon={<CheckCircle2 className="h-5 w-5 text-slate-400 group-hover:text-emerald-500 transition-colors" strokeWidth={1.75} />}
+          />
+          <SummaryCard
+            label="Còn nợ quản lý"
+            value={formatVND(summary.outstanding)}
+            hint="Tổng công nợ hiện tại"
+            icon={<AlertTriangle className="h-5 w-5 text-slate-400 group-hover:text-rose-500 transition-colors" strokeWidth={1.75} />}
+          />
         </div>
 
         <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr_0.8fr]">
-            <label className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm theo khách thuê hoặc mã hóa đơn"
-                className="input-base h-12 w-full rounded-2xl border border-slate-200 bg-slate-50/70 pl-11 pr-4 text-sm"
-              />
-            </label>
-            <select
+          <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr_0.8fr_0.8fr_0.8fr]">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm theo mã hóa đơn"
+              icon={<Search size={16} />}
+              className="h-12"
+            />
+            <Select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as 'all' | PortalInvoiceStatus)}
-              className="input-base h-12 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 text-sm"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="pending">Chờ thanh toán</option>
-              <option value="partial">Thanh toán một phần</option>
-              <option value="paid">Đã thanh toán</option>
-              <option value="overdue">Quá hạn</option>
-              <option value="cancelled">Đã hủy</option>
-            </select>
-            <input
+              onChange={(value) => setStatusFilter(value as 'all' | PortalInvoiceStatus)}
+              options={[
+                { label: 'Tất cả trạng thái', value: 'all' },
+                { label: 'Chờ thanh toán', value: 'pending' },
+                { label: 'Thanh toán một phần', value: 'partial' },
+                { label: 'Đã thanh toán', value: 'paid' },
+                { label: 'Quá hạn', value: 'overdue' },
+                { label: 'Đã hủy', value: 'cancelled' },
+              ]}
+              className="h-12"
+            />
+            <Input
               type="date"
               value={dateFrom}
               onChange={(event) => setDateFrom(event.target.value)}
-              className="input-base h-12 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 text-sm"
+              className="h-12"
             />
-            <input
+            <Input
               type="date"
               value={dateTo}
               onChange={(event) => setDateTo(event.target.value)}
-              className="input-base h-12 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 text-sm"
+              className="h-12"
             />
-            <select
+            <Select
               value={sortBy}
-              onChange={(event) => setSortBy(event.target.value as InvoiceSort)}
-              className="input-base h-12 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 text-sm"
-            >
-              <option value="due_date">Sắp xếp theo hạn thanh toán</option>
-              <option value="amount">Sắp xếp theo số tiền</option>
-              <option value="status">Sắp xếp theo trạng thái</option>
-            </select>
+              onChange={(value) => setSortBy(value as InvoiceSort)}
+              options={[
+                { label: 'Hạn thanh toán', value: 'due_date' },
+                { label: 'Số tiền', value: 'amount' },
+                { label: 'Trạng thái', value: 'status' },
+              ]}
+              className="h-12"
+            />
           </div>
         </div>
 
@@ -515,19 +508,19 @@ const InvoiceList: React.FC = () => {
                       {formatVND(invoice.balance)}
                     </div>
                     <div>
-                      <span className={cn('inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest', chip.className)}>
+                      <Badge variant={chip.variant} className="uppercase tracking-widest text-[10px]">
                         {chip.label}
-                      </span>
+                      </Badge>
                     </div>
                     <div>{formatDate(invoice.dueDate)}</div>
                     <div className="flex justify-end">
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
                         onClick={() => openInvoice(invoice.id)}
-                        className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-widest text-white"
+                        className="rounded-2xl"
                       >
                         Xem
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -538,9 +531,9 @@ const InvoiceList: React.FC = () => {
                         <p className="mt-2 text-lg font-black text-slate-900">{invoice.guestName}</p>
                         <p className="text-sm text-slate-500">{invoice.contractCode}</p>
                       </div>
-                      <span className={cn('inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest', chip.className)}>
+                      <Badge variant={chip.variant} className="uppercase tracking-widest text-[10px]">
                         {chip.label}
-                      </span>
+                      </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
@@ -574,323 +567,47 @@ const InvoiceList: React.FC = () => {
             Hiển thị {filteredInvoices.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1} đến {Math.min(page * PAGE_SIZE, filteredInvoices.length)} trên tổng {filteredInvoices.length} hóa đơn
           </p>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               disabled={page <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
-              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+              className="rounded-2xl"
             >
               Trước
-            </button>
-            <span className="px-2 text-sm font-black text-slate-900">{page}/{totalPages}</span>
-            <button
-              type="button"
+            </Button>
+            <span className="px-3 text-sm font-black text-slate-900">{page}/{totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
               disabled={page >= totalPages}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+              className="rounded-2xl"
             >
               Sau
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       <BottomSheet isOpen={!!selectedInvoiceId} onClose={closeInvoice} title={detailQuery.data?.invoiceNumber ?? 'Chi tiết hóa đơn'} height="h-[92vh]">
-        {detailQuery.isLoading ? (
-          <div className="flex h-full items-center justify-center py-16">
-            <Spinner size="lg" />
-          </div>
-        ) : detailQuery.isError ? (
-          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-            {detailQuery.error instanceof Error ? detailQuery.error.message : 'Không thể tải chi tiết hóa đơn.'}
-          </div>
-        ) : detailQuery.data ? (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <SummaryCard label="Còn lại" value={formatVND(detailQuery.data.balance)} hint="Số dư hiện tại của hóa đơn" />
-              <SummaryCard label="Tổng tiền" value={formatVND(detailQuery.data.amountDue)} hint="Tổng giá trị hóa đơn" />
-              <SummaryCard label="Đã thanh toán" value={formatVND(detailQuery.data.amountPaid)} hint="Các khoản đã được xác nhận" />
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Khách thuê</p>
-                  <p className="mt-2 font-black text-slate-900">{detailQuery.data.guestName}</p>
-                  <p className="text-sm text-slate-500">{detailQuery.data.guestPhone ?? 'Chưa có số điện thoại'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Hợp đồng</p>
-                  <p className="mt-2 font-black text-slate-900">{detailQuery.data.contractCode}</p>
-                  <p className="text-sm text-slate-500">
-                    {detailQuery.data.buildingName ?? 'Chưa gán tòa nhà'}
-                    {detailQuery.data.roomCode ? ` • ${detailQuery.data.roomCode}` : ''}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Hạn thanh toán</p>
-                  <p className="mt-2 font-bold text-slate-900">{formatDate(detailQuery.data.dueDate)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Trạng thái</p>
-                  <span className={cn('mt-2 inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest', getStatusChip(detailQuery.data.status).className)}>
-                    {getStatusChip(detailQuery.data.status).label}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-              <h3 className="text-lg font-black text-slate-900">Chi tiết các dòng phí</h3>
-              <div className="mt-4 space-y-3">
-                {detailQuery.data.lineItems.length === 0 ? (
-                  <p className="text-sm text-slate-500">Hóa đơn này chưa có dòng phí nào.</p>
-                ) : (
-                  detailQuery.data.lineItems.map((item) => (
-                    <div key={item.id} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                      <div className="space-y-1.5">
-                        <span className="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700">
-                          {getLineItemTypeLabel(item.itemType)}
-                        </span>
-                        <p className="font-bold text-slate-900">{item.description}</p>
-                        <p className="text-sm text-slate-500">{item.quantity} × {formatVND(item.unitPrice)}</p>
-                      </div>
-                      <p className="font-black text-slate-900">{formatVND(item.lineTotal)}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-              <h3 className="text-lg font-black text-slate-900">Lịch sử thanh toán</h3>
-              <div className="mt-4 space-y-3">
-                {detailQuery.data.paymentHistory.length === 0 ? (
-                  <p className="text-sm text-slate-500">Chưa có khoản thanh toán nào được ghi nhận.</p>
-                ) : (
-                  detailQuery.data.paymentHistory.map((payment) => (
-                    <div key={payment.id} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <p className="font-black text-slate-900">{payment.methodLabel}</p>
-                          <p className="text-sm text-slate-500">
-                            {formatDate(payment.paymentDate, 'dd/MM/yyyy HH:mm')} • {payment.paymentCode}
-                          </p>
-                          {payment.referenceNumber ? <p className="text-sm text-slate-600">Mã tham chiếu: {payment.referenceNumber}</p> : null}
-                          {payment.transactionId && payment.transactionId !== payment.referenceNumber ? (
-                            <p className="text-sm text-slate-600">Mã giao dịch: {payment.transactionId}</p>
-                          ) : null}
-                          {payment.receivedBy ? <p className="text-sm text-slate-600">Người nhận: {payment.receivedBy}</p> : null}
-                          {payment.senderName ? <p className="text-sm text-slate-600">Người chuyển: {payment.senderName}</p> : null}
-                          {payment.notes ? <p className="text-sm text-slate-600">Ghi chú: {payment.notes}</p> : null}
-                        </div>
-                        <p className="text-lg font-black text-slate-900">{formatVND(payment.amount)}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {detailQuery.data.balance > 0 ? (
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-                <h3 className="text-lg font-black text-slate-900">Thanh toán hóa đơn</h3>
-                <p className="mt-1 text-sm text-slate-500">Số dư còn lại: {formatVND(detailQuery.data.balance)}</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {([
-                    { value: 'bank_transfer', label: 'Chuyển khoản', icon: Landmark },
-                    { value: 'cash', label: 'Tiền mặt', icon: Wallet },
-                  ] as const).map((option) => {
-                    const Icon = option.icon;
-
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setFormField('method', option.value as DbPaymentMethod)}
-                        className={cn(
-                          'flex items-center gap-3 rounded-[24px] border px-4 py-4 text-left transition',
-                          paymentForm.method === option.value
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-200 bg-slate-50/70 text-slate-700'
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-2xl',
-                            paymentForm.method === option.value ? 'bg-white/15' : 'bg-white'
-                          )}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>
-                          <span className="block text-sm font-black uppercase tracking-[0.16em]">{option.label}</span>
-                          <span
-                            className={cn(
-                              'mt-1 block text-xs',
-                              paymentForm.method === option.value ? 'text-white/75' : 'text-slate-500'
-                            )}
-                          >
-                            {option.value === 'bank_transfer'
-                              ? 'Quét QR hoặc chuyển khoản đúng nội dung để hệ thống tự duyệt.'
-                              : 'Thanh toán trực tiếp tại ban quản lý, không cần gửi yêu cầu online.'}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {paymentForm.method === 'bank_transfer' ? (
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-2xl border border-teal-200 bg-teal-50/70 p-4">
-                      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-teal-700">Chuyển khoản tự động qua SePay</p>
-                      <p className="mt-2 text-sm text-slate-700">
-                        Quét QR hoặc chuyển khoản thủ công đúng số tiền và đúng nội dung <span className="font-black">{sepayTransferCode}</span>.
-                        Khi SePay nhận giao dịch hợp lệ, hóa đơn sẽ tự cập nhật và bảng này sẽ tự động.
-                      </p>
-                      <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr]">
-                        <div className="rounded-2xl bg-white p-3">
-                          {sepayQrValue ? (
-                            <>
-                              <img
-                                src={sepayQrValue}
-                                alt="QR thanh toán SePay"
-                                className="h-[196px] w-[196px] rounded-xl object-contain"
-                              />
-                              <p className="mt-3 text-xs text-slate-500">
-                                Ưu tiên quét QR để tránh sai nội dung chuyển khoản.
-                              </p>
-                            </>
-                          ) : (
-                            <div className="flex h-[196px] items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 text-center text-sm text-slate-500">
-                              Cần cấu hình ngân hàng và số tài khoản để tạo VietQR.
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-3 rounded-2xl bg-white p-4">
-                          <InfoRow
-                            label="Ngân hàng"
-                            value={detailQuery.data.bankDetails?.bankName || 'Chưa cấu hình'}
-                            copyValue={detailQuery.data.bankDetails?.bankName || undefined}
-                          />
-                          <InfoRow
-                            label="Số tài khoản"
-                            value={detailQuery.data.bankDetails?.accountNumber || 'Chưa cấu hình'}
-                            copyValue={detailQuery.data.bankDetails?.accountNumber || undefined}
-                          />
-                          <InfoRow
-                            label="Chủ tài khoản"
-                            value={detailQuery.data.bankDetails?.accountName || 'Chưa cấu hình'}
-                            copyValue={detailQuery.data.bankDetails?.accountName || undefined}
-                          />
-                          <InfoRow label="Nội dung chuyển khoản" value={sepayTransferCode} copyValue={sepayTransferCode} />
-                          <InfoRow
-                            label="Số tiền cần chuyển"
-                            value={formatVND(Number.isFinite(sepayAmount) ? sepayAmount : 0)}
-                          />
-                          {import.meta.env.VITE_DEMO_MODE === 'true' ? (
-                            <button
-                              type="button"
-                              onClick={simulateSepayPayment}
-                              disabled={isSimulating}
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black uppercase tracking-widest text-white disabled:opacity-60"
-                            >
-                              {isSimulating ? <Spinner size="sm" className="text-white" /> : null}
-                              {isSimulating ? 'Đang mô phỏng SePay...' : '[DEMO] Mô phỏng SePay xác nhận'}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="text-sm font-black text-slate-900">Đã chuyển nhưng chưa tự cập nhật?</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Chỉ dùng khi bạn đã chuyển khoản thành công nhưng hệ thống chưa tự duyệt.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowTransferSupportForm((current) => !current)}
-                          className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-black uppercase tracking-widest text-slate-700"
-                        >
-                          {showTransferSupportForm ? 'Ẩn biểu mẫu' : 'Gửi thông tin đối soát'}
-                        </button>
-                      </div>
-
-                      {showTransferSupportForm ? (
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={paymentForm.amount}
-                            onChange={(event) => setFormField('amount', event.target.value)}
-                            className="input-base h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm"
-                            placeholder="Số tiền đã chuyển"
-                          />
-                          <input
-                            value={paymentForm.transferReference}
-                            onChange={(event) => setFormField('transferReference', event.target.value)}
-                            className="input-base h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm"
-                            placeholder="Mã tham chiếu chuyển khoản"
-                          />
-                          <input
-                            value={paymentForm.bankName}
-                            onChange={(event) => setFormField('bankName', event.target.value)}
-                            className="input-base h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm"
-                            placeholder="Ngân hàng chuyển"
-                          />
-                          <input
-                            value={paymentForm.senderName}
-                            onChange={(event) => setFormField('senderName', event.target.value)}
-                            className="input-base h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm"
-                            placeholder="Tên người chuyển"
-                          />
-                          <input
-                            type="datetime-local"
-                            value={paymentForm.transferredAt}
-                            onChange={(event) => setFormField('transferredAt', event.target.value)}
-                            className="input-base h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm"
-                          />
-                          <textarea
-                            value={paymentForm.notes}
-                            onChange={(event) => setFormField('notes', event.target.value)}
-                            rows={4}
-                            className="input-base rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                            placeholder="Ghi chú thêm"
-                          />
-                          <div className="flex justify-end md:col-span-2">
-                            <button
-                              type="button"
-                              disabled={paymentMutation.isPending}
-                              onClick={() => paymentMutation.mutate(paymentForm)}
-                              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black uppercase tracking-widest text-white disabled:opacity-60"
-                            >
-                              {paymentMutation.isPending ? <Spinner size="sm" className="text-white" /> : <Landmark size={14} />}
-                              Gửi thông tin đối soát
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-                    Thanh toán tiền mặt nên thực hiện trực tiếp với ban quản lý hoặc lễ tân. Sau khi thu tiền, hệ thống nội bộ sẽ cập nhật hóa đơn, nên portal này không cần gửi thêm yêu cầu.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
-                Hóa đơn này đã được tất toán. Hệ thống tạm khóa yêu cầu thanh toán bổ sung.
-              </div>
-            )}
-          </div>
-        ) : null}
+        <InvoiceDetailContent
+          invoice={selectedInvoice}
+          isLoading={detailQuery.isLoading}
+          isError={detailQuery.isError}
+          error={detailQuery.error as Error | null}
+          paymentForm={paymentForm}
+          setFormField={setFormField}
+          sepayTransferCode={sepayTransferCode}
+          sepayAmount={sepayAmount}
+          sepayQrValue={sepayQrValue}
+          isSimulating={isSimulating}
+          showTransferSupportForm={showTransferSupportForm}
+          setShowTransferSupportForm={setShowTransferSupportForm}
+          simulateSepayPayment={simulateSepayPayment}
+          onSubmitPayment={() => paymentMutation.mutate(paymentForm)}
+          isSubmittingPayment={paymentMutation.isPending}
+        />
       </BottomSheet>
     </div>
   );

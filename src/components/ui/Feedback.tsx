@@ -6,11 +6,3 @@ export const Spinner = ({ className, size = "md" }: { className?: string; size?:
   const iconSize = typeof size === 'number' ? size : { sm: 16, md: 24, lg: 32 }[size];
   return <Loader2 className={cn("animate-spin text-primary", className)} size={iconSize} />;
 };
-
-export const Skeleton = ({ className }: { className?: string }) => {
-  return (
-    <div 
-      className={cn("animate-pulse bg-muted-foreground/10 rounded-md", className)} 
-    />
-  );
-};

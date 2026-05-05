@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '@/utils';
 import type { PublicListing } from '@/services/publicListingsService';
 import { HomepageListingCard } from './HomepageListingCard';
+import { Button } from '@/views/components/ui/button';
 
-const CARD_STEP = 305; // card width (300) + gap (5)
+const CARD_STEP = 336; // sm card width (w-80 = 320) + gap-4 (16)
 
 type Props = {
   title: string;
@@ -54,44 +54,38 @@ export const HomepageListingSection: React.FC<Props> = ({
   if (!isLoading && listings.length === 0) return null;
 
   return (
-    <section className="py-4 max-w-[1100px] mx-auto px-4 lg:px-0">
+    <section className="container mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header row */}
-      <div className="flex items-center h-[110px]">
-        <h2 className="text-[#0d6b5a] text-[30px] font-bold tracking-tight flex-1">
-          &nbsp;{title}
+      <div className="flex items-center py-6 sm:py-8">
+        <h2 className="text-primary text-2xl sm:text-3xl font-bold tracking-tight flex-1">
+          {title}
         </h2>
 
         {/* Carousel nav + view-all */}
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => scroll('left')}
             disabled={!canLeft}
             aria-label="Scroll left"
-            className={cn(
-              'w-9 h-9 rounded-full border flex items-center justify-center transition-colors',
-              canLeft
-                ? 'border-[#0d6b5a] text-[#0d6b5a] hover:bg-[#e8f5f1]'
-                : 'border-slate-200 text-slate-300 cursor-not-allowed'
-            )}
+            className="rounded-full w-9 h-9 border-border text-primary hover:bg-primary/5 hover:text-primary disabled:opacity-50"
           >
             <ChevronLeft size={16} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => scroll('right')}
             disabled={!canRight}
             aria-label="Scroll right"
-            className={cn(
-              'w-9 h-9 rounded-full border flex items-center justify-center transition-colors',
-              canRight
-                ? 'border-[#0d6b5a] text-[#0d6b5a] hover:bg-[#e8f5f1]'
-                : 'border-slate-200 text-slate-300 cursor-not-allowed'
-            )}
+            className="rounded-full w-9 h-9 border-border text-primary hover:bg-primary/5 hover:text-primary disabled:opacity-50"
           >
             <ChevronRight size={16} />
-          </button>
+          </Button>
           <Link
             to={viewAllHref}
-            className="ml-2 text-sm text-[#0d6b5a]/60 flex items-center gap-1 hover:text-[#0d6b5a] transition-colors font-medium"
+            className="ml-2 text-sm text-primary/80 flex items-center gap-1 hover:text-primary transition-colors font-medium"
           >
             Xem tất cả <ChevronRight size={14} />
           </Link>
@@ -101,13 +95,13 @@ export const HomepageListingSection: React.FC<Props> = ({
       {/* Scrollable cards */}
       <div
         ref={scrollRef}
-        className="flex gap-[5px] overflow-x-auto overflow-y-hidden pb-4 scroll-smooth [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-[#0d6b5a]/25 [&::-webkit-scrollbar-thumb]:rounded-full"
+        className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 scroll-smooth [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-muted [&::-webkit-scrollbar-thumb]:bg-primary/25 [&::-webkit-scrollbar-thumb]:rounded-full"
       >
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="shrink-0 w-[300px] h-[392px] rounded-[15px] bg-slate-200 animate-pulse"
+                className="shrink-0 w-72 sm:w-80 h-[320px] rounded-2xl bg-muted animate-pulse"
               />
             ))
           : listings.map((listing, i) => (
