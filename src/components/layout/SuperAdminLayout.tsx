@@ -1,86 +1,180 @@
-import React from 'react'
-import { BarChart3, Building2, LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { cn } from '@/utils'
-import useAuthStore from '@/stores/authStore'
+import React, { useState } from 'react';
+import {
+  Building2,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Moon,
+  Settings,
+  Shield,
+  Sun,
+  X,
+} from 'lucide-react';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+
+import useAuthStore from '@/stores/authStore';
+import useUIStore from '@/stores/uiStore';
+import { cn } from '@/utils';
 
 const navItems = [
-  { label: 'Dashboard', to: '/super-admin/dashboard', icon: LayoutDashboard },
-  { label: 'Organizations', to: '/super-admin/organizations', icon: Building2 },
-  { label: 'Risk & Audit', to: '/super-admin/audit', icon: Shield },
-  { label: 'Platform', to: '/super-admin/settings', icon: Settings },
-]
+  { label: 'Bảng điều khiển', to: '/super-admin/dashboard', icon: LayoutDashboard },
+  { label: 'Tổ chức', to: '/super-admin/organizations', icon: Building2 },
+  { label: 'Rủi ro & Kiểm toán', to: '/super-admin/audit', icon: Shield },
+  { label: 'Cài đặt nền tảng', to: '/super-admin/settings', icon: Settings },
+];
 
 const SuperAdminLayout: React.FC = () => {
-  const user = useAuthStore((state) => state.user)
-  const logout = useAuthStore((state) => state.logout)
-  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
+  const theme = useUIStore((state) => state.theme);
+  const toggleTheme = useUIStore((state) => state.toggleTheme);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  return (
-    <div className="min-h-screen bg-[#0B1020] text-white grid grid-cols-[280px_1fr]">
-      <aside className="border-r border-white/10 bg-[#0F172A] p-6 flex flex-col">
-        <Link to="/super-admin/dashboard" className="mb-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-300">Platform</p>
-          <h1 className="text-3xl font-display font-black tracking-tight">Super Admin</h1>
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Đăng xuất thành công');
+      navigate('/login', { replace: true });
+    } catch {
+      toast.error('Không thể đăng xuất');
+    }
+  };
+
+  const sidebarBody = (mobile: boolean) => (
+    <>
+      <div className="flex h-20 shrink-0 items-center border-b border-white/10 px-4">
+        <Link
+          to="/super-admin/dashboard"
+          className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden"
+          onClick={() => mobile && setMobileMenuOpen(false)}
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 shadow-lg shadow-slate-950/20">
+            <Building2 size={22} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-display font-bold tracking-tight">SmartStay</h1>
+            <p className="truncate text-[10px] font-mono tracking-[0.18em] text-white/55">Quản trị tối cao</p>
+          </div>
         </Link>
+        {mobile ? (
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Đóng menu"
+            className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            <X size={18} />
+          </button>
+        ) : null}
+      </div>
 
-        <nav className="space-y-2 flex-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-4 py-3 rounded-2xl transition-all',
-                isActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/6 hover:text-white',
-              )}
-            >
-              <item.icon size={18} />
-              <span className="font-bold">{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+      <nav className="min-w-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            onClick={() => mobile && setMobileMenuOpen(false)}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all',
+                isActive
+                  ? 'bg-white/12 text-white shadow-inner ring-1 ring-white/12'
+                  : 'text-white/68 hover:bg-white/7 hover:text-white',
+              )
+            }
+          >
+            <item.icon size={19} className="shrink-0" />
+            <span className="truncate">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
 
-        <div className="pt-6 border-t border-white/10 space-y-4">
-          <div className="rounded-2xl bg-white/5 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/40">Session</p>
-            <p className="font-bold mt-2">{user?.fullName ?? 'Super Admin'}</p>
-            <p className="text-white/50 text-sm">{user?.email ?? 'superadmin@smartstay.vn'}</p>
+      <div className="border-t border-white/10 bg-white/5 p-3">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">
+            {user?.username?.slice(0, 2).toUpperCase() || 'SA'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              {user?.fullName?.trim() || user?.username?.trim() || 'Quản trị tối cao'}
+            </p>
+            {user?.email ? (
+              <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.16em] text-white/45">{user.email}</p>
+            ) : null}
           </div>
           <button
-            onClick={async () => {
-              try {
-                await logout()
-                navigate('/login', { replace: true })
-              } catch {
-                return;
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 font-bold hover:bg-white/6 transition-colors"
+            type="button"
+            onClick={handleLogout}
+            aria-label="Đăng xuất"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+            title="Đăng xuất"
           >
             <LogOut size={16} />
-            Đăng xuất
           </button>
         </div>
-      </aside>
+      </div>
+    </>
+  );
 
-      <div className="min-w-0">
-        <header className="h-20 border-b border-white/10 px-8 flex items-center justify-between bg-[#0B1020]/90 backdrop-blur">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-300">SmartStay SaaS</p>
-            <h2 className="text-2xl font-black tracking-tight">Nền tảng giám sát đa tenant</h2>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-white/5 px-4 py-3">
-            <BarChart3 size={18} className="text-cyan-300" />
-            <span className="text-sm font-bold text-white/80">Frontend scaffold v1</span>
-          </div>
-        </header>
+  return (
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      {mobileMenuOpen ? (
+        <div className="fixed inset-0 z-[100] lg:hidden">
+          <div
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden
+          />
+          <aside className="absolute left-0 top-0 flex h-full w-[min(280px,88vw)] flex-col border-r border-white/10 bg-primary text-white shadow-2xl">
+            {sidebarBody(true)}
+          </aside>
+        </div>
+      ) : null}
 
-        <main className="p-8">
-          <Outlet />
-        </main>
+      <div className="relative min-h-screen lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="sticky top-0 z-50 hidden h-screen flex-col border-r border-white/10 bg-primary text-white shadow-2xl lg:flex">
+          {sidebarBody(false)}
+        </aside>
+
+        <div className="flex min-w-0 flex-col">
+          <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background text-foreground transition hover:border-primary/25 hover:text-primary lg:hidden"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Mở menu"
+              >
+                <Menu size={18} />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-secondary">Nền tảng</p>
+                <h2 className="truncate text-lg font-black tracking-tight text-foreground sm:text-xl">
+                  Không gian quản trị tối cao
+                </h2>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground transition hover:border-primary/25 hover:text-primary"
+              aria-label={theme === 'light' ? 'Chế độ tối' : 'Chế độ sáng'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          </header>
+
+          <main className="min-w-0 flex-1">
+            <div className="mx-auto w-full max-w-[1760px] min-w-0 px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 2xl:px-10">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SuperAdminLayout
+export default SuperAdminLayout;
