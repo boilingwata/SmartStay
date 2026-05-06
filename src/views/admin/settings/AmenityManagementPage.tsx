@@ -1,41 +1,68 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, ClipboardList, Filter, ShieldCheck, Waves } from 'lucide-react';
+import { Waves } from 'lucide-react';
 import amenityAdminService, { type AmenityPolicyRecord } from '@/services/amenityAdminService';
 import { ErrorBanner } from '@/components/ui/StatusStates';
 import AmenityPoliciesTab from './amenity-components/AmenityPoliciesTab';
 import AmenityExceptionsTab from './amenity-components/AmenityExceptionsTab';
 import AmenityVersionsTab from './amenity-components/AmenityVersionsTab';
+import AmenityStats from './amenity-components/AmenityStats';
 
 export default function AmenityManagementPage() {
   const [activeTab, setActiveTab] = useState<'policies' | 'exceptions' | 'versions'>('policies');
   const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
   const [selectedPolicy, setSelectedPolicy] = useState<AmenityPolicyRecord | null>(null);
 
-  const dashboardQuery = useQuery({ queryKey: ['amenity-dashboard'], queryFn: () => amenityAdminService.getDashboard() });
+  const dashboardQuery = useQuery({ 
+    queryKey: ['amenity-dashboard'], 
+    queryFn: () => amenityAdminService.getDashboard() 
+  });
+
   const tabs = [
-    { key: 'policies' as const, label: 'Chính sách và nội quy' },
-    { key: 'exceptions' as const, label: 'Ngoại lệ và ghi đè' },
-    { key: 'versions' as const, label: 'Lịch sử và thông báo' },
+    { key: 'policies' as const, label: 'Chính sách & Nội quy' },
+    { key: 'exceptions' as const, label: 'Ngoại lệ & Ghi đè' },
+    { key: 'versions' as const, label: 'Lịch sử & Thông báo' },
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-6 pb-16">
-      <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.25em] text-primary">
-            <Waves size={14} />
-            Quản lý tiện ích đặt chỗ
+    <div className="relative w-full min-w-0 space-y-8 pb-16">
+      {/* Background Gradient Mesh (Difference Anchor) */}
+      <div className="pointer-events-none absolute -top-24 right-0 -z-10 h-[600px] w-[600px] rounded-full bg-primary/10 blur-[140px] opacity-50" />
+      <div className="pointer-events-none absolute top-48 -left-24 -z-10 h-[500px] w-[500px] rounded-full bg-blue-500/10 blur-[120px] opacity-50" />
+      
+      {/* Grain Overlay (Premium Texture) */}
+      <div className="pointer-events-none fixed inset-0 -z-20 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
+
+      <header className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]">
+              <Waves size={24} strokeWidth={2.5} />
+            </div>
+            <div className="text-[12px] font-black uppercase tracking-[0.4em] text-primary/80">
+              Operations Console
+            </div>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">Quản trị tiện ích</h1>
-          <p className="max-w-5xl text-sm font-medium leading-6 text-muted-foreground">
-            Dành cho gym, hồ bơi, BBQ, sân thể thao và các tiện ích cần đặt chỗ. Phần này tách khỏi điện nước để nhân sự vận hành không nhầm giữa đặt chỗ và tính phí tiện ích.
+          
+          <div className="space-y-2">
+            <h1 className="text-5xl font-black tracking-tighter text-foreground sm:text-7xl lg:text-8xl animate-in fade-in slide-in-from-left-12 duration-1000 ease-out">
+              Quản trị <span className="text-primary drop-shadow-sm">Tiện ích</span>
+            </h1>
+            <p className="max-w-2xl text-lg font-medium leading-relaxed text-muted-foreground/70">
+              Hệ thống quản lý Gym, Pool, BBQ và các tiện ích vận hành tập trung. 
+              <span className="hidden sm:inline"> Thiết lập quy tắc, ngoại lệ và theo dõi lịch sử đặt chỗ với độ chính xác tuyệt đối.</span>
+            </p>
+          </div>
+        </div>
+
+
+        <div className="max-w-sm shrink-0 rounded-[2rem] border border-primary/20 bg-primary/[0.03] p-6 backdrop-blur-sm">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-widest text-primary/60">Lưu ý vận hành</div>
+          <p className="text-xs font-bold leading-relaxed text-primary/80">
+            Các thiết lập ngày chốt công tơ, ngày xuất hóa đơn và tiền cọc vẫn nằm trong <span className="underline underline-offset-4">Cài đặt hệ thống / Thanh toán</span>.
           </p>
         </div>
-        <div className="max-w-xl rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-bold leading-5 text-primary">
-          Các thiết lập ngày chốt công tơ, ngày xuất hóa đơn và tiền cọc theo người vẫn nằm trong Cài đặt hệ thống / Thanh toán.
-        </div>
-      </div>
+      </header>
 
       {dashboardQuery.isError ? (
         <ErrorBanner
@@ -44,50 +71,45 @@ export default function AmenityManagementPage() {
         />
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {[
-          { label: 'Chính sách', value: dashboardQuery.data?.totalPolicies ?? 0, icon: ClipboardList },
-          { label: 'Chờ duyệt', value: dashboardQuery.data?.pendingApprovals ?? 0, icon: ShieldCheck },
-          { label: 'Ngoại lệ đang mở', value: dashboardQuery.data?.activeExceptions ?? 0, icon: Filter },
-          { label: 'Đặt chỗ hôm nay', value: dashboardQuery.data?.todayBookings ?? 0, icon: CalendarClock },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
-            <div className="mb-4 inline-flex rounded-xl bg-primary/10 p-3 text-primary">
-              <item.icon size={18} />
-            </div>
-            <p className="text-3xl font-black text-foreground">{item.value}</p>
-            <p className="mt-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">{item.label}</p>
-          </div>
-        ))}
-      </section>
+      <AmenityStats data={dashboardQuery.data} isLoading={dashboardQuery.isLoading} />
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+      <nav className="flex flex-wrap gap-2 border-b border-border/60 pb-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`rounded-xl px-4 py-2 text-[13px] font-bold transition-all duration-200 ${activeTab === tab.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`relative rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-widest transition-all duration-300 ${
+              activeTab === tab.key 
+                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
           >
             {tab.label}
+            {activeTab === tab.key && (
+              <span className="absolute -bottom-[9px] left-1/2 h-1 w-8 -translate-x-1/2 rounded-t-full bg-primary" />
+            )}
           </button>
         ))}
-      </div>
+      </nav>
 
-      {activeTab === 'policies' && (
-        <AmenityPoliciesTab 
-          selectedPolicyId={selectedPolicyId} 
-          setSelectedPolicyId={setSelectedPolicyId} 
-          setSelectedPolicy={setSelectedPolicy} 
-        />
-      )}
-      
-      {activeTab === 'exceptions' && (
-        <AmenityExceptionsTab />
-      )}
-      
-      {activeTab === 'versions' && (
-        <AmenityVersionsTab selectedPolicy={selectedPolicy} />
-      )}
+      <main className="min-h-[400px]">
+        {activeTab === 'policies' && (
+          <AmenityPoliciesTab 
+            selectedPolicyId={selectedPolicyId} 
+            setSelectedPolicyId={setSelectedPolicyId} 
+            setSelectedPolicy={setSelectedPolicy} 
+          />
+        )}
+        
+        {activeTab === 'exceptions' && (
+          <AmenityExceptionsTab />
+        )}
+        
+        {activeTab === 'versions' && (
+          <AmenityVersionsTab selectedPolicy={selectedPolicy} />
+        )}
+      </main>
     </div>
   );
 }
+

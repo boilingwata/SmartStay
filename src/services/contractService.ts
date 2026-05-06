@@ -175,13 +175,6 @@ interface ContractTransferRow {
   to_tenant?: TenantRow | null;
 }
 
-interface ContractAddendumQueryRow extends ContractAddendumRow {}
-
-interface RpcContractResult {
-  contractId: number;
-  contractCode: string;
-}
-
 function parseTerms(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -327,7 +320,7 @@ function toContractDetail(
   occupantRows: RoomOccupantRow[],
   transferRows: ContractTransferRow[],
   addendumSourceAvailable: boolean,
-  addendumRows: ContractAddendumQueryRow[]
+  addendumRows: ContractAddendumRow[]
 ): ContractDetail {
   const signers = (row.contract_tenants ?? []).map(toContractTenant);
   const occupants = occupantRows.map(toContractOccupant);
@@ -465,6 +458,7 @@ export const contractService = {
       throw new Error(`[contractService] Invalid contract id: "${id}"`);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabase as any;
 
     const [contractRow, serviceRows, renewalRows, invoiceRows, occupantRows, transferRows, addendumSourceAvailable, addendumRows] =
@@ -533,7 +527,7 @@ export const contractService = {
             .order('effective_date', { ascending: false })
             .order('version_no', { ascending: false })
             .order('created_at', { ascending: false })
-        ) as Promise<ContractAddendumQueryRow[]>,
+        ) as Promise<ContractAddendumRow[]>,
       ]);
 
     return toContractDetail(
@@ -548,6 +542,7 @@ export const contractService = {
     );
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   exportContracts: async (_filters: ContractFilter): Promise<Blob> => {
     return new Blob([], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -594,47 +589,70 @@ export const contractService = {
       );
     }
 
-    const { data: invokeResult, error } = await supabase.functions.invoke('create-contract', {
-      body: {
-        roomId: numRoomId,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        rentPrice: data.rentPrice,
-        depositAmount: data.depositAmount,
-        paymentCycle: data.paymentCycle,
-        paymentDueDay: data.paymentDueDay,
-        primaryTenantId: representativeId,
-        occupantIds,
-        utilityPolicyId,
-        selectedServices: selectedServiceIds.map((id) => ({ serviceId: id })),
-        markDepositReceived: data.depositAmount > 0,
-        ownerRep: data.ownerRep,
-        ownerLegalConfirmation: {
-          ...data.ownerLegalConfirmation,
-          legalBasisType,
-          supportingDocumentUrls: legalDocumentUrls,
+    // Use raw fetch instead of supabase.functions.invoke() so we own the
+    // response body and can reliably extract the Vietnamese error message
+    // without risk of body-consumed or wrapper-swallowed errors.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const authHeader = session?.access_token ? `Bearer ${session.access_token}` : '';
+
+    const edgeRes = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-contract`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
+        body: JSON.stringify({
+          roomId: numRoomId,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          rentPrice: data.rentPrice,
+          depositAmount: data.depositAmount,
+          paymentCycle: data.paymentCycle,
+          paymentDueDay: data.paymentDueDay,
+          primaryTenantId: representativeId,
+          occupantIds,
+          utilityPolicyId,
+          selectedServices: selectedServiceIds.map((id) => ({ serviceId: id })),
+          markDepositReceived: data.depositAmount > 0,
+          ownerRep: data.ownerRep,
+          ownerLegalConfirmation: {
+            ...data.ownerLegalConfirmation,
+            legalBasisType,
+            supportingDocumentUrls: legalDocumentUrls,
+          },
+        }),
       },
-    });
+    );
 
-    if (error) {
-      // supabase.functions.invoke() puts the JSON body in `data` even on non-2xx.
-      // Extract the Vietnamese error message from the body when available.
-      const errorBody = invokeResult as { error?: string; success?: boolean } | null;
-      const serverMessage = errorBody?.error;
-      throw new Error(serverMessage ?? error.message);
+    const responseBody = (await edgeRes.json()) as {
+      success?: boolean;
+      error?: string;
+      contractId?: number;
+      contractCode?: string;
+      _debug?: unknown;
+    };
+
+    if (!edgeRes.ok || responseBody.error) {
+      const msg = responseBody.error ?? `Lỗi tạo hợp đồng (HTTP ${edgeRes.status})`;
+      throw new Error(msg);
     }
-    const result = invokeResult as RpcContractResult | null;
 
-    if (!result?.contractId) {
-      throw new Error('Không thể tạo hợp đồng');
+    const contractId = responseBody.contractId;
+    if (!contractId) {
+      throw new Error('Không nhận được contractId từ server');
     }
 
-    const contractRow = await fetchContractRow(result.contractId);
+    const contractRow = await fetchContractRow(contractId);
     return toContract(contractRow);
   },
 
   addOccupant: async (payload: AddOccupantPayload) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc('add_contract_occupant', {
       p_contract_id: Number(payload.contractId),
       p_tenant_id: Number(payload.tenantId),
@@ -652,6 +670,7 @@ export const contractService = {
   },
 
   removeOccupant: async (payload: RemoveOccupantPayload) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc('remove_contract_occupant', {
       p_contract_id: Number(payload.contractId),
       p_tenant_id: Number(payload.tenantId),
@@ -669,6 +688,7 @@ export const contractService = {
   },
 
   transferContract: async (payload: TransferContractPayload) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc('transfer_contract_representative', {
       p_old_contract_id: Number(payload.contractId),
       p_to_tenant_id: Number(payload.toTenantId),
@@ -685,6 +705,7 @@ export const contractService = {
   },
 
   liquidateContract: async (payload: LiquidateContractPayload) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc('liquidate_contract', {
       p_contract_id: Number(payload.contractId),
       p_termination_date: payload.terminationDate,

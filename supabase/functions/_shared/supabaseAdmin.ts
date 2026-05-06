@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient, type SupabaseClient as GenericSupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient as GenericSupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 export type SupabaseClient = GenericSupabaseClient<any, any>;
 

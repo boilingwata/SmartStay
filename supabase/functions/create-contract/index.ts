@@ -164,25 +164,32 @@ Deno.serve(async (req: Request) => {
 
   if (error) {
     // Log server-side for tracing in Supabase dashboard
-    console.error('[create-contract] RPC create_contract_v3 error:', {
+    const errCode = (error as { code?: string }).code;
+    const errDetails = (error as { details?: string }).details;
+    const errHint = (error as { hint?: string }).hint;
+    console.error('[create-contract] RPC create_contract_v3 FAILED:', {
       message: error.message,
-      code: (error as { code?: string }).code,
-      details: (error as { details?: string }).details,
-      hint: (error as { hint?: string }).hint,
-      roomId,
-      primaryTenantId,
-      utilityPolicyId,
+      code: errCode,
+      details: errDetails,
+      hint: errHint,
+      payload: { roomId, startDate, endDate, rentPrice, depositAmount, paymentCycle, paymentDueDay: paymentDueDaySafe, primaryTenantId, utilityPolicyId, occupantIds, filteredServiceIds },
     });
 
-    // All business-logic exceptions from the RPC are user-facing (400).
-    // Only true infrastructure failures (unique constraint bugs, schema drift) get 500.
-    const isBusinessError =
-      error.message.length > 0 &&
-      !error.message.toLowerCase().startsWith('error') &&
-      !error.message.includes('duplicate key') &&
-      !error.message.includes('violates');
-
-    return errorResponse(error.message, isBusinessError ? 400 : 500);
+    // Return detailed error so browser console can show the actual cause.
+    // The `_debug` field is safe to expose (no PII) and helps local testing.
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        _debug: {
+          code: errCode,
+          details: errDetails,
+          hint: errHint,
+          receivedPayload: { roomId, rentPrice, depositAmount, paymentCycle, paymentDueDaySafe, primaryTenantId, utilityPolicyId, occupantIdsCount: occupantIds.length, serviceCount: filteredServiceIds.length },
+        },
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } },
+    );
   }
 
   const result = data as { contractId: number; contractCode: string };

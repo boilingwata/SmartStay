@@ -153,6 +153,11 @@ SmartStay is a browser-first React SPA with a layered service architecture over 
 
 **Design System:** Tailwind tokens and local shadcn-style primitives form the UI base. The current design direction favors dense operational workspaces over marketing layouts.
 
+## Infrastructure and Deployment
+
+For detailed information on how the application is distributed across Vercel and Supabase, including network flows and CI/CD pipelines, see the [Deployment Diagram](file:///c:/Users/toduc/Downloads/SmartStay/.planning/codebase/DEPLOYMENT.md).
+
+
 ---
 
 *Architecture analysis: 2026-05-01*
