@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
     ownerLegalConfirmation,
   } = body;
 
+  // ── Input validation ───────────────────────────────────────────────────────
   if (!roomId || typeof roomId !== 'number') return errorResponse('Thiếu thông tin phòng hợp lệ.');
   if (!startDate || !endDate) return errorResponse('Thiếu ngày bắt đầu hoặc ngày kết thúc hợp đồng.');
   if (typeof rentPrice !== 'number' || rentPrice <= 0) return errorResponse('Giá thuê phải lớn hơn 0.');
@@ -109,6 +110,7 @@ Deno.serve(async (req: Request) => {
     return errorResponse('Người được ủy quyền phải có ít nhất 1 hồ sơ pháp lý đính kèm.');
   }
 
+  // ── Service catalog lookup ─────────────────────────────────────────────────
   const serviceIds = selectedServices.map((s) => s.serviceId);
   const db = createAdminClient();
   const { data: serviceRows, error: serviceError } = serviceIds.length === 0
@@ -119,6 +121,7 @@ Deno.serve(async (req: Request) => {
         .in('id', serviceIds);
 
   if (serviceError) {
+    console.error('[create-contract] service_catalog lookup error:', serviceError.message);
     return errorResponse(serviceError.message, 500);
   }
 
@@ -127,6 +130,10 @@ Deno.serve(async (req: Request) => {
   const filteredServiceIds = filteredServices.map((s) => s.serviceId);
   const servicePrices = filteredServices.map((s) => s.fixedPrice ?? null);
   const serviceQuantities = filteredServices.map((s) => s.quantity ?? 1);
+
+  // ── RPC call ──────────────────────────────────────────────────────────────
+  // p_payment_due_day is smallint in DB — cast to integer explicitly
+  const paymentDueDaySafe = Math.max(1, Math.min(31, Math.round(Number(paymentDueDay ?? 5))));
 
   const { data, error } = await db.rpc('create_contract_v3', {
     p_room_id:               roomId,
@@ -137,7 +144,7 @@ Deno.serve(async (req: Request) => {
     p_payment_cycle_months:  paymentCycle ?? 1,
     p_primary_tenant_id:     primaryTenantId,
     p_occupant_ids:          occupantIds,
-    p_payment_due_day:       paymentDueDay ?? 5,
+    p_payment_due_day:       paymentDueDaySafe,
     p_utility_policy_id:     utilityPolicyId,
     p_service_ids:           filteredServiceIds.length > 0 ? filteredServiceIds : null,
     p_service_prices:        servicePrices.length > 0 ? servicePrices : null,
@@ -156,15 +163,26 @@ Deno.serve(async (req: Request) => {
   });
 
   if (error) {
-    if (
-      error.message.includes('Kh') ||
-      error.message.includes('kh') ||
-      error.message.includes('not available') ||
-      error.message.includes('not found')
-    ) {
-      return errorResponse(error.message, 400);
-    }
-    return errorResponse(error.message, 500);
+    // Log server-side for tracing in Supabase dashboard
+    console.error('[create-contract] RPC create_contract_v3 error:', {
+      message: error.message,
+      code: (error as { code?: string }).code,
+      details: (error as { details?: string }).details,
+      hint: (error as { hint?: string }).hint,
+      roomId,
+      primaryTenantId,
+      utilityPolicyId,
+    });
+
+    // All business-logic exceptions from the RPC are user-facing (400).
+    // Only true infrastructure failures (unique constraint bugs, schema drift) get 500.
+    const isBusinessError =
+      error.message.length > 0 &&
+      !error.message.toLowerCase().startsWith('error') &&
+      !error.message.includes('duplicate key') &&
+      !error.message.includes('violates');
+
+    return errorResponse(error.message, isBusinessError ? 400 : 500);
   }
 
   const result = data as { contractId: number; contractCode: string };

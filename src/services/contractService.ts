@@ -617,7 +617,13 @@ export const contractService = {
       },
     });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      // supabase.functions.invoke() puts the JSON body in `data` even on non-2xx.
+      // Extract the Vietnamese error message from the body when available.
+      const errorBody = invokeResult as { error?: string; success?: boolean } | null;
+      const serverMessage = errorBody?.error;
+      throw new Error(serverMessage ?? error.message);
+    }
     const result = invokeResult as RpcContractResult | null;
 
     if (!result?.contractId) {
