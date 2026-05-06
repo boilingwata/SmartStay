@@ -1181,6 +1181,7 @@ export type Database = {
           name: string
           opening_date: string | null
           owner_id: string | null
+          province: string | null
           search_vector: unknown
           total_floors: number | null
           updated_at: string | null
@@ -1202,6 +1203,7 @@ export type Database = {
           name: string
           opening_date?: string | null
           owner_id?: string | null
+          province?: string | null
           search_vector?: unknown
           total_floors?: number | null
           updated_at?: string | null
@@ -1223,6 +1225,7 @@ export type Database = {
           name?: string
           opening_date?: string | null
           owner_id?: string | null
+          province?: string | null
           search_vector?: unknown
           total_floors?: number | null
           updated_at?: string | null
@@ -4146,6 +4149,7 @@ export type Database = {
           area_sqm: number | null
           availability_status: string | null
           base_rent: number | null
+          building_available_room_count: number | null
           building_address: string | null
           building_amenities: Json | null
           building_description: string | null
@@ -4153,11 +4157,13 @@ export type Database = {
           building_name: string | null
           building_uuid: string | null
           condition_score: number | null
+          cover_image_url: string | null
           facing: string | null
           floor_number: number | null
           has_balcony: boolean | null
           has_private_bathroom: boolean | null
           max_occupants: number | null
+          province: string | null
           room_amenities: Json | null
           room_code: string | null
           room_id: number | null

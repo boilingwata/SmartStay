@@ -34,13 +34,13 @@ const LandingPage: React.FC = () => {
   const fallback = listings.slice(0, 8);
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#faf9f6_0%,#ffffff_38%,#f7fafb_100%)] antialiased">
       <PublicTopbar />
 
       {/* Hero starts at y=0; topbar overlays it */}
       <HeroSection />
 
-      <div className="flex flex-col gap-12 sm:gap-16 pb-16 pt-8 sm:pt-12">
+      <div className="flex flex-col gap-14 pb-20 pt-10 sm:gap-[4.5rem] sm:pt-14">
         <RoomTypesSection />
 
         <HomepageListingSection

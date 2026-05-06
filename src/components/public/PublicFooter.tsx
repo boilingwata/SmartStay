@@ -33,7 +33,7 @@ export const PublicFooter: React.FC = () => (
             to="/listings"
             className="text-[#0d6b5a]/55 text-base font-medium hover:text-[#0d6b5a] transition-colors"
           >
-            Ticket
+            Tìm phòng
           </Link>
           <span className="text-[#0d6b5a]/55 text-base font-medium cursor-default select-none">
             Pháp lý

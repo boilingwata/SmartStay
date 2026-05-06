@@ -1,3 +1,4 @@
+import { buildingCoverUrlForRoomId } from '@/constants/listingBuildingCovers';
 import { supabase } from '@/lib/supabase';
 import { unwrap } from '@/lib/supabaseHelpers';
 import type { DbRentalApplicationStatus } from '@/types/supabase';
@@ -22,6 +23,9 @@ interface PublicListingRow {
   building_address: string
   building_description: string | null
   building_amenities: unknown
+  province: string | null
+  cover_image_url: string | null
+  building_available_room_count: number | null
   availability_status: string
 }
 
@@ -51,6 +55,10 @@ export interface PublicListing {
   buildingName: string
   buildingAddress: string
   buildingDescription?: string
+  province?: string | null
+  coverImageUrl?: string | null
+  /** Rooms in this building that are listed as available (matches public_room_listings scope). */
+  buildingAvailableRoomCount: number
   amenities: string[]
 }
 
@@ -86,11 +94,28 @@ function normalizeAmenities(value: unknown): string[] {
     : [];
 }
 
+/** Badge line for listing cards / detail (Vietnamese). */
+export function formatPublicAvailabilityLabel(
+  availabilityStatus: string,
+  buildingAvailableRoomCount: number,
+): string {
+  if (availabilityStatus !== 'available_now') return 'Đang nhận đặt chỗ';
+  const n = Math.max(0, Math.floor(buildingAvailableRoomCount));
+  if (n <= 0) return 'Hiện không còn phòng trống';
+  if (n === 1) return 'Còn 1 phòng trống';
+  return `Còn ${n} phòng trống`;
+}
+
 function toPublicListing(row: PublicListingRow): PublicListing {
   const amenitySet = new Set([
     ...normalizeAmenities(row.room_amenities),
     ...normalizeAmenities(row.building_amenities),
   ]);
+
+  const buildingAvailableRoomCount = Math.max(0, Number(row.building_available_room_count ?? 1));
+  const trimmedCover = typeof row.cover_image_url === 'string' ? row.cover_image_url.trim() : '';
+  const coverImageUrl =
+    trimmedCover.length > 0 ? trimmedCover : buildingCoverUrlForRoomId(String(row.room_id));
 
   return {
     roomId: String(row.room_id),
@@ -104,11 +129,14 @@ function toPublicListing(row: PublicListingRow): PublicListing {
     hasPrivateBathroom: row.has_private_bathroom ?? false,
     facing: row.facing ?? undefined,
     conditionScore: row.condition_score,
-    availabilityLabel: row.availability_status === 'available_now' ? 'Có thể vào ở ngay' : 'Đang nhận đặt chỗ',
+    availabilityLabel: formatPublicAvailabilityLabel(row.availability_status, buildingAvailableRoomCount),
     buildingId: String(row.building_id),
     buildingName: row.building_name,
     buildingAddress: row.building_address,
     buildingDescription: row.building_description ?? undefined,
+    province: row.province ?? null,
+    coverImageUrl,
+    buildingAvailableRoomCount,
     amenities: Array.from(amenitySet),
   };
 }

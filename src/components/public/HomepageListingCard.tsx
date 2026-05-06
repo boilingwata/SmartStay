@@ -1,88 +1,85 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
-import { cn, formatVND } from '@/utils';
+import { ImageOff } from 'lucide-react';
+import { buildingCoverUrlForRoomId } from '@/constants/listingBuildingCovers';
+import { formatVND } from '@/utils';
 import type { PublicListing } from '@/services/publicListingsService';
-
-const PREVIEW_IMAGES = [
-  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1502672023488-70e25813eb80?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=600&q=80',
-];
 
 type Props = {
   listing: PublicListing;
-  index: number;
 };
 
-export const HomepageListingCard: React.FC<Props> = ({ listing, index }) => {
-  const imageSrc = PREVIEW_IMAGES[index % PREVIEW_IMAGES.length];
-  const isAvailable = listing.availabilityLabel === 'Có thể vào ở ngay';
+export const HomepageListingCard: React.FC<Props> = ({ listing }) => {
+  const coverUrl = listing.coverImageUrl?.trim() || buildingCoverUrlForRoomId(listing.roomId);
+  const imageAlt = `${listing.roomCode} — ${listing.buildingName}`;
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [listing.roomId, listing.coverImageUrl]);
+
+  const showPlaceholder = imageFailed;
 
   return (
     <Link
       to={`/listings/${listing.roomId}`}
-      className="block bg-card text-card-foreground rounded-2xl overflow-hidden shrink-0 w-72 sm:w-80 border border-border hover:shadow-md transition-shadow duration-300 group"
+      className={[
+        'group relative isolate block w-72 shrink-0 overflow-hidden rounded-[1.35rem]',
+        'border border-border/70 bg-card text-card-foreground',
+        'shadow-[0_12px_40px_-28px_rgba(15,23,42,0.2)]',
+        'transition-[transform,box-shadow,border-color] duration-300 ease-out',
+        'hover:-translate-y-[11px] hover:border-primary/42',
+        'hover:shadow-[0_34px_70px_-28px_rgba(13,107,90,0.48),0_18px_42px_-18px_rgba(15,23,42,0.22),0_6px_16px_-8px_rgba(13,107,90,0.15)]',
+        'hover:ring-[3px] hover:ring-primary/30 hover:ring-offset-[3px] hover:ring-offset-[var(--card)]',
+        'active:translate-y-[-6px] active:scale-[0.985] active:shadow-[0_22px_48px_-26px_rgba(13,107,90,0.38)]',
+        'motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none',
+        'motion-reduce:hover:ring-0 motion-reduce:hover:ring-offset-0 motion-reduce:active:scale-100 sm:w-80',
+      ].join(' ')}
       aria-label={listing.roomCode}
     >
-      <div className="p-2 pb-0">
-        {/* Cover image */}
-        <div className="relative aspect-[4/3] rounded-xl overflow-hidden">
-          <img
-            src={imageSrc}
-            alt={listing.buildingName}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-          {/* Top gradient for tag contrast */}
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent" />
-          {/* Tags */}
-          <div className="absolute top-3 left-3 flex gap-2">
-            <span
-              className={cn(
-                'flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded-full',
-                isAvailable ? 'bg-emerald-600' : 'bg-destructive'
-              )}
-            >
-              {isAvailable ? (
-                <>
-                  <ShieldCheck size={12} />
-                  Đã xác thực
-                </>
-              ) : (
-                'Sắp hết'
-              )}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+        {!showPlaceholder ? (
+          <>
+            <img
+              src={coverUrl}
+              alt={imageAlt}
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.12] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageFailed(true)}
+            />
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/45 via-primary/[0.14] to-transparent opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 motion-reduce:hidden"
+              aria-hidden
+            />
+          </>
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-4 text-center text-muted-foreground">
+            <ImageOff className="h-9 w-9 shrink-0 opacity-45" strokeWidth={1.25} aria-hidden />
+            <span className="text-[11px] font-semibold leading-snug text-foreground/80">
+              Không tải được ảnh
             </span>
-            {!isAvailable && (
-              <span className="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                <ShieldCheck size={12} />
-                Đã xác thực
-              </span>
-            )}
+            <span className="text-[10px] leading-snug opacity-70">
+              Liên kết ảnh có thể đã hết hạn hoặc chặn hiển thị. Vẫn có thể xem chi tiết phòng.
+            </span>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="p-4 flex flex-col gap-2">
-        {/* Availability bar */}
-        <div className="w-full bg-primary/10 text-primary py-1 px-2 rounded-md flex items-center justify-center">
+      <div className="relative flex flex-col gap-2 p-4">
+        <div className="flex w-full items-center justify-center rounded-md bg-primary/10 px-2 py-1 text-primary transition-colors duration-300 ease-out group-hover:bg-primary/26 motion-reduce:transition-none">
           <span className="text-xs font-medium">{listing.availabilityLabel}</span>
         </div>
 
-        {/* Address */}
-        <p className="text-sm font-medium line-clamp-2 leading-tight">
+        <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground/95 transition-colors duration-300 group-hover:text-foreground motion-reduce:transition-none">
           {listing.buildingAddress}
         </p>
 
-        {/* Price and Info */}
         <div className="mt-1 flex flex-col gap-1">
-          <p className="text-primary text-sm font-semibold truncate">
+          <p className="truncate text-sm font-semibold text-primary transition-[filter] duration-300 group-hover:brightness-[1.12] motion-reduce:transition-none">
             Giá từ: {formatVND(listing.baseRent)}/tháng
           </p>
-          <p className="text-muted-foreground text-xs truncate">
+          <p className="truncate text-xs text-muted-foreground">
             {listing.roomType} · {listing.areaSqm}m²
           </p>
         </div>

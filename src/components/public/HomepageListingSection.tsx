@@ -85,7 +85,7 @@ export const HomepageListingSection: React.FC<Props> = ({
           </Button>
           <Link
             to={viewAllHref}
-            className="ml-2 text-sm text-primary/80 flex items-center gap-1 hover:text-primary transition-colors font-medium"
+            className="ml-2 flex items-center gap-1 text-sm font-medium text-primary/80 transition-colors duration-300 ease-out hover:text-primary"
           >
             Xem tất cả <ChevronRight size={14} />
           </Link>
@@ -95,7 +95,18 @@ export const HomepageListingSection: React.FC<Props> = ({
       {/* Scrollable cards */}
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 scroll-smooth [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-muted [&::-webkit-scrollbar-thumb]:bg-primary/25 [&::-webkit-scrollbar-thumb]:rounded-full"
+        className={[
+          'flex gap-4 overflow-x-scroll overflow-y-hidden scroll-smooth pb-3',
+          // Firefox — visible themed scrollbar
+          '[scrollbar-width:thin]',
+          '[scrollbar-color:rgba(13,107,90,0.55)_rgb(226,232,240)]',
+          // Chromium / Safari — taller thumb + track so it doesn’t feel “missing”
+          '[&::-webkit-scrollbar]:h-2.5',
+          '[&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-200/85 dark:[&::-webkit-scrollbar-track]:bg-slate-700/80',
+          '[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/55 [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-clip-padding',
+          'dark:[scrollbar-color:rgba(13,138,138,0.65)_rgb(30,41,59)]',
+          'dark:[&::-webkit-scrollbar-thumb]:bg-secondary/60',
+        ].join(' ')}
       >
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
@@ -104,8 +115,8 @@ export const HomepageListingSection: React.FC<Props> = ({
                 className="shrink-0 w-72 sm:w-80 h-[320px] rounded-2xl bg-muted animate-pulse"
               />
             ))
-          : listings.map((listing, i) => (
-              <HomepageListingCard key={listing.roomId} listing={listing} index={i} />
+          : listings.map((listing) => (
+              <HomepageListingCard key={listing.roomId} listing={listing} />
             ))}
       </div>
     </section>

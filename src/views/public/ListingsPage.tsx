@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/utils';
@@ -46,8 +46,10 @@ const formatRoomTypeLabel = (value: string) => {
 };
 
 const ListingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
+  const [province, setProvince] = useState(searchParams.get('province') ?? '');
   const [roomType, setRoomType] = useState(searchParams.get('roomType') ?? 'all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') ?? '');
@@ -59,6 +61,7 @@ const ListingsPage: React.FC = () => {
 
   useEffect(() => {
     setSearch(searchParams.get('search') ?? '');
+    setProvince(searchParams.get('province') ?? '');
     setRoomType(searchParams.get('roomType') ?? 'all');
     setMaxPrice(searchParams.get('maxPrice') ?? '');
   }, [urlSearch, searchParams]);
@@ -74,6 +77,7 @@ const ListingsPage: React.FC = () => {
   );
 
   const activeFilterCount = [
+    province !== '',
     roomType !== 'all',
     minPrice !== '',
     maxPrice !== '',
@@ -83,16 +87,19 @@ const ListingsPage: React.FC = () => {
   ].filter(Boolean).length;
 
   const clearAll = () => {
+    setProvince('');
     setRoomType('all');
     setMinPrice('');
     setMaxPrice('');
     setMinArea('');
     setMaxArea('');
     setSortBy('price_asc');
+    navigate('/listings', { replace: true });
   };
 
   const filteredListings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
+    const normalizedProvince = province.trim();
     const minP = minPrice ? Number(minPrice) : null;
     const maxP = maxPrice ? Number(maxPrice) : null;
     const minA = minArea ? Number(minArea) : null;
@@ -106,13 +113,16 @@ const ListingsPage: React.FC = () => {
         listing.buildingAddress,
       ].some((field) => field.toLowerCase().includes(normalizedSearch));
 
+      const matchesProvince =
+        normalizedProvince.length === 0 || listing.province?.trim() === normalizedProvince;
+
       const matchesType = matchesRoomTypeFilter(listing.roomType, roomType);
       const matchesMinPrice = minP === null || listing.baseRent >= minP;
       const matchesMaxPrice = maxP === null || listing.baseRent <= maxP;
       const matchesMinArea = minA === null || listing.areaSqm >= minA;
       const matchesMaxArea = maxA === null || listing.areaSqm <= maxA;
 
-      return matchesSearch && matchesType && matchesMinPrice && matchesMaxPrice && matchesMinArea && matchesMaxArea;
+      return matchesSearch && matchesProvince && matchesType && matchesMinPrice && matchesMaxPrice && matchesMinArea && matchesMaxArea;
     });
 
     result = [...result].sort((a, b) => {
@@ -123,7 +133,7 @@ const ListingsPage: React.FC = () => {
     });
 
     return result;
-  }, [listings, roomType, search, minPrice, maxPrice, minArea, maxArea, sortBy]);
+  }, [listings, province, roomType, search, minPrice, maxPrice, minArea, maxArea, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#F5F7FB] pt-[65px]">
