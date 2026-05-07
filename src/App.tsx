@@ -122,6 +122,7 @@ const App = () => {
 
               <Route element={<ProtectedRoute allowedRoles={['SuperAdmin']} />}>
                 <Route path="super-admin" element={<SuperAdminLayout />}>
+                  <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
                   {mapRoutes(superAdminRoutes)}
                 </Route>
               </Route>

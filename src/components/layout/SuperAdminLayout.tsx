@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import {
   Building2,
+  CreditCard,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
   Moon,
   Settings,
   Shield,
   Sun,
+  Users,
   X,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -20,8 +23,11 @@ import { cn } from '@/utils';
 const navItems = [
   { label: 'Bảng điều khiển', to: '/super-admin/dashboard', icon: LayoutDashboard },
   { label: 'Tổ chức', to: '/super-admin/organizations', icon: Building2 },
+  { label: 'Owner', to: '/super-admin/owners', icon: Users },
+  { label: 'Gói dịch vụ', to: '/super-admin/billing', icon: CreditCard },
+  { label: 'Cấu hình hệ thống', to: '/super-admin/system-config', icon: Settings },
   { label: 'Rủi ro & Kiểm toán', to: '/super-admin/audit', icon: Shield },
-  { label: 'Cài đặt nền tảng', to: '/super-admin/settings', icon: Settings },
+  { label: 'Hỗ trợ Owner', to: '/super-admin/support', icon: LifeBuoy },
 ];
 
 const SuperAdminLayout: React.FC = () => {
@@ -75,6 +81,7 @@ const SuperAdminLayout: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === '/super-admin/dashboard'}
             onClick={() => mobile && setMobileMenuOpen(false)}
             className={({ isActive }) =>
               cn(

@@ -4,6 +4,7 @@ import { queryClient, setupQueryNetworkRecovery } from '@/lib/queryClient';
 import { Toaster } from 'sonner';
 import { OfflineBanner, SessionExpiredOverlay } from '../ui/StatusStates';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
+import MaintenanceBanner from '@/components/layout/MaintenanceBanner';
 import useAuthStore from '@/stores/authStore';
 import useUIStore from '@/stores/uiStore';
 import i18n from '@/i18n/i18n';
@@ -45,9 +46,10 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <OfflineBanner />
-      
+      <MaintenanceBanner />
+
       {sessionExpired && <SessionExpiredOverlay onLogin={handleLoginRedirect} />}
-      
+
       {children}
       
       <ConfirmDialog />
