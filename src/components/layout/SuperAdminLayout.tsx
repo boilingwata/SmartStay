@@ -61,7 +61,7 @@ const SuperAdminLayout: React.FC = () => {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-display font-bold tracking-tight">SmartStay</h1>
-            <p className="truncate text-[10px] font-mono tracking-[0.18em] text-white/55">Quản trị tối cao</p>
+            <p className="truncate text-[10px] font-mono tracking-[0.18em] text-white/55">Quản trị hệ thống</p>
           </div>
         </Link>
         {mobile ? (
@@ -105,7 +105,7 @@ const SuperAdminLayout: React.FC = () => {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">
-              {user?.fullName?.trim() || user?.username?.trim() || 'Quản trị tối cao'}
+              {user?.fullName?.trim() || user?.username?.trim() || 'Quản trị viên'}
             </p>
             {user?.email ? (
               <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.16em] text-white/45">{user.email}</p>
@@ -159,7 +159,7 @@ const SuperAdminLayout: React.FC = () => {
               <div className="min-w-0">
                 <p className="text-[11px] font-black uppercase tracking-[0.22em] text-secondary">Nền tảng</p>
                 <h2 className="truncate text-lg font-black tracking-tight text-foreground sm:text-xl">
-                  Không gian quản trị tối cao
+                  Quản trị nền tảng
                 </h2>
               </div>
             </div>

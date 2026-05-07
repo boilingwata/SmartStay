@@ -84,7 +84,7 @@ const SuperAdminDashboard: React.FC = () => {
       <section className="rounded-[32px] border border-border/70 bg-card p-8 shadow-[0_24px_72px_-48px_rgba(15,23,42,0.45)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-secondary">Quản trị tối cao</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-secondary">Quản trị hệ thống</p>
             <h1 className="text-4xl font-black tracking-tight text-foreground">Điều hành và giám sát toàn nền tảng.</h1>
             <p className="max-w-2xl text-sm leading-7 text-muted">
               Số liệu dưới đây lấy trực tiếp từ các bảng tổ chức và gói dịch vụ trong cơ sở dữ liệu.
