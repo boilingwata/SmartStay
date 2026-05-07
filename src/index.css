@@ -22,6 +22,9 @@
     
     --card: #FFFFFF;
     --card-foreground: #1E293B;
+
+    --popover: #FFFFFF;
+    --popover-foreground: #1E293B;
     
     --muted: #64748B;
     --muted-foreground: #94A3B8;
@@ -71,6 +74,9 @@
     
     --card: #1E293B;
     --card-foreground: #F8FAFC;
+
+    --popover: #1E293B;
+    --popover-foreground: #F8FAFC;
     
     --muted: #94A3B8;
     --muted-foreground: #64748B;

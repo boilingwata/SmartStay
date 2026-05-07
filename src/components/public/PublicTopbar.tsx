@@ -19,7 +19,7 @@ export const PublicTopbar: React.FC = () => {
   }, [location.pathname]);
 
   return (
-    <nav className="fixed inset-x-0 top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[65px] flex items-center px-4 sm:px-16 border-b border-border shadow-sm">
+    <nav className="fixed inset-x-0 top-0 z-50 flex h-[65px] items-center border-b border-primary/[0.14] bg-[linear-gradient(180deg,#faf9f6_0%,#ffffff_55%,#f8fbfa_100%)] px-4 shadow-[0_6px_28px_-12px_rgba(13,107,90,0.12)] sm:px-16 motion-safe:transition-[background-color,box-shadow] motion-safe:duration-300 motion-safe:ease-out dark:border-white/10 dark:bg-[linear-gradient(180deg,#0f172a_0%,#162032_100%)] dark:shadow-[0_8px_28px_-12px_rgba(0,0,0,0.35)]">
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 shrink-0">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-sm tracking-wide">
@@ -34,14 +34,14 @@ export const PublicTopbar: React.FC = () => {
       <div className="hidden lg:flex items-center ml-8 gap-1">
         <Link
           to="/listings"
-          className="text-primary font-medium px-4 py-3 rounded-xl hover:bg-primary/10 transition-colors text-[16px]"
+          className="rounded-xl px-4 py-3 text-[16px] font-medium text-primary transition-colors duration-300 ease-out hover:bg-primary/[0.07]"
         >
           Tìm phòng
         </Link>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 text-primary font-medium px-4 py-3 rounded-xl hover:bg-primary/10 transition-colors text-[16px]">
+            <button className="flex items-center gap-2 rounded-xl px-4 py-3 text-[16px] font-medium text-primary transition-colors duration-300 ease-out hover:bg-primary/[0.07]">
               Dành cho chủ nhà
               <ChevronDown size={12} />
             </button>
@@ -53,7 +53,7 @@ export const PublicTopbar: React.FC = () => {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild className="rounded-lg cursor-pointer">
-              <Link to="/public/register?role=owner" className="w-full font-medium text-primary py-2 px-3">
+              <Link to="/public/register?intent=owner" className="w-full font-medium text-primary py-2 px-3">
                 Đăng ký tài khoản
               </Link>
             </DropdownMenuItem>

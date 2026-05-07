@@ -14,6 +14,9 @@ interface CreateOwnerRequest {
   taxCode?: string;
   address?: string;
   avatarUrl?: string;
+  /** Link new owner to an organization (super-admin onboarding). */
+  organizationId?: string;
+  memberRole?: 'owner' | 'admin' | 'staff' | 'viewer';
 }
 
 Deno.serve(async (req: Request) => {
@@ -50,6 +53,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const userId = authData.user.id;
+
+  const preferences = { email };
+
   const { data: profileRow, error: profileError } = await adminClient
     .from('profiles')
     .upsert({
@@ -61,6 +67,8 @@ Deno.serve(async (req: Request) => {
       identity_number: body.cccd?.trim() ?? null,
       address: body.address?.trim() ?? null,
       is_active: true,
+      preferences,
+      ...(body.organizationId ? { organization_id: body.organizationId } : {}),
     })
     .select('id, full_name, phone, avatar_url, role, is_active, identity_number, address')
     .single();
@@ -68,6 +76,22 @@ Deno.serve(async (req: Request) => {
   if (profileError) {
     await adminClient.auth.admin.deleteUser(userId);
     return errorResponse(`Luu ho so that bai: ${profileError.message}`, 500);
+  }
+
+  if (body.organizationId) {
+    const role = body.memberRole ?? 'owner';
+    const { error: memError } = await adminClient.from('organization_members').insert({
+      organization_id: body.organizationId,
+      user_id: userId,
+      member_role: role,
+      joined_at: new Date().toISOString(),
+      is_active: true,
+    });
+
+    if (memError) {
+      await adminClient.auth.admin.deleteUser(userId);
+      return errorResponse(`Gan thanh vien to chuc that bai: ${memError.message}`, 500);
+    }
   }
 
   return successResponse({

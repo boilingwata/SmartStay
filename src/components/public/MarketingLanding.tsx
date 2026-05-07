@@ -11,16 +11,16 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { PublicListing } from '@/services/publicListingsService';
+import { formatPublicAvailabilityLabel, type PublicListing } from '@/services/publicListingsService';
 import { ListingPreviewCard } from './ListingPreviewCard';
 
 const fallbackListings: PublicListing[] = [
-  { roomId: 'curated-1', roomCode: 'Studio Ban Công View Hồ', roomType: 'room', areaSqm: 28, baseRent: 7200000, maxOccupants: 2, floorNumber: 6, hasBalcony: true, hasPrivateBathroom: true, availabilityLabel: 'Có thể vào ở ngay', buildingId: 'building-1', buildingName: 'Westlake Maison', buildingAddress: 'Tây Hồ, Hà Nội', amenities: ['Ban công', 'Máy giặt', 'Bãi xe'] },
-  { roomId: 'curated-2', roomCode: 'Căn Hộ 1PN Trung Tâm', roomType: 'apartment', areaSqm: 42, baseRent: 11800000, maxOccupants: 2, floorNumber: 12, hasBalcony: true, hasPrivateBathroom: true, availabilityLabel: 'Có thể vào ở ngay', buildingId: 'building-2', buildingName: 'Saigon Central Living', buildingAddress: 'Quận 1, TP Hồ Chí Minh', amenities: ['Gym', 'Hồ bơi', 'Lễ tân'] },
-  { roomId: 'curated-3', roomCode: 'Nhà Phố Gia Định', roomType: 'house', areaSqm: 74, baseRent: 18900000, maxOccupants: 4, floorNumber: 2, hasBalcony: false, hasPrivateBathroom: true, availabilityLabel: 'Sẵn sàng xem phòng', buildingId: 'building-3', buildingName: 'Gia Dinh Collection', buildingAddress: 'Gò Vấp, TP Hồ Chí Minh', amenities: ['Bếp riêng', 'Sân thượng', 'Chỗ để xe'] },
-  { roomId: 'curated-4', roomCode: 'Phòng Trọ Mới Xây', roomType: 'room', areaSqm: 24, baseRent: 4600000, maxOccupants: 2, floorNumber: 4, hasBalcony: false, hasPrivateBathroom: true, availabilityLabel: 'Có thể vào ở ngay', buildingId: 'building-4', buildingName: 'Binh Duong Urban Stay', buildingAddress: 'Thuận An, Bình Dương', amenities: ['Bảo vệ', 'Thang máy', 'Wifi'] },
-  { roomId: 'curated-5', roomCode: 'Căn Hộ Sông Hàn', roomType: 'apartment', areaSqm: 51, baseRent: 13500000, maxOccupants: 3, floorNumber: 9, hasBalcony: true, hasPrivateBathroom: true, availabilityLabel: 'Sẵn sàng xem phòng', buildingId: 'building-5', buildingName: 'Han River Residence', buildingAddress: 'Sơn Trà, Đà Nẵng', amenities: ['Nội thất', 'View sông', 'Lễ tân'] },
-  { roomId: 'curated-6', roomCode: 'Mặt Bằng Tầng Trệt', roomType: 'retail', areaSqm: 68, baseRent: 22000000, maxOccupants: 6, floorNumber: 1, hasBalcony: false, hasPrivateBathroom: false, availabilityLabel: 'Đang mở cho thuê', buildingId: 'building-6', buildingName: 'District Prime', buildingAddress: 'Quận 7, TP Hồ Chí Minh', amenities: ['Mặt tiền', 'Bảo vệ', 'Chỗ xe'] },
+  { roomId: 'curated-1', roomCode: 'Studio Ban Công View Hồ', roomType: 'room', areaSqm: 28, baseRent: 7200000, maxOccupants: 2, floorNumber: 6, hasBalcony: true, hasPrivateBathroom: true, buildingAvailableRoomCount: 4, availabilityLabel: formatPublicAvailabilityLabel('available_now', 4), buildingId: 'building-1', buildingName: 'Westlake Maison', buildingAddress: 'Tây Hồ, Hà Nội', amenities: ['Ban công', 'Máy giặt', 'Bãi xe'] },
+  { roomId: 'curated-2', roomCode: 'Căn Hộ 1PN Trung Tâm', roomType: 'apartment', areaSqm: 42, baseRent: 11800000, maxOccupants: 2, floorNumber: 12, hasBalcony: true, hasPrivateBathroom: true, buildingAvailableRoomCount: 12, availabilityLabel: formatPublicAvailabilityLabel('available_now', 12), buildingId: 'building-2', buildingName: 'Saigon Central Living', buildingAddress: 'Quận 1, TP Hồ Chí Minh', amenities: ['Gym', 'Hồ bơi', 'Lễ tân'] },
+  { roomId: 'curated-3', roomCode: 'Nhà Phố Gia Định', roomType: 'house', areaSqm: 74, baseRent: 18900000, maxOccupants: 4, floorNumber: 2, hasBalcony: false, hasPrivateBathroom: true, buildingAvailableRoomCount: 1, availabilityLabel: formatPublicAvailabilityLabel('available_now', 1), buildingId: 'building-3', buildingName: 'Gia Dinh Collection', buildingAddress: 'Gò Vấp, TP Hồ Chí Minh', amenities: ['Bếp riêng', 'Sân thượng', 'Chỗ để xe'] },
+  { roomId: 'curated-4', roomCode: 'Phòng Trọ Mới Xây', roomType: 'room', areaSqm: 24, baseRent: 4600000, maxOccupants: 2, floorNumber: 4, hasBalcony: false, hasPrivateBathroom: true, buildingAvailableRoomCount: 8, availabilityLabel: formatPublicAvailabilityLabel('available_now', 8), buildingId: 'building-4', buildingName: 'Binh Duong Urban Stay', buildingAddress: 'Thuận An, Bình Dương', amenities: ['Bảo vệ', 'Thang máy', 'Wifi'] },
+  { roomId: 'curated-5', roomCode: 'Căn Hộ Sông Hàn', roomType: 'apartment', areaSqm: 51, baseRent: 13500000, maxOccupants: 3, floorNumber: 9, hasBalcony: true, hasPrivateBathroom: true, buildingAvailableRoomCount: 5, availabilityLabel: formatPublicAvailabilityLabel('available_now', 5), buildingId: 'building-5', buildingName: 'Han River Residence', buildingAddress: 'Sơn Trà, Đà Nẵng', amenities: ['Nội thất', 'View sông', 'Lễ tân'] },
+  { roomId: 'curated-6', roomCode: 'Mặt Bằng Tầng Trệt', roomType: 'retail', areaSqm: 68, baseRent: 22000000, maxOccupants: 6, floorNumber: 1, hasBalcony: false, hasPrivateBathroom: false, buildingAvailableRoomCount: 2, availabilityLabel: formatPublicAvailabilityLabel('available_now', 2), buildingId: 'building-6', buildingName: 'District Prime', buildingAddress: 'Quận 7, TP Hồ Chí Minh', amenities: ['Mặt tiền', 'Bảo vệ', 'Chỗ xe'] },
 ];
 
 const buildBrowseHref = (options: { search?: string; roomType?: string; maxPrice?: string }) => {
@@ -205,7 +205,7 @@ export const MarketingLanding: React.FC<MarketingLandingProps> = ({ previewListi
 
         <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
           {(isLoading ? Array.from({ length: 4 }).map((_, index) => ({ listing: fallbackListings[index], skeleton: true })) : featuredListings.map((listing) => ({ listing, skeleton: false }))).map(({ listing, skeleton }, index) => (
-            <ListingPreviewCard key={`featured-${listing.roomId}-${index}`} listing={listing} index={index} skeleton={skeleton} badges={skeleton ? undefined : [t('publicExperience.marketplace.card.hot'), t('publicExperience.marketplace.card.verified')]} />
+            <ListingPreviewCard key={`featured-${listing.roomId}-${index}`} listing={listing} index={index} skeleton={skeleton} />
           ))}
         </div>
       </section>

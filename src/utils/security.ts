@@ -8,10 +8,13 @@ export const TRUSTED_DOMAINS = [
   'localhost',
   '127.0.0.1',
   'i.pravatar.cc', // Whitelisted for demo avatars
-  'images.unsplash.com', // Added for amenity images
+  'images.unsplash.com', // Legacy / amenity references (may fail hotlink in browser)
+  'picsum.photos', // Deterministic demo listing covers (hotlink-friendly)
+  'fastly.picsum.photos', // picsum CDN
 ];
 
-export const DEFAULT_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop';
+export const DEFAULT_FALLBACK_IMAGE =
+  'https://picsum.photos/id/237/800/600';
 
 
 /**
